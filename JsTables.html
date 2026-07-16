@@ -1,0 +1,455 @@
+<script>
+function comparePak(a, b, key) {
+  var av = a[key],
+      bv = b[key],
+      result = 0;
+
+  if (
+    key === 'performance' ||
+    key === 'hourDeployed' ||
+    key === 'stdHours' ||
+    key === 'pieVol' ||
+    key === 'topUpVol'
+  ) {
+    var numA = Number(av),
+        numB = Number(bv);
+
+    if (typeof av === 'string' && av.indexOf('%') !== -1) {
+      numA = Number(av.replace('%', ''));
+    }
+    if (typeof bv === 'string' && bv.indexOf('%') !== -1) {
+      numB = Number(bv.replace('%', ''));
+    }
+
+    if (key === 'performance') {
+      numA = normalizePerfPak(numA);
+      numB = normalizePerfPak(numB);
+    }
+    
+    result = numA - numB;
+  } else if (typeof av === 'number' && typeof bv === 'number') {
+    result = av - bv;
+  } else {
+    result = safeTextPak(av).localeCompare(safeTextPak(bv));
+  }
+  
+  return sortState.dir === 'asc' ? result : -result;
+}
+
+function wireSortingPak() {
+  var ths = document.querySelectorAll('#mainTable th');
+  for (var i = 0; i < ths.length; i++) {
+    (function (th) {
+      th.addEventListener('click', function () {
+        var key = th.dataset.key;
+        sortState.dir = sortState.key === key 
+          ? (sortState.dir === 'asc' ? 'desc' : 'asc') 
+          : 'desc';
+        sortState.key = key;
+        renderMainTablePak(currentMainRows);
+      });
+    })(ths[i]);
+  }
+}
+
+function renderMainTablePak(sourceRows) {
+  var headers = document.querySelectorAll('#mainTable th');
+  for (var h = 0; h < headers.length; h++) {
+    headers[h].classList.remove('active-sort', 'asc', 'desc');
+    if (headers[h].dataset.key === sortState.key) {
+      headers[h].classList.add('active-sort');
+      headers[h].classList.add(sortState.dir);
+    }
+  }
+
+  var q = $('search').value.trim().toLowerCase();
+  var rows = q 
+    ? sourceRows.filter(function (r) {
+        return Object.keys(r).some(function (k) {
+          return safeTextPak(r[k]).toLowerCase().indexOf(q) !== -1;
+        });
+      })
+    : sourceRows;
+
+  rows = rows.sort(function (a, b) {
+    return comparePak(a, b, sortState.key);
+  });
+
+  var tbody = $('mainTable').querySelector('tbody');
+  tbody.innerHTML = '';
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var isExpanded = expandedRowKey !== null && r.dateTime === expandedRowKey;
+    var tr = document.createElement('tr');
+    tr.className = 'main-expandable-row' + (isExpanded ? ' expanded' : '');
+
+    tr.innerHTML =
+      '<td><span class="main-row-dt-cell">' + safeTextPak(r.dateTime) + '<i class="fa-solid fa-chevron-down main-row-chevron"></i></span></td>' +
+      '<td>' + safeTextPak(r.bonusNumber) + '</td>' +
+      '<td>' + numPak(r.hourDeployed, 2) + '</td>' +
+      '<td>' + numPak(r.stdHours, 2) + '</td>' +
+      '<td>' + numPak(r.pieVol, 0) + '</td>' +
+      '<td>' + numPak(r.topUpVol, 0) + '</td>' +
+      '<td>' + numPak(r.e3PackingVol, 0) + '</td>' +
+      '<td>' + numPak(r.parcelInductVol, 0) + '</td>' +
+      '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
+      '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
+      '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
+      '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
+
+    (function (rowEl, rowData) {
+      rowEl.addEventListener('click', function () {
+        toggleMainRowDetail(rowEl, rowData);
+      });
+    })(tr, r);
+
+    tbody.appendChild(tr);
+
+    var detailTr = document.createElement('tr');
+    detailTr.className = 'main-detail-row' + (isExpanded ? ' open' : '');
+
+    var detailTd = document.createElement('td');
+    detailTd.colSpan = 12;
+    detailTd.className = 'main-detail-td';
+    detailTd.innerHTML = '<div class="main-detail-content">' + (isExpanded ? buildMainRowDetail(r) : '') + '</div>';
+
+    detailTr.appendChild(detailTd);
+    tbody.appendChild(detailTr);
+  }
+  
+  $('status').textContent = rows.length + ' row(s) shown';
+}
+
+function toggleMainRowDetail(rowEl, rowData) {
+  var detailTr = rowEl.nextElementSibling;
+  if (!detailTr || !detailTr.classList.contains('main-detail-row')) return;
+  
+  var isOpen = rowEl.classList.contains('expanded');
+  var allExpanded = document.querySelectorAll('#mainTable .main-expandable-row.expanded');
+  
+  for (var i = 0; i < allExpanded.length; i++) {
+    if (allExpanded[i] !== rowEl) {
+      allExpanded[i].classList.remove('expanded');
+      var sib = allExpanded[i].nextElementSibling;
+      if (sib && sib.classList.contains('main-detail-row')) {
+        sib.classList.remove('open');
+      }
+    }
+  }
+  
+  if (isOpen) {
+    rowEl.classList.remove('expanded');
+    detailTr.classList.remove('open');
+    expandedRowKey = null;
+  } else {
+    rowEl.classList.add('expanded');
+    detailTr.querySelector('.main-detail-content').innerHTML = buildMainRowDetail(rowData);
+    detailTr.classList.add('open');
+    expandedRowKey = rowData.dateTime;
+  }
+}
+
+function buildMainRowDetail(rowData) {
+  var wm = parseInt($('timeWindow').value, 10) || 15;
+  var p = extractRangePartsPak(rowData.dateTime);
+  var startDate = parseDateTimePartPak(p.start);
+  var matchSet = {};
+
+  if (startDate) {
+    var endDate = new Date(startDate.getTime() + wm * 60000);
+    for (var i = 0; i < timeRanges.length; i++) {
+      var tp = extractRangePartsPak(timeRanges[i]);
+      var ts = parseDateTimePartPak(tp.start);
+      if (ts && ts >= startDate && ts < endDate) {
+        matchSet[timeRanges[i]] = true;
+      }
+    }
+  } else {
+    matchSet[rowData.dateTime] = true;
+  }
+
+  var slice = rawSideData.filter(function (r) {
+    if (!matchSet[r.timeRange]) return false;
+    if (selectedBonuses.length > 0 && selectedBonuses.indexOf(r.bonus) === -1) return false;
+    return true;
+  });
+
+  if (slice.length === 0) {
+    return '<div class="main-detail-empty">No individual data found for this period.</div>';
+  }
+
+  var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryRowsPak);
+  return buildMainDetailTableHtml_(entryRows);
+}
+
+function buildEntryDetailRowHtml_(r) {
+  var escapedBonus = escapeAttrPak(r.bonus);
+  var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
+  return '<tr>' +
+    '<td>' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</td>' +
+    '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
+    safeTextPak(r.bonus) +
+    ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
+    (isActive ? 'Click to remove filter' : 'Click to filter main view') +
+    '</span></span></td>' +
+    '<td>' + numPak(r.hourDeployed, 2) + '</td>' +
+    '<td>' + numPak(r.stdHours, 2) + '</td>' +
+    '<td>' + numPak(r.pieVol, 0) + '</td>' +
+    '<td>' + numPak(r.topUpVol, 0) + '</td>' +
+    '<td>' + numPak(r.e3PackingVol, 0) + '</td>' +
+    '<td>' + numPak(r.parcelInductVol, 0) + '</td>' +
+    '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
+    '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
+    '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
+    '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>' +
+    '</tr>';
+}
+
+function buildMainDetailTableHtml_(entryRows) {
+  var html = '<div class="table-wrap main-detail-table-wrap">';
+  html += '<table class="main-detail-table"><thead><tr>';
+  html += '<th class="no-sort">Time Block</th>';
+  html += '<th class="no-sort">Bonus Number</th>';
+  html += '<th class="no-sort">Est. Hours Deployed</th>';
+  html += '<th class="no-sort">Standard Hours</th>';
+  html += '<th class="no-sort">PiE</th>';
+  html += '<th class="no-sort">Top Up</th>';
+  html += '<th class="no-sort">E3 Packing</th>';
+  html += '<th class="no-sort">Parcel Induct</th>';
+  html += '<th class="no-sort">Parcel Sortation</th>';
+  html += '<th class="no-sort">Inbound Decanting</th>';
+  html += '<th class="no-sort">OSR Decanting</th>';
+  html += '<th class="no-sort">Productivity %</th>';
+  html += '</tr></thead><tbody>';
+  html += entryRows.map(buildEntryDetailRowHtml_).join('');
+  html += '</tbody></table></div>';
+  html += '<div class="main-detail-hint"><i class="fa-solid fa-filter" style="font-size:9px;margin-right:4px;opacity:0.6;"></i>Click any bonus number to filter the main view</div>';
+  return html;
+}
+
+function ensureBonusTimeSelects_() {
+  var fromSel = $('bonusFrom');
+  var toSel = $('bonusTo');
+  if (!fromSel || !toSel) return;
+
+  var sliced = timeRanges.slice(-96);
+  var sig = sliced.length ? (sliced[0] + '||' + sliced[sliced.length - 1] + '||' + sliced.length) : '';
+  if (fromSel.dataset.sig === sig) return;
+
+  var prevFrom = fromSel.value;
+  var prevTo = toSel.value;
+
+  fromSel.innerHTML = '';
+  toSel.innerHTML = '';
+
+  for (var i = 0; i < sliced.length; i++) {
+    var parts = extractRangePartsPak(sliced[i]);
+    var optF = document.createElement('option');
+    optF.value = sliced[i];
+    optF.textContent = parts.start;
+    fromSel.appendChild(optF);
+
+    var optT = document.createElement('option');
+    optT.value = sliced[i];
+    optT.textContent = parts.end;
+    toSel.appendChild(optT);
+  }
+
+  fromSel.dataset.sig = sig;
+
+  var fromRestored = false;
+  var toRestored = false;
+  for (var i = 0; i < sliced.length; i++) {
+    if (sliced[i] === prevFrom) { fromSel.selectedIndex = i; fromRestored = true; }
+    if (sliced[i] === prevTo) { toSel.selectedIndex = i; toRestored = true; }
+  }
+  if (!fromRestored || !toRestored || toSel.selectedIndex < fromSel.selectedIndex) {
+    fromSel.selectedIndex = Math.max(0, sliced.length - 4);
+    toSel.selectedIndex = sliced.length - 1;
+  }
+}
+
+function onBonusRangeChange() {
+  var fromSel = $('bonusFrom');
+  var toSel = $('bonusTo');
+  if (toSel.selectedIndex < fromSel.selectedIndex) {
+    toSel.selectedIndex = fromSel.selectedIndex;
+  }
+  refreshBonusTables();
+}
+
+function refreshBonusTables() {
+  var rowsLimit = parseInt($('sharedRowsLimit').value, 10) || 10;
+  renderSideTablesPak(rowsLimit);
+  saveUserPreferences();
+}
+
+function computeBonusRows_(data, stdKey) {
+  var bonusBlockMap = {};
+  data.forEach(function (r) {
+    var val = stdKey ? (Number(r[stdKey]) || 0) : (Number(r.value) || 0);
+    if (!bonusBlockMap[r.bonus]) bonusBlockMap[r.bonus] = {};
+    bonusBlockMap[r.bonus][r.timeRange] = (bonusBlockMap[r.bonus][r.timeRange] || 0) + val;
+  });
+
+  var rows = [];
+  Object.keys(bonusBlockMap).forEach(function (bonus) {
+    var blocks = bonusBlockMap[bonus];
+    var totalStandardHours = 0;
+    var activeBlocks = 0;
+    Object.keys(blocks).forEach(function (blockKey) {
+      totalStandardHours += blocks[blockKey];
+      if (blocks[blockKey] > 0) activeBlocks++;
+    });
+    if (stdKey && totalStandardHours <= 0) return;
+    var deployedHours = activeBlocks * 0.25;
+    rows.push({
+      bonus: bonus,
+      standardHour: totalStandardHours,
+      performance: deployedHours > 0 ? (totalStandardHours / deployedHours) * 100 : 0
+    });
+  });
+  return rows;
+}
+
+function buildBonusRowHtml_(r) {
+  var escapedBonus = escapeAttrPak(r.bonus);
+  var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
+  return '<tr>' +
+    '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="toggleBonusFilter(\'' + escapedBonus + '\')">' +
+    safeTextPak(r.bonus) +
+    ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
+    (isActive ? 'Click to remove filter' : 'Click to filter main view') +
+    '</span></span></td>' +
+    '<td>' + numPak(r.standardHour, 1) + '</td>' +
+    '<td><span class="pill ' + perfClassPak(r.performance) + '">' + Math.round(normalizePerfPak(r.performance)) + '%</span></td>' +
+    '</tr>';
+}
+
+function buildBonusMiniTable_(rows, metric) {
+  var html = '<table class="side-table"><thead><tr>';
+  html += '<th class="no-sort">Bonus Number</th>';
+  html += '<th class="' + (metric === 'standardHour' ? 'active-sort' : '') + '" onclick="setSideTableSort(\'standardHour\')">Standard Hours</th>';
+  html += '<th class="' + (metric === 'performance' ? 'active-sort' : '') + '" onclick="setSideTableSort(\'performance\')">Productivity %</th>';
+  html += '</tr></thead><tbody>';
+  html += rows.length
+    ? rows.map(buildBonusRowHtml_).join('')
+    : '<tr class="bonus-empty-row"><td colspan="3">None in selected range</td></tr>';
+  html += '</tbody></table>';
+  return html;
+}
+
+function buildBonusPanel_(title, color, allRows, rowsLimit) {
+  var minUnderPerf = (currentThreshold / 0.25) * 100;
+  var metric = sideSortMetric;
+
+  var topRows = allRows
+    .slice()
+    .sort(function (a, b) { return b[metric] - a[metric]; })
+    .slice(0, rowsLimit);
+
+  var underRows = allRows
+    .filter(function (r) { return r.performance >= minUnderPerf && r.performance < 100; })
+    .sort(function (a, b) { return a[metric] - b[metric]; })
+    .slice(0, rowsLimit);
+
+  var dot = color ? '<span class="breakdown-dot" style="background:' + color + ';margin-right:7px;"></span>' : '';
+
+  var html = '<div class="card panel">';
+  html += '<div class="mini-table-title"><h2>' + dot + safeTextPak(title) + '</h2><span class="tag">' + allRows.length + ' head' + (allRows.length !== 1 ? 's' : '') + '</span></div>';
+  html += '<div class="bonus-two-tables">';
+  html += '<div><div class="bonus-table-caption good"><i class="fa-solid fa-arrow-trend-up"></i> Productive</div>';
+  html += '<div class="table-wrap">' + buildBonusMiniTable_(topRows, metric) + '</div></div>';
+  html += '<div><div class="bonus-table-caption bad"><i class="fa-solid fa-arrow-trend-down"></i> Unproductive</div>';
+  html += '<div class="table-wrap">' + buildBonusMiniTable_(underRows, metric) + '</div></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function toggleBonusArea(key) {
+  var idx = hiddenBonusAreas.indexOf(key);
+  if (idx === -1) { hiddenBonusAreas.push(key); }
+  else { hiddenBonusAreas.splice(idx, 1); }
+  refreshBonusTables();
+}
+
+function renderBonusAreaToggles_(mode) {
+  var togglesEl = $('bonusAreaToggles');
+  if (!togglesEl) return;
+  togglesEl.style.display = mode === 'area' ? 'flex' : 'none';
+  if (mode !== 'area') return;
+
+  var html = '';
+  for (var v = 0; v < VOLUME_TYPES.length; v++) {
+    var t = VOLUME_TYPES[v];
+    var off = hiddenBonusAreas.indexOf(t.key) !== -1;
+    html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" onclick="toggleBonusArea(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
+            '<span class="breakdown-dot" style="background:' + t.color + '"></span>' + t.label +
+            '<i class="fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>';
+  }
+  togglesEl.innerHTML = html;
+}
+
+function renderSideTablesPak(rowsLimit) {
+  var container = $('bonusTablesContainer');
+  if (!container) return;
+
+  ensureBonusTimeSelects_();
+
+  var fromSel = $('bonusFrom');
+  var toSel = $('bonusTo');
+  var sliced = timeRanges.slice(-96);
+
+  var fromIdx = fromSel.selectedIndex;
+  var toIdx = toSel.selectedIndex;
+  if (fromIdx < 0) fromIdx = Math.max(0, sliced.length - 4);
+  if (toIdx < fromIdx) toIdx = fromIdx;
+
+  var selectedSlice = sliced.slice(fromIdx, toIdx + 1);
+  var selectedSet = {};
+  for (var i = 0; i < selectedSlice.length; i++) { selectedSet[selectedSlice[i]] = true; }
+
+  var badge = $('bonusRangeBadge');
+  if (badge) {
+    var blockCount = selectedSlice.length;
+    var minutes = blockCount * 15;
+    var hours = minutes / 60;
+    var hoursLabel = hours >= 1
+      ? (Number.isInteger(hours) ? hours + ' hr' + (hours !== 1 ? 's' : '') : hours.toFixed(1) + ' hrs')
+      : minutes + ' min';
+    badge.textContent = blockCount + ' block' + (blockCount !== 1 ? 's' : '') + ' · ' + hoursLabel;
+  }
+
+  var windowData = rawSideData.filter(function (r) { return selectedSet[r.timeRange]; });
+
+  var modeSel = $('bonusViewMode');
+  var mode = modeSel ? modeSel.value : 'overall';
+  container.className = 'bonus-tables-grid' + (mode === 'overall' ? ' overall' : '');
+
+  renderBonusAreaToggles_(mode);
+
+  var html = '';
+  if (mode === 'area') {
+    for (var v = 0; v < VOLUME_TYPES.length; v++) {
+      var t = VOLUME_TYPES[v];
+      if (hiddenBonusAreas.indexOf(t.key) !== -1) continue;
+      var rows = computeBonusRows_(windowData, t.stdKey);
+      if (rows.length === 0) continue;
+      html += buildBonusPanel_(t.label, t.color, rows, rowsLimit);
+    }
+    if (!html) {
+      html = '<div class="card panel bonus-empty-panel"><i class="fa-solid fa-ghost"></i>No activity in the selected range</div>';
+    }
+  } else {
+    html = buildBonusPanel_('All Work Areas', null, computeBonusRows_(windowData, null), rowsLimit);
+  }
+
+  container.innerHTML = html;
+}
+
+function setSideTableSort(metric) {
+  sideSortMetric = metric;
+  refreshBonusTables();
+}
+</script>

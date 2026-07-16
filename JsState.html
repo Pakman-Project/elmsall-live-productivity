@@ -1,0 +1,68 @@
+<script>
+var APP_CONFIG = {
+  thresholds: { good: 80, warn: 60 },
+  colors: { good: '#32d583', warn: '#ffcc66', bad: '#ff7a7a', accent: '#69a7ff' },
+  classes: { good: 'good', warn: 'warn', bad: 'bad' }
+};
+
+var VOLUME_TYPES = [
+  { key: 'pieVol', stdKey: 'pieStd', label: 'PiE', color: '#69a7ff' },
+  { key: 'topUpVol', stdKey: 'topUpStd', label: 'Top Up', color: '#32d583' },
+  { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', color: '#ff9f43' },
+  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', color: '#a55eea' },
+  { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', color: '#ff6b6b' },
+  { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'Inbound Decanting', color: '#48dbfb' },
+  { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', color: '#feca57' }
+];
+
+var AREA_GROUP_COLORS = ['#69a7ff', '#ff9f43', '#48dbfb', '#a55eea', '#32d583', '#ff6b6b', '#feca57'];
+var DEFAULT_AREA_GROUPS = [['pieVol', 'topUpVol'], ['e3PackingVol']];
+var MAX_AREA_GROUPS = 7;
+var areaGroupState = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+
+var BREAKDOWN_AREAS = [
+  { key: 'pie', label: 'PiE', color: '#69a7ff' },
+  { key: 'topUp', label: 'Top Up', color: '#32d583' },
+  { key: 'e3Packing', label: 'E3 Packing', color: '#ff9f43' },
+  { key: 'parcelInduct', label: 'Parcel Induct', color: '#ff6b6b' },
+  { key: 'parcelSortation', label: 'Parcel Sortation', color: '#a55eea' },
+  { key: 'inboundDecanting', label: 'Inbound Decanting', color: '#48dbfb' },
+  { key: 'osrDecanting', label: 'OSR Decanting', color: '#feca57' }
+];
+
+function applyConfigToCSSPak() {
+  var root = document.documentElement;
+  root.style.setProperty('--color-good', APP_CONFIG.colors.good);
+  root.style.setProperty('--color-warn', APP_CONFIG.colors.warn);
+  root.style.setProperty('--color-bad', APP_CONFIG.colors.bad);
+  root.style.setProperty('--accent', APP_CONFIG.colors.accent);
+}
+
+var timeRanges = [];
+var rawSideData = [];
+var allBonusList = [];
+var selectedBonuses = [];
+var currentThreshold = 0;
+var currentMainRows = [];
+var overviewVolChart = null;
+var trendChart = null;
+var trendChart2 = null;
+var trendSplitState = { enabled: false, chart1: [], chart2: [] };
+var perfChart = null;
+var volumeCharts = [];
+var sortState = { key: 'dateTime', dir: 'asc' };
+var expandedRowKey = null;
+var currentArchiveUrl = null;
+var lastRefreshTimestamp = null;
+var sideSortMetric = 'performance';
+var hiddenBonusAreas = [];
+var currentPage = 0;
+var totalPages = 4;
+var startX = 0;
+var startY = 0;
+var currentTranslate = 0;
+var prevTranslate = 0;
+var isDragging = false;
+var animationID;
+var areaGroupChart = null;
+</script>

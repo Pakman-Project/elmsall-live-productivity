@@ -1,0 +1,128 @@
+<div class="page">
+  <div class="grid">
+    <div class="card kpi">
+      <div class="kpi-header">
+        <div class="label">Head Deployed Last Hour</div>
+        <div class="kpi-tooltip">
+          <i class="fa-solid fa-circle-info"></i>
+          <div class="kpi-tooltip-content">
+            <div class="tt-title">Unique Heads</div>
+            <p>Counts unique Bonus Numbers active in the last 4 x 15min blocks.</p>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-value-row">
+        <div class="value" id="headDeployed">-</div>
+        <button class="breakdown-btn" onclick="showHeadBreakdown()" title="View breakdown by area">
+          <i class="fa-solid fa-chart-pie"></i> Breakdown
+        </button>
+      </div>
+      <div class="sub">Last 4 blocks</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-header">
+        <div class="label" id="headAbove20Label">Head > 80% Prod. Last Hour</div>
+        <div class="kpi-tooltip">
+          <i class="fa-solid fa-circle-info"></i>
+          <div class="kpi-tooltip-content">
+            <div class="tt-title">Above Threshold</div>
+            <p>Workers meeting/exceeding the hourly productivity target.</p>
+          </div>
+        </div>
+      </div>
+      <div class="value" id="headAbove20">-</div>
+      <div class="sub">Exceeding target</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-header">
+        <div class="label">Last Hour Productivity</div>
+        <div class="kpi-tooltip">
+          <i class="fa-solid fa-circle-info"></i>
+          <div class="kpi-tooltip-content">
+            <div class="tt-title">Efficiency</div>
+            <p>(Total Std. Hours / Total Est. Hours) * 100</p>
+          </div>
+        </div>
+      </div>
+      <div class="value" id="avgPerf">-</div>
+      <div class="sub">Last 4 blocks</div>
+    </div>
+    <div class="card kpi">
+      <div style="display: flex; gap: 8px; flex-grow: 1; align-items: stretch;">
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="label">Hours Range</div>
+          <select id="hoursRange" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')" style="width: 100%;">
+            <option value="3" selected>3 Hours</option>
+            <option value="6">6 Hours</option>
+            <option value="9">9 Hours</option>
+            <option value="12">12 Hours</option>
+            <option value="24">24 Hours</option>
+          </select>
+        </div>
+        <div style="width: 1px; background: var(--border);"></div>
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="label">Time Window</div>
+          <select id="timeWindow" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')" style="width: 100%;">
+            <option value="15">15 Minutes</option>
+            <option value="30">30 Minutes</option>
+            <option value="60">60 Minutes</option>
+          </select>
+        </div>
+        <div style="width: 1px; background: var(--border);"></div>
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="label">Threshold</div>
+          <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+            <span id="thresholdDisplay" style="font-size: 14px; font-weight: 700; color: var(--text);">-</span>
+          </div>
+        </div>
+      </div>
+      <div class="sub">Controls</div>
+    </div>
+  </div>
+    <div class="charts" id="page1Charts">
+      <!-- ROW 1, COL 1 -->
+      <div class="card panel">
+        <div class="mini-table-title"><h2>Volume - PiE & Top Up</h2><span class="tag">Stacked Area</span></div>
+        <canvas id="overviewVolChart"></canvas>
+      </div>
+
+      <!-- ROW 1, COL 2 -->
+      <div class="card panel">
+        <div class="mini-table-title"><h2>Overall Productivity %</h2><span class="tag">All E3 Areas</span></div>
+        <canvas id="perfChart"></canvas>
+      </div>
+
+      <!-- ROW 2, COL 1 -->
+      <div class="card panel">
+        <div class="mini-table-title">
+          <h2 id="areaGroupChartTitle">Productivity % by Work Area</h2>
+          <div style="display:flex; gap:5px; align-items:center;">
+            <button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups</button>
+          </div>
+        </div>
+        <canvas id="areaGroupChart"></canvas>
+      </div>
+
+      <!-- ROW 2, COL 2 (Becomes Row 3 centered if split) -->
+      <div class="trend-charts-wrap" id="trendChartsWrap">
+        <div class="card panel" id="trendPanel1">
+          <div class="mini-table-title">
+            <h2>Deployment Trend</h2>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
+            </div>
+          </div>
+          <canvas id="trendChart"></canvas>
+        </div>
+        <div class="card panel" id="trendPanel2" style="display:none;">
+          <div class="mini-table-title">
+            <h2 id="trendPanel2Title">Deployment Trend B</h2>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
+            </div>
+          </div>
+          <canvas id="trendChart2"></canvas>
+        </div>
+      </div>
+    </div>
+</div>

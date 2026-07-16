@@ -1,0 +1,70 @@
+<script>
+function csvEscapePak(value) {
+  var s = value === null || value === undefined ? '' : String(value);
+  if (/[",\r\n]/.test(s)) {
+    s = '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+var RAW_DATA_CSV_HEADERS_ = [
+  'Time Block', 'Bonus Number', 'Est. Hours Deployed', 'Standard Hours',
+  'PiE', 'Top Up', 'E3 Packing', 'Parcel Induct',
+  'Parcel Sortation', 'Inbound Decanting', 'OSR Decanting',
+  'Productivity %'
+];
+
+function entryRowToCsvLinePak_(r) {
+  return [
+    r.timeRange,
+    r.bonus,
+    (Number(r.hourDeployed) || 0).toFixed(2),
+    (Number(r.stdHours) || 0).toFixed(2),
+    Math.round(Number(r.pieVol) || 0),
+    Math.round(Number(r.topUpVol) || 0),
+    Math.round(Number(r.e3PackingVol) || 0),
+    Math.round(Number(r.parcelInductVol) || 0),
+    Math.round(Number(r.parcelSortationVol) || 0),
+    Math.round(Number(r.inboundDecantingVol) || 0),
+    Math.round(Number(r.osrDecantingVol) || 0),
+    (Number(r.performance) || 0).toFixed(1)
+  ].map(csvEscapePak).join(',');
+}
+
+function buildRawDataCsvPak_(entryRows) {
+  var lines = [RAW_DATA_CSV_HEADERS_.map(csvEscapePak).join(',')];
+  for (var i = 0; i < entryRows.length; i++) {
+    lines.push(entryRowToCsvLinePak_(entryRows[i]));
+  }
+  return lines.join('\r\n');
+}
+
+function buildExportTimestampPak_() {
+  var d = new Date();
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    '_' + pad(d.getHours()) + pad(d.getMinutes());
+}
+
+function downloadRawDataCsvPak() {
+  if (!rawSideData || rawSideData.length === 0) {
+    $('status').innerHTML = '<span class="bad">No data available to export.</span>';
+    return;
+  }
+
+  var entryRows = buildIndividualEntryRows_(rawSideData).sort(compareEntryRowsPak);
+  var csv = buildRawDataCsvPak_(entryRows);
+  var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = 'e3-raw-data_' + buildExportTimestampPak_() + '.csv';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+</script>

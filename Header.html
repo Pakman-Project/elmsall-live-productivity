@@ -1,0 +1,47 @@
+<div class="sticky-header">
+  <div class="topbar">
+    <div class="title">
+      <h1>E3 Live Productivity</h1>
+      <p>Live productivity view across E3 work areas</p>
+    </div>
+    <div class="controls">
+      <select id="archiveSelect" class="input">
+        <option value="" selected>Loading History...</option>
+      </select>
+      <div class="bonus-search-container">
+        <div class="search-row">
+          <button id="clearFilterBtn" class="clear-filter-btn" onclick="clearAllBonuses()">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+          <div id="searchInputWrap" class="search-input-wrap">
+            <input id="bonusSearch" class="input" type="text" placeholder="Filter by Bonus..." autocomplete="off">
+            <i class="fa fa-search"></i>
+          </div>
+        </div>
+        <div id="searchDropdown" class="search-dropdown"></div>
+      </div>
+      <button class="btn icon-btn" onclick="loadDataPak()" title="Refresh">
+        <i class="fa fa-refresh"></i>
+      </button>
+    </div>
+  </div>
+  <div id="activeFilterBanner" class="active-filter-banner">
+    <i class="fa-solid fa-filter"></i>
+    <span class="active-filter-banner-text">Filtering by <span id="activeFilterCount">0</span> bonus number(s):</span>
+    <div id="activeFilterChips" class="active-filter-chips"></div>
+    <button class="active-filter-clear-btn" onclick="clearAllBonuses()">Clear all</button>
+  </div>
+  <div class="meta">
+    <div class="meta-left">
+      <span id="status">Loading...</span>
+      <span id="noteText" class="note-text"></span>
+    </div>
+    <div class="nav-dots">
+      <div class="dot active" onclick="goToPage(0)">Overall Productivity</div>
+      <div class="dot" onclick="goToPage(1)">Volume</div>
+      <div class="dot" onclick="goToPage(2)">Bonus Numbers</div>
+      <div class="dot" onclick="goToPage(3)">Data Table</div>
+    </div>
+    <span id="lastUpdateText">-</span>
+  </div>
+</div>

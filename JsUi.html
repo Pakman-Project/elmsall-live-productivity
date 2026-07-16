@@ -1,0 +1,583 @@
+<script>
+  function updateClearBtnVisibility() {
+    var btn = $('clearFilterBtn');
+    var wrap = $('searchInputWrap');
+    if (selectedBonuses.length > 0) {
+      btn.style.display = 'flex';
+      wrap.classList.add('with-clear');
+    } else {
+      btn.style.display = 'none';
+      wrap.classList.remove('with-clear');
+    }
+  }
+
+  function clearAllBonuses() {
+    if (selectedBonuses.length === 0) return;
+    selectedBonuses = [];
+    renderBonusChips();
+    updateClearBtnVisibility();
+    applyLocalFiltersPak();
+  }
+
+  function initBonusSearch() {
+    var input = $('bonusSearch');
+    var dropdown = $('searchDropdown');
+    input.addEventListener('input', function() {
+      var q = input.value.toLowerCase().trim();
+      if (!q) { dropdown.classList.remove('active'); return; }
+      var matches = allBonusList.filter(function(b) { return b.toLowerCase().indexOf(q) !== -1; });
+      if (matches.length === 0) { dropdown.classList.remove('active'); return; }
+      dropdown.innerHTML = matches.map(function(m) {
+        return '<div class="search-item" onclick="selectBonus(\'' + m.replace(/'/g, "\\'") + '\')">' + m + '</div>';
+      }).join('');
+      dropdown.classList.add('active');
+    });
+    input.addEventListener('focus', function() {
+      if (input.value.trim()) input.dispatchEvent(new Event('input'));
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.bonus-search-container')) dropdown.classList.remove('active');
+    });
+  }
+
+  function selectBonus(bonus) {
+    if (selectedBonuses.indexOf(bonus) === -1) {
+      selectedBonuses.push(bonus);
+      renderBonusChips();
+      updateClearBtnVisibility();
+      applyLocalFiltersPak();
+    }
+    $('bonusSearch').value = '';
+    $('searchDropdown').classList.remove('active');
+  }
+
+  function removeBonus(bonus) {
+    selectedBonuses = selectedBonuses.filter(function(b) { return b !== bonus; });
+    renderBonusChips();
+    updateClearBtnVisibility();
+    applyLocalFiltersPak();
+  }
+
+  function toggleBonusFilter(bonus) {
+    if (selectedBonuses.indexOf(bonus) !== -1) { 
+      removeBonus(bonus); 
+    } else { 
+      selectedBonuses.push(bonus); 
+      renderBonusChips(); 
+      updateClearBtnVisibility(); 
+      applyLocalFiltersPak(); 
+    }
+  }
+
+  function renderBonusChips() {
+    var banner = $('activeFilterBanner');
+    var chipsEl = $('activeFilterChips');
+    if (selectedBonuses.length === 0) {
+      banner.classList.remove('active');
+      chipsEl.innerHTML = '';
+      return;
+    }
+    $('activeFilterCount').textContent = selectedBonuses.length;
+    chipsEl.innerHTML = selectedBonuses.map(function(b) {
+      return '<span class="chip">' + b + ' <span class="remove-chip" onclick="removeBonus(\'' + b.replace(/'/g, "\\'") + '\')">&times;</span></span>';
+    }).join('');
+    banner.classList.add('active');
+  }
+
+  function setArrowState() {
+    var leftBtn = document.querySelector('.page-arrow.left');
+    var rightBtn = document.querySelector('.page-arrow.right');
+    if (leftBtn) leftBtn.classList.toggle('disabled', currentPage === 0);
+    if (rightBtn) rightBtn.classList.toggle('disabled', currentPage === totalPages - 1);
+  }
+
+  function getSwipeWidth() { 
+    var container = $('swipeContainer'); 
+    return container ? container.clientWidth : window.innerWidth; 
+  }
+  
+  function setSliderPosition() { 
+    var wrapper = $('swipeWrapper'); 
+    wrapper.style.transform = 'translateX(' + currentTranslate + 'px)'; 
+  }
+
+  function goToPage(index) {
+    if (index < 0 || index >= totalPages) return;
+    currentPage = index;
+    currentTranslate = currentPage * -getSwipeWidth();
+    prevTranslate = currentTranslate;
+    setSliderPosition();
+    updateDots();
+    setArrowState();
+    resizeCharts();
+  }
+
+  function updateDots() {
+    var dots = document.querySelectorAll('.dot');
+    for (var i = 0; i < dots.length; i++) { 
+      if (i === currentPage) dots[i].classList.add('active'); 
+      else dots[i].classList.remove('active'); 
+    }
+  }
+
+  function resizeCharts() {
+    setTimeout(function() {
+      if (overviewVolChart) overviewVolChart.resize();
+      if (trendChart) trendChart.resize();
+      if (trendChart2) trendChart2.resize();
+      if (perfChart) perfChart.resize();
+      for (var i = 0; i < volumeCharts.length; i++) { 
+        if (volumeCharts[i]) volumeCharts[i].resize(); 
+      }
+    }, 310);
+  }
+
+  function touchStart() {
+    return function(event) {
+      if (event.touches && event.touches.length > 1) return;
+      var target = event.target;
+      
+      // 1. Exclude standard DOM legends
+      if (target && (target.closest('.chartjs-legend') || target.classList.contains('chartjs-legend') || target.tagName === 'LI' && target.closest('[class*="chartjs"]'))) { 
+        return; 
+      }
+
+      // 2. Exclude CANVAS legends (Chart.js draws them at the bottom 15% of the canvas)
+      if (target && target.tagName === 'CANVAS') {
+        var rect = target.getBoundingClientRect();
+        var clientY = event.touches ? event.touches[0].clientY : event.pageY;
+        // If the click is near the bottom of the canvas, ignore it so Chart.js can handle the legend click
+        if (clientY - rect.top > rect.height * 0.85) {
+          return;
+        }
+      }
+
+      isDragging = true;
+      startX = getPositionX(event);
+      startY = event.touches ? event.touches[0].clientY : event.pageY;
+      prevTranslate = -currentPage * getSwipeWidth();
+      animationID = requestAnimationFrame(animation);
+      $('swipeContainer').style.cursor = 'grabbing';
+    };
+  }
+
+  function touchEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    cancelAnimationFrame(animationID);
+    var movedBy = currentTranslate - prevTranslate;
+    
+    // 3. Only trigger page change/resize if it was an actual swipe (moved more than 15px)
+    // This prevents standard "clicks" from resetting the charts and blocking Chart.js click events
+    if (Math.abs(movedBy) > 15) {
+      if (movedBy < -75 && currentPage < totalPages - 1) currentPage += 1;
+      if (movedBy > 75 && currentPage > 0) currentPage -= 1;
+      goToPage(currentPage);
+    } else {
+      // It was just a click/tap, snap the view back without running goToPage/resizeCharts
+      currentTranslate = prevTranslate;
+      setSliderPosition();
+    }
+    
+    $('swipeContainer').style.cursor = 'grab';
+  }
+
+  function touchMove(event) {
+    if (event.touches && event.touches.length > 1) { isDragging = false; return; }
+    if (!isDragging) return; 
+    var currentX = getPositionX(event);
+    var currentY = event.touches ? event.touches[0].clientY : event.pageY;
+    var diffX = Math.abs(currentX - startX);
+    var diffY = Math.abs(currentY - startY);
+    
+    // If vertical movement is greater, cancel horizontal swipe for browser scrolling
+    if (diffY > diffX && diffY > 10) {
+      isDragging = false;
+      currentTranslate = prevTranslate;
+      setSliderPosition();
+      return;
+    }
+    currentTranslate = prevTranslate + currentX - startX;
+  }
+
+  function getPositionX(event) { 
+    return event.type.indexOf('mouse') !== -1 ? event.pageX : event.touches[0].clientX; 
+  }
+  
+  function animation() { 
+    setSliderPosition(); 
+    if (isDragging) requestAnimationFrame(animation); 
+  }
+
+  function setupSwipe() {
+    var container = $('swipeContainer');
+    container.style.cursor = 'grab';
+    container.addEventListener('touchstart', touchStart(), { passive: true });
+    container.addEventListener('touchend', touchEnd);
+    container.addEventListener('touchmove', touchMove, { passive: true });
+    container.addEventListener('mousedown', touchStart());
+    container.addEventListener('mouseup', touchEnd);
+    container.addEventListener('mouseleave', touchEnd);
+    container.addEventListener('mousemove', touchMove);
+    document.addEventListener('keydown', function(e) { 
+      if (e.key === 'ArrowRight') goToPage(currentPage + 1); 
+      if (e.key === 'ArrowLeft') goToPage(currentPage - 1); 
+    });
+    window.addEventListener('resize', function() { 
+      currentTranslate = -currentPage * getSwipeWidth(); 
+      prevTranslate = currentTranslate; 
+      setSliderPosition(); 
+      resizeCharts(); 
+    });
+    goToPage(0);
+  }
+
+  function showHeadBreakdown() {
+    if (!rawSideData || rawSideData.length === 0) return;
+    document.getElementById('breakdownOverlay').classList.add('active');
+    populateBreakdownSelects();
+  }
+    
+  function closeBreakdown() { 
+    $('breakdownOverlay').classList.remove('active'); 
+  }
+
+  function populateBreakdownSelects() {
+    var fromSel = document.getElementById('breakdownFrom');
+    var toSel = document.getElementById('breakdownTo');
+    if (!fromSel || !toSel) return;
+
+    var maxBlocks = 24 * 4; // 96 blocks = 24 hours
+    var sliced = timeRanges.slice(-maxBlocks);
+
+    function getStartLabel(tr) {
+      var parts = String(tr || '').trim().split(' - ');
+      return parts[0].trim();
+    }
+
+    fromSel.innerHTML = '';
+    toSel.innerHTML = '';
+
+    for (var i = 0; i < sliced.length; i++) {
+      var startLabel = getStartLabel(sliced[i]);
+      var optF = document.createElement('option');
+      optF.value = sliced[i];
+      optF.textContent = startLabel;
+      fromSel.appendChild(optF);
+
+      var optT = document.createElement('option');
+      optT.value = sliced[i];
+      optT.textContent = addMinutesToLabel(startLabel, 15);
+      toSel.appendChild(optT);
+    }
+
+    var defaultFromIdx = Math.max(0, sliced.length - 4);
+    fromSel.selectedIndex = defaultFromIdx;
+    toSel.selectedIndex = sliced.length - 1;
+
+    updateBreakdownRange();
+  }
+
+  function updateBreakdownRange() {
+    var fromSel = document.getElementById('breakdownFrom');
+    var toSel = document.getElementById('breakdownTo');
+    var badge = document.getElementById('breakdownRangeBadge');
+    if (!fromSel || !toSel) return;
+
+    var fromIdx = fromSel.selectedIndex;
+    var toIdx = toSel.selectedIndex;
+
+    if (toIdx < fromIdx) {
+      toSel.selectedIndex = fromIdx;
+      toIdx = fromIdx;
+    }
+
+    var blockCount = toIdx - fromIdx + 1;
+    var minutes = blockCount * 15;
+    var hours = minutes / 60;
+    var hoursLabel = hours >= 1
+      ? (Number.isInteger(hours) ? hours + ' hr' + (hours !== 1 ? 's' : '') : hours.toFixed(1) + ' hrs')
+      : minutes + ' min';
+    if (badge) badge.textContent = blockCount + ' block' + (blockCount !== 1 ? 's' : '') + ' · ' + hoursLabel;
+
+    renderBreakdownBody();
+  }
+
+  function renderBreakdownBody() {
+    var fromSel = document.getElementById('breakdownFrom');
+    var toSel = document.getElementById('breakdownTo');
+    if (!fromSel || !toSel || !rawSideData || rawSideData.length === 0) return;
+
+    var fromIdx = fromSel.selectedIndex;
+    var toIdx = toSel.selectedIndex;
+    if (toIdx < fromIdx) toIdx = fromIdx;
+
+    var maxBlocks = 24 * 4;
+    var sliced = timeRanges.slice(-maxBlocks);
+    var selectedSlice = sliced.slice(fromIdx, toIdx + 1);
+    var selectedSet = {};
+    for (var i = 0; i < selectedSlice.length; i++) { selectedSet[selectedSlice[i]] = true; }
+
+    var rangeData = rawSideData.filter(function(r) { return selectedSet[r.timeRange]; });
+
+    var bonusBlockMap = {};
+    for (var i = 0; i < rangeData.length; i++) {
+      var r = rangeData[i];
+      var bonus = r.bonus;
+      var val = Number(r.value) || 0;
+      if (!bonusBlockMap[bonus]) bonusBlockMap[bonus] = { totalStdHours: 0, activeBlocks: 0 };
+      bonusBlockMap[bonus].totalStdHours += val;
+      if (val > 0) bonusBlockMap[bonus].activeBlocks++;
+    }
+    
+    var bonusProductivity = {};
+    var bKeys = Object.keys(bonusBlockMap);
+    for (var i = 0; i < bKeys.length; i++) {
+      var b = bKeys[i];
+      var info = bonusBlockMap[b];
+      var deployed = info.activeBlocks * 0.25;
+      bonusProductivity[b] = deployed > 0 ? (info.totalStdHours / deployed) * 100 : 0;
+    }
+
+    var bonusAreaCount = {};
+    for (var a = 0; a < BREAKDOWN_AREAS.length; a++) {
+      var areaKey = BREAKDOWN_AREAS[a].key;
+      var seenInArea = {};
+      for (var i = 0; i < rangeData.length; i++) {
+        if (Number(rangeData[i][areaKey]) > 0) seenInArea[rangeData[i].bonus] = true;
+      }
+      var areaBonusKeys = Object.keys(seenInArea);
+      for (var j = 0; j < areaBonusKeys.length; j++) {
+        if (!bonusAreaCount[areaBonusKeys[j]]) bonusAreaCount[areaBonusKeys[j]] = 0;
+        bonusAreaCount[areaBonusKeys[j]]++;
+      }
+    }
+
+    var allBonuses = {};
+    for (var i = 0; i < rangeData.length; i++) { allBonuses[rangeData[i].bonus] = true; }
+    var totalUniqueHeads = Object.keys(allBonuses).length;
+
+    var breakdown = [];
+    var maxCount = 0;
+    for (var a = 0; a < BREAKDOWN_AREAS.length; a++) {
+      var area = BREAKDOWN_AREAS[a];
+      var areaBonuses = {};
+      for (var i = 0; i < rangeData.length; i++) {
+        if (Number(rangeData[i][area.key]) > 0) areaBonuses[rangeData[i].bonus] = true;
+      }
+      var bonusList = Object.keys(areaBonuses);
+      bonusList.sort(function(a, b) { return (bonusProductivity[b] || 0) - (bonusProductivity[a] || 0); });
+      var count = bonusList.length;
+      if (count > 0) {
+        breakdown.push({ label: area.label, count: count, color: area.color, bonuses: bonusList });
+        if (count > maxCount) maxCount = count;
+      }
+    }
+    breakdown.sort(function(a, b) { return b.count - a.count; });
+
+    var sumOfAreas = 0;
+    for (var i = 0; i < breakdown.length; i++) { sumOfAreas += breakdown[i].count; }
+
+    var body = document.getElementById('breakdownBody');
+    var html = '<div class="breakdown-summary">';
+    html += '<span class="breakdown-summary-num">' + totalUniqueHeads + '</span><span class="breakdown-summary-label">unique heads</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + breakdown.length + '</span><span class="breakdown-summary-label">areas active</span>';
+    if (sumOfAreas > totalUniqueHeads) {
+      html += '<span class="breakdown-summary-sep">&middot;</span><span class="breakdown-summary-num" style="font-size:16px;color:var(--accent);">' + sumOfAreas + '</span><span class="breakdown-summary-label">total assignments</span>';
+    }
+    html += '</div>';
+
+    for (var i = 0; i < breakdown.length; i++) {
+      var item = breakdown[i];
+      var pct = maxCount > 0 ? (item.count / maxCount * 100) : 0;
+      html += '<div class="breakdown-row clickable-row" onclick="toggleBreakdownDetail(this)">';
+      html += '<div class="breakdown-label"><span class="breakdown-dot" style="background:' + item.color + ';"></span>' + safeTextPak(item.label) + '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
+      html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar" style="width:0%;background:' + hexToRgbaPak(item.color, 0.55) + ';border:1px solid ' + hexToRgbaPak(item.color, 0.3) + ';" data-target="' + pct + '"></div></div>';
+      html += '<div class="breakdown-count" style="color:' + item.color + ';">' + item.count + '</div></div>';
+      html += '<div class="breakdown-detail">';
+      html += '<div class="breakdown-detail-inner">';
+      for (var b = 0; b < item.bonuses.length; b++) {
+        var bonusName = item.bonuses[b];
+        var bPerfRaw = bonusProductivity[bonusName] || 0;
+        var bPerfDisplay = normalizePerfPak(bPerfRaw);
+        var bClass = perfClassPak(bPerfRaw);
+        var isMulti = (bonusAreaCount[bonusName] || 0) > 1;
+        var multiClass = isMulti ? ' multi-area' : '';
+        var multiIcon = isMulti ? '<i class="fa-solid fa-layer-group breakdown-multi-icon"></i>' : '';
+        var escapedB = escapeAttrPak(bonusName);
+        html += '<span class="breakdown-bonus-chip ' + bClass + multiClass + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + safeTextPak(bonusName) + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span></span>';
+      }
+      html += '</div>';
+      html += '<div class="breakdown-detail-hint">Click a bonus number to filter the main view' + (sumOfAreas > totalUniqueHeads ? ' · <i class="fa-solid fa-layer-group" style="font-size:9px;margin:0 2px;"></i> = works across multiple areas' : '') + '</div>';
+      html += '</div>';
+    }
+
+    if (breakdown.length === 0) {
+      html += '<div class="breakdown-empty"><i class="fa-solid fa-ghost" style="font-size:28px;display:block;margin-bottom:10px;opacity:0.3;"></i>No activity in the selected range</div>';
+    }
+
+    body.innerHTML = html;
+    setTimeout(function() {
+      var bars = body.querySelectorAll('.breakdown-bar');
+      for (var i = 0; i < bars.length; i++) {
+        bars[i].style.width = bars[i].dataset.target + '%';
+      }
+    }, 60);
+  }
+
+  function toggleBreakdownDetail(rowEl) {
+    var detail = rowEl.nextElementSibling;
+    var isExpanded = rowEl.classList.contains('expanded');
+    var allRows = document.querySelectorAll('.breakdown-row.clickable-row.expanded');
+    for (var i = 0; i < allRows.length; i++) {
+      if (allRows[i] !== rowEl) {
+        allRows[i].classList.remove('expanded');
+        var otherDetail = allRows[i].nextElementSibling;
+        if (otherDetail && otherDetail.classList.contains('breakdown-detail')) {
+          otherDetail.classList.remove('open');
+        }
+      }
+    }
+    if (isExpanded) {
+      rowEl.classList.remove('expanded');
+      if (detail && detail.classList.contains('breakdown-detail')) {
+        detail.classList.remove('open');
+      }
+    } else {
+      rowEl.classList.add('expanded');
+      if (detail && detail.classList.contains('breakdown-detail')) {
+        detail.classList.add('open');
+      }
+    }
+  }
+
+  function openTrendSplit() {
+    $('trendSplitOverlay').classList.add('active');
+    renderTrendSplitCheckboxes();
+  }
+
+  function closeTrendSplit() {
+    $('trendSplitOverlay').classList.remove('active');
+  }
+
+  function renderTrendSplitCheckboxes() {
+    var html1 = '', html2 = '';
+    for (var i = 0; i < VOLUME_TYPES.length; i++) {
+      var v = VOLUME_TYPES[i];
+      var checked1 = trendSplitState.chart1.indexOf(v.key) !== -1 ? 'checked' : '';
+      var checked2 = trendSplitState.chart2.indexOf(v.key) !== -1 ? 'checked' : '';
+      html1 += '<label class="trend-split-cb"><input type="checkbox" data-chart="1" data-key="' + v.key + '" ' + checked1 + '><span class="trend-split-dot" style="background:' + v.color + '"></span>' + v.label + '</label>';
+      html2 += '<label class="trend-split-cb"><input type="checkbox" data-chart="2" data-key="' + v.key + '" ' + checked2 + '><span class="trend-split-dot" style="background:' + v.color + '"></span>' + v.label + '</label>';
+    }
+    $('trendSplitCh1').innerHTML = html1;
+    $('trendSplitCh2').innerHTML = html2;
+  }
+
+  function applyTrendSplit() {
+    var cbs1 = $('trendSplitCh1').querySelectorAll('input[type="checkbox"]');
+    var cbs2 = $('trendSplitCh2').querySelectorAll('input[type="checkbox"]');
+    var ch1 = [], ch2 = [];
+    for (var i = 0; i < cbs1.length; i++) { if (cbs1[i].checked) ch1.push(cbs1[i].dataset.key); }
+    for (var i = 0; i < cbs2.length; i++) { if (cbs2[i].checked) ch2.push(cbs2[i].dataset.key); }
+    
+    var chartsContainer = $('page1Charts');
+    if (ch1.length === 0 && ch2.length === 0) {
+      trendSplitState = { enabled: false, chart1: [], chart2: [] };
+      chartsContainer.classList.remove('has-split-trend');
+    } else {
+      trendSplitState = { enabled: true, chart1: ch1, chart2: ch2 };
+      chartsContainer.classList.add('has-split-trend');
+    }
+    closeTrendSplit();
+    applyLocalFiltersPak();
+  }
+
+  function resetTrendSplit() {
+    trendSplitState = { enabled: false, chart1: [], chart2: [] };
+    $('page1Charts').classList.remove('has-split-trend');
+    closeTrendSplit();
+    applyLocalFiltersPak();
+  }
+
+  var _areaGroupDraft = null;
+
+  function openAreaGroups() {
+    _areaGroupDraft = areaGroupState.map(function(g) { return g.slice(); });
+    if (_areaGroupDraft.length === 0) {
+      _areaGroupDraft = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+    }
+    $('areaGroupOverlay').classList.add('active');
+    renderAreaGroupEditor();
+  }
+
+  function closeAreaGroups() {
+    $('areaGroupOverlay').classList.remove('active');
+  }
+
+  function renderAreaGroupEditor() {
+    var html = '';
+    for (var i = 0; i < _areaGroupDraft.length; i++) {
+      var color = AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length];
+      html += '<div class="area-group-block">';
+      html += '<div class="area-group-head">';
+      html += '<h3 style="color:' + color + ';">Group ' + (i + 1) + '</h3>';
+      if (_areaGroupDraft.length > 1) {
+        html += '<button class="btn area-group-remove" onclick="removeAreaGroup(' + i + ')" title="Remove group"><i class="fa-solid fa-trash"></i></button>';
+      }
+      html += '</div>';
+      html += '<div class="area-group-areas">';
+      for (var v = 0; v < VOLUME_TYPES.length; v++) {
+        var t = VOLUME_TYPES[v];
+        var checked = _areaGroupDraft[i].indexOf(t.key) !== -1 ? 'checked' : '';
+        html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onAreaGroupCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
+      }
+      html += '</div></div>';
+    }
+    $('areaGroupEditor').innerHTML = html;
+    $('addAreaGroupBtn').style.display = _areaGroupDraft.length >= MAX_AREA_GROUPS ? 'none' : '';
+  }
+
+  function onAreaGroupCbChange(cb) {
+    var i = parseInt(cb.dataset.group, 10);
+    var key = cb.dataset.key;
+    var keys = _areaGroupDraft[i];
+    var idx = keys.indexOf(key);
+    if (cb.checked && idx === -1) { keys.push(key); }
+    else if (!cb.checked && idx !== -1) { keys.splice(idx, 1); }
+  }
+
+  function addAreaGroup() {
+    if (_areaGroupDraft.length >= MAX_AREA_GROUPS) return;
+    _areaGroupDraft.push([]);
+    renderAreaGroupEditor();
+  }
+
+  function removeAreaGroup(i) {
+    _areaGroupDraft.splice(i, 1);
+    renderAreaGroupEditor();
+  }
+
+  function applyAreaGroups() {
+    var order = VOLUME_TYPES.map(function(t) { return t.key; });
+    var cleaned = [];
+    for (var i = 0; i < _areaGroupDraft.length && cleaned.length < MAX_AREA_GROUPS; i++) {
+      var draft = _areaGroupDraft[i];
+      var keys = order.filter(function(k) { return draft.indexOf(k) !== -1; });
+      if (keys.length > 0) cleaned.push(keys);
+    }
+    if (cleaned.length === 0) {
+      cleaned = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+    }
+    areaGroupState = cleaned;
+    closeAreaGroups();
+    applyLocalFiltersPak();
+  }
+
+  function resetAreaGroups() {
+    areaGroupState = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+    closeAreaGroups();
+    applyLocalFiltersPak();
+  }
+
+</script>

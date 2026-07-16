@@ -1,0 +1,205 @@
+<script>
+function $(id) {
+  return document.getElementById(id);
+}
+
+function saveUserPreferences() {
+  try {
+    var prefs = {
+      hoursRange: $('hoursRange').value,
+      timeWindow: $('timeWindow').value,
+      volumeChartMode: $('volumeChartMode').value,
+      sharedRowsLimit: $('sharedRowsLimit').value,
+      bonusViewMode: $('bonusViewMode') ? $('bonusViewMode').value : 'area',
+      hiddenBonusAreas: hiddenBonusAreas,
+      trendSplitState: trendSplitState,
+      areaGroups: areaGroupState
+    };
+    localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
+  } catch (e) {
+    console.warn('Could not save preferences', e);
+  }
+}
+
+function loadUserPreferences() {
+  try {
+    var raw = localStorage.getItem('e3_dashboard_prefs_v1');
+    if (!raw) return;
+    
+    var prefs = JSON.parse(raw);
+
+    if (prefs.hoursRange) $('hoursRange').value = prefs.hoursRange;
+    if (prefs.timeWindow) $('timeWindow').value = prefs.timeWindow;
+    if (prefs.volumeChartMode) $('volumeChartMode').value = prefs.volumeChartMode;
+    if (prefs.sharedRowsLimit) $('sharedRowsLimit').value = prefs.sharedRowsLimit;
+    if (prefs.bonusViewMode && $('bonusViewMode')) $('bonusViewMode').value = prefs.bonusViewMode;
+
+    if (Array.isArray(prefs.hiddenBonusAreas)) {
+      var validAreaKeys = {};
+      for (var h = 0; h < VOLUME_TYPES.length; h++) { validAreaKeys[VOLUME_TYPES[h].key] = true; }
+      hiddenBonusAreas = prefs.hiddenBonusAreas.filter(function(k) { return validAreaKeys[k]; });
+    }
+
+    var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
+    for (var i = 0; i < syncedHours.length; i++) {
+      syncedHours[i].value = $('hoursRange').value;
+    }
+    
+    var syncedWindows = document.querySelectorAll('[data-sync="timeWindow"]');
+    for (var i = 0; i < syncedWindows.length; i++) {
+      syncedWindows[i].value = $('timeWindow').value;
+    }
+
+    if (prefs.trendSplitState && typeof prefs.trendSplitState.enabled === 'boolean') {
+      trendSplitState = prefs.trendSplitState;
+    }
+
+    if (Array.isArray(prefs.areaGroups)) {
+      var validKeys = {};
+      for (var v = 0; v < VOLUME_TYPES.length; v++) { validKeys[VOLUME_TYPES[v].key] = true; }
+      var cleanedGroups = [];
+      for (var g = 0; g < prefs.areaGroups.length && cleanedGroups.length < MAX_AREA_GROUPS; g++) {
+        var grp = prefs.areaGroups[g];
+        if (!Array.isArray(grp)) continue;
+        var keys = grp.filter(function(k) { return validKeys[k]; });
+        if (keys.length > 0) cleanedGroups.push(keys);
+      }
+      if (cleanedGroups.length > 0) areaGroupState = cleanedGroups;
+    }
+
+  } catch (e) {
+    console.warn('Could not load preferences', e);
+  }
+}
+
+function normalizePerfPak(v) {
+  var x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function numPak(n, d) {
+  d = d !== undefined ? d : 2;
+  var x = Number(n);
+  return Number.isFinite(x)
+    ? x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d })
+    : '-';
+}
+
+function pctPak(n, d) {
+  d = d !== undefined ? d : 1;
+  if (typeof n === 'string' && n.indexOf('%') !== -1) {
+    return n.trim();
+  }
+  var x = Number(n);
+  if (!Number.isFinite(x)) return '-';
+  return normalizePerfPak(x).toFixed(d) + '%';
+}
+
+function perfClassPak(v) {
+  var val = normalizePerfPak(v);
+  if (!Number.isFinite(val)) return APP_CONFIG.classes.bad;
+  if (val >= APP_CONFIG.thresholds.good) return APP_CONFIG.classes.good;
+  if (val >= APP_CONFIG.thresholds.warn) return APP_CONFIG.classes.warn;
+  return APP_CONFIG.classes.bad;
+}
+
+function safeTextPak(v) {
+  return String(v != null ? v : '');
+}
+
+function escapeAttrPak(s) {
+  return safeTextPak(s)
+    .replace(/&/g, '&amp;')
+    .replace(/'/g, '&#39;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function trimTimeLabelPak(str) {
+  if (!str) return '';
+  var parts = str.split(' ');
+  if (parts.length >= 5) {
+    return parts[1] + ' - ' + parts[4];
+  }
+  return str;
+}
+
+function parseDateTimePartPak(text) {
+  var s = String(text || '').trim();
+  var match = s.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  return new Date(
+    Number(match[3]),
+    Number(match[2]) - 1,
+    Number(match[1]),
+    Number(match[4]),
+    Number(match[5]),
+    0,
+    0
+  );
+}
+
+function extractRangePartsPak(t) {
+  var p = String(t || '').trim().split(' - ');
+  return p.length >= 2 
+    ? { start: p[0].trim(), end: p[1].trim() } 
+    : { start: t, end: t };
+}
+
+function formatDatePak(d) {
+  var dd = String(d.getDate()).padStart(2, '0');
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var yyyy = d.getFullYear();
+  var hh = String(d.getHours()).padStart(2, '0');
+  var min = String(d.getMinutes()).padStart(2, '0');
+  return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
+}
+
+function hexToRgbaPak(hex, a) {
+  return 'rgba(' + 
+    parseInt(hex.slice(1, 3), 16) + ', ' + 
+    parseInt(hex.slice(3, 5), 16) + ', ' + 
+    parseInt(hex.slice(5, 7), 16) + ', ' + 
+    a + ')';
+}
+
+function addMinutesToLabel(label, mins) {
+  var match = label.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return label;
+  
+  var d = new Date(
+    Number(match[3]),
+    Number(match[2]) - 1,
+    Number(match[1]),
+    Number(match[4]),
+    Number(match[5]) + mins,
+    0,
+    0
+  );
+  
+  var dd = String(d.getDate()).padStart(2, '0');
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var yyyy = d.getFullYear();
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mi = String(d.getMinutes()).padStart(2, '0');
+  
+  return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + mi;
+}
+
+function calculateBonusDisplay(bonusSet, isFilteredView) {
+  if (isFilteredView) {
+    return String(selectedBonuses.length);
+  }
+  
+  var uniqueCount = 0;
+  for (var key in bonusSet) {
+    if (bonusSet.hasOwnProperty(key)) {
+      uniqueCount++;
+    }
+  }
+  
+  var displayCount = uniqueCount === 1 ? 0 : uniqueCount;
+  return uniqueCount === 0 ? '' : String(displayCount);
+}
+</script>

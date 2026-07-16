@@ -1,0 +1,308 @@
+<script>
+
+function getPerfSplitGroups_() {
+  var groups = [];
+  for (var i = 0; i < areaGroupState.length; i++) {
+    var keys = areaGroupState[i] || [];
+    var labels = [];
+    for (var k = 0; k < keys.length; k++) {
+      for (var v = 0; v < VOLUME_TYPES.length; v++) {
+        if (VOLUME_TYPES[v].key === keys[k]) { labels.push(VOLUME_TYPES[v].label); break; }
+      }
+    }
+    if (labels.length === 0) continue;
+    groups.push({
+      id: 'g' + i,
+      label: labels.join(', '),
+      keys: keys,
+      color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length]
+    });
+  }
+  return groups;
+}
+
+function handleControlChangePak(sourceElement, type) {
+  var syncAttr = 'data-sync="' + type + '"';
+  var allSynced = document.querySelectorAll('[' + syncAttr + ']');
+  for (var i = 0; i < allSynced.length; i++) {
+    if (allSynced[i] !== sourceElement) { allSynced[i].value = sourceElement.value; }
+  }
+  applyLocalFiltersPak();
+}
+
+function applyLocalFiltersPak() {
+  var hoursRange = parseInt($('hoursRange').value, 10) || 3;
+  var windowMinutes = parseInt($('timeWindow').value, 10);
+  var rowsLimit = parseInt($('sharedRowsLimit').value, 10) || 10;
+  var blocksToKeep = hoursRange * 4;
+  var targetTimeList = timeRanges.slice(-blocksToKeep);
+  var targetTimeRanges = {};
+  for (var i = 0; i < targetTimeList.length; i++) { targetTimeRanges[targetTimeList[i]] = true; }
+  var filteredData = rawSideData.filter(function(row) {
+    if (!targetTimeRanges[row.timeRange]) return false;
+    if (selectedBonuses.length > 0 && selectedBonuses.indexOf(row.bonus) === -1) return false;
+    return true;
+  });
+  var baseRows = generateMainRows_(filteredData, targetTimeList);
+  
+  var trendRows1 = baseRows;
+  var trendRows2 = null;
+  if (trendSplitState.enabled) {
+    var has1 = trendSplitState.chart1.length > 0;
+    var has2 = trendSplitState.chart2.length > 0;
+    if (has1 && has2) {
+      trendRows1 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart1);
+      trendRows2 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart2);
+      $('trendPanel1').querySelector('h2').textContent = getTrendTitle(trendSplitState.chart1);
+    } else if (has1) {
+      trendRows1 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart1);
+      $('trendPanel1').querySelector('h2').textContent = getTrendTitle(trendSplitState.chart1);
+    } else if (has2) {
+      trendRows1 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart2);
+      $('trendPanel1').querySelector('h2').textContent = getTrendTitle(trendSplitState.chart2);
+    }
+  } else {
+    $('trendPanel1').querySelector('h2').textContent = 'Deployment Trend';
+  }
+
+  var tableData = baseRows;
+  if (windowMinutes !== 15) { tableData = getAggregatedDataPak(baseRows, windowMinutes); }
+  currentMainRows = tableData;
+  renderMainTablePak(currentMainRows);
+  renderChartsPak(baseRows, trendRows1, trendRows2, filteredData, targetTimeList);
+  renderSideTablesPak(rowsLimit);
+  saveUserPreferences();
+}
+
+function generateMainRows_(data, timeList) {
+  var rows = [];
+  timeList.forEach(function(tr) {
+    var blockData = data.filter(function(r) { return r.timeRange === tr; });
+    var qualifiedData = blockData.filter(function(r) { return (r.value || 0) > currentThreshold; });
+    var stdHours = qualifiedData.reduce(function(sum, r) { return sum + (r.value || 0); }, 0);
+    var pieTotal = blockData.reduce(function(sum, r) { return sum + (r.pie || 0); }, 0);
+    var topUpTotal = blockData.reduce(function(sum, r) { return sum + (r.topUp || 0); }, 0);
+    var e3PackingTotal = blockData.reduce(function(sum, r) { return sum + (r.e3Packing || 0); }, 0);
+    var parcelSortationTotal = blockData.reduce(function(sum, r) { return sum + (r.parcelSortation || 0); }, 0);
+    var parcelInductTotal = blockData.reduce(function(sum, r) { return sum + (r.parcelInduct || 0); }, 0);
+    var inboundDecantingTotal = blockData.reduce(function(sum, r) { return sum + (r.inboundDecanting || 0); }, 0);
+    var osrDecantingTotal = blockData.reduce(function(sum, r) { return sum + (r.osrDecanting || 0); }, 0);
+    var bonuses = {};
+    for (var j = 0; j < qualifiedData.length; j++) { bonuses[qualifiedData[j].bonus] = true; }
+    var bonusNumber = calculateBonusDisplay(bonuses, selectedBonuses.length > 0);
+    var hourDeployed = 0;
+    if (selectedBonuses.length > 0) {
+      var selectedInBlock = qualifiedData.filter(function(r) { return selectedBonuses.indexOf(r.bonus) !== -1; });
+      hourDeployed = selectedInBlock.length * 0.25;
+    } else {
+      var uniqueCount = 0;
+      for (var key in bonuses) { if (bonuses.hasOwnProperty(key)) uniqueCount++; }
+      var displayCount = uniqueCount === 1 ? 0 : uniqueCount;
+      hourDeployed = displayCount / 4;
+    }
+    var performance = hourDeployed !== 0 ? (stdHours / hourDeployed) * 100 : 0;
+    rows.push({ dateTime: tr, bonusNumber: bonusNumber, hourDeployed: hourDeployed, stdHours: stdHours, pieVol: pieTotal, topUpVol: topUpTotal, e3PackingVol: e3PackingTotal, parcelSortationVol: parcelSortationTotal, parcelInductVol: parcelInductTotal, inboundDecantingVol: inboundDecantingTotal, osrDecantingVol: osrDecantingTotal, performance: performance, rawBonusSet: bonuses });
+  });
+  return rows;
+}
+
+function buildIndividualEntryRows_(entries) {
+  return entries.map(function (r) {
+    var stdHours = Number(r.value) || 0;
+    return {
+      timeRange: r.timeRange,
+      bonus: r.bonus,
+      hourDeployed: 0.25,
+      stdHours: stdHours,
+      pieVol: Number(r.pie) || 0,
+      topUpVol: Number(r.topUp) || 0,
+      e3PackingVol: Number(r.e3Packing) || 0,
+      parcelInductVol: Number(r.parcelInduct) || 0,
+      parcelSortationVol: Number(r.parcelSortation) || 0,
+      inboundDecantingVol: Number(r.inboundDecanting) || 0,
+      osrDecantingVol: Number(r.osrDecanting) || 0,
+      performance: stdHours / 0.25 * 100
+    };
+  });
+}
+
+function compareEntryRowsPak(a, b) {
+  var da = parseDateTimePartPak(extractRangePartsPak(a.timeRange).start);
+  var db = parseDateTimePartPak(extractRangePartsPak(b.timeRange).start);
+  var ta = da ? da.getTime() : 0;
+  var tb = db ? db.getTime() : 0;
+  if (ta !== tb) return ta - tb;
+  return safeTextPak(a.bonus).localeCompare(safeTextPak(b.bonus));
+}
+
+function getAggregatedDataPak(rows, windowMinutes) {
+  var groups = {};
+  rows.forEach(function(r) {
+    var p = extractRangePartsPak(r.dateTime);
+    var startDate = parseDateTimePartPak(p.start);
+    if (!startDate) return;
+    var groupDate = new Date(startDate);
+    if (windowMinutes === 30) { var m = groupDate.getMinutes(); groupDate.setMinutes(m >= 30 ? 30 : 0, 0, 0); }
+    else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
+    else { groupDate.setSeconds(0, 0); }
+    var k = groupDate.getTime();
+    if (!groups[k]) { groups[k] = { startTime: groupDate, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bonusSet: {} }; }
+    var g = groups[k];
+    g.hourDeployed += (Number(r.hourDeployed) || 0); g.stdHours += (Number(r.stdHours) || 0); g.pieVol += (Number(r.pieVol) || 0); g.topUpVol += (Number(r.topUpVol) || 0); g.e3PackingVol += (Number(r.e3PackingVol) || 0); g.parcelSortationVol += (Number(r.parcelSortationVol) || 0); g.parcelInductVol += (Number(r.parcelInductVol) || 0); g.inboundDecantingVol += (Number(r.inboundDecantingVol) || 0); g.osrDecantingVol += (Number(r.osrDecantingVol) || 0);
+    if (r.rawBonusSet) { for (var bKey in r.rawBonusSet) { if (r.rawBonusSet.hasOwnProperty(bKey)) { g.bonusSet[bKey] = true; } } }
+  });
+  var result = [];
+  var sortedKeys = Object.keys(groups).map(Number).sort(function(a, b) { return a - b; });
+  var isFiltered = selectedBonuses.length > 0;
+  sortedKeys.forEach(function(k) {
+    var g = groups[k]; var start = g.startTime; var end = new Date(start.getTime() + (windowMinutes * 60000));
+    var label = formatDatePak(start) + ' - ' + formatDatePak(end);
+    result.push({ dateTime: label, rangeLabel: label, hourDeployed: g.hourDeployed, stdHours: g.stdHours, pieVol: g.pieVol, topUpVol: g.topUpVol, e3PackingVol: g.e3PackingVol, parcelSortationVol: g.parcelSortationVol, parcelInductVol: g.parcelInductVol, inboundDecantingVol: g.inboundDecantingVol, osrDecantingVol: g.osrDecantingVol, performance: g.hourDeployed > 0 ? (g.stdHours / g.hourDeployed) * 100 : 0, bonusNumber: calculateBonusDisplay(g.bonusSet, isFiltered) });
+  });
+  return result;
+}
+
+function aggregateTrendRows(rows, windowMinutes) {
+  var groups = {};
+  rows.forEach(function(r) {
+    var p = extractRangePartsPak(r.dateTime);
+    var startDate = parseDateTimePartPak(p.start);
+    if (!startDate) return;
+    var groupDate = new Date(startDate);
+    if (windowMinutes === 30) { var m = groupDate.getMinutes(); groupDate.setMinutes(m >= 30 ? 30 : 0, 0, 0); }
+    else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
+    var k = groupDate.getTime();
+    if (!groups[k]) { groups[k] = { startTime: groupDate, hourDeployed: 0, stdHours: 0, stdBreakdown: {} }; }
+    var g = groups[k];
+    g.hourDeployed += (Number(r.hourDeployed) || 0);
+    g.stdHours += (Number(r.stdHours) || 0); 
+    if (r.stdBreakdown) {
+      for (var bKey in r.stdBreakdown) {
+        if (r.stdBreakdown.hasOwnProperty(bKey)) {
+          g.stdBreakdown[bKey] = (g.stdBreakdown[bKey] || 0) + r.stdBreakdown[bKey];
+        }
+      }
+    }
+  });
+  var result = [];
+  var sortedKeys = Object.keys(groups).map(Number).sort(function(a, b) { return a - b; });
+  sortedKeys.forEach(function(k) {
+    var g = groups[k];
+    var start = g.startTime;
+    var end = new Date(start.getTime() + (windowMinutes * 60000));
+    result.push({ dateTime: formatDatePak(start) + ' - ' + formatDatePak(end), hourDeployed: g.hourDeployed, stdHours: g.stdHours, stdBreakdown: g.stdBreakdown });
+  });
+  return result;
+}
+
+function generateTrendRowsForAreas_(data, timeList, areaKeys) {
+  var rows = [];
+  timeList.forEach(function(tr) {
+    var blockData = data.filter(function(r) { return r.timeRange === tr; });
+    var qualifiedData = blockData.filter(function(r) { return (r.value || 0) > currentThreshold; });
+    var totalDeployed = 0;
+    var stdBreakdown = {};
+    for (var a = 0; a < areaKeys.length; a++) { stdBreakdown[areaKeys[a]] = 0; }
+
+    for (var i = 0; i < qualifiedData.length; i++) {
+      var r = qualifiedData[i];
+      var hasActivity = false;
+      for (var a = 0; a < areaKeys.length; a++) {
+        var key = areaKeys[a];
+        var volType = VOLUME_TYPES.filter(function(v){ return v.key === key; })[0];
+        var stdVal = r[volType.stdKey] || 0;
+        if (stdVal > 0) {
+          hasActivity = true;
+          stdBreakdown[key] += stdVal;
+        }
+      }
+      if (hasActivity) { totalDeployed += 0.25; }
+    }
+    rows.push({ dateTime: tr, hourDeployed: totalDeployed, stdBreakdown: stdBreakdown });
+  });
+  return rows;
+}
+
+function getTrendTitle(areaKeys) {
+  if (!areaKeys || areaKeys.length === 0) return 'Deployment Trend';
+  var labels = [];
+  for (var i = 0; i < areaKeys.length; i++) {
+    for (var j = 0; j < VOLUME_TYPES.length; j++) {
+      if (VOLUME_TYPES[j].key === areaKeys[i]) {
+        labels.push(VOLUME_TYPES[j].label);
+        break;
+      }
+    }
+  }
+  return 'Deployment Trend - ' + labels.join(', ');
+}
+
+function generatePerfSplitRows_(data, timeList, groups) {
+  var rows = [];
+  timeList.forEach(function(tr) {
+    var blockData = data.filter(function(r) { return r.timeRange === tr; });
+    var row = { dateTime: tr };
+    groups.forEach(function(group) {
+      var totalStd = 0;
+      var deployedCount = 0;
+      blockData.forEach(function(r) {
+        var hasActivity = false;
+        var bonusStd = 0;
+        group.keys.forEach(function(areaKey) {
+          var volType = VOLUME_TYPES.find(function(v) { return v.key === areaKey; });
+          if (!volType) return;
+          var stdVal = Number(r[volType.stdKey]) || 0;
+          if (stdVal > 0) { hasActivity = true; bonusStd += stdVal; }
+        });
+        if (hasActivity) { totalStd += bonusStd; deployedCount++; }
+      });
+      var deployedHours = deployedCount * 0.25;
+      // Store raw values to be safely aggregated later!
+      row[group.id + '_std'] = totalStd;
+      row[group.id + '_dep'] = deployedHours;
+    });
+    rows.push(row);
+  });
+  return rows;
+}
+
+function getAggregatedPerfSplitDataPak(rows, windowMinutes, splitGroups) {
+  var groups = {};
+  rows.forEach(function(r) {
+    var p = extractRangePartsPak(r.dateTime);
+    var startDate = parseDateTimePartPak(p.start);
+    if (!startDate) return;
+    var groupDate = new Date(startDate);
+    if (windowMinutes === 30) { var m = groupDate.getMinutes(); groupDate.setMinutes(m >= 30 ? 30 : 0, 0, 0); }
+    else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
+    var k = groupDate.getTime();
+    if (!groups[k]) {
+      groups[k] = { startTime: groupDate };
+      splitGroups.forEach(function(g) {
+        groups[k][g.id + '_std'] = 0;
+        groups[k][g.id + '_dep'] = 0;
+      });
+    }
+    var g = groups[k];
+    splitGroups.forEach(function(grp) {
+      g[grp.id + '_std'] += (r[grp.id + '_std'] || 0);
+      g[grp.id + '_dep'] += (r[grp.id + '_dep'] || 0);
+    });
+  });
+  var result = [];
+  var sortedKeys = Object.keys(groups).map(Number).sort(function(a, b) { return a - b; });
+  sortedKeys.forEach(function(k) {
+    var g = groups[k]; var start = g.startTime; var end = new Date(start.getTime() + (windowMinutes * 60000));
+    var label = formatDatePak(start) + ' - ' + formatDatePak(end);
+    var row = { dateTime: label, rangeLabel: label };
+    // Calculate the actual productivity % for the whole time window
+    splitGroups.forEach(function(grp) {
+      var std = g[grp.id + '_std'] || 0;
+      var dep = g[grp.id + '_dep'] || 0;
+      row[grp.id] = dep > 0 ? (std / dep) * 100 : 0;
+    });
+    result.push(row);
+  });
+  return result;
+}
+</script>

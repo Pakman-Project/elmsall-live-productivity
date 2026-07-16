@@ -1,0 +1,147 @@
+<script>
+  function syncTooltipHover(sourceChart, targetChart, event, activeElements) {
+    if (!targetChart) return;
+    if (activeElements.length > 0) {
+      var index = activeElements[0].index;
+      var activeList = [];
+      if (targetChart.data.datasets.length > 1) { for (var i = 0; i < targetChart.data.datasets.length; i++) { activeList.push({ datasetIndex: i, index: index }); } }
+      else { activeList.push({ datasetIndex: 0, index: index }); }
+      targetChart.setActiveElements(activeList); targetChart.tooltip.setActiveElements(activeList, event);
+    } else { targetChart.setActiveElements([]); targetChart.tooltip.setActiveElements([], event); }
+    targetChart.update('none');
+  }
+
+  function syncToTargets(sourceChart, targets, event, elements) { for (var i = 0; i < targets.length; i++) { if (targets[i]) syncTooltipHover(sourceChart, targets[i], event, elements); } }
+
+  function syncVolumeCharts(event, elements) {
+    for (var i = 0; i < volumeCharts.length; i++) {
+      var targetChart = volumeCharts[i]; if (!targetChart) continue;
+      if (elements.length > 0) { var index = elements[0].index; var activeList = [{ datasetIndex: 0, index: index }]; targetChart.setActiveElements(activeList); targetChart.tooltip.setActiveElements(activeList, event); }
+      else { targetChart.setActiveElements([]); targetChart.tooltip.setActiveElements([], event); }
+      targetChart.update('none');
+    }
+  }
+
+  function renderVolumeChartsPak(agg, xOpt, tOpt) {
+    var labels = agg.map(function(r) { return r.dateTime; });
+    var rl = agg.map(function(r) { return r.rangeLabel; });
+    var mode = $('volumeChartMode').value;
+    var container = $('volumeChartsContainer');
+    var primaryTitle = $('volPanel0').querySelector('h2');
+    if (mode === 'separate') { container.classList.remove('combined-mode'); primaryTitle.textContent = 'PiE'; }
+    else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - E3 Stacked Area Chart' : 'Volume - E3 Combined Line Chart'; }
+    for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
+    volumeCharts = [];
+    var commonTooltip = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } };
+    var isStacked = mode === 'stacked';
+    var volYAxis = { beginAtZero: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Volume', color: '#97a6c3', font: { size: 12 } }, stacked: isStacked };
+    if (mode === 'separate') {
+      for (var i = 0; i < VOLUME_TYPES.length; i++) {
+        var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
+        var chart = new Chart($('volChart' + i), { type: 'line', data: { labels: labels, datasets: [{ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, 0.1), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } });
+        volumeCharts.push(chart);
+      }
+    } else {
+      var datasets = [];
+      for (var i = 0; i < VOLUME_TYPES.length; i++) {
+        var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
+        datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, isStacked ? 0.6 : 0.1), tension: 0.35, pointRadius: 2, fill: isStacked });
+      }
+      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#eaf0ff', usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis } } });
+      volumeCharts.push(chart);
+    }
+  }
+
+  function renderChartsPak(rows, trendRows1, trendRows2, rawFilteredData, rawTimeList) {
+    if (areaGroupChart) areaGroupChart.destroy();
+    if (overviewVolChart) overviewVolChart.destroy();
+    if (trendChart) trendChart.destroy();
+    if (trendChart2) trendChart2.destroy();
+    if (perfChart) perfChart.destroy();
+    for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
+    volumeCharts = [];
+    
+    if (!rows || rows.length === 0) { return; }
+
+    var wm = parseInt($('timeWindow').value, 10);
+    var agg = getAggregatedDataPak(rows, wm);
+    var hRange = parseInt($('hoursRange').value, 10);
+    var labels = agg.map(function(r) { return r.dateTime; });
+    var rl = agg.map(function(r) { return r.rangeLabel; });
+    var pieData = agg.map(function(r) { return r.pieVol; });
+    var topUpData = agg.map(function(r) { return r.topUpVol; });
+    
+    var yMax = Math.ceil((agg.map(function(r){return r.performance;}).length ? Math.max.apply(null, agg.map(function(r){return r.performance;})) : 100) / 10) * 10 + 10;
+    var xTicksConfig = { color: '#97a6c3', maxRotation: 45, minRotation: 45, autoSkip: true, callback: function(value) { return trimTimeLabelPak(this.getLabelForValue(value)); } };
+    if (hRange >= 24) { xTicksConfig.maxTicksLimit = 24; } else if (hRange >= 12) { xTicksConfig.maxTicksLimit = 12; } else if (hRange >= 6) { xTicksConfig.maxTicksLimit = 8; }
+    var xOpt = { ticks: xTicksConfig, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Date & Time', color: '#97a6c3', font: { size: 12 } } };
+    var tOpt = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) : ''); } } };
+
+    // --- 1. VOLUME ---
+    var overviewTitleEl = $('overviewVolChart').closest('.card.panel').querySelector('h2');
+    var overviewDatasets = [];
+    if (selectedBonuses.length > 0) {
+      overviewTitleEl.textContent = 'Volume - E3 Stacked Area Chart';
+      for (var v = 0; v < VOLUME_TYPES.length; v++) {
+        var vType = VOLUME_TYPES[v]; var vData = agg.map(function(r) { return r[vType.key]; });
+        overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, 0.6), tension: 0.35, pointRadius: 2, fill: true });
+      }
+    } else {
+      overviewTitleEl.textContent = 'Volume - PiE & Top Up';
+      overviewDatasets = [
+        { label: 'Volume PiE', data: pieData, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, 0.6), tension: 0.35, pointRadius: 2, fill: true },
+        { label: 'Volume Top Up', data: topUpData, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, 0.6), tension: 0.35, pointRadius: 2, fill: true }
+      ];
+    }
+    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: '#eaf0ff' }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Volume', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [areaGroupChart, perfChart, trendChart], event, elements); } } });
+
+    // --- 2. OVERALL PRODUCTIVITY ---
+    perfChart = new Chart($('perfChart'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, max: yMax, title: { display: true, text: 'Productivity %', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [areaGroupChart, overviewVolChart, trendChart], event, elements); } } });
+
+    // --- 3. AREA GROUP ---
+    var areaGroupDatasets = [];
+    if (rawFilteredData && rawTimeList) {
+      var perfGroups = getPerfSplitGroups_();
+      var perfSplitBase = generatePerfSplitRows_(rawFilteredData, rawTimeList, perfGroups);
+      var perfSplitAgg = getAggregatedPerfSplitDataPak(perfSplitBase, wm, perfGroups);
+      perfGroups.forEach(function(group) {
+        areaGroupDatasets.push({ label: group.label, data: perfSplitAgg.map(function(r) { return r[group.id] || 0; }), borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
+      });
+    }
+    areaGroupChart = new Chart($('areaGroupChart'), { type: 'line', data: { labels: labels, datasets: areaGroupDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: '#eaf0ff' }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Productivity %', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(areaGroupChart, [perfChart, overviewVolChart, trendChart], event, elements); } } });
+
+    // --- 4. TREND ---
+    var trendAgg1 = aggregateTrendRows(trendRows1, wm);
+    var dep1 = trendAgg1.map(function(r) { return r.hourDeployed; });
+    var dep2 = [], trendAgg2 = null; var trendYMax = null;
+    
+    if (trendSplitState.enabled && trendRows2) {
+      trendAgg2 = aggregateTrendRows(trendRows2, wm); dep2 = trendAgg2.map(function(r) { return r.hourDeployed; });
+      var allVals = dep1.concat(dep2); var checkAggs = [trendAgg1, trendAgg2];
+      for(var c=0; c<checkAggs.length; c++) { for(var i=0; i<checkAggs[c].length; i++) { var bk = checkAggs[c][i].stdBreakdown; var blockTotal = 0; for(var k in bk) { blockTotal += (bk[k] || 0); } allVals.push(blockTotal); } }
+      var peakVal = Math.max.apply(null, allVals); trendYMax = Math.ceil((peakVal * 1.20) / 5) * 5; if (trendYMax === 0) trendYMax = 10;
+    }
+    var trendY = { min: 0, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Hours', color: '#97a6c3', font: { size: 12 } } };
+    if (trendYMax !== null) { trendY.max = trendYMax; trendY.stacked = true; }
+
+    function buildTrendDatasets(aggData, areaKeys) {
+      var ds = [{ label: 'Hour Deployed', data: aggData.map(function(r) { return r.hourDeployed; }), borderWidth: 2.5, borderColor: APP_CONFIG.colors.accent, backgroundColor: 'transparent', tension: 0.35, pointRadius: 2, fill: false, stack: 'deployed-line', order: 1 }];
+      for (var a = 0; a < areaKeys.length; a++) { var key = areaKeys[a]; var type = VOLUME_TYPES.filter(function(v){ return v.key === key; })[0]; ds.push({ label: type.label + ' Std Hrs', data: aggData.map(function(r) { return (r.stdBreakdown && r.stdBreakdown[key]) || 0; }), borderWidth: 1, borderColor: type.color, backgroundColor: hexToRgbaPak(type.color, 0.35), tension: 0.35, pointRadius: 0, fill: true, stack: 'std-hours-stack', order: 2 }); }
+      return ds;
+    }
+
+    var datasets1;
+    if (trendSplitState.enabled && trendSplitState.chart1.length > 0) { datasets1 = buildTrendDatasets(trendAgg1, trendSplitState.chart1); } else { var std1 = trendAgg1.map(function(r) { if (r.stdBreakdown) { var total = 0; for(var k in r.stdBreakdown) { total += (r.stdBreakdown[k]||0); } if (total > 0) return total; } return r.stdHours || 0; }); datasets1 = [ { label: 'Hour Deployed', data: dep1, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, 0.1), tension: 0.35, pointRadius: 2, fill: true }, { label: 'Standard Hours', data: std1, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, 0.1), tension: 0.35, pointRadius: 2, fill: true } ]; }
+
+    trendChart = new Chart($('trendChart'), { type: 'line', data: { labels: labels, datasets: datasets1 }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#eaf0ff' }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) { syncToTargets(trendChart, [areaGroupChart, perfChart, overviewVolChart], event, elements); } } });
+
+    var trendPanel2 = $('trendPanel2'); var trendWrap = $('trendChartsWrap');
+    if (trendSplitState.enabled && trendRows2) {
+      trendPanel2.style.display = 'block'; trendWrap.classList.add('split-mode'); $('trendPanel2Title').textContent = getTrendTitle(trendSplitState.chart2);
+      var datasets2 = buildTrendDatasets(trendAgg2, trendSplitState.chart2);
+      trendChart2 = new Chart($('trendChart2'), { type: 'line', data: { labels: labels, datasets: datasets2 }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#eaf0ff' }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) { syncToTargets(trendChart2, [trendChart, areaGroupChart, perfChart, overviewVolChart], event, elements); } } });
+    } else { trendPanel2.style.display = 'none'; trendWrap.classList.remove('split-mode'); trendChart2 = null; }
+
+    renderVolumeChartsPak(agg, xOpt, tOpt);
+  }
+</script>

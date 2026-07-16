@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>E3 Live Productivity</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <div id="loadingOverlay" class="active">
+      <i class="fa-solid fa-circle-notch fa-spin"></i>
+      <span>Loading Data...</span>
+    </div>
+
+    <div id="breakdownOverlay" class="breakdown-overlay" onclick="closeBreakdown()">
+      <div class="breakdown-modal" onclick="event.stopPropagation()">
+        <div class="breakdown-header">
+          <div>
+            <h2>Head Deployed Breakdown</h2>
+            <p class="breakdown-subtitle">By work area</p>
+          </div>
+          <button class="breakdown-close" onclick="closeBreakdown()" aria-label="Close breakdown">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="breakdown-time-bar">
+          <label class="breakdown-time-label">From</label>
+          <select id="breakdownFrom" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
+          <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
+          <label class="breakdown-time-label">To</label>
+          <select id="breakdownTo" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
+          <span id="breakdownRangeBadge" class="breakdown-range-badge">-</span>
+        </div>
+        <div class="breakdown-body" id="breakdownBody"></div>
+        <div class="breakdown-footer">
+          <i class="fa-solid fa-circle-info"></i>
+          <span>Total may exceed "Head Deployed" because some operators work across multiple areas within the same hour.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <?!= include('Header'); ?>
+
+      <div class="swipe-container" id="swipeContainer">
+        <div class="page-arrows" aria-hidden="false">
+          <button class="page-arrow left" type="button" title="Previous page" aria-label="Previous page" onclick="goToPage(currentPage - 1)">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <button class="page-arrow right" type="button" title="Next page" aria-label="Next page" onclick="goToPage(currentPage + 1)">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+
+        <div class="swipe-wrapper" id="swipeWrapper">
+          <?!= include('PageOverall'); ?>
+
+          <div class="page">
+            <div class="volume-charts" id="volumeChartsContainer">
+              <div class="volume-controls">
+                <label for="hoursRangeVol">Hours Range:</label>
+                <select id="hoursRangeVol" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')" style="padding: 4px 8px; width: auto;">
+                  <option value="3" selected>3 Hours</option>
+                  <option value="6">6 Hours</option>
+                  <option value="9">9 Hours</option>
+                  <option value="12">12 Hours</option>
+                  <option value="24">24 Hours</option>
+                </select>
+
+                <label for="timeWindowVol">Time Window:</label>
+                <select id="timeWindowVol" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')" style="padding: 4px 8px; width: auto;">
+                  <option value="15">15 Minutes</option>
+                  <option value="30">30 Minutes</option>
+                  <option value="60">60 Minutes</option>
+                </select>
+
+                <label for="volumeChartMode">Display Mode:</label>
+                <select id="volumeChartMode" class="row-select" style="padding: 4px 8px; width: auto;" onchange="applyLocalFiltersPak()">
+                  <option value="separate" selected>Separate Charts</option>
+                  <option value="combined">Combined Line</option>
+                  <option value="stacked">Stacked Area</option>
+                </select>
+              </div>
+
+              <div class="card panel vol-chart-panel vol-primary-panel" id="volPanel0">
+                <div class="mini-table-title">
+                  <h2>PiE</h2>
+                  <span class="tag">Item</span>
+                </div>
+                <canvas id="volChart0"></canvas>
+              </div>
+
+              <div class="card panel vol-chart-panel" id="volPanel1">
+                <div class="mini-table-title">
+                  <h2>Top Up</h2>
+                  <span class="tag">Item</span>
+                </div>
+                <canvas id="volChart1"></canvas>
+              </div>
+
+              <div class="card panel vol-chart-panel" id="volPanel2">
+                <div class="mini-table-title">
+                  <h2>E3 Packing</h2>
+                  <span class="tag">Item</span>
+                </div>
+                <canvas id="volChart2"></canvas>
+              </div>
+
+              <div class="card panel vol-chart-panel" id="volPanel3">
+                <div class="mini-table-title">
+                  <h2>Parcel Induct</h2>
+                  <span class="tag">Parcel</span>
+                </div>
+                <canvas id="volChart3"></canvas>
+              </div>
+
+              <div class="card panel vol-chart-panel" id="volPanel4">
+                <div class="mini-table-title">
+                  <h2>Parcel Sortation</h2>
+                  <span class="tag">Parcel</span>
+                </div>
+                <canvas id="volChart4"></canvas>
+              </div>
+
+              <div class="card panel vol-chart-panel" id="volPanel5">
+                <div class="mini-table-title">
+                  <h2>Inbound Decanting</h2>
+                  <span class="tag">BDC</span>
+                </div>
+                <canvas id="volChart5"></canvas>
+              </div>
+
+              <div class="card panel vol-chart-panel" id="volPanel6">
+                <div class="mini-table-title">
+                  <h2>OSR Decanting</h2>
+                  <span class="tag">BDC</span>
+                </div>
+                <canvas id="volChart6"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="page">
+            <div class="bonus-page-controls">
+              <div class="bonus-controls">
+                <label for="bonusViewMode">Display Mode:</label>
+                <select id="bonusViewMode" class="row-select" onchange="refreshBonusTables()">
+                  <option value="area" selected>By Work Area</option>
+                  <option value="overall">Overall</option>
+                </select>
+                <select id="sharedRowsLimit" class="row-select" onchange="applyLocalFiltersPak()">
+                  <option value="10" selected>10 Rows</option>
+                  <option value="15">15 Rows</option>
+                  <option value="20">20 Rows</option>
+                </select>
+              </div>
+              <div class="breakdown-time-bar bonus-time-bar">
+                <label class="breakdown-time-label">From</label>
+                <select id="bonusFrom" class="breakdown-time-select" onchange="onBonusRangeChange()"></select>
+                <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
+                <label class="breakdown-time-label">To</label>
+                <select id="bonusTo" class="breakdown-time-select" onchange="onBonusRangeChange()"></select>
+                <span id="bonusRangeBadge" class="breakdown-range-badge">-</span>
+              </div>
+              <div id="bonusAreaToggles" class="bonus-area-toggles"></div>
+            </div>
+
+            <div id="bonusTablesContainer" class="bonus-tables-grid"></div>
+          </div>
+
+          <div class="page">
+            <div class="card panel span-12">
+              <div class="mini-table-title">
+                <h2>Main Table</h2>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <input id="search" class="input" type="text" placeholder="Search rows..." style="padding: 4px 8px; width: 200px;">
+                  <button class="btn" id="downloadRawDataBtn" onclick="downloadRawDataCsvPak()" title="Download all individual raw entries as CSV">
+                    <i class="fa-solid fa-download"></i> Download raw data
+                  </button>
+                  <span class="tag">Click headers to sort</span>
+                </div>
+              </div>
+              <div id="mainTableWrapper" class="table-wrap">
+                <table id="mainTable">
+                  <thead>
+                    <tr>
+                      <th data-key="dateTime">Date Time</th>
+                      <th data-key="bonusNumber">Unique Bonus Number</th>
+                      <th data-key="hourDeployed">Est. Hours Deployed</th>
+                      <th data-key="stdHours">Standard Hours</th>
+                      <th data-key="pieVol">PiE</th>
+                      <th data-key="topUpVol">Top Up</th>
+                      <th data-key="e3PackingVol">E3 Packing</th>
+                      <th data-key="parcelInductVol">Parcel Induct</th>
+                      <th data-key="parcelSortationVol">Parcel Sortation</th>
+                      <th data-key="inboundDecantingVol">Inbound Decanting</th>
+                      <th data-key="osrDecantingVol">OSR Decanting</th>
+                      <th data-key="performance">Productivity %</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </div> 
+    </div>
+
+    <div id="trendSplitOverlay" class="breakdown-overlay" onclick="closeTrendSplit()">
+      <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 600px;">
+        <div class="breakdown-header">
+          <div>
+            <h2>Split Deployment Trend</h2>
+            <p class="breakdown-subtitle">Select areas for each chart. The same area can appear in both.</p>
+          </div>
+          <button class="breakdown-close" onclick="closeTrendSplit()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        
+        <div class="breakdown-body">
+          <div class="two-panels" style="gap: 20px;">
+            <div>
+              <h3 style="margin-top:0; font-size:14px; color:var(--accent);">Chart A</h3>
+              <div id="trendSplitCh1"></div>
+            </div>
+            <div>
+              <h3 style="margin-top:0; font-size:14px; color:var(--color-good);">Chart B</h3>
+              <div id="trendSplitCh2"></div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" onclick="resetTrendSplit()" style="border-color: var(--color-bad); color: var(--color-bad);">Reset to Single</button>
+            <button class="btn" onclick="applyTrendSplit()" style="background: var(--accent); color: #fff; border-color: var(--accent);">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="areaGroupOverlay" class="breakdown-overlay" onclick="closeAreaGroups()">
+      <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
+        <div class="breakdown-header">
+          <div>
+            <h2>Area Groups</h2>
+            <p class="breakdown-subtitle">Choose which areas belong to each group. The same area can appear in multiple groups (up to 7 groups).</p>
+          </div>
+          <button class="breakdown-close" onclick="closeAreaGroups()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="breakdown-body">
+          <div id="areaGroupEditor"></div>
+          <button class="btn" id="addAreaGroupBtn" onclick="addAreaGroup()"><i class="fa-solid fa-plus"></i> Add Group</button>
+          <div class="modal-actions">
+            <button class="btn" onclick="resetAreaGroups()" style="border-color: var(--color-bad); color: var(--color-bad);">Reset to Default</button>
+            <button class="btn" onclick="applyAreaGroups()" style="background: var(--accent); color: #fff; border-color: var(--accent);">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <?!= include('JsState'); ?>
+    <?!= include('JsHelpers'); ?>
+    <?!= include('JsData'); ?>
+    <?!= include('JsCharts'); ?>
+    <?!= include('JsTables'); ?>
+    <?!= include('JsExport'); ?>
+    <?!= include('JsUi'); ?>
+    <?!= include('JsInit'); ?>
+  </body>
+</html>

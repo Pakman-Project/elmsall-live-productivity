@@ -1,0 +1,192 @@
+<script>
+  function populateArchiveDropdown() {
+    google.script.run.withSuccessHandler(function(links) {
+      var sel = $('archiveSelect');
+      sel.innerHTML = '<option value="">Live</option>';
+      for (var i = 0; i < links.length; i++) { 
+        var opt = document.createElement('option'); 
+        opt.value = links[i].url; 
+        opt.textContent = links[i].name; 
+        sel.appendChild(opt); 
+      }
+      
+      // ALWAYS default to Live on startup to prevent loading stale archives
+      currentArchiveUrl = null;
+      loadDataPak(null);
+      
+    }).getArchiveLinks();
+  }
+
+  function loadDataPak(archiveUrl, silent) {
+    var overlay = $('loadingOverlay');
+    
+    if (!silent) {
+      if (overlay) overlay.classList.add('active');
+      $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Loading...';
+    } else {
+      $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Updating...';
+    }
+
+    var savedScroll = 0;
+    var activePage = null;
+    var focusedEl = null;
+    var focusedId = null;
+    var selStart = null;
+    var selEnd = null;
+
+    if (silent) {
+      var pages = document.querySelectorAll('.page');
+      if (pages[currentPage]) {
+        activePage = pages[currentPage];
+        savedScroll = activePage.scrollTop;
+      }
+      focusedEl = document.activeElement;
+      if (focusedEl && focusedEl.id) {
+        focusedId = focusedEl.id;
+        if (typeof focusedEl.selectionStart === 'number' && typeof focusedEl.selectionEnd === 'number') {
+          selStart = focusedEl.selectionStart;
+          selEnd = focusedEl.selectionEnd;
+        }
+      }
+    }
+
+    var urlToFetch = archiveUrl !== undefined ? archiveUrl : currentArchiveUrl;
+    
+    google.script.run.withSuccessHandler(function(data) {
+      // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
+      try {
+        timeRanges = data.timeRanges || [];
+        rawSideData = data.rawSideData || [];
+        allBonusList = data.bonusList || [];
+        currentThreshold = parseFloat(data.threshold) || 0;
+        currentArchiveUrl = urlToFetch || null;
+        if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }
+        
+        $('headAbove20Label').textContent = 'Head > ' + Math.round(currentThreshold * 4 * 100) + '% Prod. Last Hour';
+        renderBonusChips();
+        updateClearBtnVisibility();
+        $('thresholdDisplay').textContent = currentThreshold || '-';
+        $('lastUpdateText').textContent = 'Last Update: ' + (data.lastRefresh || '-');
+        
+        var last4Times = {};
+        var last4Slice = timeRanges.slice(-4);
+        for (var i = 0; i < last4Slice.length; i++) { last4Times[last4Slice[i]] = true; }
+        var lastHourRawData = rawSideData.filter(function(r) { return last4Times[r.timeRange]; });
+        
+        var headSet = {};
+        for (var i = 0; i < lastHourRawData.length; i++) { headSet[lastHourRawData[i].bonus] = true; }
+        var uniqueHeadsLastHour = Object.keys(headSet).length;
+        $('headDeployed').textContent = uniqueHeadsLastHour;
+        
+        var headHoursLastHour = {};
+        for (var i = 0; i < lastHourRawData.length; i++) { 
+          var bonus = lastHourRawData[i].bonus; 
+          if (!headHoursLastHour[bonus]) headHoursLastHour[bonus] = 0; 
+          headHoursLastHour[bonus] += (lastHourRawData[i].value || 0); 
+        }
+        var hourTarget = currentThreshold * 4;
+        var countAboveThreshold = 0;
+        var headKeys = Object.keys(headHoursLastHour);
+        for (var i = 0; i < headKeys.length; i++) { 
+          if (headHoursLastHour[headKeys[i]] >= hourTarget) { countAboveThreshold++; } 
+        }
+        $('headAbove20').textContent = countAboveThreshold;
+        
+        var tS = 0;
+        for (var i = 0; i < lastHourRawData.length; i++) { tS += (lastHourRawData[i].value || 0); }
+        var blockGroup = {};
+        for (var i = 0; i < lastHourRawData.length; i++) { 
+          var tr = lastHourRawData[i].timeRange; 
+          if (!blockGroup[tr]) blockGroup[tr] = {}; 
+          blockGroup[tr][lastHourRawData[i].bonus] = true; 
+        }
+        var totalDisplayCount = 0;
+        var bgKeys = Object.keys(blockGroup);
+        for (var i = 0; i < bgKeys.length; i++) { 
+          var cnt = Object.keys(blockGroup[bgKeys[i]]).length; 
+          totalDisplayCount += (cnt === 1 ? 0 : cnt); 
+        }
+        var tD = totalDisplayCount / 4;
+        $('avgPerf').textContent = tD > 0 ? (((tS / tD) * 100).toFixed(0)) + '%' : '0%';
+        
+        applyLocalFiltersPak();
+        
+        $('status').textContent = 'Loaded';
+        var noteEl = $('noteText');
+        if (data.note && String(data.note).trim() !== '') { noteEl.textContent = String(data.note).trim(); } 
+        else { noteEl.textContent = ''; }
+        
+        if (silent) {
+          if (activePage) { activePage.scrollTop = savedScroll; }
+          if (focusedId) {
+            var elToRestore = document.getElementById(focusedId);
+            if (elToRestore) {
+              elToRestore.focus();
+              if (selStart !== null && selEnd !== null) {
+                try { elToRestore.setSelectionRange(selStart, selEnd); } catch(e){}
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Dashboard Render Error:", e);
+        $('status').innerHTML = '<span class="bad">Render Error: Check Console</span>';
+      }
+
+      // GUARANTEE overlay removal outside the try/catch so it NEVER gets stuck
+      if (!silent && overlay) overlay.classList.remove('active');
+      
+    }).withFailureHandler(function(err) {
+      $('status').innerHTML = '<span class="bad">Error: ' + (err.message || err) + '</span>';
+      if (!silent && overlay) overlay.classList.remove('active');
+    }).getDashboardData(urlToFetch);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    applyConfigToCSSPak();
+    wireSortingPak();
+    initBonusSearch();
+    
+    // Load UI preferences (Dropdowns, Split States) - BUT NOT THE ARCHIVE URL
+    loadUserPreferences(); 
+    
+    if (trendSplitState && trendSplitState.enabled === true) {
+      document.querySelector('.charts').classList.add('has-split-trend');
+    }
+
+    setupSwipe();
+    setArrowState();
+    
+    // Populate dropdowns first, THEN fetch data (handled inside populateArchiveDropdown now)
+    populateArchiveDropdown(); 
+    
+    $('archiveSelect').addEventListener('change', function() {
+      currentArchiveUrl = this.value;
+      if (currentArchiveUrl) {
+        var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
+        for (var i = 0; i < syncedHours.length; i++) { syncedHours[i].value = '24'; }
+        var syncedWindows = document.querySelectorAll('[data-sync="timeWindow"]');
+        for (var i = 0; i < syncedWindows.length; i++) { syncedWindows[i].value = '60'; }
+      }
+      loadDataPak(currentArchiveUrl);
+    });
+    
+    setInterval(function() {
+      if (lastRefreshTimestamp === null) return;
+      if (currentArchiveUrl) return; 
+      google.script.run.withSuccessHandler(function(remoteTimestamp) {
+        if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) { 
+          console.log("Change detected in Front!B2. Refreshing data silently..."); 
+          loadDataPak(currentArchiveUrl, true); 
+        }
+        else { console.log("No change in Front!B2."); }
+      }).getLastRefreshTimestamp();
+    }, 60000);
+  });
+
+  var _searchDebounce = null;
+  $('search').addEventListener('input', function() {
+    clearTimeout(_searchDebounce);
+    _searchDebounce = setTimeout(function() { renderMainTablePak(currentMainRows); }, 200);
+  });
+</script>
