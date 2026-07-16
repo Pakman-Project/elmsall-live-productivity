@@ -101,7 +101,24 @@
     // --- 3. AREA GROUP ---
     var areaGroupDatasets = [];
     if (rawFilteredData && rawTimeList) {
-      var perfGroups = getPerfSplitGroups_();
+      var perfGroups;
+      if (selectedBonuses.length > 0) {
+        // Bonus filter active: ignore the user's configured groups and show each
+        // involved work area as its own group (mirrors the Volume chart behavior)
+        perfGroups = [];
+        for (var pg = 0; pg < VOLUME_TYPES.length; pg++) {
+          var pgType = VOLUME_TYPES[pg];
+          var pgHasActivity = false;
+          for (var pd = 0; pd < rawFilteredData.length; pd++) {
+            if ((Number(rawFilteredData[pd][pgType.stdKey]) || 0) > 0) { pgHasActivity = true; break; }
+          }
+          if (pgHasActivity) {
+            perfGroups.push({ id: 'g' + pg, label: pgType.label, keys: [pgType.key], color: pgType.color, showLine: true, showTrend: false });
+          }
+        }
+      } else {
+        perfGroups = getPerfSplitGroups_();
+      }
       var perfSplitBase = generatePerfSplitRows_(rawFilteredData, rawTimeList, perfGroups);
       var perfSplitAgg = getAggregatedPerfSplitDataPak(perfSplitBase, wm, perfGroups);
       perfGroups.forEach(function(group) {
