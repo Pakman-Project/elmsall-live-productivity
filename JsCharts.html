@@ -113,7 +113,7 @@
             if ((Number(rawFilteredData[pd][pgType.stdKey]) || 0) > 0) { pgHasActivity = true; break; }
           }
           if (pgHasActivity) {
-            perfGroups.push({ id: 'g' + pg, label: pgType.label, keys: [pgType.key], color: pgType.color, showLine: true, showTrend: false });
+            perfGroups.push({ id: 'g' + pg, label: pgType.label, keys: [pgType.key], color: pgType.color, showLine: true, showTrend: true });
           }
         }
       } else {
