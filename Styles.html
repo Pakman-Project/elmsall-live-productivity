@@ -827,7 +827,7 @@ canvas {
 .clickable-bonus {
   position: relative;
   cursor: pointer;
-  color: var(--accent);
+  color: var(--text);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -1532,81 +1532,55 @@ canvas {
   white-space: nowrap;
 }
 
-/* 1. Fixed 450px height for standard 2-row layout */
-    .charts {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      grid-template-rows: 450px 450px; 
-      gap: 14px;
-      margin-bottom: 14px;
-      min-height: 100%; 
-    }
+.charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
 
-    .charts .card.panel {
-      display: flex;
-      flex-direction: column;
-      min-height: 0; 
-      overflow: visible; 
-      position: relative;
-    }
+.charts .card.panel {
+  display: flex;
+  flex-direction: column;
+  height: 450px;
+  min-height: 0;
+  position: relative;
+}
 
-    .charts canvas {
-      flex: 1 1 0px; 
-      min-height: 0;
-      max-height: 100%;
-      width: 100% !important;
-    }
+.charts .card.panel.span-charts-full {
+  grid-column: 1 / -1;
+}
 
-    /* Standard wrapper for when the single combined chart is showing */
-    .trend-charts-wrap {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      grid-auto-rows: minmax(0, 1fr); 
-      gap: 14px;
-      min-height: 0; 
-    }
+.charts canvas {
+  flex: 1 1 0px;
+  min-height: 0;
+  max-height: 100%;
+  width: 100% !important;
+}
 
-    /* ==========================================================
-       WHEN SPLIT IS ACTIVE: 3-ROW LAYOUT
-       Row 1: [1] (Volume)       [2] (Overall Prod)
-       Row 2: [3] (Area Group)   [4] (Split Trend 1)
-       Row 3:       [5] (Split Trend 2 Centered)
-       ========================================================== */
-    
-    /* Lock all 3 rows to exactly 450px */
-    .charts.has-split-trend {
-      grid-template-rows: 450px 450px 450px;
-    }
+/* Deployment Trend charts — dynamically populated, 1 to MAX_TREND_CHARTS panels.
+   Reflows its own column count independently of the .charts grid above. */
+.trend-charts-wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
 
-    /* MAGIC: Added !important to guarantee the wrapper becomes "invisible" 
-       to the layout, even if inline styles try to fight it. */
-    .charts.has-split-trend > .trend-charts-wrap {
-      display: contents !important; 
-    }
+.trend-charts-wrap .card.panel {
+  display: flex;
+  flex-direction: column;
+  height: 450px;
+  min-height: 0;
+  position: relative;
+}
 
-    /* [3] The Area Group Chart */
-    .charts.has-split-trend > .card.panel:nth-child(3) {
-      grid-column: 1; 
-      grid-row: 2; 
-      width: 100%; 
-      margin: 0; 
-    }
-
-    /* [4] The Split Trend 1 
-       Changed to *:nth-child(1) to catch it regardless of exact class names */
-    .charts.has-split-trend > .trend-charts-wrap > *:nth-child(1) {
-      grid-column: 2;
-      grid-row: 2;
-    }
-
-    /* [5] The Split Trend 2 
-       Changed to *:nth-child(2) for the same bulletproof reason */
-    .charts.has-split-trend > .trend-charts-wrap > *:nth-child(2) {
-      grid-column: 1 / -1; 
-      grid-row: 3;
-      width: calc(50% - 7px); 
-      margin: 0 auto; 
-    }
+.trend-charts-wrap canvas {
+  flex: 1 1 0px;
+  min-height: 0;
+  max-height: 100%;
+  width: 100% !important;
+}
 
 .trend-split-cb {
   display: flex;
@@ -2010,26 +1984,9 @@ canvas {
 @media (max-width: 1100px) {
   .charts {
     grid-template-columns: 1fr;
-    grid-template-rows: none;
-    grid-auto-rows: auto;
   }
-  .charts > .card.panel:last-child:nth-child(odd) {
-    width: 100%;
-  }
-  .charts.has-split-trend {
-    grid-template-rows: none;
-    grid-auto-rows: auto;
-  }
-  .charts.has-split-trend > .card.panel:nth-child(3) {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
-  .charts.has-split-trend > .trend-charts-wrap > *:nth-child(1),
-  .charts.has-split-trend > .trend-charts-wrap > *:nth-child(2) {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    width: 100%;
-    margin: 0;
+  .trend-charts-wrap {
+    grid-template-columns: 1fr;
   }
   .volume-charts:not(.combined-mode) {
     grid-template-columns: 1fr;
@@ -2045,14 +2002,6 @@ canvas {
   }
   .bonus-two-tables {
     grid-template-columns: 1fr;
-  }
-  .trend-charts-wrap {
-    grid-column: 1 / -1 !important;
-    width: 100% !important;
-    margin: 0 !important;
-  }
-  .trend-charts-wrap.split-mode {
-    grid-template-columns: 1fr !important;
   }
 }
 
@@ -2109,7 +2058,8 @@ canvas {
   canvas {
     height: 220px !important;
   }
-  .page:nth-child(1) .charts canvas {
+  .page:nth-child(1) .charts canvas,
+  .page:nth-child(1) .trend-charts-wrap canvas {
     height: 320px !important;
   }
   .volume-charts canvas {

@@ -213,28 +213,20 @@
     </div>
 
     <div id="trendSplitOverlay" class="breakdown-overlay" onclick="closeTrendSplit()">
-      <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 600px;">
+      <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
         <div class="breakdown-header">
           <div>
             <h2>Split Deployment Trend</h2>
-            <p class="breakdown-subtitle">Select areas for each chart. The same area can appear in both.</p>
+            <p class="breakdown-subtitle">Select areas for each chart. The same area can appear in multiple charts (up to 7 charts).</p>
           </div>
           <button class="breakdown-close" onclick="closeTrendSplit()" aria-label="Close">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-        
+
         <div class="breakdown-body">
-          <div class="two-panels" style="gap: 20px;">
-            <div>
-              <h3 style="margin-top:0; font-size:14px; color:var(--accent);">Chart A</h3>
-              <div id="trendSplitCh1"></div>
-            </div>
-            <div>
-              <h3 style="margin-top:0; font-size:14px; color:var(--color-good);">Chart B</h3>
-              <div id="trendSplitCh2"></div>
-            </div>
-          </div>
+          <div id="trendSplitEditor"></div>
+          <button class="btn" id="addTrendSplitBtn" onclick="addTrendSplitChart()"><i class="fa-solid fa-plus"></i> Add Chart</button>
           <div class="modal-actions">
             <button class="btn" onclick="resetTrendSplit()" style="border-color: var(--color-bad); color: var(--color-bad);">Reset to Single</button>
             <button class="btn" onclick="applyTrendSplit()" style="background: var(--accent); color: #fff; border-color: var(--accent);">Apply</button>

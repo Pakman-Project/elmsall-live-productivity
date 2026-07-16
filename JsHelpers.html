@@ -50,8 +50,14 @@ function loadUserPreferences() {
       syncedWindows[i].value = $('timeWindow').value;
     }
 
-    if (prefs.trendSplitState && typeof prefs.trendSplitState.enabled === 'boolean') {
-      trendSplitState = prefs.trendSplitState;
+    if (prefs.trendSplitState && typeof prefs.trendSplitState.enabled === 'boolean' && Array.isArray(prefs.trendSplitState.charts)) {
+      var validTrendKeys = {};
+      for (var vt = 0; vt < VOLUME_TYPES.length; vt++) { validTrendKeys[VOLUME_TYPES[vt].key] = true; }
+      var cleanedTrendCharts = prefs.trendSplitState.charts
+        .filter(function(c) { return Array.isArray(c); })
+        .map(function(c) { return c.filter(function(k) { return validTrendKeys[k]; }); })
+        .slice(0, MAX_TREND_CHARTS);
+      trendSplitState = { enabled: !!prefs.trendSplitState.enabled, charts: cleanedTrendCharts };
     }
 
     if (Array.isArray(prefs.areaGroups)) {

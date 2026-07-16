@@ -80,20 +80,17 @@
     </div>
   </div>
     <div class="charts" id="page1Charts">
-      <!-- ROW 1, COL 1 -->
       <div class="card panel">
         <div class="mini-table-title"><h2>Volume - PiE & Top Up</h2><span class="tag">Stacked Area</span></div>
         <canvas id="overviewVolChart"></canvas>
       </div>
 
-      <!-- ROW 1, COL 2 -->
       <div class="card panel">
         <div class="mini-table-title"><h2>Overall Productivity %</h2><span class="tag">All E3 Areas</span></div>
         <canvas id="perfChart"></canvas>
       </div>
 
-      <!-- ROW 2, COL 1 -->
-      <div class="card panel">
+      <div class="card panel span-charts-full">
         <div class="mini-table-title">
           <h2 id="areaGroupChartTitle">Productivity % by Work Area</h2>
           <div style="display:flex; gap:5px; align-items:center;">
@@ -102,27 +99,8 @@
         </div>
         <canvas id="areaGroupChart"></canvas>
       </div>
-
-      <!-- ROW 2, COL 2 (Becomes Row 3 centered if split) -->
-      <div class="trend-charts-wrap" id="trendChartsWrap">
-        <div class="card panel" id="trendPanel1">
-          <div class="mini-table-title">
-            <h2>Deployment Trend</h2>
-            <div style="display:flex; gap:5px; align-items:center;">
-              <button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
-            </div>
-          </div>
-          <canvas id="trendChart"></canvas>
-        </div>
-        <div class="card panel" id="trendPanel2" style="display:none;">
-          <div class="mini-table-title">
-            <h2 id="trendPanel2Title">Deployment Trend B</h2>
-            <div style="display:flex; gap:5px; align-items:center;">
-              <button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
-            </div>
-          </div>
-          <canvas id="trendChart2"></canvas>
-        </div>
-      </div>
     </div>
+
+    <!-- Populated dynamically with 1-7 chart panels by renderChartsPak() -->
+    <div class="trend-charts-wrap" id="trendChartsWrap"></div>
 </div>

@@ -340,7 +340,7 @@ function buildBonusMiniTable_(rows, metric) {
   return html;
 }
 
-function buildBonusPanel_(title, color, allRows, rowsLimit) {
+function buildBonusPanel_(title, allRows, rowsLimit) {
   var minUnderPerf = (currentThreshold / 0.25) * 100;
   var metric = sideSortMetric;
 
@@ -354,10 +354,8 @@ function buildBonusPanel_(title, color, allRows, rowsLimit) {
     .sort(function (a, b) { return a[metric] - b[metric]; })
     .slice(0, rowsLimit);
 
-  var dot = color ? '<span class="breakdown-dot" style="background:' + color + ';margin-right:7px;"></span>' : '';
-
   var html = '<div class="card panel">';
-  html += '<div class="mini-table-title"><h2>' + dot + safeTextPak(title) + '</h2><span class="tag">' + allRows.length + ' head' + (allRows.length !== 1 ? 's' : '') + '</span></div>';
+  html += '<div class="mini-table-title"><h2>' + safeTextPak(title) + '</h2><span class="tag">' + allRows.length + ' head' + (allRows.length !== 1 ? 's' : '') + '</span></div>';
   html += '<div class="bonus-two-tables">';
   html += '<div><div class="bonus-table-caption good"><i class="fa-solid fa-arrow-trend-up"></i> Productive</div>';
   html += '<div class="table-wrap">' + buildBonusMiniTable_(topRows, metric) + '</div></div>';
@@ -436,13 +434,13 @@ function renderSideTablesPak(rowsLimit) {
       if (hiddenBonusAreas.indexOf(t.key) !== -1) continue;
       var rows = computeBonusRows_(windowData, t.stdKey);
       if (rows.length === 0) continue;
-      html += buildBonusPanel_(t.label, t.color, rows, rowsLimit);
+      html += buildBonusPanel_(t.label, rows, rowsLimit);
     }
     if (!html) {
       html = '<div class="card panel bonus-empty-panel"><i class="fa-solid fa-ghost"></i>No activity in the selected range</div>';
     }
   } else {
-    html = buildBonusPanel_('All Work Areas', null, computeBonusRows_(windowData, null), rowsLimit);
+    html = buildBonusPanel_('All Work Areas', computeBonusRows_(windowData, null), rowsLimit);
   }
 
   container.innerHTML = html;

@@ -45,31 +45,29 @@ function applyLocalFiltersPak() {
   });
   var baseRows = generateMainRows_(filteredData, targetTimeList);
   
-  var trendRows1 = baseRows;
-  var trendRows2 = null;
-  if (trendSplitState.enabled) {
-    var has1 = trendSplitState.chart1.length > 0;
-    var has2 = trendSplitState.chart2.length > 0;
-    if (has1 && has2) {
-      trendRows1 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart1);
-      trendRows2 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart2);
-      $('trendPanel1').querySelector('h2').textContent = getTrendTitle(trendSplitState.chart1);
-    } else if (has1) {
-      trendRows1 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart1);
-      $('trendPanel1').querySelector('h2').textContent = getTrendTitle(trendSplitState.chart1);
-    } else if (has2) {
-      trendRows1 = generateTrendRowsForAreas_(filteredData, targetTimeList, trendSplitState.chart2);
-      $('trendPanel1').querySelector('h2').textContent = getTrendTitle(trendSplitState.chart2);
-    }
+  var activeTrendCharts = [];
+  if (trendSplitState.enabled && trendSplitState.charts) {
+    activeTrendCharts = trendSplitState.charts.filter(function(c) { return c.length > 0; });
+  }
+
+  var trendRowsList, trendTitles, trendAreaKeysList;
+  if (activeTrendCharts.length > 0) {
+    trendRowsList = activeTrendCharts.map(function(areaKeys) {
+      return generateTrendRowsForAreas_(filteredData, targetTimeList, areaKeys);
+    });
+    trendTitles = activeTrendCharts.map(function(areaKeys) { return getTrendTitle(areaKeys); });
+    trendAreaKeysList = activeTrendCharts;
   } else {
-    $('trendPanel1').querySelector('h2').textContent = 'Deployment Trend';
+    trendRowsList = [baseRows];
+    trendTitles = ['Deployment Trend'];
+    trendAreaKeysList = [[]];
   }
 
   var tableData = baseRows;
   if (windowMinutes !== 15) { tableData = getAggregatedDataPak(baseRows, windowMinutes); }
   currentMainRows = tableData;
   renderMainTablePak(currentMainRows);
-  renderChartsPak(baseRows, trendRows1, trendRows2, filteredData, targetTimeList);
+  renderChartsPak(baseRows, trendRowsList, trendTitles, trendAreaKeysList, filteredData, targetTimeList);
   renderSideTablesPak(rowsLimit);
   saveUserPreferences();
 }

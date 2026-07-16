@@ -123,11 +123,12 @@
   function resizeCharts() {
     setTimeout(function() {
       if (overviewVolChart) overviewVolChart.resize();
-      if (trendChart) trendChart.resize();
-      if (trendChart2) trendChart2.resize();
+      for (var t = 0; t < trendCharts.length; t++) {
+        if (trendCharts[t]) trendCharts[t].resize();
+      }
       if (perfChart) perfChart.resize();
-      for (var i = 0; i < volumeCharts.length; i++) { 
-        if (volumeCharts[i]) volumeCharts[i].resize(); 
+      for (var i = 0; i < volumeCharts.length; i++) {
+        if (volumeCharts[i]) volumeCharts[i].resize();
       }
     }, 310);
   }
@@ -452,50 +453,76 @@
     }
   }
 
+  var _trendSplitDraft = null;
+
   function openTrendSplit() {
+    _trendSplitDraft = (trendSplitState.charts && trendSplitState.charts.length > 0)
+      ? trendSplitState.charts.map(function(c) { return c.slice(); })
+      : [[], []];
     $('trendSplitOverlay').classList.add('active');
-    renderTrendSplitCheckboxes();
+    renderTrendSplitEditor();
   }
 
   function closeTrendSplit() {
     $('trendSplitOverlay').classList.remove('active');
   }
 
-  function renderTrendSplitCheckboxes() {
-    var html1 = '', html2 = '';
-    for (var i = 0; i < VOLUME_TYPES.length; i++) {
-      var v = VOLUME_TYPES[i];
-      var checked1 = trendSplitState.chart1.indexOf(v.key) !== -1 ? 'checked' : '';
-      var checked2 = trendSplitState.chart2.indexOf(v.key) !== -1 ? 'checked' : '';
-      html1 += '<label class="trend-split-cb"><input type="checkbox" data-chart="1" data-key="' + v.key + '" ' + checked1 + '><span class="trend-split-dot" style="background:' + v.color + '"></span>' + v.label + '</label>';
-      html2 += '<label class="trend-split-cb"><input type="checkbox" data-chart="2" data-key="' + v.key + '" ' + checked2 + '><span class="trend-split-dot" style="background:' + v.color + '"></span>' + v.label + '</label>';
+  function renderTrendSplitEditor() {
+    var html = '';
+    for (var i = 0; i < _trendSplitDraft.length; i++) {
+      var label = TREND_CHART_LABELS[i] || ('Chart ' + (i + 1));
+      html += '<div class="area-group-block">';
+      html += '<div class="area-group-head">';
+      html += '<h3>' + label + '</h3>';
+      if (_trendSplitDraft.length > 1) {
+        html += '<button class="btn area-group-remove" onclick="removeTrendSplitChart(' + i + ')" title="Remove chart"><i class="fa-solid fa-trash"></i></button>';
+      }
+      html += '</div>';
+      html += '<div class="area-group-areas">';
+      for (var v = 0; v < VOLUME_TYPES.length; v++) {
+        var t = VOLUME_TYPES[v];
+        var checked = _trendSplitDraft[i].indexOf(t.key) !== -1 ? 'checked' : '';
+        html += '<label class="trend-split-cb"><input type="checkbox" data-chart="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onTrendSplitCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
+      }
+      html += '</div></div>';
     }
-    $('trendSplitCh1').innerHTML = html1;
-    $('trendSplitCh2').innerHTML = html2;
+    $('trendSplitEditor').innerHTML = html;
+    $('addTrendSplitBtn').style.display = _trendSplitDraft.length >= MAX_TREND_CHARTS ? 'none' : '';
+  }
+
+  function onTrendSplitCbChange(cb) {
+    var i = parseInt(cb.dataset.chart, 10);
+    var key = cb.dataset.key;
+    var keys = _trendSplitDraft[i];
+    var idx = keys.indexOf(key);
+    if (cb.checked && idx === -1) { keys.push(key); }
+    else if (!cb.checked && idx !== -1) { keys.splice(idx, 1); }
+  }
+
+  function addTrendSplitChart() {
+    if (_trendSplitDraft.length >= MAX_TREND_CHARTS) return;
+    _trendSplitDraft.push([]);
+    renderTrendSplitEditor();
+  }
+
+  function removeTrendSplitChart(i) {
+    _trendSplitDraft.splice(i, 1);
+    renderTrendSplitEditor();
   }
 
   function applyTrendSplit() {
-    var cbs1 = $('trendSplitCh1').querySelectorAll('input[type="checkbox"]');
-    var cbs2 = $('trendSplitCh2').querySelectorAll('input[type="checkbox"]');
-    var ch1 = [], ch2 = [];
-    for (var i = 0; i < cbs1.length; i++) { if (cbs1[i].checked) ch1.push(cbs1[i].dataset.key); }
-    for (var i = 0; i < cbs2.length; i++) { if (cbs2[i].checked) ch2.push(cbs2[i].dataset.key); }
-    
-    var chartsContainer = $('page1Charts');
-    if (ch1.length === 0 && ch2.length === 0) {
-      trendSplitState = { enabled: false, chart1: [], chart2: [] };
-      chartsContainer.classList.remove('has-split-trend');
-    } else {
-      trendSplitState = { enabled: true, chart1: ch1, chart2: ch2 };
-      chartsContainer.classList.add('has-split-trend');
-    }
+    var order = VOLUME_TYPES.map(function(t) { return t.key; });
+    var cleaned = _trendSplitDraft.map(function(keys) {
+      return order.filter(function(k) { return keys.indexOf(k) !== -1; });
+    });
+    var anySelected = cleaned.some(function(c) { return c.length > 0; });
+    trendSplitState = anySelected ? { enabled: true, charts: cleaned } : { enabled: false, charts: [] };
     closeTrendSplit();
     applyLocalFiltersPak();
   }
 
   function resetTrendSplit() {
-    trendSplitState = { enabled: false, chart1: [], chart2: [] };
-    $('page1Charts').classList.remove('has-split-trend');
+    trendSplitState = { enabled: false, charts: [] };
     closeTrendSplit();
     applyLocalFiltersPak();
   }

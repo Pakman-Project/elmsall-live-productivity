@@ -148,11 +148,7 @@
     initBonusSearch();
     
     // Load UI preferences (Dropdowns, Split States) - BUT NOT THE ARCHIVE URL
-    loadUserPreferences(); 
-    
-    if (trendSplitState && trendSplitState.enabled === true) {
-      document.querySelector('.charts').classList.add('has-split-trend');
-    }
+    loadUserPreferences();
 
     setupSwipe();
     setArrowState();
