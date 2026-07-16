@@ -18,7 +18,14 @@ var VOLUME_TYPES = [
 var AREA_GROUP_COLORS = ['#69a7ff', '#ff9f43', '#48dbfb', '#a55eea', '#32d583', '#ff6b6b', '#feca57'];
 var DEFAULT_AREA_GROUPS = [['pieVol', 'topUpVol'], ['e3PackingVol']];
 var MAX_AREA_GROUPS = 7;
-var areaGroupState = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+
+function defaultAreaGroupState_() {
+  return DEFAULT_AREA_GROUPS.map(function(g) {
+    return { keys: g.slice(), showLine: true, showTrend: false };
+  });
+}
+
+var areaGroupState = defaultAreaGroupState_();
 
 var BREAKDOWN_AREAS = [
   { key: 'pie', label: 'PiE', color: '#69a7ff' },

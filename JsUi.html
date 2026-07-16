@@ -530,9 +530,11 @@
   var _areaGroupDraft = null;
 
   function openAreaGroups() {
-    _areaGroupDraft = areaGroupState.map(function(g) { return g.slice(); });
+    _areaGroupDraft = areaGroupState.map(function(g) {
+      return { keys: (g.keys || []).slice(), showLine: g.showLine !== false, showTrend: g.showTrend === true };
+    });
     if (_areaGroupDraft.length === 0) {
-      _areaGroupDraft = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+      _areaGroupDraft = defaultAreaGroupState_();
     }
     $('areaGroupOverlay').classList.add('active');
     renderAreaGroupEditor();
@@ -546,17 +548,22 @@
     var html = '';
     for (var i = 0; i < _areaGroupDraft.length; i++) {
       var color = AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length];
+      var g = _areaGroupDraft[i];
       html += '<div class="area-group-block">';
       html += '<div class="area-group-head">';
       html += '<h3 style="color:' + color + ';">Group ' + (i + 1) + '</h3>';
+      html += '<div class="area-group-modes">';
+      html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-mode="showLine" ' + (g.showLine ? 'checked' : '') + ' onchange="onAreaGroupModeChange(this)"><span class="area-cb-text">Line</span></label>';
+      html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-mode="showTrend" ' + (g.showTrend ? 'checked' : '') + ' onchange="onAreaGroupModeChange(this)"><span class="area-cb-text">Trend Line</span></label>';
       if (_areaGroupDraft.length > 1) {
         html += '<button class="btn area-group-remove" onclick="removeAreaGroup(' + i + ')" title="Remove group"><i class="fa-solid fa-trash"></i></button>';
       }
       html += '</div>';
+      html += '</div>';
       html += '<div class="area-group-areas">';
       for (var v = 0; v < VOLUME_TYPES.length; v++) {
         var t = VOLUME_TYPES[v];
-        var checked = _areaGroupDraft[i].indexOf(t.key) !== -1 ? 'checked' : '';
+        var checked = g.keys.indexOf(t.key) !== -1 ? 'checked' : '';
         html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onAreaGroupCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
       }
       html += '</div></div>';
@@ -568,15 +575,27 @@
   function onAreaGroupCbChange(cb) {
     var i = parseInt(cb.dataset.group, 10);
     var key = cb.dataset.key;
-    var keys = _areaGroupDraft[i];
+    var keys = _areaGroupDraft[i].keys;
     var idx = keys.indexOf(key);
     if (cb.checked && idx === -1) { keys.push(key); }
     else if (!cb.checked && idx !== -1) { keys.splice(idx, 1); }
   }
 
+  function onAreaGroupModeChange(cb) {
+    var i = parseInt(cb.dataset.group, 10);
+    var mode = cb.dataset.mode;
+    var g = _areaGroupDraft[i];
+    g[mode] = cb.checked;
+    // At least one of Line / Trend Line must stay selected
+    if (!g.showLine && !g.showTrend) {
+      g[mode] = true;
+      cb.checked = true;
+    }
+  }
+
   function addAreaGroup() {
     if (_areaGroupDraft.length >= MAX_AREA_GROUPS) return;
-    _areaGroupDraft.push([]);
+    _areaGroupDraft.push({ keys: [], showLine: true, showTrend: false });
     renderAreaGroupEditor();
   }
 
@@ -590,11 +609,15 @@
     var cleaned = [];
     for (var i = 0; i < _areaGroupDraft.length && cleaned.length < MAX_AREA_GROUPS; i++) {
       var draft = _areaGroupDraft[i];
-      var keys = order.filter(function(k) { return draft.indexOf(k) !== -1; });
-      if (keys.length > 0) cleaned.push(keys);
+      var keys = order.filter(function(k) { return draft.keys.indexOf(k) !== -1; });
+      if (keys.length === 0) continue;
+      var showLine = draft.showLine !== false;
+      var showTrend = draft.showTrend === true;
+      if (!showLine && !showTrend) showLine = true;
+      cleaned.push({ keys: keys, showLine: showLine, showTrend: showTrend });
     }
     if (cleaned.length === 0) {
-      cleaned = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+      cleaned = defaultAreaGroupState_();
     }
     areaGroupState = cleaned;
     closeAreaGroups();
@@ -602,7 +625,7 @@
   }
 
   function resetAreaGroups() {
-    areaGroupState = DEFAULT_AREA_GROUPS.map(function(g) { return g.slice(); });
+    areaGroupState = defaultAreaGroupState_();
     closeAreaGroups();
     applyLocalFiltersPak();
   }

@@ -66,9 +66,15 @@ function loadUserPreferences() {
       var cleanedGroups = [];
       for (var g = 0; g < prefs.areaGroups.length && cleanedGroups.length < MAX_AREA_GROUPS; g++) {
         var grp = prefs.areaGroups[g];
-        if (!Array.isArray(grp)) continue;
-        var keys = grp.filter(function(k) { return validKeys[k]; });
-        if (keys.length > 0) cleanedGroups.push(keys);
+        // Legacy shape was a plain array of keys; current shape is {keys, showLine, showTrend}
+        var keysSrc = Array.isArray(grp) ? grp : (grp && Array.isArray(grp.keys) ? grp.keys : null);
+        if (!keysSrc) continue;
+        var keys = keysSrc.filter(function(k) { return validKeys[k]; });
+        if (keys.length === 0) continue;
+        var showLine = Array.isArray(grp) ? true : grp.showLine !== false;
+        var showTrend = Array.isArray(grp) ? false : grp.showTrend === true;
+        if (!showLine && !showTrend) showLine = true;
+        cleanedGroups.push({ keys: keys, showLine: showLine, showTrend: showTrend });
       }
       if (cleanedGroups.length > 0) areaGroupState = cleanedGroups;
     }
@@ -81,6 +87,22 @@ function loadUserPreferences() {
 function normalizePerfPak(v) {
   var x = Number(v);
   return Number.isFinite(x) ? x : 0;
+}
+
+// Least-squares linear fit over the series; returns the fitted value per index.
+function linearTrendPak(data) {
+  var n = 0, sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (var i = 0; i < data.length; i++) {
+    var y = Number(data[i]);
+    if (!Number.isFinite(y)) continue;
+    n++; sx += i; sy += y; sxy += i * y; sxx += i * i;
+  }
+  if (n < 2) return data.map(function() { return null; });
+  var denom = n * sxx - sx * sx;
+  if (denom === 0) return data.map(function() { return null; });
+  var slope = (n * sxy - sx * sy) / denom;
+  var intercept = (sy - slope * sx) / n;
+  return data.map(function(_, i) { return intercept + slope * i; });
 }
 
 function numPak(n, d) {

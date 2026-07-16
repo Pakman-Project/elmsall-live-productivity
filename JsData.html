@@ -3,7 +3,8 @@
 function getPerfSplitGroups_() {
   var groups = [];
   for (var i = 0; i < areaGroupState.length; i++) {
-    var keys = areaGroupState[i] || [];
+    var entry = areaGroupState[i] || {};
+    var keys = entry.keys || [];
     var labels = [];
     for (var k = 0; k < keys.length; k++) {
       for (var v = 0; v < VOLUME_TYPES.length; v++) {
@@ -15,7 +16,9 @@ function getPerfSplitGroups_() {
       id: 'g' + i,
       label: labels.join(', '),
       keys: keys,
-      color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length]
+      color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length],
+      showLine: entry.showLine !== false,
+      showTrend: entry.showTrend === true
     });
   }
   return groups;

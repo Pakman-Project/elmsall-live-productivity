@@ -90,7 +90,7 @@
         <canvas id="perfChart"></canvas>
       </div>
 
-      <div class="card panel span-charts-full">
+      <div class="card panel">
         <div class="mini-table-title">
           <h2 id="areaGroupChartTitle">Productivity % by Work Area</h2>
           <div style="display:flex; gap:5px; align-items:center;">
@@ -99,8 +99,9 @@
         </div>
         <canvas id="areaGroupChart"></canvas>
       </div>
-    </div>
 
-    <!-- Populated dynamically with 1-7 chart panels by renderChartsPak() -->
-    <div class="trend-charts-wrap" id="trendChartsWrap"></div>
+      <!-- Populated dynamically with 1-7 chart panels by renderChartsPak();
+           display:contents makes the panels flow directly in the .charts grid -->
+      <div class="trend-charts-wrap" id="trendChartsWrap"></div>
+    </div>
 </div>

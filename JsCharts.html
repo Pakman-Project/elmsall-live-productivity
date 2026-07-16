@@ -105,7 +105,13 @@
       var perfSplitBase = generatePerfSplitRows_(rawFilteredData, rawTimeList, perfGroups);
       var perfSplitAgg = getAggregatedPerfSplitDataPak(perfSplitBase, wm, perfGroups);
       perfGroups.forEach(function(group) {
-        areaGroupDatasets.push({ label: group.label, data: perfSplitAgg.map(function(r) { return r[group.id] || 0; }), borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
+        var dataArr = perfSplitAgg.map(function(r) { return r[group.id] || 0; });
+        if (group.showLine) {
+          areaGroupDatasets.push({ label: group.label, data: dataArr, borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
+        }
+        if (group.showTrend) {
+          areaGroupDatasets.push({ label: group.label + ' (Trend)', data: linearTrendPak(dataArr), borderWidth: 2, borderColor: group.color, backgroundColor: 'transparent', borderDash: [6, 4], tension: 0, pointRadius: 0, fill: false });
+        }
       });
     }
     areaGroupChart = new Chart($('areaGroupChart'), { type: 'line', data: { labels: labels, datasets: areaGroupDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: '#eaf0ff' }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Productivity %', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(areaGroupChart, [perfChart, overviewVolChart].concat(trendCharts), event, elements); } } });
@@ -140,10 +146,15 @@
     var trendWrap = $('trendChartsWrap');
     trendWrap.innerHTML = '';
 
+    var totalChartPanels = 3 + trendRowsList.length;
+
     for (var ti = 0; ti < trendRowsList.length; ti++) {
       (function(idx) {
         var panelEl = document.createElement('div');
         panelEl.className = 'card panel';
+        if (idx === trendRowsList.length - 1 && totalChartPanels % 2 === 1) {
+          panelEl.className += ' chart-center-odd';
+        }
         var titleHtml = '<h2>' + safeTextPak(trendTitles[idx]) + '</h2>';
         if (idx === 0) {
           titleHtml += '<div style="display:flex; gap:5px; align-items:center;"><button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button></div>';

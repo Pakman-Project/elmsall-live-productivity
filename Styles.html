@@ -1547,10 +1547,6 @@ canvas {
   position: relative;
 }
 
-.charts .card.panel.span-charts-full {
-  grid-column: 1 / -1;
-}
-
 .charts canvas {
   flex: 1 1 0px;
   min-height: 0;
@@ -1559,27 +1555,18 @@ canvas {
 }
 
 /* Deployment Trend charts — dynamically populated, 1 to MAX_TREND_CHARTS panels.
-   Reflows its own column count independently of the .charts grid above. */
+   display:contents makes the panels participate directly in the parent
+   .charts grid, keeping every chart 2-per-row. */
 .trend-charts-wrap {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 14px;
-  margin-bottom: 14px;
+  display: contents;
 }
 
-.trend-charts-wrap .card.panel {
-  display: flex;
-  flex-direction: column;
-  height: 450px;
-  min-height: 0;
-  position: relative;
-}
-
-.trend-charts-wrap canvas {
-  flex: 1 1 0px;
-  min-height: 0;
-  max-height: 100%;
-  width: 100% !important;
+/* Last chart panel on the page when the total count is odd — span the full
+   row but render at half width, centered (same pattern as the volume page). */
+.charts .card.panel.chart-center-odd {
+  grid-column: 1 / -1;
+  width: calc((100% - 14px) / 2);
+  margin: 0 auto;
 }
 
 .trend-split-cb {
@@ -1637,6 +1624,18 @@ canvas {
   font-size: 11px;
   border-color: rgba(255, 122, 122, 0.35);
   color: var(--color-bad);
+}
+
+.area-group-modes {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.area-group-modes .trend-split-cb {
+  border-bottom: none;
+  padding: 2px 0;
+  font-size: 12px;
 }
 
 .area-group-areas {
@@ -1754,6 +1753,13 @@ canvas {
 
 .bonus-tables-grid.overall {
   grid-template-columns: 1fr;
+}
+
+/* Last area panel when the count is odd — half width, centered */
+.bonus-tables-grid:not(.overall) > .card.panel:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  width: calc((100% - 14px) / 2);
+  margin: 0 auto;
 }
 
 .bonus-tables-grid > .card.panel {
@@ -1985,8 +1991,11 @@ canvas {
   .charts {
     grid-template-columns: 1fr;
   }
-  .trend-charts-wrap {
-    grid-template-columns: 1fr;
+  .charts .card.panel.chart-center-odd {
+    width: 100%;
+  }
+  .bonus-tables-grid:not(.overall) > .card.panel:last-child:nth-child(odd) {
+    width: 100%;
   }
   .volume-charts:not(.combined-mode) {
     grid-template-columns: 1fr;
