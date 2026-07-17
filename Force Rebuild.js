@@ -10,7 +10,7 @@ function forceRebuildProcessedData() {
   // 1. Clear existing data in Processed sheet (Row 2 down to Columns A:R)
   var lastProcRow = procSheet.getLastRow();
   if (lastProcRow > 1) {
-    procSheet.getRange(2, 1, lastProcRow - 1, 18).clearContent();
+    procSheet.getRange(2, 1, lastProcRow - 1, 22).clearContent();
   }
 
   // 2. Clear cached properties so the automated script knows it's a fresh start
@@ -38,14 +38,14 @@ function forceRebuildProcessedData() {
 
   if (sortedAC.length === 0) return;
 
-  var headers = procSheet.getRange('D1:J1').getDisplayValues()[0].map(function(v) { return norm(v); });
+  var headers = procSheet.getRange('D1:L1').getDisplayValues()[0].map(function(v) { return norm(v); });
 
   // 5. Build the output rows
   var outputDR = buildProcessedRows_(sortedAC, null, true, sumF, sumE, divisor, headers);
 
   // 6. Bulk write back to the sheet
   procSheet.getRange(2, 1, sortedAC.length, 3).setValues(sortedAC);
-  procSheet.getRange(2, 4, outputDR.length, 15).setValues(outputDR);
+  procSheet.getRange(2, 4, outputDR.length, 19).setValues(outputDR);
 
   // 7. Update properties to current state
   props.setProperty('PROC_A2_LAST', norm(sortedAC[0][0]));

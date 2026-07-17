@@ -682,7 +682,9 @@ tr:hover td {
   display: none;
 }
 
-.volume-charts:not(.combined-mode) > .vol-chart-panel:last-child:nth-child(8) {
+/* Last volume panel when the panel count is odd (controls div is child 1,
+   so an odd panel count puts the last panel at an even child index) */
+.volume-charts:not(.combined-mode) > .vol-chart-panel:last-child:nth-child(even) {
   grid-column: 1 / -1;
   width: calc((100% - 14px) / 2);
   margin: 0 auto;
@@ -1640,7 +1642,7 @@ canvas {
 
 .area-group-areas {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 0 10px;
 }
 
@@ -1832,7 +1834,7 @@ canvas {
 }
 
 #mainTable {
-  min-width: 1530px;
+  min-width: 1770px;
   table-layout: fixed;
 }
 
@@ -1900,6 +1902,16 @@ canvas {
   width: 120px;
 }
 
+#mainTable th:nth-child(13), #mainTable td:nth-child(13),
+.main-detail-table th:nth-child(13), .main-detail-table td:nth-child(13) {
+  width: 120px;
+}
+
+#mainTable th:nth-child(14), #mainTable td:nth-child(14),
+.main-detail-table th:nth-child(14), .main-detail-table td:nth-child(14) {
+  width: 120px;
+}
+
 .main-expandable-row {
   cursor: pointer;
 }
@@ -1961,7 +1973,7 @@ canvas {
 }
 
 .main-detail-table {
-  min-width: 1530px;
+  min-width: 1770px;
 }
 
 .main-detail-table th,
@@ -2000,7 +2012,7 @@ canvas {
   .volume-charts:not(.combined-mode) {
     grid-template-columns: 1fr;
   }
-  .volume-charts:not(.combined-mode) > .vol-chart-panel:last-child:nth-child(8) {
+  .volume-charts:not(.combined-mode) > .vol-chart-panel:last-child:nth-child(even) {
     width: 100%;
   }
   .two-panels {

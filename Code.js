@@ -86,6 +86,74 @@ function getArchiveLinks() {
 }
 
 // ─────────────────────────────────────────────
+// Helpers: read Processed Data (15mins) rows, handling both layouts.
+// v2 (current): std D:L (idx 3-11), total M (idx 12), volumes N:V (idx 13-21).
+// v1 (legacy archives, pre BCR/E1-E2): std D:J (3-9), total K (10), volumes L:R (11-17).
+// Detected via L1: in v2 it is the last "D.Analysis - ..." header.
+// ─────────────────────────────────────────────
+function readProcRows_(sheet, lastRow) {
+  var l1 = String(sheet.getRange('L1').getDisplayValue() || '');
+  var isV2 = l1.indexOf('D.Analysis') === 0;
+  var cols = isV2 ? 22 : 18;
+  return {
+    vals: sheet.getRange(2, 1, lastRow - 1, cols).getValues(),
+    disps: sheet.getRange(2, 1, lastRow - 1, cols).getDisplayValues(),
+    isV2: isV2
+  };
+}
+
+function buildSideEntry_(valsRow, dispsRow, isV2) {
+  if (isV2) {
+    return {
+      timeRange: String(dispsRow[0]).trim(),
+      bonus: String(dispsRow[2]).trim(),
+      value: toNumber_(valsRow[12]),
+      pieStd: toNumber_(valsRow[3]),
+      topUpStd: toNumber_(valsRow[4]),
+      e3PackingStd: toNumber_(valsRow[5]),
+      parcelSortationStd: toNumber_(valsRow[6]),
+      parcelInductStd: toNumber_(valsRow[7]),
+      inboundDecantingStd: toNumber_(valsRow[8]),
+      osrDecantingStd: toNumber_(valsRow[9]),
+      bcrInductingStd: toNumber_(valsRow[10]),
+      e1e2InductingStd: toNumber_(valsRow[11]),
+      pie: toNumber_(valsRow[13]),
+      topUp: toNumber_(valsRow[14]),
+      e3Packing: toNumber_(valsRow[15]),
+      parcelSortation: toNumber_(valsRow[16]),
+      parcelInduct: toNumber_(valsRow[17]),
+      inboundDecanting: toNumber_(valsRow[18]),
+      osrDecanting: toNumber_(valsRow[19]),
+      bcrInducting: toNumber_(valsRow[20]),
+      e1e2Inducting: toNumber_(valsRow[21])
+    };
+  }
+  return {
+    timeRange: String(dispsRow[0]).trim(),
+    bonus: String(dispsRow[2]).trim(),
+    value: toNumber_(valsRow[10]),
+    pieStd: toNumber_(valsRow[3]),
+    topUpStd: toNumber_(valsRow[4]),
+    e3PackingStd: toNumber_(valsRow[5]),
+    parcelSortationStd: toNumber_(valsRow[6]),
+    parcelInductStd: toNumber_(valsRow[7]),
+    inboundDecantingStd: toNumber_(valsRow[8]),
+    osrDecantingStd: toNumber_(valsRow[9]),
+    bcrInductingStd: 0,
+    e1e2InductingStd: 0,
+    pie: toNumber_(valsRow[11]),
+    topUp: toNumber_(valsRow[12]),
+    e3Packing: toNumber_(valsRow[13]),
+    parcelSortation: toNumber_(valsRow[14]),
+    parcelInduct: toNumber_(valsRow[15]),
+    inboundDecanting: toNumber_(valsRow[16]),
+    osrDecanting: toNumber_(valsRow[17]),
+    bcrInducting: 0,
+    e1e2Inducting: 0
+  };
+}
+
+// ─────────────────────────────────────────────
 // Helper: parse start datetime from a range string
 // e.g. "14/06/2026 23:15 - 15/06/2026 23:30" → Date
 // ─────────────────────────────────────────────
@@ -230,38 +298,15 @@ function getDashboardData(archiveUrl) {
         var archiveSS = SpreadsheetApp.openByUrl(yesterdayArchiveUrl);
         var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
         if (archiveSource && archiveSource.getLastRow() >= 2) {
-          var aLR = archiveSource.getLastRow();
-          var aV = archiveSource.getRange(2, 1, aLR - 1, 18).getValues();
-          var aD = archiveSource.getRange(2, 1, aLR - 1, 18).getDisplayValues();
+          var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
 
-          for (var i = 0; i < aV.length; i++) {
-            var aTR = String(aD[i][0]).trim();
-            if (!yesterdayTRSet[aTR]) continue;
+          for (var i = 0; i < aRead.vals.length; i++) {
+            var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.isV2);
+            if (!yesterdayTRSet[aEntry.timeRange]) continue;
+            if (!aEntry.bonus || aEntry.value <= 0) continue;
 
-            var aBonus = String(aD[i][2]).trim();
-            var aVal = toNumber_(aV[i][10]);
-            if (!aBonus || aVal <= 0) continue;
-
-            archiveDataMap[aTR + '||' + aBonus] = {
-              timeRange: aTR,
-              bonus: aBonus,
-              value: toNumber_(aV[i][10]),
-              pieStd: toNumber_(aV[i][3]),
-              topUpStd: toNumber_(aV[i][4]),
-              e3PackingStd: toNumber_(aV[i][5]),
-              parcelSortationStd: toNumber_(aV[i][6]),
-              parcelInductStd: toNumber_(aV[i][7]),
-              inboundDecantingStd: toNumber_(aV[i][8]),
-              osrDecantingStd: toNumber_(aV[i][9]),
-              pie: toNumber_(aV[i][11]),
-              topUp: toNumber_(aV[i][12]),
-              e3Packing: toNumber_(aV[i][13]),
-              parcelSortation: toNumber_(aV[i][14]),
-              parcelInduct: toNumber_(aV[i][15]),
-              inboundDecanting: toNumber_(aV[i][16]),
-              osrDecanting: toNumber_(aV[i][17])
-            };
-            bonusSet[aBonus] = true;
+            archiveDataMap[aEntry.timeRange + '||' + aEntry.bonus] = aEntry;
+            bonusSet[aEntry.bonus] = true;
           }
         }
       } catch (e) {
@@ -271,65 +316,25 @@ function getDashboardData(archiveUrl) {
 
     // ── Step 2: Read from live file ──
     if (sourceSheet.getLastRow() >= 2) {
-      var lastRow3 = sourceSheet.getLastRow();
-      var vals = sourceSheet.getRange(2, 1, lastRow3 - 1, 18).getValues();
-      var disps = sourceSheet.getRange(2, 1, lastRow3 - 1, 18).getDisplayValues();
+      var lRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
 
-      for (var i = 0; i < vals.length; i++) {
-        var lTR = String(disps[i][0]).trim();
-        var lBonus = String(disps[i][2]).trim();
-        var lVal = toNumber_(vals[i][10]);
-        if (!lBonus || lVal <= 0) continue;
+      for (var i = 0; i < lRead.vals.length; i++) {
+        var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.isV2);
+        if (!lEntry.bonus || lEntry.value <= 0) continue;
 
-        var lKey = lTR + '||' + lBonus;
+        var lKey = lEntry.timeRange + '||' + lEntry.bonus;
 
-        if (yesterdayTRSet[lTR]) {
+        if (yesterdayTRSet[lEntry.timeRange]) {
           // For yesterday ranges: only use live if archive does NOT have this row
           if (!archiveDataMap[lKey]) {
-            rawSideData.push({
-              timeRange: lTR,
-              bonus: lBonus,
-              value: lVal,
-              pieStd: toNumber_(vals[i][3]),
-              topUpStd: toNumber_(vals[i][4]),
-              e3PackingStd: toNumber_(vals[i][5]),
-              parcelSortationStd: toNumber_(vals[i][6]),
-              parcelInductStd: toNumber_(vals[i][7]),
-              inboundDecantingStd: toNumber_(vals[i][8]),
-              osrDecantingStd: toNumber_(vals[i][9]),
-              pie: toNumber_(vals[i][11]),
-              topUp: toNumber_(vals[i][12]),
-              e3Packing: toNumber_(vals[i][13]),
-              parcelSortation: toNumber_(vals[i][14]),
-              parcelInduct: toNumber_(vals[i][15]),
-              inboundDecanting: toNumber_(vals[i][16]),
-              osrDecanting: toNumber_(vals[i][17])
-            });
-            bonusSet[lBonus] = true;
+            rawSideData.push(lEntry);
+            bonusSet[lEntry.bonus] = true;
           }
           // If archive has it, archive wins — skip the live row
-        } else if (todayTRSet[lTR]) {
+        } else if (todayTRSet[lEntry.timeRange]) {
           // Today ranges: always take from live
-          rawSideData.push({
-            timeRange: lTR,
-            bonus: lBonus,
-            value: lVal,
-            pieStd: toNumber_(vals[i][3]),
-            topUpStd: toNumber_(vals[i][4]),
-            e3PackingStd: toNumber_(vals[i][5]),
-            parcelSortationStd: toNumber_(vals[i][6]),
-            parcelInductStd: toNumber_(vals[i][7]),
-            inboundDecantingStd: toNumber_(vals[i][8]),
-            osrDecantingStd: toNumber_(vals[i][9]),
-            pie: toNumber_(vals[i][11]),
-            topUp: toNumber_(vals[i][12]),
-            e3Packing: toNumber_(vals[i][13]),
-            parcelSortation: toNumber_(vals[i][14]),
-            parcelInduct: toNumber_(vals[i][15]),
-            inboundDecanting: toNumber_(vals[i][16]),
-            osrDecanting: toNumber_(vals[i][17])
-          });
-          bonusSet[lBonus] = true;
+          rawSideData.push(lEntry);
+          bonusSet[lEntry.bonus] = true;
         }
       }
     }
@@ -345,49 +350,18 @@ function getDashboardData(archiveUrl) {
     // ARCHIVE MODE — Single source (unchanged)
     // ═══════════════════════════════════════════════
     if (sourceSheet.getLastRow() >= 2) {
-      var lastRow3 = sourceSheet.getLastRow();
-      var vals = sourceSheet.getRange(2, 1, lastRow3 - 1, 18).getValues();
-      var disps = sourceSheet.getRange(2, 1, lastRow3 - 1, 18).getDisplayValues();
+      var sRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
       var timeSet = {};
 
       for (var t = 0; t < timeRanges.length; t++) {
         timeSet[timeRanges[t]] = true;
       }
 
-      for (var i = 0; i < vals.length; i++) {
-        var tr = String(disps[i][0]).trim();
-        var bonus = String(disps[i][2]).trim();
-
-        var val = toNumber_(vals[i][10]);
-        var pie = toNumber_(vals[i][11]);
-        var topUp = toNumber_(vals[i][12]);
-        var e3Packing = toNumber_(vals[i][13]);
-        var parcelSortation = toNumber_(vals[i][14]);
-        var parcelInduct = toNumber_(vals[i][15]);
-        var inboundDecanting = toNumber_(vals[i][16]);
-        var osrDecanting = toNumber_(vals[i][17]);
-
-        if (timeSet[tr] && bonus && val > 0) {
-          rawSideData.push({
-            timeRange: tr,
-            bonus: bonus,
-            value: val,
-            pieStd: toNumber_(vals[i][3]),
-            topUpStd: toNumber_(vals[i][4]),
-            e3PackingStd: toNumber_(vals[i][5]),
-            parcelSortationStd: toNumber_(vals[i][6]),
-            parcelInductStd: toNumber_(vals[i][7]),
-            inboundDecantingStd: toNumber_(vals[i][8]),
-            osrDecantingStd: toNumber_(vals[i][9]),
-            pie: pie,
-            topUp: topUp,
-            e3Packing: e3Packing,
-            parcelSortation: parcelSortation,
-            parcelInduct: parcelInduct,
-            inboundDecanting: inboundDecanting,
-            osrDecanting: osrDecanting
-          });
-          bonusSet[bonus] = true;
+      for (var i = 0; i < sRead.vals.length; i++) {
+        var entry = buildSideEntry_(sRead.vals[i], sRead.disps[i], sRead.isV2);
+        if (timeSet[entry.timeRange] && entry.bonus && entry.value > 0) {
+          rawSideData.push(entry);
+          bonusSet[entry.bonus] = true;
         }
       }
     }
@@ -497,7 +471,8 @@ function computeProcessedAggregates_(dataValues) {
       dType === 'ParcelSortedToSack' ||
       dType === 'SPAR' ||
       dType === 'DECN' ||
-      dType === 'ODEC'
+      dType === 'ODEC' ||
+      dType === 'SPOS'
     ) {
       bucket = dType;
     }
@@ -522,9 +497,16 @@ function computeProcessedAggregates_(dataValues) {
   return { sortedAC: sortedAC, sumF: sumF, sumE: sumE };
 }
 
+// 9 work areas: std hours D:L, total M, volumes N:V (19 output columns).
+// Both inducting areas share the SPOS event type; they stay separate because
+// the volume lookup key includes each column's own report-name header.
+var PROC_AREA_COUNT_ = 9;
+var PROC_VOLUME_BUCKETS_ = ['MSKU_PSKU', 'TPUT', 'PackingItemScannedEvent', 'ParcelSortedToSack', 'SPAR', 'DECN', 'ODEC', 'SPOS', 'SPOS'];
+
 function buildProcessedRows_(procData, existingRows, fullRebuild, sumF, sumE, divisor, headers) {
   var norm = function(v) { return String(v === null || v === undefined ? '' : v).trim(); };
   var isBlank = function(v) { return v === '' || v === null || v === undefined; };
+  var totalCols = PROC_AREA_COUNT_ * 2 + 1;
   var output = [];
 
   for (var i = 0; i < procData.length; i++) {
@@ -533,11 +515,11 @@ function buildProcessedRows_(procData, existingRows, fullRebuild, sumF, sumE, di
     var b = norm(r[1]);
     var c = norm(r[2]);
 
-    var rowOut = new Array(15).fill('');
+    var rowOut = new Array(totalCols).fill('');
 
     if (!a) {
       if (existingRows) {
-        for (var col = 0; col < 15; col++) rowOut[col] = existingRows[i][col];
+        for (var col = 0; col < totalCols; col++) rowOut[col] = existingRows[i][col];
       }
       output.push(rowOut);
       continue;
@@ -550,27 +532,22 @@ function buildProcessedRows_(procData, existingRows, fullRebuild, sumF, sumE, di
 
     var totalK = rowDJ.reduce(function(s, v) { return s + (Number(v) || 0); }, 0);
 
-    var rowLR = [
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[0]) + '|MSKU_PSKU'] || 0),
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[1]) + '|TPUT'] || 0),
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[2]) + '|PackingItemScannedEvent'] || 0),
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[3]) + '|ParcelSortedToSack'] || 0),
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[4]) + '|SPAR'] || 0),
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[5]) + '|DECN'] || 0),
-      (sumE[a + '|' + b + '|' + c + '|' + norm(headers[6]) + '|ODEC'] || 0)
-    ];
+    var rowLR = [];
+    for (var v = 0; v < PROC_AREA_COUNT_; v++) {
+      rowLR.push(sumE[a + '|' + b + '|' + c + '|' + norm(headers[v]) + '|' + PROC_VOLUME_BUCKETS_[v]] || 0);
+    }
 
     if (fullRebuild) {
-      for (var col = 0; col < 7; col++) rowOut[col] = rowDJ[col];
-      rowOut[7] = totalK;
-      for (var col = 0; col < 7; col++) rowOut[8 + col] = rowLR[col];
+      for (var col = 0; col < PROC_AREA_COUNT_; col++) rowOut[col] = rowDJ[col];
+      rowOut[PROC_AREA_COUNT_] = totalK;
+      for (var col = 0; col < PROC_AREA_COUNT_; col++) rowOut[PROC_AREA_COUNT_ + 1 + col] = rowLR[col];
     } else {
-      for (var col = 0; col < 7; col++) {
+      for (var col = 0; col < PROC_AREA_COUNT_; col++) {
         rowOut[col] = isBlank(existingRows[i][col]) ? rowDJ[col] : existingRows[i][col];
       }
-      rowOut[7] = isBlank(existingRows[i][7]) ? totalK : existingRows[i][7];
-      for (var col = 0; col < 7; col++) {
-        var targetIndex = 8 + col;
+      rowOut[PROC_AREA_COUNT_] = isBlank(existingRows[i][PROC_AREA_COUNT_]) ? totalK : existingRows[i][PROC_AREA_COUNT_];
+      for (var col = 0; col < PROC_AREA_COUNT_; col++) {
+        var targetIndex = PROC_AREA_COUNT_ + 1 + col;
         rowOut[targetIndex] = isBlank(existingRows[i][targetIndex])
           ? rowLR[col]
           : existingRows[i][targetIndex];
@@ -618,7 +595,7 @@ function updateProcessedData15mins() {
   var lastDataRow = dataSheet.getLastRow();
 
   if (lastDataRow < 2) {
-    if (lastProcRow > 1) procSheet.getRange(2, 1, lastProcRow - 1, 18).clearContent();
+    if (lastProcRow > 1) procSheet.getRange(2, 1, lastProcRow - 1, 22).clearContent();
     props.setProperty('PROC_A2_LAST', '');
     props.setProperty('DATA_LAST_ROW', '1');
     return;
@@ -649,13 +626,13 @@ function updateProcessedData15mins() {
 
   if (newProcRowCount === 0) {
     if (oldProcRowCount > 0) {
-      procSheet.getRange(2, 1, oldProcRowCount, 18).clearContent();
+      procSheet.getRange(2, 1, oldProcRowCount, 22).clearContent();
     }
     props.setProperty('PROC_A2_LAST', currentA2);
     return;
   }
 
-  var headers = procSheet.getRange('D1:J1').getDisplayValues()[0].map(function(v) { return norm(v); });
+  var headers = procSheet.getRange('D1:L1').getDisplayValues()[0].map(function(v) { return norm(v); });
 
   // ==========================================
   // WRITE-FIRST PATTERN: Write BEFORE clearing
@@ -669,13 +646,13 @@ function updateProcessedData15mins() {
     }
 
     if (outputDR.length > 0) {
-      procSheet.getRange(2, 4, outputDR.length, 15).setValues(outputDR);
+      procSheet.getRange(2, 4, outputDR.length, 19).setValues(outputDR);
     }
 
     if (newProcRowCount < oldProcRowCount) {
       var orphanedRows = oldProcRowCount - newProcRowCount;
       if (orphanedRows > 0) {
-        procSheet.getRange(newProcRowCount + 2, 1, orphanedRows, 18).clearContent();
+        procSheet.getRange(newProcRowCount + 2, 1, orphanedRows, 22).clearContent();
       }
     }
 
@@ -684,7 +661,7 @@ function updateProcessedData15mins() {
     return;
   }
 
-  var existingRows = procSheet.getRange(2, 4, newProcRowCount, 15).getValues();
+  var existingRows = procSheet.getRange(2, 4, newProcRowCount, 19).getValues();
 
   var rowsToUpdate = [];
   for (var i = 0; i < newProcRowCount; i++) {
@@ -731,7 +708,7 @@ function updateProcessedData15mins() {
     var blockExisting = existingRows.slice(startIdx, endIdx + 1);
 
     var output = buildProcessedRows_(blockProcData, blockExisting, false, sumF, sumE, divisor, headers);
-    procSheet.getRange(startIdx + 2, 4, blockLen, 15).setValues(output);
+    procSheet.getRange(startIdx + 2, 4, blockLen, 19).setValues(output);
   }
 
   props.setProperty('PROC_A2_LAST', currentA2);

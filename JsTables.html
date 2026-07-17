@@ -96,6 +96,8 @@ function renderMainTablePak(sourceRows) {
       '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
       '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
       '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
+      '<td>' + numPak(r.bcrInductingVol, 0) + '</td>' +
+      '<td>' + numPak(r.e1e2InductingVol, 0) + '</td>' +
       '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
 
     (function (rowEl, rowData) {
@@ -110,7 +112,7 @@ function renderMainTablePak(sourceRows) {
     detailTr.className = 'main-detail-row' + (isExpanded ? ' open' : '');
 
     var detailTd = document.createElement('td');
-    detailTd.colSpan = 12;
+    detailTd.colSpan = 14;
     detailTd.className = 'main-detail-td';
     detailTd.innerHTML = '<div class="main-detail-content">' + (isExpanded ? buildMainRowDetail(r) : '') + '</div>';
 
@@ -202,6 +204,8 @@ function buildEntryDetailRowHtml_(r) {
     '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
     '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
     '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
+    '<td>' + numPak(r.bcrInductingVol, 0) + '</td>' +
+    '<td>' + numPak(r.e1e2InductingVol, 0) + '</td>' +
     '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>' +
     '</tr>';
 }
@@ -220,6 +224,8 @@ function buildMainDetailTableHtml_(entryRows) {
   html += '<th class="no-sort">Parcel Sortation</th>';
   html += '<th class="no-sort">Inbound Decanting</th>';
   html += '<th class="no-sort">OSR Decanting</th>';
+  html += '<th class="no-sort">BCR Inducting</th>';
+  html += '<th class="no-sort">E1/E2 Inducting</th>';
   html += '<th class="no-sort">Productivity %</th>';
   html += '</tr></thead><tbody>';
   html += entryRows.map(buildEntryDetailRowHtml_).join('');
