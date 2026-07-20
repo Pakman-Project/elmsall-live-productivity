@@ -9,9 +9,9 @@
  * 2. Read only Data!A:A to get row date keys
  * 3. For each past date:
  *    - make archive copy
- *    - delete every row that is not that date
+ *    - clear every row that is not that date
  *    - set Front!B2
- * 4. Live file keeps ONLY today by deleting all other rows
+ * 4. Live file keeps ONLY today by clear all other rows, Sort Data!A2:K by Column I again
  * 5. Refresh the Links sheet with current archive files
  ************************************************************/
 
@@ -89,7 +89,7 @@ function archivePastDatesAndTrimLive_() {
   const existingArchives = getExistingArchiveNames_();
   logDebug_(`Existing archives: ${existingArchives.size}`);
 
-  createArchivesDeleteRows_(
+  createArchivesClearRows_(
     liveSS,
     tz,
     pastDates,
@@ -98,8 +98,9 @@ function archivePastDatesAndTrimLive_() {
     dataStartRow
   );
 
-  // ONLY keep today's rows - delete everything else
-  trimLiveByDeletingRows_(
+  // ONLY keep today's rows - clear everything else, then re-sort so the
+  // kept rows compact to the top and cleared (blank) rows sink to the bottom
+  trimLiveByClearingRows_(
     liveSheet,
     rowKeys,
     dataStartRow,
@@ -141,9 +142,9 @@ function processRows_(dateValues, tz, todayKey) {
 }
 
 /************************************************************
- * CREATE ARCHIVES: DELETE ONLY
+ * CREATE ARCHIVES: CLEAR ONLY
  ************************************************************/
-function createArchivesDeleteRows_(
+function createArchivesClearRows_(
   liveSS,
   tz,
   pastDates,
@@ -172,10 +173,10 @@ function createArchivesDeleteRows_(
     const archiveSS = SpreadsheetApp.openById(archiveFile.getId());
     const archiveSheet = getSheetOrThrow_(archiveSS, ARCHIVE_CFG.DATA_SHEET_NAME);
 
-    const deleteBlocks = getDeleteBlocks_(rowKeys, dataStartRow, new Set([dateKey]));
-    logDebug_(`Delete blocks: ${deleteBlocks.length}`);
+    const clearBlocks = getClearBlocks_(rowKeys, dataStartRow, new Set([dateKey]));
+    logDebug_(`Clear blocks: ${clearBlocks.length}`);
 
-    applyDeleteBlocksBottomUp_(archiveSheet, deleteBlocks);
+    applyClearBlocks_(archiveSheet, clearBlocks);
 
     setArchiveB2_(archiveSS, dateObj);
 
@@ -184,33 +185,36 @@ function createArchivesDeleteRows_(
 }
 
 /************************************************************
- * TRIM LIVE: DELETE ONLY
+ * TRIM LIVE: CLEAR, THEN RE-SORT
  ************************************************************/
-function trimLiveByDeletingRows_(sheet, rowKeys, startRow, allowedKeys) {
-  const deleteBlocks = getDeleteBlocks_(rowKeys, startRow, allowedKeys);
-  logDebug_(`Live delete blocks: ${deleteBlocks.length}`);
+function trimLiveByClearingRows_(sheet, rowKeys, startRow, allowedKeys) {
+  const clearBlocks = getClearBlocks_(rowKeys, startRow, allowedKeys);
+  logDebug_(`Live clear blocks: ${clearBlocks.length}`);
 
-  // Calculate total rows that would be deleted
-  let totalToDelete = 0;
-  for (let i = 0; i < deleteBlocks.length; i++) {
-    totalToDelete += deleteBlocks[i][1];
+  // Calculate total rows that would be cleared
+  let totalToClear = 0;
+  for (let i = 0; i < clearBlocks.length; i++) {
+    totalToClear += clearBlocks[i][1];
   }
 
-  // If we'd delete ALL rows, skip to avoid the
-  // "Sorry, it is not possible to delete all non-frozen rows" error.
-  // This happens at midnight when today's data hasn't arrived yet.
-  if (totalToDelete >= rowKeys.length) {
+  // If we'd clear ALL rows, skip so we don't wipe the live sheet's data
+  // entirely. This happens at midnight when today's data hasn't arrived yet.
+  if (totalToClear >= rowKeys.length) {
     log_('WARNING: No rows match the keep-set. Skipping live trim to preserve data.');
     return;
   }
 
-  applyDeleteBlocksBottomUp_(sheet, deleteBlocks);
+  applyClearBlocks_(sheet, clearBlocks);
+
+  // Re-sort by Column I so today's kept rows compact to the top and the
+  // now-blank cleared rows sink to the bottom.
+  sheet.getRange(startRow, 1, rowKeys.length, 11).sort({ column: 9, ascending: true });
 }
 
 /************************************************************
- * BUILD DELETE BLOCKS
+ * BUILD CLEAR BLOCKS
  ************************************************************/
-function getDeleteBlocks_(rowKeys, startRow, allowedKeys) {
+function getClearBlocks_(rowKeys, startRow, allowedKeys) {
   const blocks = [];
   let blockStart = null;
 
@@ -234,13 +238,15 @@ function getDeleteBlocks_(rowKeys, startRow, allowedKeys) {
 }
 
 /************************************************************
- * APPLY DELETE BLOCKS
+ * APPLY CLEAR BLOCKS
+ * Order doesn't matter here — clearing content never shifts rows,
+ * unlike deleteRows() which required bottom-up application.
  ************************************************************/
-function applyDeleteBlocksBottomUp_(sheet, blocks) {
-  for (let i = blocks.length - 1; i >= 0; i--) {
+function applyClearBlocks_(sheet, blocks) {
+  for (let i = 0; i < blocks.length; i++) {
     const [row, count] = blocks[i];
     if (count > 0) {
-      sheet.deleteRows(row, count);
+      sheet.getRange(row, 1, count, 11).clearContent();
     }
   }
 }
