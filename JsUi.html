@@ -224,13 +224,34 @@
       if (e.key === 'ArrowRight') goToPage(currentPage + 1); 
       if (e.key === 'ArrowLeft') goToPage(currentPage - 1); 
     });
-    window.addEventListener('resize', function() { 
-      currentTranslate = -currentPage * getSwipeWidth(); 
-      prevTranslate = currentTranslate; 
-      setSliderPosition(); 
-      resizeCharts(); 
+    window.addEventListener('resize', function() {
+      currentTranslate = -currentPage * getSwipeWidth();
+      prevTranslate = currentTranslate;
+      setSliderPosition();
+      resizeCharts();
+
+      var nowCardMode = isCardModePak();
+      if (nowCardMode !== lastMainTableCardMode) {
+        lastMainTableCardMode = nowCardMode;
+        renderMainTablePak(currentMainRows);
+      }
     });
+    lastMainTableCardMode = isCardModePak();
     goToPage(0);
+  }
+
+  function initKpiTooltipTaps_() {
+    document.querySelectorAll('.kpi-tooltip').forEach(function(tip) {
+      tip.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var wasOpen = tip.classList.contains('open');
+        document.querySelectorAll('.kpi-tooltip.open').forEach(function(t) { t.classList.remove('open'); });
+        if (!wasOpen) tip.classList.add('open');
+      });
+    });
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.kpi-tooltip.open').forEach(function(t) { t.classList.remove('open'); });
+    });
   }
 
   function showHeadBreakdown() {

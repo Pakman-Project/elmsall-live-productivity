@@ -63,7 +63,7 @@
             <div class="volume-charts" id="volumeChartsContainer">
               <div class="volume-controls">
                 <label for="hoursRangeVol">Hours Range:</label>
-                <select id="hoursRangeVol" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')" style="padding: 4px 8px; width: auto;">
+                <select id="hoursRangeVol" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')">
                   <option value="3" selected>3 Hours</option>
                   <option value="6">6 Hours</option>
                   <option value="9">9 Hours</option>
@@ -72,14 +72,14 @@
                 </select>
 
                 <label for="timeWindowVol">Time Window:</label>
-                <select id="timeWindowVol" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')" style="padding: 4px 8px; width: auto;">
+                <select id="timeWindowVol" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')">
                   <option value="15">15 Minutes</option>
                   <option value="30">30 Minutes</option>
                   <option value="60">60 Minutes</option>
                 </select>
 
                 <label for="volumeChartMode">Display Mode:</label>
-                <select id="volumeChartMode" class="row-select" style="padding: 4px 8px; width: auto;" onchange="applyLocalFiltersPak()">
+                <select id="volumeChartMode" class="row-select" onchange="applyLocalFiltersPak()">
                   <option value="separate" selected>Separate Charts</option>
                   <option value="combined">Combined Line</option>
                   <option value="stacked">Stacked Area</option>
@@ -192,36 +192,45 @@
             <div class="card panel span-12">
               <div class="mini-table-title">
                 <h2>Main Table</h2>
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <input id="search" class="input" type="text" placeholder="Search rows..." style="padding: 4px 8px; width: 200px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                  <input id="search" class="input" type="text" placeholder="Search rows...">
                   <button class="btn" id="downloadRawDataBtn" onclick="downloadRawDataCsvPak()" title="Download all individual raw entries as CSV">
                     <i class="fa-solid fa-download"></i> Download raw data
                   </button>
                   <span class="tag">Click headers to sort</span>
+                  <div class="main-sort-mobile">
+                    <select id="mainSortSelect" class="row-select"></select>
+                    <button class="btn icon-btn" id="mainSortDirBtn" type="button" title="Toggle sort direction">
+                      <i class="fa-solid fa-arrow-down-wide-short"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div id="mainTableWrapper" class="table-wrap">
-                <table id="mainTable">
-                  <thead>
-                    <tr>
-                      <th data-key="dateTime">Date Time</th>
-                      <th data-key="bonusNumber">Unique Bonus Number</th>
-                      <th data-key="hourDeployed">Est. Hours Deployed</th>
-                      <th data-key="stdHours">Standard Hours</th>
-                      <th data-key="pieVol">PiE</th>
-                      <th data-key="topUpVol">Top Up</th>
-                      <th data-key="e3PackingVol">E3 Packing</th>
-                      <th data-key="parcelInductVol">Parcel Induct</th>
-                      <th data-key="parcelSortationVol">Parcel Sortation</th>
-                      <th data-key="inboundDecantingVol">Inbound Decanting</th>
-                      <th data-key="osrDecantingVol">OSR Decanting</th>
-                      <th data-key="bcrInductingVol">BCR Inducting</th>
-                      <th data-key="e1e2InductingVol">E1/E2 Inducting</th>
-                      <th data-key="performance">Productivity %</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
+              <div id="mainTableWrapper">
+                <div class="table-wrap">
+                  <table id="mainTable">
+                    <thead>
+                      <tr>
+                        <th data-key="dateTime">Date Time</th>
+                        <th data-key="bonusNumber">Unique Bonus Number</th>
+                        <th data-key="hourDeployed">Est. Hours Deployed</th>
+                        <th data-key="stdHours">Standard Hours</th>
+                        <th data-key="pieVol">PiE</th>
+                        <th data-key="topUpVol">Top Up</th>
+                        <th data-key="e3PackingVol">E3 Packing</th>
+                        <th data-key="parcelInductVol">Parcel Induct</th>
+                        <th data-key="parcelSortationVol">Parcel Sortation</th>
+                        <th data-key="inboundDecantingVol">Inbound Decanting</th>
+                        <th data-key="osrDecantingVol">OSR Decanting</th>
+                        <th data-key="bcrInductingVol">BCR Inducting</th>
+                        <th data-key="e1e2InductingVol">E1/E2 Inducting</th>
+                        <th data-key="performance">Productivity %</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+                <div id="mainCardList" class="main-card-list"></div>
               </div>
             </div>
           </div>

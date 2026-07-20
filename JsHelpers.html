@@ -84,6 +84,10 @@ function loadUserPreferences() {
   }
 }
 
+function isCardModePak() {
+  return window.matchMedia('(max-width: 700px)').matches;
+}
+
 function normalizePerfPak(v) {
   var x = Number(v);
   return Number.isFinite(x) ? x : 0;

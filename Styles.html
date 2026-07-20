@@ -545,7 +545,8 @@ body {
   pointer-events: none;
 }
 
-.kpi-tooltip:hover .kpi-tooltip-content {
+.kpi-tooltip:hover .kpi-tooltip-content,
+.kpi-tooltip.open .kpi-tooltip-content {
   display: block;
 }
 
@@ -1838,6 +1839,16 @@ canvas {
   table-layout: fixed;
 }
 
+.main-card-list {
+  display: none;
+}
+
+.main-sort-mobile {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Shared column widths — kept identical between #mainTable and .main-detail-table
    (same nth-child position) so the expanded per-entry table's columns line up
    vertically under the Main Table's columns. */
@@ -2073,6 +2084,16 @@ canvas {
     width: 240px;
     font-size: 12px;
   }
+  .kpi-controls-row {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .kpi-control-col {
+    flex: 1 1 calc(50% - 4px) !important;
+  }
+  .kpi-control-sep {
+    display: none;
+  }
   .panel {
     padding: 12px 8px;
   }
@@ -2289,6 +2310,165 @@ canvas {
   .breakdown-detail-inner {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
+
+  /* Main Table -> card list */
+  #mainTableWrapper .table-wrap {
+    display: none;
+  }
+  .main-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mini-table-title .tag {
+    display: none;
+  }
+  .main-sort-mobile {
+    display: flex;
+    width: 100%;
+  }
+  #mainSortSelect {
+    flex: 1;
+    padding: 10px 30px 10px 12px;
+    font-size: 14px;
+  }
+  #mainSortDirBtn.desc i {
+    transform: scaleY(-1);
+  }
+
+  .main-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+    cursor: pointer;
+  }
+  .main-card.expanded {
+    background: rgba(105, 167, 255, 0.07);
+    border-color: rgba(105, 167, 255, 0.3);
+  }
+  .main-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .main-card-dt {
+    flex: 1;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .main-card.expanded .main-row-chevron {
+    transform: rotate(180deg);
+    opacity: 0.85;
+  }
+  .main-card-bonus {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .main-card-hours {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .main-card-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .main-card-metric {
+    display: flex;
+    flex-direction: column;
+    font-size: 11px;
+  }
+  .main-card-metric-label {
+    color: var(--muted);
+  }
+  .main-card-metric-value {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .main-card .main-detail-row {
+    display: none;
+    margin-top: 10px;
+  }
+  .main-card .main-detail-row.open {
+    display: block;
+  }
+  .main-card .main-detail-td,
+  .main-card .main-detail-content {
+    padding: 0;
+  }
+
+  .entry-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .entry-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.15);
+  }
+  .entry-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .entry-card-time {
+    color: var(--muted);
+  }
+  .entry-card-hours {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .entry-card-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 4px 8px;
+    margin-top: 6px;
+  }
+  .entry-card-metric {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .entry-card-metric b {
+    color: var(--text);
+  }
+
+  /* Part B fixes: touch-target/spacing gaps beyond the existing pass */
+  .area-group-modes .trend-split-cb {
+    padding: 12px 0;
+    font-size: 14px;
+  }
+  .breakdown-time-select {
+    padding: 10px 12px;
+  }
+  .chartjs-legend li {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .breakdown-close {
+    width: 42px;
+    height: 42px;
+  }
 }
 
 @media (max-width: 400px) {
@@ -2393,7 +2573,8 @@ canvas {
   }
   .bonus-area-chip {
     font-size: 13px;
-    padding: 6px 12px;
+    padding: 8px 14px;
+    min-height: 36px;
   }
   .bonus-controls label {
     font-size: 13px;

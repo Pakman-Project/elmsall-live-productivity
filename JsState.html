@@ -17,6 +17,41 @@ var VOLUME_TYPES = [
   { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', color: '#38ada9' }
 ];
 
+// Ordered to match #mainTable's column order (and the CSV export header order) —
+// intentionally NOT the same order as VOLUME_TYPES (which swaps Parcel Induct/Sortation).
+var MAIN_TABLE_METRIC_COLUMNS = [
+  { key: 'pieVol', label: 'PiE' },
+  { key: 'topUpVol', label: 'Top Up' },
+  { key: 'e3PackingVol', label: 'E3 Packing' },
+  { key: 'parcelInductVol', label: 'Parcel Induct' },
+  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
+  { key: 'inboundDecantingVol', label: 'Inbound Decanting' },
+  { key: 'osrDecantingVol', label: 'OSR Decanting' },
+  { key: 'bcrInductingVol', label: 'BCR Inducting' },
+  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' }
+];
+
+// Mirrors the #mainTable <th data-key> list, used to populate the mobile sort <select>.
+var mainTableSortableColumns = [
+  { key: 'dateTime', label: 'Date Time' },
+  { key: 'bonusNumber', label: 'Unique Bonus Number' },
+  { key: 'hourDeployed', label: 'Est. Hours Deployed' },
+  { key: 'stdHours', label: 'Standard Hours' },
+  { key: 'pieVol', label: 'PiE' },
+  { key: 'topUpVol', label: 'Top Up' },
+  { key: 'e3PackingVol', label: 'E3 Packing' },
+  { key: 'parcelInductVol', label: 'Parcel Induct' },
+  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
+  { key: 'inboundDecantingVol', label: 'Inbound Decanting' },
+  { key: 'osrDecantingVol', label: 'OSR Decanting' },
+  { key: 'bcrInductingVol', label: 'BCR Inducting' },
+  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'performance', label: 'Productivity %' }
+];
+
+// Caches the last-known table/card mode so the resize handler only re-renders on an actual flip.
+var lastMainTableCardMode = null;
+
 var AREA_GROUP_COLORS = ['#69a7ff', '#ff9f43', '#48dbfb', '#a55eea', '#32d583', '#ff6b6b', '#feca57'];
 var DEFAULT_AREA_GROUPS = [['pieVol', 'topUpVol'], ['e3PackingVol']];
 var MAX_AREA_GROUPS = 7;

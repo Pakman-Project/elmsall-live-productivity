@@ -42,13 +42,35 @@ function wireSortingPak() {
     (function (th) {
       th.addEventListener('click', function () {
         var key = th.dataset.key;
-        sortState.dir = sortState.key === key 
-          ? (sortState.dir === 'asc' ? 'desc' : 'asc') 
+        sortState.dir = sortState.key === key
+          ? (sortState.dir === 'asc' ? 'desc' : 'asc')
           : 'desc';
         sortState.key = key;
         renderMainTablePak(currentMainRows);
       });
     })(ths[i]);
+  }
+
+  var sortSelect = $('mainSortSelect');
+  if (sortSelect) {
+    sortSelect.innerHTML = mainTableSortableColumns.map(function (c) {
+      return '<option value="' + c.key + '">' + c.label + '</option>';
+    }).join('');
+    sortSelect.value = sortState.key;
+    sortSelect.addEventListener('change', function () {
+      sortState.key = sortSelect.value;
+      renderMainTablePak(currentMainRows);
+    });
+  }
+
+  var dirBtn = $('mainSortDirBtn');
+  if (dirBtn) {
+    dirBtn.classList.toggle('desc', sortState.dir === 'desc');
+    dirBtn.addEventListener('click', function () {
+      sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      dirBtn.classList.toggle('desc', sortState.dir === 'desc');
+      renderMainTablePak(currentMainRows);
+    });
   }
 }
 
@@ -61,9 +83,13 @@ function renderMainTablePak(sourceRows) {
       headers[h].classList.add(sortState.dir);
     }
   }
+  var sortSelect = $('mainSortSelect');
+  if (sortSelect && sortSelect.value !== sortState.key) sortSelect.value = sortState.key;
+  var dirBtn = $('mainSortDirBtn');
+  if (dirBtn) dirBtn.classList.toggle('desc', sortState.dir === 'desc');
 
   var q = $('search').value.trim().toLowerCase();
-  var rows = q 
+  var rows = q
     ? sourceRows.filter(function (r) {
         return Object.keys(r).some(function (k) {
           return safeTextPak(r[k]).toLowerCase().indexOf(q) !== -1;
@@ -76,78 +102,127 @@ function renderMainTablePak(sourceRows) {
   });
 
   var tbody = $('mainTable').querySelector('tbody');
-  tbody.innerHTML = '';
+  var cardList = $('mainCardList');
 
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    var isExpanded = expandedRowKey !== null && r.dateTime === expandedRowKey;
-    var tr = document.createElement('tr');
-    tr.className = 'main-expandable-row' + (isExpanded ? ' expanded' : '');
+  if (isCardModePak()) {
+    tbody.innerHTML = '';
+    cardList.innerHTML = rows.map(buildMainCardHtml_).join('');
+    wireMainCardEvents_(cardList, rows);
+  } else {
+    cardList.innerHTML = '';
+    tbody.innerHTML = '';
 
-    tr.innerHTML =
-      '<td><span class="main-row-dt-cell">' + safeTextPak(r.dateTime) + '<i class="fa-solid fa-chevron-down main-row-chevron"></i></span></td>' +
-      '<td>' + safeTextPak(r.bonusNumber) + '</td>' +
-      '<td>' + numPak(r.hourDeployed, 2) + '</td>' +
-      '<td>' + numPak(r.stdHours, 2) + '</td>' +
-      '<td>' + numPak(r.pieVol, 0) + '</td>' +
-      '<td>' + numPak(r.topUpVol, 0) + '</td>' +
-      '<td>' + numPak(r.e3PackingVol, 0) + '</td>' +
-      '<td>' + numPak(r.parcelInductVol, 0) + '</td>' +
-      '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
-      '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
-      '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
-      '<td>' + numPak(r.bcrInductingVol, 0) + '</td>' +
-      '<td>' + numPak(r.e1e2InductingVol, 0) + '</td>' +
-      '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var isExpanded = expandedRowKey !== null && r.dateTime === expandedRowKey;
+      var tr = document.createElement('tr');
+      tr.className = 'main-expandable-row' + (isExpanded ? ' expanded' : '');
 
-    (function (rowEl, rowData) {
-      rowEl.addEventListener('click', function () {
-        toggleMainRowDetail(rowEl, rowData);
-      });
-    })(tr, r);
+      tr.innerHTML =
+        '<td><span class="main-row-dt-cell">' + safeTextPak(r.dateTime) + '<i class="fa-solid fa-chevron-down main-row-chevron"></i></span></td>' +
+        '<td>' + safeTextPak(r.bonusNumber) + '</td>' +
+        '<td>' + numPak(r.hourDeployed, 2) + '</td>' +
+        '<td>' + numPak(r.stdHours, 2) + '</td>' +
+        '<td>' + numPak(r.pieVol, 0) + '</td>' +
+        '<td>' + numPak(r.topUpVol, 0) + '</td>' +
+        '<td>' + numPak(r.e3PackingVol, 0) + '</td>' +
+        '<td>' + numPak(r.parcelInductVol, 0) + '</td>' +
+        '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
+        '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
+        '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
+        '<td>' + numPak(r.bcrInductingVol, 0) + '</td>' +
+        '<td>' + numPak(r.e1e2InductingVol, 0) + '</td>' +
+        '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
 
-    tbody.appendChild(tr);
+      (function (rowEl, rowData) {
+        rowEl.addEventListener('click', function () {
+          toggleMainRowDetail(rowEl, rowData);
+        });
+      })(tr, r);
 
-    var detailTr = document.createElement('tr');
-    detailTr.className = 'main-detail-row' + (isExpanded ? ' open' : '');
+      tbody.appendChild(tr);
 
-    var detailTd = document.createElement('td');
-    detailTd.colSpan = 14;
-    detailTd.className = 'main-detail-td';
-    detailTd.innerHTML = '<div class="main-detail-content">' + (isExpanded ? buildMainRowDetail(r) : '') + '</div>';
+      var detailTr = document.createElement('tr');
+      detailTr.className = 'main-detail-row' + (isExpanded ? ' open' : '');
 
-    detailTr.appendChild(detailTd);
-    tbody.appendChild(detailTr);
+      var detailTd = document.createElement('td');
+      detailTd.colSpan = 14;
+      detailTd.className = 'main-detail-td';
+      detailTd.innerHTML = '<div class="main-detail-content">' + (isExpanded ? buildMainRowDetail(r) : '') + '</div>';
+
+      detailTr.appendChild(detailTd);
+      tbody.appendChild(detailTr);
+    }
   }
-  
+
   $('status').textContent = rows.length + ' row(s) shown';
 }
 
+function buildMainCardHtml_(r) {
+  var isExpanded = expandedRowKey !== null && r.dateTime === expandedRowKey;
+  var metricsHtml = MAIN_TABLE_METRIC_COLUMNS.map(function (m) {
+    return '<div class="main-card-metric"><span class="main-card-metric-label">' + m.label + '</span>' +
+           '<span class="main-card-metric-value">' + numPak(r[m.key], 0) + '</span></div>';
+  }).join('');
+
+  return '<div class="main-card main-expandable-row' + (isExpanded ? ' expanded' : '') + '">' +
+    '<div class="main-card-head">' +
+      '<div class="main-card-dt">' + safeTextPak(r.dateTime) + '<i class="fa-solid fa-chevron-down main-row-chevron"></i></div>' +
+      '<div class="main-card-bonus">' + safeTextPak(r.bonusNumber) + '</div>' +
+      '<span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span>' +
+    '</div>' +
+    '<div class="main-card-hours">' +
+      '<span>Est. Hours <b>' + numPak(r.hourDeployed, 2) + '</b></span>' +
+      '<span>Std. Hours <b>' + numPak(r.stdHours, 2) + '</b></span>' +
+    '</div>' +
+    '<div class="main-card-metrics">' + metricsHtml + '</div>' +
+    '<div class="main-detail-row' + (isExpanded ? ' open' : '') + '">' +
+      '<div class="main-detail-content">' + (isExpanded ? buildMainRowDetail(r) : '') + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function wireMainCardEvents_(cardList, rows) {
+  var cardEls = cardList.querySelectorAll('.main-card');
+  for (var i = 0; i < cardEls.length; i++) {
+    (function (cardEl, rowData) {
+      cardEl.querySelector('.main-card-head').addEventListener('click', function () {
+        toggleMainRowDetail(cardEl, rowData);
+      });
+    })(cardEls[i], rows[i]);
+  }
+}
+
+function findMainDetailEl_(rowEl) {
+  var nested = rowEl.querySelector('.main-detail-row');
+  if (nested) return nested;
+  var sib = rowEl.nextElementSibling;
+  return (sib && sib.classList.contains('main-detail-row')) ? sib : null;
+}
+
 function toggleMainRowDetail(rowEl, rowData) {
-  var detailTr = rowEl.nextElementSibling;
-  if (!detailTr || !detailTr.classList.contains('main-detail-row')) return;
-  
+  var detailEl = findMainDetailEl_(rowEl);
+  if (!detailEl) return;
+
   var isOpen = rowEl.classList.contains('expanded');
-  var allExpanded = document.querySelectorAll('#mainTable .main-expandable-row.expanded');
-  
+  var allExpanded = document.querySelectorAll('#mainTableWrapper .main-expandable-row.expanded');
+
   for (var i = 0; i < allExpanded.length; i++) {
     if (allExpanded[i] !== rowEl) {
       allExpanded[i].classList.remove('expanded');
-      var sib = allExpanded[i].nextElementSibling;
-      if (sib && sib.classList.contains('main-detail-row')) {
-        sib.classList.remove('open');
-      }
+      var otherDetail = findMainDetailEl_(allExpanded[i]);
+      if (otherDetail) otherDetail.classList.remove('open');
     }
   }
-  
+
   if (isOpen) {
     rowEl.classList.remove('expanded');
-    detailTr.classList.remove('open');
+    detailEl.classList.remove('open');
     expandedRowKey = null;
   } else {
     rowEl.classList.add('expanded');
-    detailTr.querySelector('.main-detail-content').innerHTML = buildMainRowDetail(rowData);
-    detailTr.classList.add('open');
+    detailEl.querySelector('.main-detail-content').innerHTML = buildMainRowDetail(rowData);
+    detailEl.classList.add('open');
     expandedRowKey = rowData.dateTime;
   }
 }
@@ -182,7 +257,35 @@ function buildMainRowDetail(rowData) {
   }
 
   var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryRowsPak);
-  return buildMainDetailTableHtml_(entryRows);
+  return isCardModePak() ? buildMainDetailCardsHtml_(entryRows) : buildMainDetailTableHtml_(entryRows);
+}
+
+function buildEntryDetailCardHtml_(r) {
+  var escapedBonus = escapeAttrPak(r.bonus);
+  var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
+  var metricsHtml = MAIN_TABLE_METRIC_COLUMNS.map(function (m) {
+    return '<div class="entry-card-metric"><span>' + m.label + '</span><b>' + numPak(r[m.key], 0) + '</b></div>';
+  }).join('');
+
+  return '<div class="entry-card">' +
+    '<div class="entry-card-head">' +
+      '<span class="entry-card-time">' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</span>' +
+      '<span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
+        safeTextPak(r.bonus) + ' <i class="fa-solid fa-filter filter-icon"></i>' +
+      '</span>' +
+      '<span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span>' +
+    '</div>' +
+    '<div class="entry-card-hours"><span>Est ' + numPak(r.hourDeployed, 2) + '</span><span>Std ' + numPak(r.stdHours, 2) + '</span></div>' +
+    '<div class="entry-card-metrics">' + metricsHtml + '</div>' +
+  '</div>';
+}
+
+function buildMainDetailCardsHtml_(entryRows) {
+  var html = '<div class="entry-card-list">';
+  html += entryRows.map(buildEntryDetailCardHtml_).join('');
+  html += '</div>';
+  html += '<div class="main-detail-hint"><i class="fa-solid fa-filter" style="font-size:9px;margin-right:4px;opacity:0.6;"></i>Click any bonus number to filter the main view</div>';
+  return html;
 }
 
 function buildEntryDetailRowHtml_(r) {
