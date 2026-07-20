@@ -1,6 +1,9 @@
 <script>
   function populateArchiveDropdown() {
+    var _tDrop = performance.now();  // PERF (temporary)
+    console.log('[PERF] getArchiveLinks call START');
     google.script.run.withSuccessHandler(function(links) {
+      console.log('[PERF] getArchiveLinks round-trip: ' + Math.round(performance.now() - _tDrop) + 'ms');
       var sel = $('archiveSelect');
       sel.innerHTML = '<option value="">Live</option>';
       for (var i = 0; i < links.length; i++) { 
@@ -51,8 +54,11 @@
     }
 
     var urlToFetch = archiveUrl !== undefined ? archiveUrl : currentArchiveUrl;
-    
+
+    var _tLoad = performance.now();  // PERF (temporary)
+    console.log('[PERF] getDashboardData call START (archive=' + (urlToFetch || 'LIVE') + ')');
     google.script.run.withSuccessHandler(function(data) {
+      console.log('[PERF] getDashboardData round-trip: ' + Math.round(performance.now() - _tLoad) + 'ms');
       // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
       try {
         timeRanges = data.timeRanges || [];

@@ -34,9 +34,10 @@ function updateThreshold(value) {
 }
 
 function getArchiveLinks() {
+  var _tA = Date.now();  // PERF (temporary)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var linksSheet = ss.getSheetByName(CONFIG.LINKS_SHEET_NAME);
-  if (!linksSheet) return [];
+  if (!linksSheet) { Logger.log('[PERF] getArchiveLinks (no Links sheet): +' + (Date.now() - _tA) + 'ms'); return []; }
 
   var lastRow = linksSheet.getLastRow();
   if (lastRow < 2) return [];
@@ -80,6 +81,7 @@ function getArchiveLinks() {
     return b.date.getTime() - a.date.getTime();
   });
 
+  Logger.log('[PERF] getArchiveLinks: +' + (Date.now() - _tA) + 'ms (' + uniqueLinks.length + ' links)');
   return uniqueLinks.map(function(l) {
     return { name: l.name, url: l.url };
   });
@@ -170,8 +172,14 @@ function parseTimeRangeStart_(tr) {
 }
 
 function getDashboardData(archiveUrl) {
+  // ── PERF TIMING (temporary): logs elapsed ms per step to the Executions log.
+  // Remove once load-time profiling is done. ──
+  var _t0 = Date.now();
+  var _lap = function(label) { Logger.log('[PERF] ' + label + ': +' + (Date.now() - _t0) + 'ms'); };
+
   var ss;
   var isLiveMode = !archiveUrl;
+  _lap('start (live=' + isLiveMode + ')');
 
   if (archiveUrl) {
     try {
@@ -182,6 +190,7 @@ function getDashboardData(archiveUrl) {
   } else {
     ss = SpreadsheetApp.getActiveSpreadsheet();
   }
+  _lap('spreadsheet opened');
 
   var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) throw new Error("Sheet not found: " + CONFIG.SHEET_NAME);
@@ -191,6 +200,7 @@ function getDashboardData(archiveUrl) {
 
   var threshold = sheet.getRange(CONFIG.THRESHOLD_CELL).getValue();
   var lastRefresh = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
+  _lap('Front cells read');
 
   if (archiveUrl) {
     var lastRow = sourceSheet.getLastRow();
@@ -251,6 +261,7 @@ function getDashboardData(archiveUrl) {
   var timeRanges = generateTimeRanges_(lastRefresh, 96);
   var rawSideData = [];
   var bonusSet = {};
+  _lap('time ranges generated');
 
   // ═══════════════════════════════════════════════
   // MERGED MODE — Live = Yesterday archive + Today live
@@ -282,6 +293,7 @@ function getDashboardData(archiveUrl) {
     var yesterdayStr = Utilities.formatDate(yesterdayDate, tz, "dd/MM/yyyy");
 
     var archiveLinks = getArchiveLinks();
+    _lap('getArchiveLinks (live merge)');
     var yesterdayArchiveUrl = null;
     for (var a = 0; a < archiveLinks.length; a++) {
       if (archiveLinks[a].name === yesterdayStr) {
@@ -296,6 +308,7 @@ function getDashboardData(archiveUrl) {
     if (yesterdayArchiveUrl) {
       try {
         var archiveSS = SpreadsheetApp.openByUrl(yesterdayArchiveUrl);
+        _lap('yesterday archive openByUrl');
         var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
         if (archiveSource && archiveSource.getLastRow() >= 2) {
           var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
@@ -309,6 +322,7 @@ function getDashboardData(archiveUrl) {
             bonusSet[aEntry.bonus] = true;
           }
         }
+        _lap('yesterday archive read+parsed');
       } catch (e) {
         Logger.log('Yesterday archive read failed (' + yesterdayStr + '): ' + e.message);
       }
@@ -344,6 +358,7 @@ function getDashboardData(archiveUrl) {
     for (var k = 0; k < aKeys.length; k++) {
       rawSideData.push(archiveDataMap[aKeys[k]]);
     }
+    _lap('live Processed Data read+merged');
 
   } else {
     // ═══════════════════════════════════════════════
@@ -365,6 +380,7 @@ function getDashboardData(archiveUrl) {
         }
       }
     }
+    _lap('archive-mode Processed Data read');
   }
 
   var displayTime = sheet.getRange(CONFIG.DATETIME_CELL).getDisplayValue();
@@ -376,6 +392,7 @@ function getDashboardData(archiveUrl) {
   var b2Val = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
   var noteVal = sheet.getRange('G3').getValue();
 
+  _lap('DONE (rawSideData rows=' + rawSideData.length + ')');
   return {
     threshold: threshold,
     lastRefresh: displayTime || Utilities.formatDate(lastRefresh, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),
