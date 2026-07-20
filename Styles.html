@@ -2094,6 +2094,34 @@ canvas {
   .kpi-control-sep {
     display: none;
   }
+
+  /* Compact header: re-flow topbar/meta children into a grid without touching
+     desktop markup or CSS — .topbar/.controls/.meta collapse via display:contents
+     so their real children become direct grid items of .sticky-header. */
+  .sticky-header {
+    display: grid;
+    grid-template-columns: 1fr minmax(100px, 150px);
+    grid-template-areas:
+      "title title"
+      "search archive"
+      "status refresh"
+      "banner banner"
+      "dots dots"
+      "lastupdate lastupdate";
+    row-gap: 8px;
+  }
+  .topbar, .controls, .meta {
+    display: contents;
+  }
+  .title { grid-area: title; }
+  .bonus-search-container { grid-area: search; }
+  #archiveSelect { grid-area: archive; align-self: start; }
+  .refresh-btn { grid-area: refresh; justify-self: end; align-self: center; }
+  .meta-left { grid-area: status; }
+  #activeFilterBanner { grid-area: banner; }
+  .nav-dots { grid-area: dots; }
+  #lastUpdateText { grid-area: lastupdate; text-align: right; }
+
   .panel {
     padding: 12px 8px;
   }
