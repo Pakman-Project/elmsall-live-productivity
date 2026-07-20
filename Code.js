@@ -561,6 +561,15 @@ function buildProcessedRows_(procData, existingRows, fullRebuild, sumF, sumE, di
 }
 
 function updateProcessedData15mins() {
+  // NO-OP: "Processed Data (15mins)" is now written directly by the Databricks
+  // pipeline. This entry point is intentionally neutered so a leftover time
+  // trigger or an accidental manual run can't race Databricks and corrupt the
+  // tab. The original implementation is preserved below under a *_LEGACY_UNUSED_
+  // name for reference / rollback but is never called.
+  Logger.log('updateProcessedData15mins: no-op — processing handled by Databricks.');
+}
+
+function updateProcessedData15mins_LEGACY_UNUSED_() {
   // ==========================================
   // GATEKEEPER LOGIC
   // ==========================================

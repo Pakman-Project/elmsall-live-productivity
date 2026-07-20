@@ -1,9 +1,17 @@
 function forceRebuildProcessedData() {
+  // NO-OP: "Processed Data (15mins)" is now written directly by the Databricks
+  // pipeline. Neutered so a manual run can't overwrite the tab and race Databricks.
+  // To rebuild historical data, re-run the Databricks Backfill notebook instead.
+  // Original implementation preserved below under *_LEGACY_UNUSED_ (never called).
+  Logger.log('forceRebuildProcessedData: no-op — processing handled by Databricks.');
+}
+
+function forceRebuildProcessedData_LEGACY_UNUSED_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var frontSheet = ss.getSheetByName('Front');
   var procSheet = ss.getSheetByName('Processed Data (15mins)');
   var dataSheet = ss.getSheetByName('Data');
-  
+
   var props = PropertiesService.getDocumentProperties();
   var scriptProps = PropertiesService.getScriptProperties();
 
