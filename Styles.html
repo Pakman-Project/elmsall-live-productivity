@@ -707,6 +707,12 @@ tr:hover td {
   margin-right: 8px;
 }
 
+.vol-control-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .volume-charts canvas {
   height: 280px !important;
 }
@@ -1487,6 +1493,13 @@ canvas {
   flex-shrink: 0;
 }
 
+/* On desktop these collapse so their children (label/select/arrow) flow
+   directly into .breakdown-time-bar's flex row exactly as before grouping
+   them — only the 700px override below turns each into a real, full-width row. */
+.time-row {
+  display: contents;
+}
+
 .breakdown-time-label {
   color: var(--muted);
   font-size: 12px;
@@ -2102,13 +2115,14 @@ canvas {
     display: grid;
     grid-template-columns: 1fr minmax(100px, 150px);
     grid-template-areas:
-      "title title"
+      "title refresh"
       "search archive"
-      "status refresh"
+      "status status"
       "banner banner"
       "dots dots"
       "lastupdate lastupdate";
     row-gap: 8px;
+    column-gap: 10px;
   }
   .topbar, .controls, .meta {
     display: contents;
@@ -2116,7 +2130,7 @@ canvas {
   .title { grid-area: title; }
   .bonus-search-container { grid-area: search; }
   #archiveSelect { grid-area: archive; align-self: start; }
-  .refresh-btn { grid-area: refresh; justify-self: end; align-self: center; }
+  .refresh-btn { grid-area: refresh; justify-self: end; align-self: start; }
   .meta-left { grid-area: status; }
   #activeFilterBanner { grid-area: banner; }
   .nav-dots { grid-area: dots; }
@@ -2224,16 +2238,16 @@ canvas {
     flex: none;
   }
   .page-arrow {
-    width: 44px;
-    height: 100px;
-    opacity: 0.4;
+    width: 36px;
+    height: 90px;
+    opacity: 0.12;
   }
   .page-arrow i {
     font-size: 18px;
   }
   .page-arrow:hover,
   .page-arrow:focus-visible {
-    opacity: 0.8;
+    opacity: 0.45;
   }
   .chip {
     font-size: 13px;
@@ -2292,6 +2306,27 @@ canvas {
   .volume-controls label {
     font-size: 13px;
     margin-right: 4px;
+  }
+  .vol-control-group {
+    flex: 1 1 calc(50% - 4px);
+    gap: 8px;
+  }
+  .vol-control-group select {
+    flex: 1;
+    min-width: 0;
+  }
+  .vol-control-group-wide {
+    flex: 1 1 100%;
+  }
+
+  /* From/To time-bar: each becomes a real full-width row instead of the
+     desktop display:contents pass-through, so From/arrow and To/badge
+     always split onto two deliberate lines instead of wrapping mid-pair. */
+  .time-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
   }
   .breakdown-modal {
     width: 95%;

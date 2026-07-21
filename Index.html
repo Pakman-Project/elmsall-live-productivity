@@ -28,12 +28,16 @@
           </button>
         </div>
         <div class="breakdown-time-bar">
-          <label class="breakdown-time-label">From</label>
-          <select id="breakdownFrom" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
-          <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
-          <label class="breakdown-time-label">To</label>
-          <select id="breakdownTo" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
-          <span id="breakdownRangeBadge" class="breakdown-range-badge">-</span>
+          <div class="time-row time-row-from">
+            <label class="breakdown-time-label">From</label>
+            <select id="breakdownFrom" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
+            <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
+          </div>
+          <div class="time-row time-row-to">
+            <label class="breakdown-time-label">To</label>
+            <select id="breakdownTo" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
+            <span id="breakdownRangeBadge" class="breakdown-range-badge">-</span>
+          </div>
         </div>
         <div class="breakdown-body" id="breakdownBody"></div>
         <div class="breakdown-footer">
@@ -62,28 +66,34 @@
           <div class="page">
             <div class="volume-charts" id="volumeChartsContainer">
               <div class="volume-controls">
-                <label for="hoursRangeVol">Hours Range:</label>
-                <select id="hoursRangeVol" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')">
-                  <option value="3" selected>3 Hours</option>
-                  <option value="6">6 Hours</option>
-                  <option value="9">9 Hours</option>
-                  <option value="12">12 Hours</option>
-                  <option value="24">24 Hours</option>
-                </select>
+                <div class="vol-control-group">
+                  <label for="hoursRangeVol">Hours Range:</label>
+                  <select id="hoursRangeVol" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')">
+                    <option value="3" selected>3 Hours</option>
+                    <option value="6">6 Hours</option>
+                    <option value="9">9 Hours</option>
+                    <option value="12">12 Hours</option>
+                    <option value="24">24 Hours</option>
+                  </select>
+                </div>
 
-                <label for="timeWindowVol">Time Window:</label>
-                <select id="timeWindowVol" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')">
-                  <option value="15">15 Minutes</option>
-                  <option value="30">30 Minutes</option>
-                  <option value="60">60 Minutes</option>
-                </select>
+                <div class="vol-control-group">
+                  <label for="timeWindowVol">Time Window:</label>
+                  <select id="timeWindowVol" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')">
+                    <option value="15">15 Minutes</option>
+                    <option value="30">30 Minutes</option>
+                    <option value="60">60 Minutes</option>
+                  </select>
+                </div>
 
-                <label for="volumeChartMode">Display Mode:</label>
-                <select id="volumeChartMode" class="row-select" onchange="applyLocalFiltersPak()">
-                  <option value="separate" selected>Separate Charts</option>
-                  <option value="combined">Combined Line</option>
-                  <option value="stacked">Stacked Area</option>
-                </select>
+                <div class="vol-control-group vol-control-group-wide">
+                  <label for="volumeChartMode">Display Mode:</label>
+                  <select id="volumeChartMode" class="row-select" onchange="applyLocalFiltersPak()">
+                    <option value="separate" selected>Separate Charts</option>
+                    <option value="combined">Combined Line</option>
+                    <option value="stacked">Stacked Area</option>
+                  </select>
+                </div>
               </div>
 
               <div class="card panel vol-chart-panel vol-primary-panel" id="volPanel0">
@@ -175,12 +185,16 @@
                 </select>
               </div>
               <div class="breakdown-time-bar bonus-time-bar">
-                <label class="breakdown-time-label">From</label>
-                <select id="bonusFrom" class="breakdown-time-select" onchange="onBonusRangeChange()"></select>
-                <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
-                <label class="breakdown-time-label">To</label>
-                <select id="bonusTo" class="breakdown-time-select" onchange="onBonusRangeChange()"></select>
-                <span id="bonusRangeBadge" class="breakdown-range-badge">-</span>
+                <div class="time-row time-row-from">
+                  <label class="breakdown-time-label">From</label>
+                  <select id="bonusFrom" class="breakdown-time-select" onchange="onBonusRangeChange()"></select>
+                  <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="time-row time-row-to">
+                  <label class="breakdown-time-label">To</label>
+                  <select id="bonusTo" class="breakdown-time-select" onchange="onBonusRangeChange()"></select>
+                  <span id="bonusRangeBadge" class="breakdown-range-badge">-</span>
+                </div>
               </div>
               <div id="bonusAreaToggles" class="bonus-area-toggles"></div>
             </div>
