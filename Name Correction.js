@@ -67,4 +67,36 @@ function formatColumnCPeriodically() {
   range.setValues(corrected);
   // THEN force the column to Plain Text to stop Sheets from reverting 3E3 back to 3.00E+03
   range.setNumberFormat('@'); 
+  calculateColumnF();
+}
+
+
+function calculateColumnF() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Data');
+  if (!sheet) return;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  // Read Column G
+  const gValues = sheet.getRange(2, 7, lastRow - 1, 1).getValues();
+
+  // Calculate F = G / 60 (4 significant figures)
+  const fValues = gValues.map(([g]) => {
+    if (g === '' || g === null) return [''];
+
+    const num = Number(g);
+    if (isNaN(num)) return [''];
+
+    const result = num / 60;
+
+    // Return as number with 4 significant figures
+    return [Number(result.toPrecision(4))];
+  });
+
+  // Write results to Column F
+  sheet.getRange(2, 6, fValues.length, 1).setValues(fValues);
+
+  // Optional: display up to 4 decimal places without trailing zeros
+  sheet.getRange(2, 6, fValues.length, 1).setNumberFormat('0.####');
 }
