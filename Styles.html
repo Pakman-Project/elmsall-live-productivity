@@ -1,55 +1,62 @@
 <style>
 :root {
-  /* Light theme = default. Dark theme lives in :root[data-theme="dark"]. */
-  --bg: #f7f9fc;
-  --panel: #ffffff;
-  --border: rgba(15, 23, 42, 0.12);
-  --text: #1b2536;
-  --muted: #5a6a86;
-  --accent: #2f6fdb;
-  --color-good: #1f9d57;
-  --color-warn: #c98411;
-  --color-bad: #e5484d;
-  --shadow: 0 18px 55px rgba(15, 23, 42, 0.14);
+  /* NEXT design system (Material 3 --mat-sys-* palette), light = default.
+     Dark theme lives under .dark-theme on <html>. */
+  --bg: #f5f5f5;                    /* --mat-sys-background */
+  --panel: #ffffff;                 /* --mat-sys-surface */
+  --border: #c3c7c7;                /* --mat-sys-outline-variant */
+  --text: rgba(0, 0, 0, 0.87);      /* --mat-sys-on-surface */
+  --muted: #434848;                 /* --mat-sys-on-surface-variant */
+  --accent: #007a7a;                /* --mat-sys-primary (teal) */
+  --accent-contrast: #ffffff;       /* text on accent */
+  --color-good: #3c6939;            /* --mat-sys-success */
+  --color-warn: #cc4b00;            /* --mat-sys-warning */
+  --color-bad: #d32f2f;             /* --mat-sys-error */
+  --header-bg: #000000;             /* black top bar */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.10);
+  --radius-card: 8px;
 
-  --w2: rgba(15, 23, 42, 0.02);
-  --w3: rgba(15, 23, 42, 0.03);
-  --w4: rgba(15, 23, 42, 0.04);
-  --w5: rgba(15, 23, 42, 0.05);
-  --w6: rgba(15, 23, 42, 0.06);
-  --w7: rgba(15, 23, 42, 0.06);
-  --w8: rgba(15, 23, 42, 0.07);
-  --w10: rgba(15, 23, 42, 0.09);
-  --w12: rgba(15, 23, 42, 0.10);
-  --w15: rgba(15, 23, 42, 0.12);
-  --w25: rgba(15, 23, 42, 0.18);
+  --w2: rgba(0, 0, 0, 0.02);
+  --w3: rgba(0, 0, 0, 0.03);
+  --w4: rgba(0, 0, 0, 0.04);
+  --w5: rgba(0, 0, 0, 0.05);
+  --w6: rgba(0, 0, 0, 0.06);
+  --w7: rgba(0, 0, 0, 0.06);
+  --w8: rgba(0, 0, 0, 0.08);
+  --w10: rgba(0, 0, 0, 0.09);
+  --w12: rgba(0, 0, 0, 0.10);
+  --w15: rgba(0, 0, 0, 0.12);
+  --w25: rgba(0, 0, 0, 0.18);
 
-  --surface-dropdown: rgba(255, 255, 255, 0.99);
-  --surface-dropdown-2: rgba(255, 255, 255, 0.97);
+  --surface-dropdown: #ffffff;
+  --surface-dropdown-2: #f6f3f2;    /* --mat-sys-surface-container-low */
   --surface-solid: #ffffff;
   --surface-solid-0: rgba(255, 255, 255, 0);
   --surface-elevated: #ffffff;
-  --surface-panel-strong: rgba(248, 250, 253, 0.99);
+  --surface-panel-strong: #f0edec;  /* --mat-sys-surface-container */
   --tour-tip-bg: #ffffff;
 
-  --text-soft-95: rgba(27, 37, 54, 0.95);
-  --text-soft-40: rgba(27, 37, 54, 0.40);
+  --text-soft-95: rgba(0, 0, 0, 0.87);
+  --text-soft-40: rgba(0, 0, 0, 0.40);
 
-  --tour-mask: rgba(15, 23, 42, 0.42);
-  --control-bg: rgba(255, 255, 255, 0.9);
+  --tour-mask: rgba(0, 0, 0, 0.45);
+  --control-bg: #ffffff;
 }
 
-:root[data-theme="dark"] {
-  --bg: #0b1220;
-  --panel: rgba(255, 255, 255, 0.06);
-  --border: rgba(255, 255, 255, 0.10);
-  --text: #eaf0ff;
-  --muted: #97a6c3;
-  --accent: #69a7ff;
-  --color-good: #32d583;
-  --color-warn: #ffcc66;
-  --color-bad: #ff7a7a;
-  --shadow: 0 18px 55px rgba(0, 0, 0, 0.34);
+.dark-theme {
+  --bg: #121212;
+  --panel: #1e1e1e;                 /* --mat-sys-surface */
+  --border: rgba(255, 255, 255, 0.23);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.70);
+  --accent: #009393;
+  --accent-contrast: #ffffff;
+  --color-good: #a1d399;
+  --color-warn: #ff9d5c;
+  --color-bad: #f44336;
+  --header-bg: #000000;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.45);
+  --radius-card: 8px;
 
   --w2: rgba(255, 255, 255, 0.02);
   --w3: rgba(255, 255, 255, 0.03);
@@ -63,19 +70,19 @@
   --w15: rgba(255, 255, 255, 0.15);
   --w25: rgba(255, 255, 255, 0.25);
 
-  --surface-dropdown: rgba(10, 16, 30, 0.98);
-  --surface-dropdown-2: rgba(10, 16, 30, 0.96);
-  --surface-solid: rgba(11, 18, 32, 0.99);
-  --surface-solid-0: rgba(11, 18, 32, 0);
-  --surface-elevated: rgba(20, 30, 55, 0.98);
-  --surface-panel-strong: rgba(15, 23, 42, 0.98);
-  --tour-tip-bg: #101a2e;
+  --surface-dropdown: #2c272d;      /* --mat-sys-surface-container */
+  --surface-dropdown-2: #2c272d;
+  --surface-solid: #1e1e1e;
+  --surface-solid-0: rgba(30, 30, 30, 0);
+  --surface-elevated: #2c272d;
+  --surface-panel-strong: #1b211e;  /* --mat-sys-surface-container-high */
+  --tour-tip-bg: #1e1e1e;
 
-  --text-soft-95: rgba(234, 240, 255, 0.95);
-  --text-soft-40: rgba(234, 240, 255, 0.40);
+  --text-soft-95: rgba(255, 255, 255, 0.95);
+  --text-soft-40: rgba(255, 255, 255, 0.40);
 
-  --tour-mask: rgba(4, 9, 20, 0.60);
-  --control-bg: rgba(0, 0, 0, 0.3);
+  --tour-mask: rgba(0, 0, 0, 0.62);
+  --control-bg: #2c272d;
 }
 /* === end theme tokens === */
 
@@ -92,19 +99,12 @@ body {
 }
 
 body {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  /* Light (default): no top-left blue glow. */
-  background: radial-gradient(circle at top right, rgba(50, 213, 131, 0.10), transparent 22%),
-              var(--bg);
+  font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
   color: var(--text);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-:root[data-theme="dark"] body {
-  background: radial-gradient(circle at top left, rgba(105, 167, 255, 0.17), transparent 28%),
-              radial-gradient(circle at top right, rgba(50, 213, 131, 0.10), transparent 22%),
-              var(--bg);
 }
 
 #loadingOverlay {
@@ -138,14 +138,240 @@ body {
 }
 
 .wrap {
-  max-width: 1600px;
-  margin: 0 auto;
   width: 100%;
   height: 100dvh;
   min-height: 0;
   display: flex;
   flex-direction: column;
   position: relative;
+}
+
+/* ============================================================
+   NEXT chrome — black top header, left icon rail, main column
+   ============================================================ */
+.next-header {
+  flex: 0 0 auto;
+  height: 64px;
+  background: var(--header-bg);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  box-shadow: rgba(0, 0, 0, 0.19) 0 1px 2px, rgba(0, 0, 0, 0.12) 0 1px 3px 1px;
+  z-index: 1000;
+  position: relative;
+}
+.next-header-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+.next-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.next-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+}
+.next-header-meta .note-text { color: #ff9d5c; font-weight: 600; }
+.next-logo {
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-decoration: none;
+  line-height: 1;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.next-logo:hover {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+  transform: scale(1.03);
+}
+.next-header-divider {
+  width: 1px;
+  height: 26px;
+  background: rgba(255, 255, 255, 0.35);
+  flex: 0 0 auto;
+}
+.next-header-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 200;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.next-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+.next-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.next-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Inputs sitting on the black bar: translucent light fields. */
+.next-header .input,
+.next-header #archiveSelect {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  height: 36px;
+}
+.next-header .input::placeholder { color: rgba(255, 255, 255, 0.7); }
+.next-header #archiveSelect { min-width: 150px; max-width: 200px; }
+.next-header #archiveSelect option { background: var(--surface-dropdown) !important; color: var(--text) !important; }
+.next-header .input:focus { border-color: rgba(255, 255, 255, 0.55); }
+.next-header .search-input-wrap .fa-search { color: rgba(255, 255, 255, 0.7); }
+
+.header-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  flex: 0 0 auto;
+}
+.header-icon-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.header-icon-btn .material-symbols-outlined { font-size: 22px; }
+
+.app-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+.next-rail {
+  flex: 0 0 96px;
+  width: 96px;
+  background: var(--panel);
+  box-shadow: inset -1px 0 0 var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 20px;
+  overflow-y: auto;
+}
+.next-rail .rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.next-rail .rail-item .rail-icon {
+  width: 56px;
+  height: 32px;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-size: 24px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.next-rail .rail-item .rail-label {
+  line-height: 1.2;
+  white-space: normal;
+}
+.next-rail .rail-item:hover { color: var(--text); }
+.next-rail .rail-item:hover .rail-icon { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.next-rail .rail-item.active { color: var(--accent); }
+.next-rail .rail-item.active .rail-icon {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 700px) {
+  /* Header reflows into 3 rows:
+       [ brand            | actions (buttons) ]
+       [ Live + Filter    (controls, one row) ]
+       [ status .... last-update   (meta)     ]  */
+  .next-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand    actions"
+      "controls controls"
+      "meta     meta";
+    align-items: center;
+    row-gap: 8px;
+    column-gap: 8px;
+    height: auto;
+    padding: 8px 12px;
+  }
+  .next-header-left,
+  .next-header-right { display: contents; }
+  .next-brand { grid-area: brand; }
+  .next-header-actions { grid-area: actions; }
+  .next-header-controls { grid-area: controls; display: flex; gap: 8px; }
+  .next-header-meta {
+    grid-area: meta;
+    justify-content: space-between;
+    font-size: 10.5px;
+  }
+  .next-header-title { font-size: 17px; }
+  .next-header-controls #archiveSelect { flex: 0 0 auto; min-width: 110px; max-width: 150px; }
+  .next-header-controls .bonus-search-container { flex: 1 1 auto; width: auto; }
+
+  /* Rail becomes a horizontal strip under the header. */
+  .app-body { flex-direction: column; }
+  .next-rail {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 6px 0;
+    box-shadow: inset 0 -1px 0 var(--border);
+  }
+  .next-rail .rail-item { width: auto; font-size: 0.64rem; }
+  .next-rail .rail-item .rail-icon { width: 46px; height: 28px; font-size: 20px; }
 }
 
 .sticky-header {
@@ -537,11 +763,10 @@ body {
 }
 
 .card {
-  background: linear-gradient(180deg, var(--panel), var(--w3));
+  background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
+  border-radius: var(--radius-card);
+  box-shadow: none;
 }
 
 .kpi {
@@ -2186,44 +2411,6 @@ canvas {
     display: none;
   }
 
-  /* Compact header: re-flow topbar/meta children into a grid without touching
-     desktop markup or CSS — .topbar/.controls/.meta collapse via display:contents
-     so their real children become direct grid items of .sticky-header. */
-  .sticky-header {
-    display: grid;
-    grid-template-columns: 1fr minmax(100px, 150px);
-    grid-template-areas:
-      "titleh1 refresh"
-      "tagline refresh"
-      "search archive"
-      "status lastupdate"
-      "note note"
-      "banner banner"
-      "dots dots";
-    row-gap: 8px;
-    column-gap: 10px;
-    align-items: start;
-  }
-  .topbar, .controls, .meta, .meta-left, .title {
-    display: contents;
-  }
-  .title h1 { grid-area: titleh1; }
-  .title p {
-    grid-area: tagline;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-    margin-top: 0;
-  }
-  .bonus-search-container { grid-area: search; }
-  #archiveSelect { grid-area: archive; align-self: start; }
-  .header-actions { grid-area: refresh; justify-self: end; align-self: start; }
-  #status { grid-area: status; justify-self: start; }
-  #noteText { grid-area: note; justify-self: stretch; width: 100%; }
-  #activeFilterBanner { grid-area: banner; }
-  .nav-dots { grid-area: dots; }
-  #lastUpdateText { grid-area: lastupdate; text-align: right; justify-self: end; white-space: nowrap; }
 
   .panel {
     padding: 12px 8px;

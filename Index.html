@@ -6,14 +6,20 @@
     <title>E3 Live Productivity</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-    <!-- Apply saved theme before first paint so a dark-mode user never flashes light. -->
+    <!-- Apply saved theme before first paint so a dark-mode user never flashes light.
+         Matches the NEXT site convention: a `dark-theme` class on <html>. -->
     <script>
       (function () {
         try {
           var p = JSON.parse(localStorage.getItem('e3_dashboard_prefs_v1') || '{}');
-          if (p && p.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+          var t = (p && p.theme) ? p.theme : localStorage.getItem('theme');
+          if (t === 'dark') document.documentElement.classList.add('dark-theme');
         } catch (e) {}
       })();
     </script>
@@ -60,17 +66,45 @@
     <div class="wrap">
       <?!= include('Header'); ?>
 
-      <div class="swipe-container" id="swipeContainer">
-        <div class="page-arrows" aria-hidden="false">
-          <button class="page-arrow left" type="button" title="Previous page" aria-label="Previous page" onclick="goToPage(currentPage - 1)">
-            <i class="fa-solid fa-chevron-left"></i>
-          </button>
-          <button class="page-arrow right" type="button" title="Next page" aria-label="Next page" onclick="goToPage(currentPage + 1)">
-            <i class="fa-solid fa-chevron-right"></i>
-          </button>
-        </div>
+      <div class="app-body">
+        <nav class="next-rail" aria-label="Pages">
+          <a class="rail-item dot active" onclick="goToPage(0)" title="Overall Productivity">
+            <span class="rail-icon material-symbols-outlined">insights</span>
+            <span class="rail-label">Overall</span>
+          </a>
+          <a class="rail-item dot" onclick="goToPage(1)" title="Volume">
+            <span class="rail-icon material-symbols-outlined">bar_chart</span>
+            <span class="rail-label">Volume</span>
+          </a>
+          <a class="rail-item dot" onclick="goToPage(2)" title="Bonus Numbers">
+            <span class="rail-icon material-symbols-outlined">tag</span>
+            <span class="rail-label">Bonus</span>
+          </a>
+          <a class="rail-item dot" onclick="goToPage(3)" title="Data Table">
+            <span class="rail-icon material-symbols-outlined">table_rows</span>
+            <span class="rail-label">Data Table</span>
+          </a>
+        </nav>
 
-        <div class="swipe-wrapper" id="swipeWrapper">
+        <div class="app-main">
+          <div id="activeFilterBanner" class="active-filter-banner">
+            <i class="fa-solid fa-filter"></i>
+            <span class="active-filter-banner-text">Filtering by <span id="activeFilterCount">0</span> bonus number(s):</span>
+            <div id="activeFilterChips" class="active-filter-chips"></div>
+            <button class="active-filter-clear-btn" onclick="clearAllBonuses()">Clear all</button>
+          </div>
+
+          <div class="swipe-container" id="swipeContainer">
+            <div class="page-arrows" aria-hidden="false">
+              <button class="page-arrow left" type="button" title="Previous page" aria-label="Previous page" onclick="goToPage(currentPage - 1)">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <button class="page-arrow right" type="button" title="Next page" aria-label="Next page" onclick="goToPage(currentPage + 1)">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+
+            <div class="swipe-wrapper" id="swipeWrapper">
           <?!= include('PageOverall'); ?>
 
           <div class="page">
@@ -259,6 +293,8 @@
             </div>
           </div>
 
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -10,15 +10,13 @@ function $(id) {
 // update the header toggle button.
 function applyTheme_(theme) {
   currentTheme = (theme === 'dark') ? 'dark' : 'light';
-  if (currentTheme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-  }
+  // Match the NEXT site: a `dark-theme` class on <html>, mirrored to localStorage.
+  document.documentElement.classList.toggle('dark-theme', currentTheme === 'dark');
+  try { localStorage.setItem('theme', currentTheme); } catch (e) {}
   var btn = $('themeToggleBtn');
   if (btn) {
-    var icon = btn.querySelector('i');
-    if (icon) icon.className = (currentTheme === 'dark') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    var icon = btn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = (currentTheme === 'dark') ? 'light_mode' : 'dark_mode';
     var label = (currentTheme === 'dark') ? 'Switch to light mode' : 'Switch to dark mode';
     btn.setAttribute('title', label);
     btn.setAttribute('aria-label', label);

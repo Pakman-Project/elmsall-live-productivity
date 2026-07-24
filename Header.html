@@ -1,13 +1,23 @@
-<div class="sticky-header">
-  <div class="topbar">
-    <div class="title">
-      <h1>E3 Live Productivity</h1>
-      <p>Live productivity view across E3 work areas</p>
+<header class="next-header">
+  <div class="next-header-left">
+    <div class="next-brand">
+      <a class="next-logo" href="#" onclick="return false;" aria-label="NEXT">NEXT</a>
+      <span class="next-header-divider" aria-hidden="true"></span>
+      <h1 class="next-header-title">E3 Live Productivity</h1>
     </div>
-    <div class="controls">
-      <select id="archiveSelect" class="input">
+    <div class="next-header-meta">
+      <span id="status">Loading...</span>
+      <span id="noteText" class="note-text"></span>
+      <span id="lastUpdateText">-</span>
+    </div>
+  </div>
+
+  <div class="next-header-right">
+    <div class="next-header-controls">
+      <select id="archiveSelect" class="input header-input">
         <option value="" selected>Loading History...</option>
       </select>
+
       <div class="bonus-search-container">
         <div class="search-row">
           <button id="clearFilterBtn" class="clear-filter-btn" onclick="clearAllBonuses()">
@@ -20,36 +30,18 @@
         </div>
         <div id="searchDropdown" class="search-dropdown"></div>
       </div>
-      <div class="header-actions">
-        <button class="btn icon-btn theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme_()" title="Switch to dark mode" aria-label="Switch to dark mode">
-          <i class="fa-solid fa-moon"></i>
-        </button>
-        <button class="btn icon-btn tour-help-btn" onclick="openTourMenu()" title="Take the tour" aria-label="Take the tour">
-          <i class="fa-solid fa-circle-question"></i>
-        </button>
-        <button class="btn icon-btn refresh-btn" onclick="loadDataPak()" title="Refresh">
-          <i class="fa fa-refresh"></i>
-        </button>
-      </div>
+    </div>
+
+    <div class="next-header-actions">
+      <button class="header-icon-btn refresh-btn" onclick="loadDataPak()" title="Refresh" aria-label="Refresh">
+        <span class="material-symbols-outlined">refresh</span>
+      </button>
+      <button class="header-icon-btn tour-help-btn" onclick="openTourMenu()" title="Take the tour" aria-label="Take the tour">
+        <span class="material-symbols-outlined">help</span>
+      </button>
+      <button class="header-icon-btn" id="themeToggleBtn" onclick="toggleTheme_()" title="Switch to dark mode" aria-label="Switch to dark mode">
+        <span class="material-symbols-outlined">dark_mode</span>
+      </button>
     </div>
   </div>
-  <div id="activeFilterBanner" class="active-filter-banner">
-    <i class="fa-solid fa-filter"></i>
-    <span class="active-filter-banner-text">Filtering by <span id="activeFilterCount">0</span> bonus number(s):</span>
-    <div id="activeFilterChips" class="active-filter-chips"></div>
-    <button class="active-filter-clear-btn" onclick="clearAllBonuses()">Clear all</button>
-  </div>
-  <div class="meta">
-    <div class="meta-left">
-      <span id="status">Loading...</span>
-      <span id="noteText" class="note-text"></span>
-    </div>
-    <div class="nav-dots">
-      <div class="dot active" onclick="goToPage(0)">Overall Productivity</div>
-      <div class="dot" onclick="goToPage(1)">Volume</div>
-      <div class="dot" onclick="goToPage(2)">Bonus Numbers</div>
-      <div class="dot" onclick="goToPage(3)">Data Table</div>
-    </div>
-    <span id="lastUpdateText">-</span>
-  </div>
-</div>
+</header>

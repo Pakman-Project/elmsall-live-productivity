@@ -2,11 +2,11 @@
   // Theme-aware chart colors (canvas can't read CSS vars directly). Re-read on
   // each chart build so a light/dark toggle + re-render picks up the new theme.
   function _isLightTheme_() {
-    return document.documentElement.getAttribute('data-theme') !== 'dark';
+    return !document.documentElement.classList.contains('dark-theme');
   }
-  function CHART_MUTED() { return _isLightTheme_() ? "#5a6a86" : "#97a6c3"; }
-  function CHART_TEXT()  { return _isLightTheme_() ? "#1b2536" : "#eaf0ff"; }
-  function CHART_GRID()  { return _isLightTheme_() ? "rgba(15,23,42,0.08)" : "rgba(255,255,255,0.06)"; }
+  function CHART_MUTED() { return _isLightTheme_() ? "#434848" : "rgba(255,255,255,0.70)"; }
+  function CHART_TEXT()  { return _isLightTheme_() ? "rgba(0,0,0,0.87)" : "rgba(255,255,255,0.92)"; }
+  function CHART_GRID()  { return _isLightTheme_() ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"; }
   // Area-fill shading: keep it minimal in light mode so charts stay clean.
   function CHART_FILL_A(a) { return _isLightTheme_() ? +(a * 0.35).toFixed(3) : a; }
 
