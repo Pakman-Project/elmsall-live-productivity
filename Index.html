@@ -8,6 +8,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+    <!-- Apply saved theme before first paint so a dark-mode user never flashes light. -->
+    <script>
+      (function () {
+        try {
+          var p = JSON.parse(localStorage.getItem('e3_dashboard_prefs_v1') || '{}');
+          if (p && p.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) {}
+      })();
+    </script>
+
     <?!= include('Styles'); ?>
   </head>
   <body>
@@ -248,9 +258,9 @@
               </div>
             </div>
           </div>
-          
+
         </div>
-      </div> 
+      </div>
     </div>
 
     <div id="trendSplitOverlay" class="breakdown-overlay" onclick="closeTrendSplit()">
@@ -299,6 +309,43 @@
       </div>
     </div>
 
+    <div id="tourMenuOverlay" class="breakdown-overlay" onclick="closeTourMenu()">
+      <div class="breakdown-modal tour-menu-modal" onclick="event.stopPropagation()">
+        <div class="breakdown-header">
+          <div>
+            <h2>Take the tour</h2>
+            <p class="breakdown-subtitle">Start from the beginning, or jump straight to a section.</p>
+          </div>
+          <button class="breakdown-close" onclick="closeTourMenu()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="breakdown-body">
+          <button class="btn tour-menu-start" onclick="startFullTour_()">
+            <i class="fa-solid fa-play"></i> Start full tour from the beginning
+          </button>
+          <div class="tour-menu-list" id="tourMenuList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tourOverlay" class="tour-overlay" aria-hidden="true">
+      <div id="tourSpotlight" class="tour-spotlight"></div>
+      <div id="tourTooltip" class="tour-tooltip" role="dialog" aria-modal="true" aria-labelledby="tourTipTitle">
+        <div class="tour-tip-step" id="tourStepCounter"></div>
+        <h3 id="tourTipTitle"></h3>
+        <p id="tourTipBody"></p>
+        <div class="tour-click-hint" id="tourClickHint" style="display:none;"><i class="fa-solid fa-hand-pointer"></i>Click the highlighted control to continue.</div>
+        <div class="tour-tip-actions">
+          <button class="tour-skip" id="tourSkipBtn" type="button">Skip tour</button>
+          <div class="tour-nav">
+            <button class="tour-back" id="tourBackBtn" type="button">Back</button>
+            <button class="tour-next" id="tourNextBtn" type="button">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <?!= include('JsState'); ?>
     <?!= include('JsHelpers'); ?>
     <?!= include('JsData'); ?>
@@ -306,6 +353,8 @@
     <?!= include('JsTables'); ?>
     <?!= include('JsExport'); ?>
     <?!= include('JsUi'); ?>
+    <?!= include('JsTourData'); ?>
+    <?!= include('JsTour'); ?>
     <?!= include('JsInit'); ?>
   </body>
 </html>

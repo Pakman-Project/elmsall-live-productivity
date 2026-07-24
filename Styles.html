@@ -1,5 +1,45 @@
 <style>
 :root {
+  /* Light theme = default. Dark theme lives in :root[data-theme="dark"]. */
+  --bg: #f7f9fc;
+  --panel: #ffffff;
+  --border: rgba(15, 23, 42, 0.12);
+  --text: #1b2536;
+  --muted: #5a6a86;
+  --accent: #2f6fdb;
+  --color-good: #1f9d57;
+  --color-warn: #c98411;
+  --color-bad: #e5484d;
+  --shadow: 0 18px 55px rgba(15, 23, 42, 0.14);
+
+  --w2: rgba(15, 23, 42, 0.02);
+  --w3: rgba(15, 23, 42, 0.03);
+  --w4: rgba(15, 23, 42, 0.04);
+  --w5: rgba(15, 23, 42, 0.05);
+  --w6: rgba(15, 23, 42, 0.06);
+  --w7: rgba(15, 23, 42, 0.06);
+  --w8: rgba(15, 23, 42, 0.07);
+  --w10: rgba(15, 23, 42, 0.09);
+  --w12: rgba(15, 23, 42, 0.10);
+  --w15: rgba(15, 23, 42, 0.12);
+  --w25: rgba(15, 23, 42, 0.18);
+
+  --surface-dropdown: rgba(255, 255, 255, 0.99);
+  --surface-dropdown-2: rgba(255, 255, 255, 0.97);
+  --surface-solid: #ffffff;
+  --surface-solid-0: rgba(255, 255, 255, 0);
+  --surface-elevated: #ffffff;
+  --surface-panel-strong: rgba(248, 250, 253, 0.99);
+  --tour-tip-bg: #ffffff;
+
+  --text-soft-95: rgba(27, 37, 54, 0.95);
+  --text-soft-40: rgba(27, 37, 54, 0.40);
+
+  --tour-mask: rgba(15, 23, 42, 0.42);
+  --control-bg: rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme="dark"] {
   --bg: #0b1220;
   --panel: rgba(255, 255, 255, 0.06);
   --border: rgba(255, 255, 255, 0.10);
@@ -10,7 +50,34 @@
   --color-warn: #ffcc66;
   --color-bad: #ff7a7a;
   --shadow: 0 18px 55px rgba(0, 0, 0, 0.34);
+
+  --w2: rgba(255, 255, 255, 0.02);
+  --w3: rgba(255, 255, 255, 0.03);
+  --w4: rgba(255, 255, 255, 0.04);
+  --w5: rgba(255, 255, 255, 0.05);
+  --w6: rgba(255, 255, 255, 0.06);
+  --w7: rgba(255, 255, 255, 0.07);
+  --w8: rgba(255, 255, 255, 0.08);
+  --w10: rgba(255, 255, 255, 0.10);
+  --w12: rgba(255, 255, 255, 0.12);
+  --w15: rgba(255, 255, 255, 0.15);
+  --w25: rgba(255, 255, 255, 0.25);
+
+  --surface-dropdown: rgba(10, 16, 30, 0.98);
+  --surface-dropdown-2: rgba(10, 16, 30, 0.96);
+  --surface-solid: rgba(11, 18, 32, 0.99);
+  --surface-solid-0: rgba(11, 18, 32, 0);
+  --surface-elevated: rgba(20, 30, 55, 0.98);
+  --surface-panel-strong: rgba(15, 23, 42, 0.98);
+  --tour-tip-bg: #101a2e;
+
+  --text-soft-95: rgba(234, 240, 255, 0.95);
+  --text-soft-40: rgba(234, 240, 255, 0.40);
+
+  --tour-mask: rgba(4, 9, 20, 0.60);
+  --control-bg: rgba(0, 0, 0, 0.3);
 }
+/* === end theme tokens === */
 
 * {
   box-sizing: border-box;
@@ -26,13 +93,18 @@ body {
 
 body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background: radial-gradient(circle at top left, rgba(105, 167, 255, 0.17), transparent 28%),
-              radial-gradient(circle at top right, rgba(50, 213, 131, 0.10), transparent 22%),
+  /* Light (default): no top-left blue glow. */
+  background: radial-gradient(circle at top right, rgba(50, 213, 131, 0.10), transparent 22%),
               var(--bg);
   color: var(--text);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+:root[data-theme="dark"] body {
+  background: radial-gradient(circle at top left, rgba(105, 167, 255, 0.17), transparent 28%),
+              radial-gradient(circle at top right, rgba(50, 213, 131, 0.10), transparent 22%),
+              var(--bg);
 }
 
 #loadingOverlay {
@@ -79,7 +151,7 @@ body {
 .sticky-header {
   position: relative;
   z-index: 1000;
-  background: rgba(11, 18, 32, 0);
+  background: var(--surface-solid-0);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
@@ -122,7 +194,7 @@ body {
   min-width: 180px;
   max-width: 220px;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: var(--w5) !important;
   color: var(--text) !important;
   background-image: none;
   padding: 6px 10px;
@@ -196,7 +268,7 @@ body {
   top: 100%;
   left: 0;
   right: 0;
-  background: rgba(15, 23, 42, 0.98);
+  background: var(--surface-panel-strong);
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 10px 10px;
@@ -218,7 +290,7 @@ body {
 }
 
 .search-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--w8);
 }
 
 .active-filter-banner {
@@ -302,7 +374,7 @@ body {
 .btn,
 .row-select {
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--w5);
   color: var(--text);
   border-radius: 10px;
   padding: 6px 10px;
@@ -313,7 +385,7 @@ body {
 
 .input:focus {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--w8);
 }
 
 .btn {
@@ -323,7 +395,7 @@ body {
 
 .btn:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.10);
+  background: var(--w10);
 }
 
 .btn:active {
@@ -338,6 +410,12 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 14px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .meta {
@@ -459,7 +537,7 @@ body {
 }
 
 .card {
-  background: linear-gradient(180deg, var(--panel), rgba(255, 255, 255, 0.03));
+  background: linear-gradient(180deg, var(--panel), var(--w3));
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow);
@@ -514,7 +592,7 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--w8);
   color: var(--muted);
   font-size: 9px;
   cursor: help;
@@ -534,8 +612,8 @@ body {
   transform: translateX(-50%);
   width: 280px;
   padding: 12px;
-  background: rgba(10, 16, 30, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--surface-dropdown);
+  border: 1px solid var(--w15);
   border-radius: 12px;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
   z-index: 2000;
@@ -612,7 +690,7 @@ table {
 th,
 td {
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--w8);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -628,7 +706,7 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: rgba(10, 16, 30, 0.96);
+  background: var(--surface-dropdown-2);
   color: var(--muted);
   font-size: 11px;
   text-transform: uppercase;
@@ -639,7 +717,7 @@ th {
 }
 
 tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--w3);
 }
 
 .pill {
@@ -650,7 +728,7 @@ tr:hover td {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--w6);
   min-width: 50px;
 }
 
@@ -746,7 +824,7 @@ tr:hover td {
 }
 
 .chartjs-legend li:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--w8);
 }
 
 .chartjs-legend li.hidden {
@@ -783,7 +861,7 @@ canvas {
   border-radius: 999px;
   font-size: 11px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--w5);
   border: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -792,7 +870,7 @@ canvas {
   padding: 3px 6px;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--control-bg);
   color: var(--text);
   font-size: 11px;
   outline: none;
@@ -879,8 +957,8 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 8px;
-  background: rgba(10, 16, 30, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--surface-dropdown);
+  border: 1px solid var(--w15);
   border-radius: 6px;
   font-size: 10px;
   white-space: nowrap;
@@ -895,7 +973,7 @@ canvas {
   left: 50%;
   transform: translateX(-50%);
   border: 4px solid transparent;
-  border-bottom-color: rgba(10, 16, 30, 0.98);
+  border-bottom-color: var(--surface-dropdown);
 }
 
 .clickable-bonus:hover .bonus-tip {
@@ -922,7 +1000,7 @@ canvas {
   border: none;
   border-radius: 14px;
   background: rgba(105, 167, 255, 0.5);
-  color: rgba(234, 240, 255, 0.4);
+  color: var(--text-soft-40);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -936,7 +1014,7 @@ canvas {
 .page-arrow:hover,
 .page-arrow:focus-visible {
   opacity: 0.65;
-  color: rgba(234, 240, 255, 0.95);
+  color: var(--text-soft-95);
   background: rgba(105, 167, 255, 0.14);
   transform: scale(1.02);
   outline: none;
@@ -974,7 +1052,7 @@ canvas {
 
 .side-table th:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--w10);
 }
 
 .side-table th.active-sort {
@@ -1006,7 +1084,7 @@ canvas {
 
 .side-table th.no-sort:hover {
   color: var(--muted);
-  background: rgba(10, 16, 30, 0.96);
+  background: var(--surface-dropdown-2);
 }
 
 #mainTable th {
@@ -1017,7 +1095,7 @@ canvas {
 }
 
 #mainTable th:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--w10);
 }
 
 #mainTable th.active-sort {
@@ -1065,10 +1143,10 @@ canvas {
 }
 
 .breakdown-modal {
-  background: linear-gradient(180deg, rgba(20, 30, 55, 0.98), rgba(11, 18, 32, 0.99));
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, var(--surface-elevated), var(--surface-solid));
+  border: 1px solid var(--w12);
   border-radius: 20px;
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--w4) inset;
   width: 90%;
   max-width: 1000px;
   max-height: 85vh;
@@ -1110,7 +1188,7 @@ canvas {
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--w5);
   color: var(--muted);
   cursor: pointer;
   display: flex;
@@ -1150,7 +1228,7 @@ canvas {
   gap: 8px;
   margin-bottom: 22px;
   padding-bottom: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--w6);
   flex-wrap: wrap;
 }
 
@@ -1166,7 +1244,7 @@ canvas {
 }
 
 .breakdown-summary-sep {
-  color: rgba(255, 255, 255, 0.15);
+  color: var(--w15);
   font-size: 14px;
   margin: 0 2px;
 }
@@ -1206,7 +1284,7 @@ canvas {
 .breakdown-bar-wrap {
   flex: 1;
   height: 30px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--w4);
   border-radius: 8px;
   overflow: hidden;
   position: relative;
@@ -1295,11 +1373,11 @@ canvas {
 }
 
 .breakdown-row.clickable-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--w4);
 }
 
 .breakdown-row.clickable-row:active {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--w7);
 }
 
 .breakdown-chevron {
@@ -1354,8 +1432,8 @@ canvas {
   gap: 5px;
   padding: 5px 8px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: var(--w5);
+  border: 1px solid var(--w10);
   color: var(--text);
   font-size: 12px;
   font-weight: 500;
@@ -1508,7 +1586,7 @@ canvas {
 }
 
 .breakdown-time-select {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--w5);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 8px;
@@ -1533,7 +1611,7 @@ canvas {
 }
 
 .breakdown-time-sep {
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--w25);
   font-size: 11px;
   flex-shrink: 0;
 }
@@ -1543,7 +1621,7 @@ canvas {
   border-radius: 999px;
   font-size: 11px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--w5);
   border: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -1620,7 +1698,7 @@ canvas {
   border-radius: 10px;
   padding: 10px 14px;
   margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--w2);
 }
 
 .area-group-head {
@@ -1727,7 +1805,7 @@ canvas {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--w5);
   color: var(--text);
   font-size: 11px;
   font-weight: 600;
@@ -2072,7 +2150,7 @@ canvas {
     letter-spacing: -0.02em;
   }
   .title p {
-    font-size: 14px;
+    font-size: 12px;
   }
   .page {
     padding: 8px 6px;
@@ -2080,18 +2158,18 @@ canvas {
   .kpi,
   .span-12 {
     grid-column: span 6;
-    padding: 12px 10px;
+    padding: 8px 8px;
   }
   .kpi .label {
-    font-size: 13px;
+    font-size: 11px;
   }
   .kpi .value {
-    font-size: 32px;
-    margin-top: 6px;
+    font-size: 20px;
+    margin-top: 2px;
   }
   .kpi .sub {
-    font-size: 12px;
-    padding-top: 6px;
+    font-size: 10px;
+    padding-top: 3px;
   }
   .kpi-tooltip-content {
     width: 240px;
@@ -2115,26 +2193,37 @@ canvas {
     display: grid;
     grid-template-columns: 1fr minmax(100px, 150px);
     grid-template-areas:
-      "title refresh"
+      "titleh1 refresh"
+      "tagline refresh"
       "search archive"
-      "status status"
+      "status lastupdate"
+      "note note"
       "banner banner"
-      "dots dots"
-      "lastupdate lastupdate";
+      "dots dots";
     row-gap: 8px;
     column-gap: 10px;
+    align-items: start;
   }
-  .topbar, .controls, .meta {
+  .topbar, .controls, .meta, .meta-left, .title {
     display: contents;
   }
-  .title { grid-area: title; }
+  .title h1 { grid-area: titleh1; }
+  .title p {
+    grid-area: tagline;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    margin-top: 0;
+  }
   .bonus-search-container { grid-area: search; }
   #archiveSelect { grid-area: archive; align-self: start; }
-  .refresh-btn { grid-area: refresh; justify-self: end; align-self: start; }
-  .meta-left { grid-area: status; }
+  .header-actions { grid-area: refresh; justify-self: end; align-self: start; }
+  #status { grid-area: status; justify-self: start; }
+  #noteText { grid-area: note; justify-self: stretch; width: 100%; }
   #activeFilterBanner { grid-area: banner; }
   .nav-dots { grid-area: dots; }
-  #lastUpdateText { grid-area: lastupdate; text-align: right; }
+  #lastUpdateText { grid-area: lastupdate; text-align: right; justify-self: end; white-space: nowrap; }
 
   .panel {
     padding: 12px 8px;
@@ -2180,13 +2269,17 @@ canvas {
     min-width: 0;
     max-width: 100%;
     width: 100%;
-    padding: 10px 12px;
-    font-size: 15px;
+    padding: 8px 10px;
+    font-size: 14px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
   #bonusSearch {
     width: 100% !important;
-    padding: 10px 35px 10px 12px !important;
-    font-size: 15px;
+    padding: 10px 32px 10px 10px !important;
+    font-size: 16px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
   .search-input-wrap i.fa-search {
     right: 12px;
@@ -2194,11 +2287,13 @@ canvas {
   }
   .search-item {
     padding: 12px;
-    font-size: 15px;
+    font-size: 14px;
   }
   .row-select {
     padding: 8px 30px 8px 10px;
     font-size: 14px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
   .icon-btn {
     width: 44px;
@@ -2208,7 +2303,9 @@ canvas {
   #search {
     width: 100% !important;
     padding: 10px 12px;
-    font-size: 15px;
+    font-size: 16px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
   .table-wrap {
     overflow-x: auto;
@@ -2218,6 +2315,14 @@ canvas {
   td {
     padding: 10px 8px;
     font-size: 14px;
+  }
+  .side-table th {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    font-size: 11px;
+    line-height: 1.25;
+    padding: 6px 4px;
   }
   .meta {
     flex-wrap: wrap;
@@ -2297,19 +2402,21 @@ canvas {
   #status,
   #lastUpdateText,
   .note-text {
-    font-size: 13px;
+    font-size: 10px;
   }
   .volume-controls {
     gap: 8px;
     padding-bottom: 8px;
   }
   .volume-controls label {
-    font-size: 13px;
-    margin-right: 4px;
+    font-size: 11px;
+    margin-right: 0;
   }
   .vol-control-group {
     flex: 1 1 calc(50% - 4px);
-    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
   }
   .vol-control-group select {
     flex: 1;
@@ -2327,6 +2434,14 @@ canvas {
     align-items: center;
     gap: 10px;
     width: 100%;
+  }
+  .breakdown-time-label {
+    min-width: 32px;
+    flex-shrink: 0;
+  }
+  .time-row .breakdown-time-select {
+    flex: 1;
+    max-width: none;
   }
   .breakdown-modal {
     width: 95%;
@@ -2394,6 +2509,8 @@ canvas {
     flex: 1;
     padding: 10px 30px 10px 12px;
     font-size: 14px;
+    min-height: 44px;
+    box-sizing: border-box;
   }
   #mainSortDirBtn.desc i {
     transform: scaleY(-1);
@@ -2402,7 +2519,7 @@ canvas {
   .main-card {
     border: 1px solid var(--border);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--w3);
     padding: 12px;
     cursor: pointer;
   }
@@ -2539,7 +2656,7 @@ canvas {
     font-size: 20px;
   }
   .kpi .value {
-    font-size: 28px;
+    font-size: 18px;
   }
   .kpi,
   .span-12 {
@@ -2634,10 +2751,15 @@ canvas {
   .page {
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
+  .bonus-area-toggles {
+    gap: 4px;
+  }
   .bonus-area-chip {
-    font-size: 13px;
-    padding: 8px 14px;
-    min-height: 36px;
+    font-size: 10px;
+    padding: 4px 6px;
+    min-height: 0;
+    flex: 1 1 auto;
+    justify-content: center;
   }
   .bonus-controls label {
     font-size: 13px;
@@ -2648,5 +2770,282 @@ canvas {
   .breakdown-detail {
     padding-left: 0;
   }
+}
+
+/* ============================================================
+   Guided tour (spotlight + coach-mark tooltip)
+   ============================================================ */
+.tour-help-btn i {
+  color: var(--accent);
+}
+
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above the breakdown/loading overlays (z 10001/10000) so button-demo modals
+     appear beneath the tour layer while the tooltip stays on top. */
+  z-index: 10002;
+  display: none;
+}
+.tour-overlay.active {
+  display: block;
+}
+/* When a step has no target, the overlay itself provides the dark backdrop. */
+.tour-overlay.no-spotlight {
+  background: var(--tour-mask);
+}
+/* Button-demo steps: overlay is transparent so the opened modal (which draws its
+   own dark backdrop) shows through, with only the tooltip floating on top. */
+.tour-overlay.passthrough {
+  background: transparent;
+}
+.tour-overlay.passthrough .tour-spotlight {
+  display: none;
+}
+
+.tour-spotlight {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  /* The huge spread box-shadow darkens the whole screen EXCEPT this rectangle. */
+  box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 22px rgba(105, 167, 255, 0.55);
+  pointer-events: none;
+  transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
+}
+.tour-overlay.no-spotlight .tour-spotlight {
+  display: none;
+}
+
+.tour-tooltip {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 330px;
+  max-width: calc(100vw - 32px);
+  /* Solid, opaque surface (the --panel token is only 6% white, too see-through). */
+  background: var(--tour-tip-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.6);
+  z-index: 4001;
+}
+/* Button-demo steps: pin the tooltip to the bottom so it doesn't cover the modal. */
+.tour-overlay.passthrough .tour-tooltip {
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: 26px;
+  transform: translateX(-50%);
+}
+.tour-tip-step {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+.tour-tooltip h3 {
+  margin: 6px 0 8px;
+  font-size: 17px;
+  color: var(--text);
+}
+.tour-tooltip p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.tour-tip-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+.tour-nav {
+  display: flex;
+  gap: 8px;
+}
+.tour-tooltip button {
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.tour-skip {
+  color: var(--muted);
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+  border-color: transparent !important;
+}
+.tour-skip:hover {
+  color: var(--text);
+}
+.tour-back:hover {
+  border-color: var(--accent);
+}
+.tour-back[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+.tour-next {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.tour-next:hover {
+  filter: brightness(1.08);
+}
+.tour-next[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  filter: none;
+}
+
+/* Interactive step: the overlay lets clicks reach the highlighted control (only
+   that control and the tooltip are usable — a document guard blocks the rest). */
+.tour-tooltip {
+  pointer-events: auto;
+}
+.tour-overlay.interactive {
+  pointer-events: none;
+}
+.tour-overlay.interactive .tour-spotlight {
+  animation: tourPulse 1.5s ease-in-out infinite;
+}
+@keyframes tourPulse {
+  0%, 100% { box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 0 3px rgba(105, 167, 255, 0.65); }
+  50%      { box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 0 8px rgba(105, 167, 255, 0.28); }
+}
+/* Modal-close (passthrough + interactive): ring-only highlight, no dark mask,
+   so the opened modal stays fully visible while its close button pulses. */
+.tour-overlay.passthrough .tour-spotlight {
+  display: none;
+}
+.tour-overlay.passthrough.interactive .tour-spotlight {
+  display: block;
+  box-shadow: 0 0 0 3px rgba(105, 167, 255, 0.95);
+  animation: tourRing 1.4s ease-in-out infinite;
+}
+@keyframes tourRing {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(105, 167, 255, 0.95); }
+  50%      { box-shadow: 0 0 0 6px rgba(105, 167, 255, 0.35); }
+}
+.tour-click-hint {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.tour-click-hint i {
+  margin-right: 5px;
+}
+
+@media (max-width: 700px) {
+  /* Tooltip becomes a fixed bottom sheet; the element stays spotlit above it. */
+  .tour-tooltip {
+    left: 12px;
+    right: 12px;
+    top: auto;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    transform: none;
+  }
+  .tour-tip-actions {
+    margin-top: 14px;
+  }
+  .tour-tooltip button {
+    padding: 10px 16px;
+  }
+}
+
+/* ---- Tour replay menu (the "?" picker) ---- */
+.tour-menu-modal {
+  max-width: 460px;
+}
+.tour-menu-start {
+  width: 100%;
+  justify-content: center;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  padding: 11px 14px;
+  margin-bottom: 14px;
+}
+.tour-menu-start:hover {
+  filter: brightness(1.08);
+}
+.tour-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tour-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--w4);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.tour-menu-item:hover {
+  background: var(--w8);
+  border-color: var(--accent);
+}
+.tour-menu-item:active {
+  transform: scale(0.99);
+}
+.tour-menu-item-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tour-menu-item-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.tour-menu-item-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.tour-menu-item-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.tour-menu-item > i {
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

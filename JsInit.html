@@ -6,27 +6,92 @@
       console.log('[PERF] getArchiveLinks round-trip: ' + Math.round(performance.now() - _tDrop) + 'ms');
       var sel = $('archiveSelect');
       sel.innerHTML = '<option value="">Live</option>';
-      for (var i = 0; i < links.length; i++) { 
-        var opt = document.createElement('option'); 
-        opt.value = links[i].url; 
-        opt.textContent = links[i].name; 
-        sel.appendChild(opt); 
+      for (var i = 0; i < links.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = links[i].url;
+        opt.textContent = links[i].name;
+        sel.appendChild(opt);
       }
-      
+
       // ALWAYS default to Live on startup to prevent loading stale archives
       currentArchiveUrl = null;
       loadDataPak(null);
-      
+
     }).getArchiveLinks();
+  }
+
+  // Renders a full dashboard payload (real OR demo/tour data) into the UI: KPI
+  // cards, notes, and all charts/tables via applyLocalFiltersPak(). Kept separate
+  // from loadDataPak so the tour can re-apply the real payload when it finishes.
+  function renderDashboardPayload_(data) {
+    timeRanges = data.timeRanges || [];
+    rawSideData = data.rawSideData || [];
+    allBonusList = data.bonusList || [];
+    currentThreshold = parseFloat(data.threshold) || 0;
+    if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }
+
+    $('headAbove20Label').textContent = 'Head > ' + Math.round(currentThreshold * 4 * 100) + '% Prod. Last Hour';
+    renderBonusChips();
+    updateClearBtnVisibility();
+    $('thresholdDisplay').textContent = currentThreshold || '-';
+    $('lastUpdateText').textContent = 'Last Update: ' + (data.lastRefresh || '-');
+
+    var last4Times = {};
+    var last4Slice = timeRanges.slice(-4);
+    for (var i = 0; i < last4Slice.length; i++) { last4Times[last4Slice[i]] = true; }
+    var lastHourRawData = rawSideData.filter(function(r) { return last4Times[r.timeRange]; });
+
+    var headSet = {};
+    for (var i = 0; i < lastHourRawData.length; i++) { headSet[lastHourRawData[i].bonus] = true; }
+    var uniqueHeadsLastHour = Object.keys(headSet).length;
+    $('headDeployed').textContent = uniqueHeadsLastHour;
+
+    var headHoursLastHour = {};
+    for (var i = 0; i < lastHourRawData.length; i++) {
+      var bonus = lastHourRawData[i].bonus;
+      if (!headHoursLastHour[bonus]) headHoursLastHour[bonus] = 0;
+      headHoursLastHour[bonus] += (lastHourRawData[i].value || 0);
+    }
+    var hourTarget = currentThreshold * 4;
+    var countAboveThreshold = 0;
+    var headKeys = Object.keys(headHoursLastHour);
+    for (var i = 0; i < headKeys.length; i++) {
+      if (headHoursLastHour[headKeys[i]] >= hourTarget) { countAboveThreshold++; }
+    }
+    $('headAbove20').textContent = countAboveThreshold;
+
+    var tS = 0;
+    for (var i = 0; i < lastHourRawData.length; i++) { tS += (lastHourRawData[i].value || 0); }
+    var blockGroup = {};
+    for (var i = 0; i < lastHourRawData.length; i++) {
+      var tr = lastHourRawData[i].timeRange;
+      if (!blockGroup[tr]) blockGroup[tr] = {};
+      blockGroup[tr][lastHourRawData[i].bonus] = true;
+    }
+    var totalDisplayCount = 0;
+    var bgKeys = Object.keys(blockGroup);
+    for (var i = 0; i < bgKeys.length; i++) {
+      var cnt = Object.keys(blockGroup[bgKeys[i]]).length;
+      totalDisplayCount += (cnt === 1 ? 0 : cnt);
+    }
+    var tD = totalDisplayCount / 4;
+    $('avgPerf').textContent = tD > 0 ? (((tS / tD) * 100).toFixed(0)) + '%' : '0%';
+
+    applyLocalFiltersPak();
+
+    $('status').textContent = 'Loaded';
+    var noteEl = $('noteText');
+    if (data.note && String(data.note).trim() !== '') { noteEl.textContent = String(data.note).trim(); }
+    else { noteEl.textContent = ''; }
   }
 
   function loadDataPak(archiveUrl, silent) {
     var overlay = $('loadingOverlay');
-    
-    if (!silent) {
+
+    if (!silent && !tourActive) {
       if (overlay) overlay.classList.add('active');
       $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Loading...';
-    } else {
+    } else if (!tourActive) {
       $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Updating...';
     }
 
@@ -61,75 +126,26 @@
       console.log('[PERF] getDashboardData round-trip: ' + Math.round(performance.now() - _tLoad) + 'ms');
       // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
       try {
-        timeRanges = data.timeRanges || [];
-        rawSideData = data.rawSideData || [];
-        allBonusList = data.bonusList || [];
-        currentThreshold = parseFloat(data.threshold) || 0;
-        currentArchiveUrl = urlToFetch || null;
-        if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }
-        
-        $('headAbove20Label').textContent = 'Head > ' + Math.round(currentThreshold * 4 * 100) + '% Prod. Last Hour';
-        renderBonusChips();
-        updateClearBtnVisibility();
-        $('thresholdDisplay').textContent = currentThreshold || '-';
-        $('lastUpdateText').textContent = 'Last Update: ' + (data.lastRefresh || '-');
-        
-        var last4Times = {};
-        var last4Slice = timeRanges.slice(-4);
-        for (var i = 0; i < last4Slice.length; i++) { last4Times[last4Slice[i]] = true; }
-        var lastHourRawData = rawSideData.filter(function(r) { return last4Times[r.timeRange]; });
-        
-        var headSet = {};
-        for (var i = 0; i < lastHourRawData.length; i++) { headSet[lastHourRawData[i].bonus] = true; }
-        var uniqueHeadsLastHour = Object.keys(headSet).length;
-        $('headDeployed').textContent = uniqueHeadsLastHour;
-        
-        var headHoursLastHour = {};
-        for (var i = 0; i < lastHourRawData.length; i++) { 
-          var bonus = lastHourRawData[i].bonus; 
-          if (!headHoursLastHour[bonus]) headHoursLastHour[bonus] = 0; 
-          headHoursLastHour[bonus] += (lastHourRawData[i].value || 0); 
-        }
-        var hourTarget = currentThreshold * 4;
-        var countAboveThreshold = 0;
-        var headKeys = Object.keys(headHoursLastHour);
-        for (var i = 0; i < headKeys.length; i++) { 
-          if (headHoursLastHour[headKeys[i]] >= hourTarget) { countAboveThreshold++; } 
-        }
-        $('headAbove20').textContent = countAboveThreshold;
-        
-        var tS = 0;
-        for (var i = 0; i < lastHourRawData.length; i++) { tS += (lastHourRawData[i].value || 0); }
-        var blockGroup = {};
-        for (var i = 0; i < lastHourRawData.length; i++) { 
-          var tr = lastHourRawData[i].timeRange; 
-          if (!blockGroup[tr]) blockGroup[tr] = {}; 
-          blockGroup[tr][lastHourRawData[i].bonus] = true; 
-        }
-        var totalDisplayCount = 0;
-        var bgKeys = Object.keys(blockGroup);
-        for (var i = 0; i < bgKeys.length; i++) { 
-          var cnt = Object.keys(blockGroup[bgKeys[i]]).length; 
-          totalDisplayCount += (cnt === 1 ? 0 : cnt); 
-        }
-        var tD = totalDisplayCount / 4;
-        $('avgPerf').textContent = tD > 0 ? (((tS / tD) * 100).toFixed(0)) + '%' : '0%';
-        
-        applyLocalFiltersPak();
-        
-        $('status').textContent = 'Loaded';
-        var noteEl = $('noteText');
-        if (data.note && String(data.note).trim() !== '') { noteEl.textContent = String(data.note).trim(); } 
-        else { noteEl.textContent = ''; }
-        
-        if (silent) {
-          if (activePage) { activePage.scrollTop = savedScroll; }
-          if (focusedId) {
-            var elToRestore = document.getElementById(focusedId);
-            if (elToRestore) {
-              elToRestore.focus();
-              if (selStart !== null && selEnd !== null) {
-                try { elToRestore.setSelectionRange(selStart, selEnd); } catch(e){}
+        if (tourActive) {
+          // Tour is showing demo data — stash the real payload and apply it when the tour ends.
+          pendingRealData = data;
+          pendingRealData.__archiveUrl = urlToFetch || null;
+          $('status').textContent = 'Loaded';
+        } else {
+          renderDashboardPayload_(data);
+          currentArchiveUrl = urlToFetch || null;
+          lastRealPayload = data;
+          lastRealPayload.__archiveUrl = urlToFetch || null;
+
+          if (silent) {
+            if (activePage) { activePage.scrollTop = savedScroll; }
+            if (focusedId) {
+              var elToRestore = document.getElementById(focusedId);
+              if (elToRestore) {
+                elToRestore.focus();
+                if (selStart !== null && selEnd !== null) {
+                  try { elToRestore.setSelectionRange(selStart, selEnd); } catch(e){}
+                }
               }
             }
           }
@@ -140,11 +156,11 @@
       }
 
       // GUARANTEE overlay removal outside the try/catch so it NEVER gets stuck
-      if (!silent && overlay) overlay.classList.remove('active');
-      
+      if (!silent && !tourActive && overlay) overlay.classList.remove('active');
+
     }).withFailureHandler(function(err) {
-      $('status').innerHTML = '<span class="bad">Error: ' + (err.message || err) + '</span>';
-      if (!silent && overlay) overlay.classList.remove('active');
+      if (!tourActive) $('status').innerHTML = '<span class="bad">Error: ' + (err.message || err) + '</span>';
+      if (!silent && !tourActive && overlay) overlay.classList.remove('active');
     }).getDashboardData(urlToFetch);
   }
 
@@ -159,10 +175,10 @@
 
     setupSwipe();
     setArrowState();
-    
+
     // Populate dropdowns first, THEN fetch data (handled inside populateArchiveDropdown now)
-    populateArchiveDropdown(); 
-    
+    populateArchiveDropdown();
+
     $('archiveSelect').addEventListener('change', function() {
       currentArchiveUrl = this.value;
       if (currentArchiveUrl) {
@@ -173,18 +189,21 @@
       }
       loadDataPak(currentArchiveUrl);
     });
-    
+
     setInterval(function() {
       if (lastRefreshTimestamp === null) return;
-      if (currentArchiveUrl) return; 
+      if (currentArchiveUrl) return;
       google.script.run.withSuccessHandler(function(remoteTimestamp) {
-        if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) { 
-          console.log("Change detected in Front!B2. Refreshing data silently..."); 
-          loadDataPak(currentArchiveUrl, true); 
+        if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) {
+          console.log("Change detected in Front!B2. Refreshing data silently...");
+          loadDataPak(currentArchiveUrl, true);
         }
         else { console.log("No change in Front!B2."); }
       }).getLastRefreshTimestamp();
     }, 60000);
+
+    // First-visit guided tour (shows demo data while the real data loads).
+    maybeAutoStartTour_();
   });
 
   var _searchDebounce = null;

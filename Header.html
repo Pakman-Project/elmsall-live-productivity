@@ -20,9 +20,17 @@
         </div>
         <div id="searchDropdown" class="search-dropdown"></div>
       </div>
-      <button class="btn icon-btn refresh-btn" onclick="loadDataPak()" title="Refresh">
-        <i class="fa fa-refresh"></i>
-      </button>
+      <div class="header-actions">
+        <button class="btn icon-btn theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme_()" title="Switch to dark mode" aria-label="Switch to dark mode">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+        <button class="btn icon-btn tour-help-btn" onclick="openTourMenu()" title="Take the tour" aria-label="Take the tour">
+          <i class="fa-solid fa-circle-question"></i>
+        </button>
+        <button class="btn icon-btn refresh-btn" onclick="loadDataPak()" title="Refresh">
+          <i class="fa fa-refresh"></i>
+        </button>
+      </div>
     </div>
   </div>
   <div id="activeFilterBanner" class="active-filter-banner">

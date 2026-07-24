@@ -1,4 +1,15 @@
 <script>
+  // Theme-aware chart colors (canvas can't read CSS vars directly). Re-read on
+  // each chart build so a light/dark toggle + re-render picks up the new theme.
+  function _isLightTheme_() {
+    return document.documentElement.getAttribute('data-theme') !== 'dark';
+  }
+  function CHART_MUTED() { return _isLightTheme_() ? "#5a6a86" : "#97a6c3"; }
+  function CHART_TEXT()  { return _isLightTheme_() ? "#1b2536" : "#eaf0ff"; }
+  function CHART_GRID()  { return _isLightTheme_() ? "rgba(15,23,42,0.08)" : "rgba(255,255,255,0.06)"; }
+  // Area-fill shading: keep it minimal in light mode so charts stay clean.
+  function CHART_FILL_A(a) { return _isLightTheme_() ? +(a * 0.35).toFixed(3) : a; }
+
   function syncTooltipHover(sourceChart, targetChart, event, activeElements) {
     if (!targetChart) return;
     if (activeElements.length > 0) {
@@ -34,20 +45,20 @@
     volumeCharts = [];
     var commonTooltip = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } };
     var isStacked = mode === 'stacked';
-    var volYAxis = { beginAtZero: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Volume', color: '#97a6c3', font: { size: 12 } }, stacked: isStacked };
+    var volYAxis = { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } }, stacked: isStacked };
     if (mode === 'separate') {
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
-        var chart = new Chart($('volChart' + i), { type: 'line', data: { labels: labels, datasets: [{ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, 0.1), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } });
+        var chart = new Chart($('volChart' + i), { type: 'line', data: { labels: labels, datasets: [{ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } });
         volumeCharts.push(chart);
       }
     } else {
       var datasets = [];
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
-        datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, isStacked ? 0.6 : 0.1), tension: 0.35, pointRadius: 2, fill: isStacked });
+        datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(isStacked ? 0.6 : 0.1)), tension: 0.35, pointRadius: 2, fill: isStacked });
       }
-      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#eaf0ff', usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis } } });
+      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: CHART_TEXT(), usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis } } });
       volumeCharts.push(chart);
     }
   }
@@ -72,9 +83,9 @@
     var topUpData = agg.map(function(r) { return r.topUpVol; });
     
     var yMax = Math.ceil((agg.map(function(r){return r.performance;}).length ? Math.max.apply(null, agg.map(function(r){return r.performance;})) : 100) / 10) * 10 + 10;
-    var xTicksConfig = { color: '#97a6c3', maxRotation: 45, minRotation: 45, autoSkip: true, callback: function(value) { return trimTimeLabelPak(this.getLabelForValue(value)); } };
+    var xTicksConfig = { color: CHART_MUTED(), maxRotation: 45, minRotation: 45, autoSkip: true, callback: function(value) { return trimTimeLabelPak(this.getLabelForValue(value)); } };
     if (hRange >= 24) { xTicksConfig.maxTicksLimit = 24; } else if (hRange >= 12) { xTicksConfig.maxTicksLimit = 12; } else if (hRange >= 6) { xTicksConfig.maxTicksLimit = 8; }
-    var xOpt = { ticks: xTicksConfig, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Date & Time', color: '#97a6c3', font: { size: 12 } } };
+    var xOpt = { ticks: xTicksConfig, grid: { color: CHART_GRID() }, title: { display: true, text: 'Date & Time', color: CHART_MUTED(), font: { size: 12 } } };
     var tOpt = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) : ''); } } };
 
     // --- 1. VOLUME ---
@@ -84,19 +95,19 @@
       overviewTitleEl.textContent = 'Volume - E3 Stacked Area Chart';
       for (var v = 0; v < VOLUME_TYPES.length; v++) {
         var vType = VOLUME_TYPES[v]; var vData = agg.map(function(r) { return r[vType.key]; });
-        overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, 0.6), tension: 0.35, pointRadius: 2, fill: true });
+        overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
       }
     } else {
       overviewTitleEl.textContent = 'Volume - PiE & Top Up';
       overviewDatasets = [
-        { label: 'Volume PiE', data: pieData, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, 0.6), tension: 0.35, pointRadius: 2, fill: true },
-        { label: 'Volume Top Up', data: topUpData, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, 0.6), tension: 0.35, pointRadius: 2, fill: true }
+        { label: 'Volume PiE', data: pieData, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true },
+        { label: 'Volume Top Up', data: topUpData, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true }
       ];
     }
-    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: '#eaf0ff' }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Volume', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [areaGroupChart, perfChart].concat(trendCharts), event, elements); } } });
+    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [areaGroupChart, perfChart].concat(trendCharts), event, elements); } } });
 
     // --- 2. OVERALL PRODUCTIVITY ---
-    perfChart = new Chart($('perfChart'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, max: yMax, title: { display: true, text: 'Productivity %', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [areaGroupChart, overviewVolChart].concat(trendCharts), event, elements); } } });
+    perfChart = new Chart($('perfChart'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [areaGroupChart, overviewVolChart].concat(trendCharts), event, elements); } } });
 
     // --- 3. AREA GROUP ---
     var areaGroupDatasets = [];
@@ -131,12 +142,12 @@
         }
       });
     }
-    areaGroupChart = new Chart($('areaGroupChart'), { type: 'line', data: { labels: labels, datasets: areaGroupDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: '#eaf0ff' }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Productivity %', color: '#97a6c3', font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(areaGroupChart, [perfChart, overviewVolChart].concat(trendCharts), event, elements); } } });
+    areaGroupChart = new Chart($('areaGroupChart'), { type: 'line', data: { labels: labels, datasets: areaGroupDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(areaGroupChart, [perfChart, overviewVolChart].concat(trendCharts), event, elements); } } });
 
     // --- 4. TREND (1 to MAX_TREND_CHARTS charts) ---
     function buildTrendDatasets(aggData, areaKeys) {
       var ds = [{ label: 'Hour Deployed', data: aggData.map(function(r) { return r.hourDeployed; }), borderWidth: 2.5, borderColor: APP_CONFIG.colors.accent, backgroundColor: 'transparent', tension: 0.35, pointRadius: 2, fill: false, stack: 'deployed-line', order: 1 }];
-      for (var a = 0; a < areaKeys.length; a++) { var key = areaKeys[a]; var type = VOLUME_TYPES.filter(function(v){ return v.key === key; })[0]; ds.push({ label: type.label + ' Std Hrs', data: aggData.map(function(r) { return (r.stdBreakdown && r.stdBreakdown[key]) || 0; }), borderWidth: 1, borderColor: type.color, backgroundColor: hexToRgbaPak(type.color, 0.35), tension: 0.35, pointRadius: 0, fill: true, stack: 'std-hours-stack', order: 2 }); }
+      for (var a = 0; a < areaKeys.length; a++) { var key = areaKeys[a]; var type = VOLUME_TYPES.filter(function(v){ return v.key === key; })[0]; ds.push({ label: type.label + ' Std Hrs', data: aggData.map(function(r) { return (r.stdBreakdown && r.stdBreakdown[key]) || 0; }), borderWidth: 1, borderColor: type.color, backgroundColor: hexToRgbaPak(type.color, CHART_FILL_A(0.35)), tension: 0.35, pointRadius: 0, fill: true, stack: 'std-hours-stack', order: 2 }); }
       return ds;
     }
 
@@ -157,7 +168,7 @@
       var peakVal = allVals.length ? Math.max.apply(null, allVals) : 0;
       trendYMax = Math.ceil((peakVal * 1.20) / 5) * 5; if (trendYMax === 0) trendYMax = 10;
     }
-    var trendY = { min: 0, ticks: { color: '#97a6c3' }, grid: { color: 'rgba(255,255,255,0.06)' }, title: { display: true, text: 'Hours', color: '#97a6c3', font: { size: 12 } } };
+    var trendY = { min: 0, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Hours', color: CHART_MUTED(), font: { size: 12 } } };
     if (trendYMax !== null) { trendY.max = trendYMax; trendY.stacked = true; }
 
     var trendWrap = $('trendChartsWrap');
@@ -191,12 +202,12 @@
             return r.stdHours || 0;
           });
           datasets = [
-            { label: 'Hour Deployed', data: dep, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, 0.1), tension: 0.35, pointRadius: 2, fill: true },
-            { label: 'Standard Hours', data: std, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, 0.1), tension: 0.35, pointRadius: 2, fill: true }
+            { label: 'Hour Deployed', data: dep, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true },
+            { label: 'Standard Hours', data: std, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }
           ];
         }
 
-        trendCharts[idx] = new Chart($('trendChart_' + idx), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#eaf0ff' }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
+        trendCharts[idx] = new Chart($('trendChart_' + idx), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
           var others = [areaGroupChart, perfChart, overviewVolChart];
           for (var k = 0; k < trendCharts.length; k++) { if (k !== idx && trendCharts[k]) others.push(trendCharts[k]); }
           syncToTargets(trendCharts[idx], others, event, elements);

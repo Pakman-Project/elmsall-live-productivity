@@ -1,0 +1,86 @@
+<script>
+// Builds a self-contained, plausible-looking demo payload in the exact shape
+// getDashboardData() returns, so the guided tour can show a fully populated
+// dashboard (KPIs, all 9 volume charts, bonus tables, data table) while the
+// real data loads in the background. Deterministic (seeded) so it looks stable.
+function buildTourDummyData_() {
+  // volKey matches the raw-row volume field; the std field is volKey + 'Std'
+  // (mirrors VOLUME_TYPES stdKey naming in JsState).
+  var AREAS = [
+    'pie', 'topUp', 'e3Packing', 'parcelInduct', 'parcelSortation',
+    'inboundDecanting', 'osrDecanting', 'bcrInducting', 'e1e2Inducting'
+  ];
+
+  var seed = 20260722;
+  function rnd() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  }
+
+  var NUM_BLOCKS = 48; // 12 hours of 15-minute blocks
+  var now = new Date();
+  now.setSeconds(0, 0);
+  now.setMinutes(now.getMinutes() - (now.getMinutes() % 15)); // floor to 15-min grid
+
+  var timeRanges = [];
+  for (var b = NUM_BLOCKS; b >= 1; b--) {
+    var start = new Date(now.getTime() - b * 15 * 60000);
+    var end = new Date(start.getTime() + 15 * 60000);
+    timeRanges.push(formatDatePak(start) + ' - ' + formatDatePak(end));
+  }
+
+  // 18 demo bonus numbers, two per work area — each a random 3-char alphanumeric
+  // code (letters + digits, e.g. "0X9"), matching the real bonus-number style.
+  var CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  function randCode() {
+    return CHARSET.charAt(Math.floor(rnd() * CHARSET.length)) +
+           CHARSET.charAt(Math.floor(rnd() * CHARSET.length)) +
+           CHARSET.charAt(Math.floor(rnd() * CHARSET.length));
+  }
+  var bonuses = [];
+  var bonusArea = {};
+  var used = {};
+  for (var a = 0; a < AREAS.length; a++) {
+    for (var k = 0; k < 2; k++) {
+      var bn;
+      do { bn = randCode(); } while (used[bn]);
+      used[bn] = true;
+      bonuses.push(bn);
+      bonusArea[bn] = AREAS[a];
+    }
+  }
+
+  var rawSideData = [];
+  for (var i = 0; i < timeRanges.length; i++) {
+    for (var j = 0; j < bonuses.length; j++) {
+      if (rnd() < 0.22) continue; // ~78% of operators active per block
+      var bn = bonuses[j];
+      var area = bonusArea[bn];
+      var value = 0.16 + rnd() * 0.085;        // std hours per block: 0.16..0.245
+      var volume = Math.round(20 + rnd() * 160); // items/parcels this block
+      var row = {
+        timeRange: timeRanges[i],
+        bonus: bn,
+        value: value,
+        pie: 0, topUp: 0, e3Packing: 0, parcelInduct: 0, parcelSortation: 0,
+        inboundDecanting: 0, osrDecanting: 0, bcrInducting: 0, e1e2Inducting: 0,
+        pieStd: 0, topUpStd: 0, e3PackingStd: 0, parcelInductStd: 0, parcelSortationStd: 0,
+        inboundDecantingStd: 0, osrDecantingStd: 0, bcrInductingStd: 0, e1e2InductingStd: 0
+      };
+      row[area] = volume;
+      row[area + 'Std'] = value;
+      rawSideData.push(row);
+    }
+  }
+
+  return {
+    timeRanges: timeRanges,
+    rawSideData: rawSideData,
+    bonusList: bonuses,
+    threshold: 0.15,
+    lastRefresh: 'Example data (tour)',
+    currentTimestamp: null,
+    note: ''
+  };
+}
+</script>

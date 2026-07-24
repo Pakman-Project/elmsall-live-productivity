@@ -3,6 +3,37 @@ function $(id) {
   return document.getElementById(id);
 }
 
+// ---- Light / dark theme -----------------------------------------------------
+// Light is the default (no attribute); dark is opt-in via data-theme="dark".
+// The attribute is also set by a tiny inline script in <head> before first paint
+// so a returning dark-mode user doesn't flash light. These keep it in sync and
+// update the header toggle button.
+function applyTheme_(theme) {
+  currentTheme = (theme === 'dark') ? 'dark' : 'light';
+  if (currentTheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  var btn = $('themeToggleBtn');
+  if (btn) {
+    var icon = btn.querySelector('i');
+    if (icon) icon.className = (currentTheme === 'dark') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    var label = (currentTheme === 'dark') ? 'Switch to light mode' : 'Switch to dark mode';
+    btn.setAttribute('title', label);
+    btn.setAttribute('aria-label', label);
+  }
+}
+
+function toggleTheme_() {
+  applyTheme_(currentTheme === 'dark' ? 'light' : 'dark');
+  saveUserPreferences();
+  // Canvas charts bake in their colors at build time — rebuild for the new theme.
+  if (typeof applyLocalFiltersPak === 'function') {
+    try { applyLocalFiltersPak(); } catch (e) {}
+  }
+}
+
 function saveUserPreferences() {
   try {
     var prefs = {
@@ -13,7 +44,8 @@ function saveUserPreferences() {
       bonusViewMode: $('bonusViewMode') ? $('bonusViewMode').value : 'area',
       hiddenBonusAreas: hiddenBonusAreas,
       trendSplitState: trendSplitState,
-      areaGroups: areaGroupState
+      areaGroups: areaGroupState,
+      theme: currentTheme
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
   } catch (e) {
@@ -27,6 +59,8 @@ function loadUserPreferences() {
     if (!raw) return;
     
     var prefs = JSON.parse(raw);
+
+    applyTheme_(prefs.theme === 'dark' ? 'dark' : 'light');
 
     if (prefs.hoursRange) $('hoursRange').value = prefs.hoursRange;
     if (prefs.timeWindow) $('timeWindow').value = prefs.timeWindow;

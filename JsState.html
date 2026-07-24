@@ -101,6 +101,15 @@ var sortState = { key: 'dateTime', dir: 'asc' };
 var expandedRowKey = null;
 var currentArchiveUrl = null;
 var lastRefreshTimestamp = null;
+// UI theme: 'light' (default) or 'dark'. Persisted inside the user-prefs blob.
+var currentTheme = 'light';
+// Guided tour coordination: while tourActive is true the dashboard shows demo
+// data, and any real payload that arrives is stashed in pendingRealData to be
+// applied when the tour ends. lastRealPayload keeps the most recent real payload
+// so a "replay tour" (when data is already loaded) can be restored afterwards.
+var tourActive = false;
+var pendingRealData = null;
+var lastRealPayload = null;
 var sideSortMetric = 'performance';
 var hiddenBonusAreas = [];
 var currentPage = 0;

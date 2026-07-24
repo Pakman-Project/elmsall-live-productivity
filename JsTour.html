@@ -1,0 +1,553 @@
+<script>
+// ============================================================================
+// Guided tour — a self-contained spotlight/coach-mark walkthrough. No external
+// libraries (CSP-safe). Shows demo data (buildTourDummyData_) while the real
+// data loads in the background, then applies the real data when the tour ends.
+//
+// Steps are grouped into "parts" (part 1, 2, ...) with auto sub-numbering shown
+// as e.g. "PART 2 OF 7 · 2.3" so the tour never looks like "5 / 32".
+//
+// Interactive steps make the highlighted control genuinely clickable: the user
+// MUST click it to continue (the Next button is disabled), so the tour shows
+// exactly what each control does. Modal demos are closed by clicking the modal's
+// own × (also interactive). Non-interactive steps just explain, with Next.
+// ============================================================================
+
+var TOUR_SEEN_KEY = 'e3_tour_seen_v1';
+var tourStepIndex = 0;
+var tourCurrentStep = null;
+var tourStepCleanup = null;
+var currentInteractiveCfg = null;
+var _tourRepositionRaf = null;
+
+var tourStartedAuto = false;
+var tourReturnPage = 0;
+var tourReturnScroll = 0;
+
+var TOUR_STEPS = [
+  // ===== Part 1 — Getting around ============================================
+  { part: 1, page: 0, target: null,
+    title: 'Welcome 👋',
+    body: 'This is E3 Live Productivity — a live view of warehouse output across every E3 work area. This tour walks you through each page using example data while your real data loads in the background. We’ll have you click things as we go!' },
+  { part: 1, page: 0, target: '.refresh-btn',
+    title: 'Live & auto-refreshing',
+    body: 'The dashboard refreshes on its own every minute. Tap here any time to refresh immediately.' },
+  { part: 1, page: 0, target: '#archiveSelect',
+    title: 'Live vs history',
+    body: 'Stay on “Live” for today, or pick a saved snapshot from this dropdown to look back at an earlier day.' },
+  { part: 1, page: 0, target: '.bonus-search-container',
+    title: 'Filter by bonus number',
+    body: 'Type a bonus number here to focus the whole dashboard on specific operators. Clear it to see everyone again.' },
+  { part: 1, page: 0, target: '.nav-dots',
+    title: 'Four pages',
+    body: 'Overall, Volume, Bonus Numbers and Data Table. Tap a name here, use the side arrows, or swipe left/right.' },
+
+  // ===== Part 2 — Overall: KPIs & breakdown =================================
+  { part: 2, page: 0, target: '.grid .kpi:not(:last-child)', union: true,
+    title: 'Hour-at-a-glance KPIs',
+    body: 'These three cards summarise the last hour: heads deployed, how many are hitting target, and overall productivity.' },
+  { part: 2, page: 0, target: 'button[onclick="showHeadBreakdown()"]',
+    interactive: { sel: 'button[onclick="showHeadBreakdown()"]', type: 'click' },
+    title: 'Open the head breakdown',
+    body: 'Give the “Breakdown” button a click to see deployed heads split by work area.' },
+  { part: 2, page: 0, target: '#breakdownOverlay .breakdown-close', modal: true,
+    interactive: { sel: '#breakdownOverlay .breakdown-close', type: 'click' },
+    cleanup: function () { if (typeof closeBreakdown === 'function') closeBreakdown(); },
+    title: 'Head breakdown by area',
+    body: 'Here it is — deployed heads by work area. Change the From/To range at the top to re-slice it. When you’re done, click the × to close.' },
+  { part: 2, page: 0, target: '.kpi-controls-row',
+    title: 'Time controls',
+    body: 'Change how many hours are shown and the window size (15 / 30 / 60 min). These stay in sync across every page.' },
+
+  // ===== Part 3 — Overall: charts & groups =================================
+  { part: 3, page: 0, target: '.charts > .card.panel:nth-child(1), .charts > .card.panel:nth-child(2)', union: true,
+    title: 'Overview charts (1 of 2)',
+    body: 'Two live charts: volume (PiE & Top Up as a stacked area) and overall productivity across all E3 areas over time.' },
+  { part: 3, page: 0, target: '.charts > .card.panel:nth-child(3), .trend-charts-wrap > .card.panel', union: true,
+    title: 'Overview charts (2 of 2)',
+    body: 'Productivity by work area, plus the deployment trend below it. The “Groups” button lets you choose which areas to compare.' },
+  { part: 3, page: 0, target: 'button[onclick="openAreaGroups()"]',
+    interactive: { sel: 'button[onclick="openAreaGroups()"]', type: 'click' },
+    title: 'Open the Groups editor',
+    body: 'Click “Groups” to build your own work-area comparisons.' },
+  { part: 3, page: 0, target: '#areaGroupOverlay .breakdown-close', modal: true,
+    interactive: { sel: '#areaGroupOverlay .breakdown-close', type: 'click' },
+    cleanup: function () { if (typeof closeAreaGroups === 'function') closeAreaGroups(); },
+    title: 'Groups editor',
+    body: 'Build up to 7 groups of work areas, toggle each group’s line/trend, then Apply — the work-area chart updates to match. Click the × to close when you’re ready.' },
+
+  // ===== Part 4 — Volume page ==============================================
+  { part: 4, page: 1, target: '.volume-controls',
+    title: 'Volume page',
+    body: 'Track item and parcel volumes per work area. Let’s try changing how it’s displayed.' },
+  { part: 4, page: 1, target: '#volumeChartMode',
+    interactive: { sel: '#volumeChartMode', type: 'change', changeValue: 'stacked' },
+    title: 'Change the display mode',
+    body: 'Use this dropdown to switch between separate charts, one combined line, or a stacked area. Choose “Stacked Area”.' },
+  { part: 4, page: 1, target: '.volume-charts',
+    cleanup: function () { var s = $('volumeChartMode'); if (s) { s.value = 'separate'; applyLocalFiltersPak(); } },
+    title: 'Stacked view',
+    body: 'All areas now stack into a single chart, so you see the total shape and each area’s share at once.' },
+
+  // ===== Part 5 — Bonus Numbers page =======================================
+  { part: 5, page: 2, target: '.bonus-page-controls',
+    title: 'Bonus Numbers page',
+    body: 'Rank operators by productivity. Let’s walk through what you can do here.' },
+  { part: 5, page: 2, target: '#bonusViewMode',
+    interactive: { sel: '#bonusViewMode', type: 'change', changeValue: 'overall' },
+    title: 'By area or overall',
+    body: 'Switch between one table per work area, or a single overall ranking. Choose “Overall”.' },
+  { part: 5, page: 2, target: '#bonusTablesContainer',
+    cleanup: function () { var s = $('bonusViewMode'); if (s) { s.value = 'area'; if (typeof refreshBonusTables === 'function') refreshBonusTables(); } },
+    title: 'Overall ranking',
+    body: 'Now every operator sits in one combined league table.' },
+  { part: 5, page: 2, target: '.bonus-area-chip',
+    interactive: { sel: '.bonus-area-chip', type: 'click' },
+    title: 'Show / hide work areas',
+    body: 'Each chip toggles a work area on or off. Click one to hide it.' },
+  { part: 5, page: 2, target: '.bonus-area-toggles',
+    cleanup: function () { hiddenBonusAreas = []; if (typeof refreshBonusTables === 'function') refreshBonusTables(); },
+    title: 'Areas filtered',
+    body: 'That area drops out of the tables. Toggle chips to focus on just the areas you care about.' },
+  { part: 5, page: 2, target: '.side-table th[onclick^="setSideTableSort"]',
+    interactive: { sel: '.side-table th[onclick^="setSideTableSort"]', type: 'click' },
+    title: 'Sort the tables',
+    body: 'Click a column header — Standard Hours or Productivity % — to re-sort every table by it.' },
+  { part: 5, page: 2, target: '.clickable-bonus',
+    interactive: { sel: '.clickable-bonus', type: 'click' },
+    title: 'Filter by an operator',
+    body: 'Every bonus number is clickable. Click one to filter the ENTIRE dashboard down to just that operator.' },
+  { part: 5, page: 2, target: '#activeFilterBanner',
+    interactive: { sel: '.active-filter-clear-btn', type: 'click' },
+    title: 'Site-wide filter',
+    body: 'This banner shows the active filter — every page now reflects only that operator. Click “Clear all” to remove it.' },
+
+  // ===== Part 6 — Data Table page ==========================================
+  { part: 6, page: 3, target: '.span-12 .mini-table-title',
+    title: 'Data Table page',
+    body: 'The raw numbers behind everything — one row per time block. You can search, sort, expand, and export it.' },
+  { part: 6, page: 3,
+    interactive: function (isMobile) {
+      return isMobile
+        ? { sel: '#mainSortSelect', type: 'change', changeValue: 'performance' }
+        : { sel: '#mainTable th', type: 'click' };
+    },
+    title: 'Sort any column',
+    body: 'Click a column header to sort by it (on mobile, use the sort dropdown). Try sorting by Productivity %.' },
+  { part: 6, page: 3,
+    interactive: function (isMobile) {
+      // Desktop rows are clickable anywhere; mobile cards only toggle from their header.
+      return isMobile
+        ? { sel: '.main-card-head', type: 'click' }
+        : { sel: '.main-expandable-row', type: 'click' };
+    },
+    title: 'Expand a row',
+    body: 'Click a row (its header, on mobile) to expand the per-operator detail behind that time block.' },
+  { part: 6, page: 3, target: '.main-detail-content',
+    title: 'Per-operator detail',
+    body: 'Each expanded row lists every operator in that block with their volumes and productivity. The bonus numbers in here are clickable too.' },
+  { part: 6, page: 3, target: '.main-detail-content .clickable-bonus',
+    interactive: { sel: '.main-detail-content .clickable-bonus', type: 'click' },
+    title: 'Filter from the detail',
+    body: 'Just like on the Bonus page, click an operator here to filter the whole dashboard to them.' },
+  { part: 6, page: 3, target: '#activeFilterBanner',
+    interactive: { sel: '.active-filter-clear-btn', type: 'click' },
+    cleanup: function () { expandedRowKey = null; },
+    title: 'Filtered again',
+    body: 'Same site-wide filter, reached from the data table. Click “Clear all” to remove it.' },
+  { part: 6, page: 3, target: '#downloadRawDataBtn',
+    title: 'Export to CSV',
+    body: 'Clicking “Download raw data” exports every individual entry as a CSV — handy for pivoting in Excel.' },
+
+  // ===== Part 7 — Wrap up ===================================================
+  { part: 7, page: 0, target: null,
+    title: 'You’re all set ✅',
+    body: 'That’s the tour! Your real live data is ready now. You can replay this any time from the “?” button in the header.' }
+];
+
+// Pre-compute part sub-numbering + total parts for the "PART 2 OF 7 · 2.3" label.
+var TOUR_TOTAL_PARTS = 0;
+(function computeTourParts_() {
+  var counts = {};
+  for (var i = 0; i < TOUR_STEPS.length; i++) {
+    var p = TOUR_STEPS[i].part || 1;
+    counts[p] = (counts[p] || 0) + 1;
+    TOUR_STEPS[i]._sub = counts[p];
+    if (p > TOUR_TOTAL_PARTS) TOUR_TOTAL_PARTS = p;
+  }
+})();
+
+// Short thematic name per part, shown in the "?" replay menu.
+var TOUR_PART_TITLES = {
+  1: 'Getting around',
+  2: 'Overall — KPIs & breakdown',
+  3: 'Overall — charts & groups',
+  4: 'Volume page',
+  5: 'Bonus Numbers page',
+  6: 'Data Table page',
+  7: 'Wrap up'
+};
+
+function firstStepIndexOfPart_(part) {
+  for (var i = 0; i < TOUR_STEPS.length; i++) {
+    if ((TOUR_STEPS[i].part || 1) === part) return i;
+  }
+  return 0;
+}
+
+// ---- Replay menu (the "?" button) -------------------------------------------
+function openTourMenu() {
+  if (tourActive) return;
+  var list = $('tourMenuList');
+  if (list) {
+    var html = '';
+    for (var p = 1; p <= TOUR_TOTAL_PARTS; p++) {
+      var count = 0;
+      for (var i = 0; i < TOUR_STEPS.length; i++) if ((TOUR_STEPS[i].part || 1) === p) count++;
+      var title = TOUR_PART_TITLES[p] || ('Part ' + p);
+      html += '<button class="tour-menu-item" onclick="startTourPart_(' + p + ')">' +
+                '<span class="tour-menu-item-num">' + p + '</span>' +
+                '<span class="tour-menu-item-text">' +
+                  '<span class="tour-menu-item-title">' + title + '</span>' +
+                  '<span class="tour-menu-item-sub">' + count + ' step' + (count === 1 ? '' : 's') + '</span>' +
+                '</span>' +
+                '<i class="fa-solid fa-chevron-right"></i>' +
+              '</button>';
+    }
+    list.innerHTML = html;
+  }
+  var ov = $('tourMenuOverlay');
+  if (ov) ov.classList.add('active');
+}
+
+function closeTourMenu() {
+  var ov = $('tourMenuOverlay');
+  if (ov) ov.classList.remove('active');
+}
+
+function startFullTour_() {
+  closeTourMenu();
+  startTour(false, 0);
+}
+
+function startTourPart_(part) {
+  closeTourMenu();
+  startTour(false, firstStepIndexOfPart_(part));
+}
+
+function isTourMobile_() {
+  return window.matchMedia('(max-width: 700px)').matches;
+}
+
+function resolveInteractive_(step) {
+  if (!step || !step.interactive) return null;
+  return (typeof step.interactive === 'function') ? step.interactive(isTourMobile_()) : step.interactive;
+}
+
+function getActivePageScrollTop_() {
+  var pages = document.querySelectorAll('.page');
+  return (pages[currentPage] ? pages[currentPage].scrollTop : 0);
+}
+function setPageScrollTop_(index, value) {
+  var pages = document.querySelectorAll('.page');
+  if (pages[index]) pages[index].scrollTop = value;
+}
+
+function startTour(isAuto, startIndex) {
+  if (tourActive) return;
+  tourActive = true;
+  tourStartedAuto = (isAuto === true);
+  tourReturnPage = currentPage;
+  tourReturnScroll = getActivePageScrollTop_();
+
+  document.querySelectorAll('.kpi-tooltip.open').forEach(function(t) { t.classList.remove('open'); });
+
+  try { renderDashboardPayload_(buildTourDummyData_()); } catch (e) { console.warn('Tour demo render failed', e); }
+
+  var lo = $('loadingOverlay');
+  if (lo) lo.classList.remove('active');
+
+  $('tourOverlay').classList.add('active');
+
+  window.addEventListener('resize', tourReposition_);
+  window.addEventListener('scroll', tourReposition_, true);
+  document.addEventListener('keydown', tourKeydown_);
+
+  // showTourStep_ switches to the step's page itself; start wherever asked
+  // (0 for a full run, or the first step of a chosen part from the "?" menu).
+  var start = (typeof startIndex === 'number' && startIndex > 0 && startIndex < TOUR_STEPS.length) ? startIndex : 0;
+  showTourStep_(start);
+}
+
+function endTour_() {
+  if (!tourActive) return;
+  disarmInteractive_();
+  runStepCleanup_();
+  tourActive = false;
+
+  var ov = $('tourOverlay');
+  ov.classList.remove('active', 'no-spotlight', 'passthrough', 'interactive');
+
+  window.removeEventListener('resize', tourReposition_);
+  window.removeEventListener('scroll', tourReposition_, true);
+  document.removeEventListener('keydown', tourKeydown_);
+
+  try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch (e) {}
+
+  expandedRowKey = null;
+
+  var payload = pendingRealData || lastRealPayload;
+  pendingRealData = null;
+  if (payload) {
+    try {
+      renderDashboardPayload_(payload);
+      currentArchiveUrl = (typeof payload.__archiveUrl !== 'undefined') ? payload.__archiveUrl : currentArchiveUrl;
+      lastRealPayload = payload;
+    } catch (e) { console.error('Restore after tour failed', e); }
+  } else {
+    $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Loading...';
+    var lo = $('loadingOverlay');
+    if (lo) lo.classList.add('active');
+  }
+
+  if (tourStartedAuto) {
+    goToPage(0);
+    setPageScrollTop_(0, 0);
+  } else {
+    goToPage(tourReturnPage);
+    setPageScrollTop_(tourReturnPage, tourReturnScroll);
+  }
+}
+
+function runStepCleanup_() {
+  if (tourStepCleanup) {
+    try { tourStepCleanup(); } catch (e) {}
+    tourStepCleanup = null;
+  }
+}
+
+function tourKeydown_(e) {
+  if (e.key === 'Escape') { endTour_(); }
+  else if (e.key === 'ArrowRight') { tourNext_(); }
+  else if (e.key === 'ArrowLeft' && tourStepIndex > 0) { showTourStep_(tourStepIndex - 1); }
+}
+
+function tourReposition_() {
+  if (!tourActive) return;
+  if (_tourRepositionRaf) cancelAnimationFrame(_tourRepositionRaf);
+  _tourRepositionRaf = requestAnimationFrame(function() { placeTourTooltip_(tourCurrentStep); });
+}
+
+// ---- Interactive-step wiring -------------------------------------------------
+var _tourGuardClick = null;
+var _tourChangeListener = null;
+var _tourAdvanceScheduled = false;
+
+function armInteractive_(step) {
+  var cfg = resolveInteractive_(step);
+  currentInteractiveCfg = cfg;
+  if (!cfg) return;
+
+  _tourGuardClick = function(e) {
+    var t = e.target;
+    if (t.closest && t.closest('.tour-tooltip')) return;
+    if (t.closest && t.closest(cfg.sel)) {
+      if (cfg.type === 'click') scheduleInteractiveAdvance_(60);
+      return; // let the control's native handler run
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  document.addEventListener('click', _tourGuardClick, true);
+
+  if (cfg.type === 'change') {
+    _tourChangeListener = function(e) {
+      if (e.target.closest && e.target.closest(cfg.sel)) scheduleInteractiveAdvance_(150);
+    };
+    document.addEventListener('change', _tourChangeListener, true);
+  }
+}
+
+function disarmInteractive_() {
+  if (_tourGuardClick) { document.removeEventListener('click', _tourGuardClick, true); _tourGuardClick = null; }
+  if (_tourChangeListener) { document.removeEventListener('change', _tourChangeListener, true); _tourChangeListener = null; }
+  currentInteractiveCfg = null;
+}
+
+function scheduleInteractiveAdvance_(delay) {
+  if (_tourAdvanceScheduled) return;
+  _tourAdvanceScheduled = true;
+  var fromIndex = tourStepIndex;
+  setTimeout(function() {
+    _tourAdvanceScheduled = false;
+    if (tourActive && tourStepIndex === fromIndex) showTourStep_(tourStepIndex + 1);
+  }, delay || 60);
+}
+
+// Keyboard-only fallback (ArrowRight) still replicates the interaction.
+function triggerInteractive_(step) {
+  var cfg = currentInteractiveCfg || resolveInteractive_(step);
+  if (!cfg) { showTourStep_(tourStepIndex + 1); return; }
+  var el = document.querySelector(cfg.sel);
+  if (!el) { disarmInteractive_(); showTourStep_(tourStepIndex + 1); return; }
+  if (cfg.type === 'change') { el.value = cfg.changeValue; el.dispatchEvent(new Event('change', { bubbles: true })); }
+  else { el.click(); }
+  scheduleInteractiveAdvance_(cfg.type === 'change' ? 200 : 120);
+}
+
+function tourNext_() {
+  var step = tourCurrentStep;
+  if (step && step.interactive) triggerInteractive_(step);
+  else showTourStep_(tourStepIndex + 1);
+}
+
+// ---- Rendering ---------------------------------------------------------------
+function getStepRect_(step) {
+  var selector = step && (step.target || (currentInteractiveCfg && currentInteractiveCfg.sel));
+  if (!selector) return null;
+  var els = step.union
+    ? Array.prototype.slice.call(document.querySelectorAll(selector))
+    : [document.querySelector(selector)];
+  var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity, found = false;
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    if (!el) continue;
+    var r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;
+    found = true;
+    left = Math.min(left, r.left); top = Math.min(top, r.top);
+    right = Math.max(right, r.right); bottom = Math.max(bottom, r.bottom);
+  }
+  if (!found) return null;
+  return { left: left, top: top, width: right - left, height: bottom - top };
+}
+
+function positionSpotlight_(rect) {
+  var sp = $('tourSpotlight');
+  var pad = 8;
+  sp.style.left = (rect.left - pad) + 'px';
+  sp.style.top = (rect.top - pad) + 'px';
+  sp.style.width = (rect.width + pad * 2) + 'px';
+  sp.style.height = (rect.height + pad * 2) + 'px';
+}
+
+function showTourStep_(i) {
+  if (i < 0) i = 0;
+  if (i >= TOUR_STEPS.length) { endTour_(); return; }
+
+  disarmInteractive_();
+  runStepCleanup_();
+
+  tourStepIndex = i;
+  var step = TOUR_STEPS[i];
+  tourCurrentStep = step;
+
+  var pageChanged = (typeof step.page === 'number' && step.page !== currentPage);
+  if (pageChanged) goToPage(step.page);
+
+  $('tourStepCounter').textContent = 'Part ' + step.part + ' of ' + TOUR_TOTAL_PARTS + '  ·  ' + step.part + '.' + step._sub;
+  $('tourTipTitle').textContent = step.title;
+  $('tourTipBody').textContent = step.body;
+
+  var isLast = (i === TOUR_STEPS.length - 1);
+  var interactive = !!step.interactive;
+
+  $('tourClickHint').style.display = interactive ? 'inline-block' : 'none';
+  $('tourBackBtn').disabled = (i === 0);
+  $('tourNextBtn').textContent = isLast ? 'Done' : 'Next';
+  // Interactive steps require the real click — Next is disabled there.
+  $('tourNextBtn').disabled = interactive;
+  $('tourSkipBtn').style.visibility = isLast ? 'hidden' : 'visible';
+
+  var delay = pageChanged ? 400 : 0;
+  setTimeout(function() {
+    if (step.action) { try { step.action(); } catch (e) { console.warn('Tour action failed', e); } }
+    tourStepCleanup = step.cleanup || null;
+
+    if (interactive) armInteractive_(step);
+
+    var selector = step.target || (currentInteractiveCfg && currentInteractiveCfg.sel);
+    var firstEl = selector ? document.querySelector(selector) : null;
+    if (firstEl && !step.modal) {
+      try { firstEl.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (e) {}
+      setTimeout(function() { placeTourTooltip_(step); }, 220);
+    } else {
+      placeTourTooltip_(step);
+      // Modals scale in over ~0.3s — re-measure the close-button ring once the
+      // modal has settled so the highlight lands squarely on the ×.
+      if (step.modal) {
+        setTimeout(function() { if (tourCurrentStep === step) placeTourTooltip_(step); }, 400);
+        setTimeout(function() { if (tourCurrentStep === step) placeTourTooltip_(step); }, 700);
+      }
+    }
+  }, delay);
+}
+
+function placeTourTooltip_(step) {
+  var ov = $('tourOverlay');
+  var tip = $('tourTooltip');
+
+  ov.classList.remove('no-spotlight', 'passthrough', 'interactive');
+
+  // Modal steps: transparent overlay so the opened modal shows; tooltip pins
+  // to the bottom (CSS). If interactive, ring the modal's close button.
+  if (step && step.modal) {
+    ov.classList.add('passthrough');
+    if (step.interactive) {
+      ov.classList.add('interactive');
+      var mRect = getStepRect_(step);
+      if (mRect) positionSpotlight_(mRect);
+    }
+    tip.style.left = ''; tip.style.top = ''; tip.style.transform = '';
+    return;
+  }
+
+  var rect = getStepRect_(step);
+
+  if (!rect) {
+    ov.classList.add('no-spotlight');
+    tip.style.left = ''; tip.style.top = ''; tip.style.transform = '';
+    return;
+  }
+
+  if (step && step.interactive) ov.classList.add('interactive');
+  positionSpotlight_(rect);
+
+  if (isTourMobile_()) {
+    tip.style.left = ''; tip.style.top = ''; tip.style.transform = '';
+    return;
+  }
+
+  var margin = 14;
+  var tipW = tip.offsetWidth;
+  var tipH = tip.offsetHeight;
+
+  var top = rect.top + rect.height + 12;
+  if (top + tipH > window.innerHeight - margin) top = rect.top - tipH - 12;
+  if (top < margin) top = margin;
+
+  var left = rect.left + rect.width / 2 - tipW / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - tipW - margin));
+
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+  tip.style.transform = 'none';
+}
+
+function maybeAutoStartTour_() {
+  var seen = '1';
+  try { seen = localStorage.getItem(TOUR_SEEN_KEY); } catch (e) {}
+  if (seen) return;
+  setTimeout(function() { startTour(true); }, 500);
+}
+
+// Wire the tooltip buttons once (markup exists before this script runs).
+(function wireTour_() {
+  var next = $('tourNextBtn');
+  var back = $('tourBackBtn');
+  var skip = $('tourSkipBtn');
+  if (next) next.addEventListener('click', function() { if (!next.disabled) tourNext_(); });
+  if (back) back.addEventListener('click', function() { if (tourStepIndex > 0) showTourStep_(tourStepIndex - 1); });
+  if (skip) skip.addEventListener('click', function() { endTour_(); });
+})();
+</script>
