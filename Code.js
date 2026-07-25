@@ -18,6 +18,56 @@ var CONFIG = {
   LINKS_SHEET_NAME: 'Links'
 };
 
+// ─────────────────────────────────────────────
+// CacheService helpers.
+// A single cache value is capped at 100KB, so larger JSON payloads are split
+// across numbered chunk keys. Everything is wrapped in try/catch and fails
+// SOFT: a cache miss or error just falls back to reading the sheet, so caching
+// can never break a load — worst case it's as slow as before.
+// ─────────────────────────────────────────────
+var CACHE_CHUNK_SIZE_ = 90000;
+var CACHE_MAX_TOTAL_ = 1800000;  // don't attempt to cache absurdly large payloads
+
+function cachePutLarge_(key, str, ttlSeconds) {
+  try {
+    if (!str || str.length > CACHE_MAX_TOTAL_) return false;
+    var cache = CacheService.getScriptCache();
+    var n = Math.ceil(str.length / CACHE_CHUNK_SIZE_);
+    var map = {};
+    for (var i = 0; i < n; i++) {
+      map[key + '_' + i] = str.substring(i * CACHE_CHUNK_SIZE_, (i + 1) * CACHE_CHUNK_SIZE_);
+    }
+    map[key + '_n'] = String(n);
+    cache.putAll(map, ttlSeconds);
+    return true;
+  } catch (e) {
+    Logger.log('cachePutLarge_ failed: ' + e.message);
+    return false;
+  }
+}
+
+function cacheGetLarge_(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var n = Number(cache.get(key + '_n'));
+    if (!n || isNaN(n)) return null;
+    var keys = [];
+    for (var i = 0; i < n; i++) { keys.push(key + '_' + i); }
+    var got = cache.getAll(keys);
+    var out = '';
+    for (var j = 0; j < n; j++) {
+      var part = got[key + '_' + j];
+      // Chunks can expire independently — if any is gone the payload is
+      // unusable, so treat it as a miss rather than returning truncated JSON.
+      if (part === null || part === undefined) return null;
+      out += part;
+    }
+    return out;
+  } catch (e) {
+    return null;
+  }
+}
+
 
 
 function updateThreshold(value) {
@@ -35,10 +85,26 @@ function updateThreshold(value) {
 }
 
 function getArchiveLinks() {
-  var _tA = Date.now();  // PERF (temporary)
+
+  // Called twice per dashboard load (once by the client for the History
+  // dropdown, once internally by getDashboardData to find yesterday's archive),
+  // and the Links sheet changes at most once a day — so a short cache removes
+  // the duplicate read entirely. Payload is small (≤14 links), no chunking.
+  var _linksCache = null;
+  try { _linksCache = CacheService.getScriptCache(); } catch (e) {}
+  if (_linksCache) {
+    var _hit = _linksCache.get('archiveLinks_v1');
+    if (_hit) {
+      try {
+        var _parsed = JSON.parse(_hit);
+        return _parsed;
+      } catch (e) {}
+    }
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var linksSheet = ss.getSheetByName(CONFIG.LINKS_SHEET_NAME);
-  if (!linksSheet) { Logger.log('[PERF] getArchiveLinks (no Links sheet): +' + (Date.now() - _tA) + 'ms'); return []; }
+  if (!linksSheet) return [];
 
   var lastRow = linksSheet.getLastRow();
   if (lastRow < 2) return [];
@@ -82,10 +148,13 @@ function getArchiveLinks() {
     return b.date.getTime() - a.date.getTime();
   });
 
-  Logger.log('[PERF] getArchiveLinks: +' + (Date.now() - _tA) + 'ms (' + uniqueLinks.length + ' links)');
-  return uniqueLinks.map(function(l) {
+  var _out = uniqueLinks.map(function(l) {
     return { name: l.name, url: l.url };
   });
+  if (_linksCache) {
+    try { _linksCache.put('archiveLinks_v1', JSON.stringify(_out), 300); } catch (e) {}
+  }
+  return _out;
 }
 
 // ─────────────────────────────────────────────
@@ -100,7 +169,11 @@ function readProcRows_(sheet, lastRow) {
   var cols = isV2 ? 22 : 18;
   return {
     vals: sheet.getRange(2, 1, lastRow - 1, cols).getValues(),
-    disps: sheet.getRange(2, 1, lastRow - 1, cols).getDisplayValues(),
+    // Only columns A:C are ever needed as display values — buildSideEntry_ reads
+    // dispsRow[0] (time range) and dispsRow[2] (bonus) and takes every other
+    // field from vals, in BOTH the v1 and v2 layouts. Reading 3 columns instead
+    // of the full 18/22 removes most of a second full-sheet read per call.
+    disps: sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues(),
     isV2: isV2
   };
 }
@@ -173,14 +246,8 @@ function parseTimeRangeStart_(tr) {
 }
 
 function getDashboardData(archiveUrl) {
-  // ── PERF TIMING (temporary): logs elapsed ms per step to the Executions log.
-  // Remove once load-time profiling is done. ──
-  var _t0 = Date.now();
-  var _lap = function(label) { Logger.log('[PERF] ' + label + ': +' + (Date.now() - _t0) + 'ms'); };
-
   var ss;
   var isLiveMode = !archiveUrl;
-  _lap('start (live=' + isLiveMode + ')');
 
   if (archiveUrl) {
     try {
@@ -191,7 +258,6 @@ function getDashboardData(archiveUrl) {
   } else {
     ss = SpreadsheetApp.getActiveSpreadsheet();
   }
-  _lap('spreadsheet opened');
 
   var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) throw new Error("Sheet not found: " + CONFIG.SHEET_NAME);
@@ -201,7 +267,6 @@ function getDashboardData(archiveUrl) {
 
   var threshold = sheet.getRange(CONFIG.THRESHOLD_CELL).getValue();
   var lastRefresh = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
-  _lap('Front cells read');
 
   if (archiveUrl) {
     var lastRow = sourceSheet.getLastRow();
@@ -262,7 +327,6 @@ function getDashboardData(archiveUrl) {
   var timeRanges = generateTimeRanges_(lastRefresh, 96);
   var rawSideData = [];
   var bonusSet = {};
-  _lap('time ranges generated');
 
   // ═══════════════════════════════════════════════
   // MERGED MODE — Live = Yesterday archive + Today live
@@ -294,7 +358,6 @@ function getDashboardData(archiveUrl) {
     var yesterdayStr = Utilities.formatDate(yesterdayDate, tz, "dd/MM/yyyy");
 
     var archiveLinks = getArchiveLinks();
-    _lap('getArchiveLinks (live merge)');
     var yesterdayArchiveUrl = null;
     for (var a = 0; a < archiveLinks.length; a++) {
       if (archiveLinks[a].name === yesterdayStr) {
@@ -307,25 +370,57 @@ function getDashboardData(archiveUrl) {
     var archiveDataMap = {};   // key = "timeRange||bonus"
 
     if (yesterdayArchiveUrl) {
-      try {
-        var archiveSS = SpreadsheetApp.openByUrl(yesterdayArchiveUrl);
-        _lap('yesterday archive openByUrl');
-        var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
-        if (archiveSource && archiveSource.getLastRow() >= 2) {
-          var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
+      // Opening + fully parsing yesterday's archive spreadsheet is the single
+      // most expensive thing in this function, and it is pure waste: that file
+      // is already archived (immutable), and every viewer/auto-refresh inside
+      // the same 15-minute window needs the exact same slice of it.
+      //
+      // So cache the FILTERED entries. The key pins both the archive date and
+      // the exact yesterday-window bounds, so when the rolling 24h window moves
+      // the key changes and a stale slice can never be reused. TTL is kept to
+      // 15 min so that an archive still being written just after midnight
+      // self-heals quickly rather than being pinned all day.
+      var yKeys = Object.keys(yesterdayTRSet);
+      var yEntries = null;
+      var yCacheKey = null;
 
-          for (var i = 0; i < aRead.vals.length; i++) {
-            var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.isV2);
-            if (!yesterdayTRSet[aEntry.timeRange]) continue;
-            if (!aEntry.bonus || aEntry.value <= 0) continue;
-
-            archiveDataMap[aEntry.timeRange + '||' + aEntry.bonus] = aEntry;
-            bonusSet[aEntry.bonus] = true;
-          }
+      if (yKeys.length) {
+        yKeys.sort();
+        yCacheKey = 'ydayArch_v1_' + yesterdayStr + '_' + yKeys.length +
+                    '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
+        var yCached = cacheGetLarge_(yCacheKey);
+        if (yCached) {
+          try {
+            yEntries = JSON.parse(yCached);
+          } catch (e) { yEntries = null; }
         }
-        _lap('yesterday archive read+parsed');
-      } catch (e) {
-        Logger.log('Yesterday archive read failed (' + yesterdayStr + '): ' + e.message);
+      }
+
+      if (!yEntries) {
+        yEntries = [];
+        try {
+          var archiveSS = SpreadsheetApp.openByUrl(yesterdayArchiveUrl);
+          var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
+          if (archiveSource && archiveSource.getLastRow() >= 2) {
+            var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
+
+            for (var i = 0; i < aRead.vals.length; i++) {
+              var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.isV2);
+              if (!yesterdayTRSet[aEntry.timeRange]) continue;
+              if (!aEntry.bonus || aEntry.value <= 0) continue;
+              yEntries.push(aEntry);
+            }
+          }
+          if (yCacheKey) { cachePutLarge_(yCacheKey, JSON.stringify(yEntries), 900); }
+        } catch (e) {
+          Logger.log('Yesterday archive read failed (' + yesterdayStr + '): ' + e.message);
+        }
+      }
+
+      for (var yi = 0; yi < yEntries.length; yi++) {
+        var yEnt = yEntries[yi];
+        archiveDataMap[yEnt.timeRange + '||' + yEnt.bonus] = yEnt;
+        bonusSet[yEnt.bonus] = true;
       }
     }
 
@@ -359,7 +454,6 @@ function getDashboardData(archiveUrl) {
     for (var k = 0; k < aKeys.length; k++) {
       rawSideData.push(archiveDataMap[aKeys[k]]);
     }
-    _lap('live Processed Data read+merged');
 
   } else {
     // ═══════════════════════════════════════════════
@@ -381,7 +475,6 @@ function getDashboardData(archiveUrl) {
         }
       }
     }
-    _lap('archive-mode Processed Data read');
   }
 
   var displayTime = sheet.getRange(CONFIG.DATETIME_CELL).getDisplayValue();
@@ -393,7 +486,6 @@ function getDashboardData(archiveUrl) {
   var b2Val = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
   var noteVal = sheet.getRange('G3').getValue();
 
-  _lap('DONE (rawSideData rows=' + rawSideData.length + ')');
   return {
     threshold: threshold,
     lastRefresh: displayTime || Utilities.formatDate(lastRefresh, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),

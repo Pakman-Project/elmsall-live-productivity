@@ -1,10 +1,15 @@
 <script>
+  // Fills the History dropdown. Deliberately does NOT kick off the data load:
+  // the archive list and the dashboard data are independent, so they are fired
+  // in parallel from DOMContentLoaded. Chaining them (load list -> then load
+  // data) meant startup waited for TWO sequential server round-trips before any
+  // data could appear.
   function populateArchiveDropdown() {
-    var _tDrop = performance.now();  // PERF (temporary)
-    console.log('[PERF] getArchiveLinks call START');
     google.script.run.withSuccessHandler(function(links) {
-      console.log('[PERF] getArchiveLinks round-trip: ' + Math.round(performance.now() - _tDrop) + 'ms');
       var sel = $('archiveSelect');
+      // The user could have changed the selection while the list was loading —
+      // preserve it rather than silently snapping back to Live.
+      var previous = sel.value;
       sel.innerHTML = '<option value="">Live</option>';
       for (var i = 0; i < links.length; i++) {
         var opt = document.createElement('option');
@@ -12,12 +17,56 @@
         opt.textContent = links[i].name;
         sel.appendChild(opt);
       }
-
-      // ALWAYS default to Live on startup to prevent loading stale archives
-      currentArchiveUrl = null;
-      loadDataPak(null);
-
+      if (previous) sel.value = previous;
+    }).withFailureHandler(function(err) {
+      console.warn('Archive list failed to load:', err && err.message ? err.message : err);
     }).getArchiveLinks();
+  }
+
+  // ── Stale-while-revalidate cache ───────────────────────────────────────────
+  // The last LIVE payload is kept in localStorage so a returning user sees the
+  // dashboard populated immediately instead of staring at a spinner for a full
+  // server round-trip. The cached view is always labelled "Updating..." while
+  // fresh data is fetched in the background, and it still shows its own
+  // "Last Update" timestamp — so it is never passed off as live data.
+  var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v1';
+  var PAYLOAD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;  // 6h: older than a shift is not worth showing
+  var PAYLOAD_CACHE_MAX_CHARS = 3000000;              // stay well clear of the ~5MB localStorage quota
+
+  // Only LIVE data is cached. Archive snapshots are picked deliberately and are
+  // never the default view on startup, so caching them would only burn quota.
+  function savePayloadCache_(data, archiveUrl) {
+    if (archiveUrl) return;
+    try {
+      var json = JSON.stringify({ savedAt: Date.now(), payload: data });
+      if (json.length > PAYLOAD_CACHE_MAX_CHARS) return;
+      localStorage.setItem(PAYLOAD_CACHE_KEY, json);
+    } catch (e) {
+      // Quota exceeded or storage unavailable — drop the stale copy and move on.
+      try { localStorage.removeItem(PAYLOAD_CACHE_KEY); } catch (e2) {}
+    }
+  }
+
+  // Returns true if a cached payload was rendered, so the caller can fetch
+  // silently (no blocking overlay) instead of showing the full-screen spinner.
+  function renderCachedPayload_() {
+    try {
+      var raw = localStorage.getItem(PAYLOAD_CACHE_KEY);
+      if (!raw) return false;
+      var wrapper = JSON.parse(raw);
+      if (!wrapper || !wrapper.payload || !wrapper.savedAt) return false;
+      if (Date.now() - wrapper.savedAt > PAYLOAD_CACHE_MAX_AGE_MS) return false;
+      if (!wrapper.payload.timeRanges || !wrapper.payload.timeRanges.length) return false;
+
+      renderDashboardPayload_(wrapper.payload);
+      lastRealPayload = wrapper.payload;
+      lastRealPayload.__archiveUrl = null;
+      // Don't let the cached timestamp look like a completed live refresh; the
+      // caller immediately overwrites status with "Updating...".
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   // Renders a full dashboard payload (real OR demo/tour data) into the UI: KPI
@@ -120,12 +169,11 @@
 
     var urlToFetch = archiveUrl !== undefined ? archiveUrl : currentArchiveUrl;
 
-    var _tLoad = performance.now();  // PERF (temporary)
-    console.log('[PERF] getDashboardData call START (archive=' + (urlToFetch || 'LIVE') + ')');
     google.script.run.withSuccessHandler(function(data) {
-      console.log('[PERF] getDashboardData round-trip: ' + Math.round(performance.now() - _tLoad) + 'ms');
       // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
       try {
+        savePayloadCache_(data, urlToFetch);
+
         if (tourActive) {
           // Tour is showing demo data — stash the real payload and apply it when the tour ends.
           pendingRealData = data;
@@ -176,8 +224,29 @@
     setupSwipe();
     setArrowState();
 
-    // Populate dropdowns first, THEN fetch data (handled inside populateArchiveDropdown now)
+    // ALWAYS start on Live so a stale archive is never auto-loaded.
+    currentArchiveUrl = null;
+
+    // Paint the last known LIVE view instantly from localStorage, then refresh
+    // in the background. If there's nothing usable cached we fall back to the
+    // normal blocking spinner. Skipped on a first visit (no cache) and while
+    // the guided tour is running, since the tour renders its own demo data.
+    var paintedFromCache = false;
+    if (!tourActive) {
+      paintedFromCache = renderCachedPayload_();
+    }
+    if (paintedFromCache) {
+      var lo = $('loadingOverlay');
+      if (lo) lo.classList.remove('active');
+    }
+
+    // Fire BOTH server round-trips in parallel — they don't depend on each
+    // other, so waiting for the archive list before requesting data was
+    // doubling time-to-first-data.
     populateArchiveDropdown();
+    // silent=true when we already painted cached data: refresh in the
+    // background rather than covering the populated dashboard with a spinner.
+    loadDataPak(null, paintedFromCache);
 
     $('archiveSelect').addEventListener('change', function() {
       currentArchiveUrl = this.value;
@@ -195,10 +264,8 @@
       if (currentArchiveUrl) return;
       google.script.run.withSuccessHandler(function(remoteTimestamp) {
         if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) {
-          console.log("Change detected in Front!B2. Refreshing data silently...");
           loadDataPak(currentArchiveUrl, true);
         }
-        else { console.log("No change in Front!B2."); }
       }).getLastRefreshTimestamp();
     }, 60000);
 
