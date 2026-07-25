@@ -52,22 +52,14 @@
   }
 
   function renderVolumeAreaToggles_(mode) {
-    var togglesEl = $('volumeAreaToggles');
-    if (!togglesEl) return;
     // Only meaningful in Separate Charts mode — Combined/Stacked already have
     // their own per-series toggle via the Chart.js legend.
-    togglesEl.style.display = mode === 'separate' ? 'flex' : 'none';
-    if (mode !== 'separate') return;
-
-    var html = '';
-    for (var v = 0; v < VOLUME_TYPES.length; v++) {
-      var t = VOLUME_TYPES[v];
-      var off = hiddenVolumeAreas.indexOf(t.key) !== -1;
-      html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" onclick="toggleVolumeArea(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
-              '<span class="breakdown-dot" style="background:' + t.color + '"></span>' + t.label +
-              '<i class="fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>';
-    }
-    togglesEl.innerHTML = html;
+    renderAreaToggleChips_({
+      containerId: 'volumeAreaToggles',
+      visible: mode === 'separate',
+      hiddenKeys: hiddenVolumeAreas,
+      onToggle: 'toggleVolumeArea'
+    });
   }
 
   function renderVolumeChartsPak(agg, xOpt, tOpt) {

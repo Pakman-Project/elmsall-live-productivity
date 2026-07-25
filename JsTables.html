@@ -486,20 +486,12 @@ function toggleBonusArea(key) {
 }
 
 function renderBonusAreaToggles_(mode) {
-  var togglesEl = $('bonusAreaToggles');
-  if (!togglesEl) return;
-  togglesEl.style.display = mode === 'area' ? 'flex' : 'none';
-  if (mode !== 'area') return;
-
-  var html = '';
-  for (var v = 0; v < VOLUME_TYPES.length; v++) {
-    var t = VOLUME_TYPES[v];
-    var off = hiddenBonusAreas.indexOf(t.key) !== -1;
-    html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" onclick="toggleBonusArea(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
-            '<span class="breakdown-dot" style="background:' + t.color + '"></span>' + t.label +
-            '<i class="fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>';
-  }
-  togglesEl.innerHTML = html;
+  renderAreaToggleChips_({
+    containerId: 'bonusAreaToggles',
+    visible: mode === 'area',
+    hiddenKeys: hiddenBonusAreas,
+    onToggle: 'toggleBonusArea'
+  });
 }
 
 function renderSideTablesPak(rowsLimit) {
