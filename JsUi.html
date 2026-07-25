@@ -568,11 +568,10 @@
   function renderAreaGroupEditor() {
     var html = '';
     for (var i = 0; i < _areaGroupDraft.length; i++) {
-      var color = AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length];
       var g = _areaGroupDraft[i];
       html += '<div class="area-group-block">';
       html += '<div class="area-group-head">';
-      html += '<h3 style="color:' + color + ';">Group ' + (i + 1) + '</h3>';
+      html += '<h3>Group ' + (i + 1) + '</h3>';
       html += '<div class="area-group-modes">';
       html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-mode="showLine" ' + (g.showLine ? 'checked' : '') + ' onchange="onAreaGroupModeChange(this)"><span class="area-cb-text">Line</span></label>';
       html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-mode="showTrend" ' + (g.showTrend ? 'checked' : '') + ' onchange="onAreaGroupModeChange(this)"><span class="area-cb-text">Trend Line</span></label>';
