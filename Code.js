@@ -245,6 +245,29 @@ function parseTimeRangeStart_(tr) {
   return new Date(Number(dp[2]), Number(dp[1]) - 1, Number(dp[0]), Number(tp[0]), Number(tp[1]), 0);
 }
 
+// Parses the END datetime out of a "<start> - <end>" time-range string.
+//
+// ⚠ BEHAVIOUR PRESERVED DELIBERATELY: the space-split below requires FOUR parts,
+// but formatDateTimeRange_ writes ranges as "dd/MM/yyyy HH:mm - dd/MM/yyyy HH:mm",
+// whose end half splits into TWO parts ("dd/MM/yyyy", "HH:mm"). So this never
+// matches and always returns null - which is exactly what the two copies of this
+// logic inside getDashboardData did before they were extracted here.
+//
+// Making it parse correctly would change which 24h window archive views load
+// (lastRefresh would become "last data point + 1 day at 00:00" instead of the
+// archive's Front!B2 value), so it is left as-is pending a decision rather than
+// silently changed. See parseTimeRangeStart_ for the format actually in use.
+function parseTimeRangeEnd_(rangeStr) {
+  if (typeof rangeStr !== 'string' || rangeStr.indexOf('-') === -1) return null;
+  var parts = rangeStr.split('-');
+  if (parts.length !== 2) return null;
+  var endParts = parts[1].trim().split(' ');
+  if (endParts.length !== 4) return null;
+  var d = endParts[0], m = endParts[1], y = endParts[2], time = endParts[3];
+  var timeParts = time.split(':');
+  return new Date(y + '-' + m + '-' + d + 'T' + timeParts[0] + ':' + timeParts[1] + ':00');
+}
+
 function getDashboardData(archiveUrl) {
   var ss;
   var isLiveMode = !archiveUrl;
@@ -271,20 +294,9 @@ function getDashboardData(archiveUrl) {
   if (archiveUrl) {
     var lastRow = sourceSheet.getLastRow();
     if (lastRow >= 2) {
-      var lastTimeRangeStr = sourceSheet.getRange(lastRow, 1).getDisplayValue();
-      if (typeof lastTimeRangeStr === 'string' && lastTimeRangeStr.indexOf('-') !== -1) {
-        var parts = lastTimeRangeStr.split('-');
-        if (parts.length === 2) {
-          var endDateStr = parts[1].trim();
-          var endParts = endDateStr.split(' ');
-          if (endParts.length === 4) {
-            var d = endParts[0], m = endParts[1], y = endParts[2], time = endParts[3];
-            var timeParts = time.split(':');
-            var h = timeParts[0], min = timeParts[1];
-            var lastDataPoint = new Date(y + '-' + m + '-' + d + 'T' + h + ':' + min + ':00');
-            lastRefresh = new Date(lastDataPoint.getFullYear(), lastDataPoint.getMonth(), lastDataPoint.getDate() + 1, 0, 0, 0);
-          }
-        }
+      var lastDataPoint = parseTimeRangeEnd_(sourceSheet.getRange(lastRow, 1).getDisplayValue());
+      if (lastDataPoint) {
+        lastRefresh = new Date(lastDataPoint.getFullYear(), lastDataPoint.getMonth(), lastDataPoint.getDate() + 1, 0, 0, 0);
       }
     }
 
@@ -302,20 +314,8 @@ function getDashboardData(archiveUrl) {
     if (!lastRefresh || !(lastRefresh instanceof Date)) {
       var lastRow2 = sourceSheet.getLastRow();
       if (lastRow2 >= 2) {
-        var lastTimeRangeStr2 = sourceSheet.getRange(lastRow2, 1).getValue();
-        if (typeof lastTimeRangeStr2 === 'string' && lastTimeRangeStr2.indexOf('-') !== -1) {
-          var parts2 = lastTimeRangeStr2.split('-');
-          if (parts2.length === 2) {
-            var endDateStr2 = parts2[1].trim();
-            var endParts2 = endDateStr2.split(' ');
-            if (endParts2.length === 4) {
-              var d2 = endParts2[0], m2 = endParts2[1], y2 = endParts2[2], time2 = endParts2[3];
-              var timeParts2 = time2.split(':');
-              var h2 = timeParts2[0], min2 = timeParts2[1];
-              lastRefresh = new Date(y2 + '-' + m2 + '-' + d2 + 'T' + h2 + ':' + min2 + ':00');
-            }
-          }
-        }
+        var parsedEnd = parseTimeRangeEnd_(sourceSheet.getRange(lastRow2, 1).getValue());
+        if (parsedEnd) { lastRefresh = parsedEnd; }
       }
     }
 
