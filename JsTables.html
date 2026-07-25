@@ -58,6 +58,10 @@ function wireSortingPak() {
     }).join('');
     sortSelect.value = sortState.key;
     sortSelect.addEventListener('change', function () {
+      // Match the desktop header-click behaviour: switching to a different
+      // column starts at descending, so the dropdown and the direction button
+      // never disagree about what the table is actually sorted by.
+      if (sortSelect.value !== sortState.key) sortState.dir = 'desc';
       sortState.key = sortSelect.value;
       renderMainTablePak(currentMainRows);
     });

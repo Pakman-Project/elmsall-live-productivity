@@ -33,6 +33,33 @@
     }
   }
 
+  function toggleVolumeArea(key) {
+    var idx = hiddenVolumeAreas.indexOf(key);
+    if (idx === -1) { hiddenVolumeAreas.push(key); }
+    else { hiddenVolumeAreas.splice(idx, 1); }
+    saveUserPreferences();
+    applyLocalFiltersPak();
+  }
+
+  function renderVolumeAreaToggles_(mode) {
+    var togglesEl = $('volumeAreaToggles');
+    if (!togglesEl) return;
+    // Only meaningful in Separate Charts mode — Combined/Stacked already have
+    // their own per-series toggle via the Chart.js legend.
+    togglesEl.style.display = mode === 'separate' ? 'flex' : 'none';
+    if (mode !== 'separate') return;
+
+    var html = '';
+    for (var v = 0; v < VOLUME_TYPES.length; v++) {
+      var t = VOLUME_TYPES[v];
+      var off = hiddenVolumeAreas.indexOf(t.key) !== -1;
+      html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" onclick="toggleVolumeArea(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
+              '<span class="breakdown-dot" style="background:' + t.color + '"></span>' + t.label +
+              '<i class="fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>';
+    }
+    togglesEl.innerHTML = html;
+  }
+
   function renderVolumeChartsPak(agg, xOpt, tOpt) {
     var labels = agg.map(function(r) { return r.dateTime; });
     var rl = agg.map(function(r) { return r.rangeLabel; });
@@ -43,11 +70,38 @@
     else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - E3 Stacked Area Chart' : 'Volume - E3 Combined Line Chart'; }
     for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
     volumeCharts = [];
+
+    renderVolumeAreaToggles_(mode);
+
+    // Panel show/hide only applies in separate mode; combined/stacked always
+    // show every series (toggled via the chart's own legend instead).
+    var visibleIndices = [];
+    for (var vp = 0; vp < VOLUME_TYPES.length; vp++) {
+      var panelEl = $('volPanel' + vp);
+      if (!panelEl) continue;
+      panelEl.classList.remove('vol-span-full');
+      if (mode === 'separate') {
+        var isHidden = hiddenVolumeAreas.indexOf(VOLUME_TYPES[vp].key) !== -1;
+        panelEl.style.display = isHidden ? 'none' : '';
+        if (!isHidden) visibleIndices.push(vp);
+      } else {
+        panelEl.style.display = '';
+      }
+    }
+    // Last visible panel spans full width when the visible count is odd —
+    // driven by JS (not :nth-child) so it stays correct no matter which areas
+    // are hidden, not just when every panel is shown.
+    if (mode === 'separate' && visibleIndices.length % 2 === 1) {
+      var lastVisibleEl = $('volPanel' + visibleIndices[visibleIndices.length - 1]);
+      if (lastVisibleEl) lastVisibleEl.classList.add('vol-span-full');
+    }
+
     var commonTooltip = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } };
     var isStacked = mode === 'stacked';
     var volYAxis = { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } }, stacked: isStacked };
     if (mode === 'separate') {
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
+        if (hiddenVolumeAreas.indexOf(VOLUME_TYPES[i].key) !== -1) continue;
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
         var chart = new Chart($('volChart' + i), { type: 'line', data: { labels: labels, datasets: [{ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } });
         volumeCharts.push(chart);

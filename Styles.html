@@ -163,18 +163,20 @@ body {
   z-index: 1000;
   position: relative;
 }
-.next-header-left {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
+/* Desktop: collapse the left/right wrappers so brand, meta, controls and
+   actions are all direct flex children of the header on one row. The brand's
+   auto right-margin pushes everything after it (meta + controls + actions) to
+   the right edge, so status/last-update sit on the right in web view. */
+.next-header-left,
+.next-header-right {
+  display: contents;
 }
 .next-brand {
   display: flex;
   align-items: center;
   gap: 14px;
   min-width: 0;
+  margin-right: auto;
 }
 .next-header-meta {
   display: flex;
@@ -182,6 +184,7 @@ body {
   gap: 12px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
 }
 .next-header-meta .note-text { color: #ff9d5c; font-weight: 600; }
 .next-logo {
@@ -211,12 +214,6 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.next-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;
 }
 .next-header-controls {
   display: flex;
@@ -346,13 +343,14 @@ body {
   }
   .next-header-left,
   .next-header-right { display: contents; }
-  .next-brand { grid-area: brand; }
+  .next-brand { grid-area: brand; margin-right: 0; }
   .next-header-actions { grid-area: actions; }
   .next-header-controls { grid-area: controls; display: flex; gap: 8px; }
   .next-header-meta {
     grid-area: meta;
     justify-content: space-between;
     font-size: 10.5px;
+    white-space: normal;
   }
   .next-header-title { font-size: 17px; }
   .next-header-controls #archiveSelect { flex: 0 0 auto; min-width: 110px; max-width: 150px; }
@@ -986,9 +984,10 @@ tr:hover td {
   display: none;
 }
 
-/* Last volume panel when the panel count is odd (controls div is child 1,
-   so an odd panel count puts the last panel at an even child index) */
-.volume-charts:not(.combined-mode) > .vol-chart-panel:last-child:nth-child(even) {
+/* Last VISIBLE volume panel when the visible count is odd. Driven by JS
+   (renderVolumeChartsPak) rather than a pure :nth-child rule, since hiding
+   panels via the area-toggle chips makes DOM position != visible position. */
+.volume-charts:not(.combined-mode) > .vol-chart-panel.vol-span-full {
   grid-column: 1 / -1;
   width: calc((100% - 14px) / 2);
   margin: 0 auto;
@@ -1000,8 +999,14 @@ tr:hover td {
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
-  padding-bottom: 10px;
   flex-wrap: wrap;
+}
+
+/* Sit the chips ~10px under the controls row (matching the Bonus page), rather
+   than the volume grid's full 14px row-gap plus the controls' bottom padding. */
+.volume-charts > #volumeAreaToggles.bonus-area-toggles {
+  grid-column: 1 / -1;
+  margin-top: -4px;
 }
 
 .volume-controls label {
@@ -1811,7 +1816,9 @@ canvas {
 }
 
 .breakdown-time-select {
-  background: var(--w5);
+  /* Same field surface as .row-select (Display Mode etc.) — var(--w5) reads as
+     grey on the light theme's white cards. */
+  background: var(--control-bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 8px;
@@ -1831,7 +1838,7 @@ canvas {
 }
 
 .breakdown-time-select option {
-  background: var(--bg);
+  background: var(--surface-dropdown);
   color: var(--text);
 }
 
@@ -1992,7 +1999,11 @@ canvas {
   gap: 10px 18px;
   flex-wrap: wrap;
   margin-bottom: 12px;
-  padding: 2px 4px;
+  /* No horizontal padding: it would make #bonusAreaToggles narrower than the
+     Volume page's #volumeAreaToggles (which spans the full grid width), and
+     since the chips stretch (flex: 1 1 auto on mobile) even a few px changes
+     how many chips fit per row — the two pages would wrap differently. */
+  padding: 2px 0;
 }
 
 .bonus-controls {
@@ -2057,6 +2068,11 @@ canvas {
 
 .bonus-area-chip.off {
   opacity: 0.4;
+}
+
+/* Hidden chips also lose their colour dot, so "off" reads at a glance. */
+.bonus-area-chip.off .breakdown-dot {
+  filter: grayscale(1);
 }
 
 .bonus-area-chip.off:hover {
@@ -2339,7 +2355,9 @@ canvas {
   .volume-charts:not(.combined-mode) {
     grid-template-columns: 1fr;
   }
-  .volume-charts:not(.combined-mode) > .vol-chart-panel:last-child:nth-child(even) {
+  /* Single-column on mobile: the odd-last panel must be full width, not the
+     desktop half-width. Must match the .vol-span-full class set by JS. */
+  .volume-charts:not(.combined-mode) > .vol-chart-panel.vol-span-full {
     width: 100%;
   }
   .two-panels {
@@ -2699,7 +2717,10 @@ canvas {
     min-height: 44px;
     box-sizing: border-box;
   }
-  #mainSortDirBtn.desc i {
+  /* The base icon (fa-arrow-down-wide-short) already reads as DESCENDING, so
+     it's the ASCENDING state that must be flipped — not the other way round,
+     which showed an up-arrow while the table was sorted descending. */
+  #mainSortDirBtn:not(.desc) i {
     transform: scaleY(-1);
   }
 
@@ -2948,8 +2969,22 @@ canvas {
     flex: 1 1 auto;
     justify-content: center;
   }
+  /* Keep "Display Mode:" + its select + the rows select on one row. The
+     selects shrink (flex + min-width:0) instead of wrapping onto a new line. */
+  .bonus-controls {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
   .bonus-controls label {
     font-size: 13px;
+    flex: 0 0 auto;
+    margin-right: 0;
+  }
+  .bonus-controls .row-select {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-right: 24px;
   }
 }
 

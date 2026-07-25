@@ -41,6 +41,7 @@ function saveUserPreferences() {
       sharedRowsLimit: $('sharedRowsLimit').value,
       bonusViewMode: $('bonusViewMode') ? $('bonusViewMode').value : 'area',
       hiddenBonusAreas: hiddenBonusAreas,
+      hiddenVolumeAreas: hiddenVolumeAreas,
       trendSplitState: trendSplitState,
       areaGroups: areaGroupState,
       theme: currentTheme
@@ -70,6 +71,12 @@ function loadUserPreferences() {
       var validAreaKeys = {};
       for (var h = 0; h < VOLUME_TYPES.length; h++) { validAreaKeys[VOLUME_TYPES[h].key] = true; }
       hiddenBonusAreas = prefs.hiddenBonusAreas.filter(function(k) { return validAreaKeys[k]; });
+    }
+
+    if (Array.isArray(prefs.hiddenVolumeAreas)) {
+      var validVolAreaKeys = {};
+      for (var hv = 0; hv < VOLUME_TYPES.length; hv++) { validVolAreaKeys[VOLUME_TYPES[hv].key] = true; }
+      hiddenVolumeAreas = prefs.hiddenVolumeAreas.filter(function(k) { return validVolAreaKeys[k]; });
     }
 
     var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
