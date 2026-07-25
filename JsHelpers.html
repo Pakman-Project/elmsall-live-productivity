@@ -15,8 +15,8 @@ function applyTheme_(theme) {
   try { localStorage.setItem('theme', currentTheme); } catch (e) {}
   var btn = $('themeToggleBtn');
   if (btn) {
-    var icon = btn.querySelector('.material-symbols-outlined');
-    if (icon) icon.textContent = (currentTheme === 'dark') ? 'light_mode' : 'dark_mode';
+    var icon = btn.querySelector('i');
+    if (icon) icon.className = (currentTheme === 'dark') ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
     var label = (currentTheme === 'dark') ? 'Switch to light mode' : 'Switch to dark mode';
     btn.setAttribute('title', label);
     btn.setAttribute('aria-label', label);

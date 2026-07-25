@@ -58,7 +58,10 @@
       if (Date.now() - wrapper.savedAt > PAYLOAD_CACHE_MAX_AGE_MS) return false;
       if (!wrapper.payload.timeRanges || !wrapper.payload.timeRanges.length) return false;
 
+      // Instant paint is the whole point here — don't animate it in.
+      setChartAnimationEnabled_(false);
       renderDashboardPayload_(wrapper.payload);
+      setChartAnimationEnabled_(true);
       lastRealPayload = wrapper.payload;
       lastRealPayload.__archiveUrl = null;
       // Don't let the cached timestamp look like a completed live refresh; the
@@ -134,6 +137,11 @@
     else { noteEl.textContent = ''; }
   }
 
+  // Retry the last attempted load (shown alongside the error status).
+  function retryLoadPak() {
+    loadDataPak(currentArchiveUrl);
+  }
+
   function loadDataPak(archiveUrl, silent) {
     var overlay = $('loadingOverlay');
 
@@ -180,7 +188,11 @@
           pendingRealData.__archiveUrl = urlToFetch || null;
           $('status').textContent = 'Loaded';
         } else {
+          // Background refreshes redraw without animation so the dashboard
+          // doesn't visibly stutter every minute.
+          setChartAnimationEnabled_(!silent);
           renderDashboardPayload_(data);
+          setChartAnimationEnabled_(true);
           currentArchiveUrl = urlToFetch || null;
           lastRealPayload = data;
           lastRealPayload.__archiveUrl = urlToFetch || null;
@@ -207,7 +219,12 @@
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
 
     }).withFailureHandler(function(err) {
-      if (!tourActive) $('status').innerHTML = '<span class="bad">Error: ' + (err.message || err) + '</span>';
+      if (!tourActive) {
+        // Offer a way back: without this the only recovery was a page reload.
+        var msg = (err && err.message) ? err.message : String(err);
+        $('status').innerHTML = '<span class="bad">Error: ' + escapeAttrPak(msg) + '</span>' +
+          ' <button type="button" class="status-retry-btn" onclick="retryLoadPak()">Retry</button>';
+      }
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
     }).getDashboardData(urlToFetch);
   }

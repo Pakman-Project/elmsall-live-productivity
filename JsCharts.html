@@ -10,6 +10,16 @@
   // Area-fill shading: keep it minimal in light mode so charts stay clean.
   function CHART_FILL_A(a) { return _isLightTheme_() ? +(a * 0.35).toFixed(3) : a; }
 
+  // Every render rebuilds all ~13 charts from scratch. Animating that on a
+  // background auto-refresh makes the whole dashboard look like it's stuttering
+  // once a minute, so animation is reserved for user-driven renders.
+  var _chartAnimDefault;
+  function setChartAnimationEnabled_(enabled) {
+    if (typeof Chart === 'undefined') return;
+    if (_chartAnimDefault === undefined) { _chartAnimDefault = Chart.defaults.animation; }
+    Chart.defaults.animation = enabled ? _chartAnimDefault : false;
+  }
+
   function syncTooltipHover(sourceChart, targetChart, event, activeElements) {
     if (!targetChart) return;
     if (activeElements.length > 0) {

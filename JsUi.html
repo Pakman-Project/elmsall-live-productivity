@@ -112,11 +112,15 @@
     resizeCharts();
   }
 
+  // Highlights the nav item for the current page. Targets .rail-item directly
+  // rather than a generic .dot class: the old class was shared with the
+  // pre-reskin nav pills, so any element that happened to carry it would have
+  // been treated as a page and silently broken this index-based matching.
   function updateDots() {
-    var dots = document.querySelectorAll('.dot');
-    for (var i = 0; i < dots.length; i++) { 
-      if (i === currentPage) dots[i].classList.add('active'); 
-      else dots[i].classList.remove('active'); 
+    var items = document.querySelectorAll('.next-rail .rail-item');
+    for (var i = 0; i < items.length; i++) {
+      if (i === currentPage) items[i].classList.add('active');
+      else items[i].classList.remove('active');
     }
   }
 
