@@ -135,11 +135,42 @@
     var noteEl = $('noteText');
     if (data.note && String(data.note).trim() !== '') { noteEl.textContent = String(data.note).trim(); }
     else { noteEl.textContent = ''; }
+    updateStaleWarning_();
   }
 
   // Retry the last attempted load (shown alongside the error status).
   function retryLoadPak() {
     loadDataPak(currentArchiveUrl);
+  }
+
+  // ── Stale-data warning ─────────────────────────────────────────────────────
+  // If the upstream pipeline stalls, the dashboard would otherwise keep showing
+  // its last numbers with no indication they've stopped moving. lastRefreshTimestamp
+  // is Front!B2 — the timestamp the pipeline writes on each successful run — so
+  // an unchanging value means data has stopped arriving, not that the page broke.
+  //
+  // Threshold allows for the pipeline's own safety margin plus a missed run or
+  // two, so a single late run doesn't cry wolf.
+  var STALE_AFTER_MS = 45 * 60 * 1000;
+
+  function updateStaleWarning_() {
+    var el = $('staleWarning');
+    if (!el) return;
+    // Archive snapshots are historical by definition — "stale" is meaningless.
+    if (currentArchiveUrl || lastRefreshTimestamp === null) {
+      el.style.display = 'none';
+      return;
+    }
+    var ageMs = Date.now() - lastRefreshTimestamp;
+    if (ageMs < STALE_AFTER_MS) {
+      el.style.display = 'none';
+      return;
+    }
+    var mins = Math.floor(ageMs / 60000);
+    var label = mins >= 120 ? (Math.floor(mins / 60) + 'h') : (mins + ' min');
+    el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> No new data for ' + label;
+    el.title = 'The dashboard is live, but the upstream pipeline has not published new data since the last update shown.';
+    el.style.display = 'inline-flex';
   }
 
   function loadDataPak(archiveUrl, silent) {
@@ -285,6 +316,10 @@
         }
       }).getLastRefreshTimestamp();
     }, 60000);
+
+    // Re-evaluate staleness locally (no server call) so the warning appears
+    // while the page is left open, not only on the next successful load.
+    setInterval(updateStaleWarning_, 60000);
 
     // First-visit guided tour (shows demo data while the real data loads).
     maybeAutoStartTour_();

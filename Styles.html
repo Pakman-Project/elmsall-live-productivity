@@ -201,6 +201,19 @@ body {
   cursor: pointer;
 }
 .status-retry-btn:hover { filter: brightness(1.1); }
+
+/* Pipeline-stall warning in the header meta row. */
+.stale-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(204, 75, 0, 0.16);
+  color: #ff9d5c;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .next-logo {
   font-weight: 700;
   font-size: 22px;
@@ -321,6 +334,13 @@ body {
 .next-rail .rail-item .rail-label {
   line-height: 1.2;
   white-space: normal;
+}
+/* Keyboard users need to see where focus is — the rail items are real
+   <button>s now, so give them a visible focus ring. */
+.next-rail .rail-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 8px;
 }
 .next-rail .rail-item:hover { color: var(--text); }
 .next-rail .rail-item:hover .rail-icon { background: color-mix(in srgb, var(--accent) 10%, transparent); }

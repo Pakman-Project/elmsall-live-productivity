@@ -147,8 +147,13 @@
   function updateDots() {
     var items = document.querySelectorAll('.next-rail .rail-item');
     for (var i = 0; i < items.length; i++) {
-      if (i === currentPage) items[i].classList.add('active');
-      else items[i].classList.remove('active');
+      if (i === currentPage) {
+        items[i].classList.add('active');
+        items[i].setAttribute('aria-current', 'page');
+      } else {
+        items[i].classList.remove('active');
+        items[i].removeAttribute('aria-current');
+      }
     }
   }
 
