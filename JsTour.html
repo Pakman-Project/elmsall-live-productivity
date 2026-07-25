@@ -159,8 +159,19 @@ var TOUR_STEPS = [
     title: 'Export to CSV',
     body: 'Clicking “Download raw data” exports every individual entry as a CSV — handy for pivoting in Excel.' },
 
-  // ===== Part 7 — Wrap up ===================================================
+  // ===== Part 7 — Your settings are remembered =============================
+  { part: 7, page: 0, target: '.kpi-controls-row',
+    title: 'It remembers your setup',
+    body: 'You don’t have to set things up twice. Your Hours Range and Time Window are saved in this browser and come back automatically next time you open the dashboard.' },
   { part: 7, page: 0, target: null,
+    title: 'What else is saved',
+    body: 'Also remembered: the Volume and Bonus display modes, which work areas you’ve hidden with the chips, your Area Groups and split trend charts, and how many rows the bonus tables show. Your bonus-number filter is NOT saved — every visit starts showing everyone.' },
+  { part: 7, page: 0, target: '#themeToggleBtn',
+    title: 'Light or dark',
+    body: 'This button switches between light and dark mode — that’s remembered too, so the dashboard always opens the way you like it.' },
+
+  // ===== Part 8 — Wrap up ===================================================
+  { part: 8, page: 0, target: null,
     title: 'You’re all set ✅',
     body: 'That’s the tour! Your real live data is ready now. You can replay this any time from the “?” button in the header.' }
 ];
@@ -185,8 +196,14 @@ var TOUR_PART_TITLES = {
   4: 'Volume page',
   5: 'Bonus Numbers page',
   6: 'Data Table page',
-  7: 'Wrap up'
+  7: 'Your saved settings',
+  8: 'Wrap up'
 };
+
+// Parts that are skipped in the "?" replay menu — the wrap-up is just a
+// closing note, so it isn't worth jumping to on its own. It still runs at the
+// end of a full tour.
+var TOUR_MENU_HIDDEN_PARTS = { 8: true };
 
 function firstStepIndexOfPart_(part) {
   for (var i = 0; i < TOUR_STEPS.length; i++) {
@@ -202,6 +219,7 @@ function openTourMenu() {
   if (list) {
     var html = '';
     for (var p = 1; p <= TOUR_TOTAL_PARTS; p++) {
+      if (TOUR_MENU_HIDDEN_PARTS[p]) continue;
       var count = 0;
       for (var i = 0; i < TOUR_STEPS.length; i++) if ((TOUR_STEPS[i].part || 1) === p) count++;
       var title = TOUR_PART_TITLES[p] || ('Part ' + p);
