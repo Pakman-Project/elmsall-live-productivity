@@ -33,6 +33,32 @@ function handleControlChangePak(sourceElement, type) {
   applyLocalFiltersPak();
 }
 
+// Builds all 96 fifteen-minute blocks (00:00-00:15 … 23:45-00:00) for a single
+// day, so the Data Table can always show the full day regardless of the Hours
+// Range selector — including blocks later than "now" or with no data yet, which
+// come back as zero-value placeholder rows from generateMainRows_.
+//
+// The day is anchored to the MOST RECENT loaded block's date, not the first.
+// On the live view the feed can include a couple of pre-midnight blocks from
+// yesterday (the pipeline's pre-midnight grace), so the first block can be
+// yesterday — the latest block is today, which is the day we want. For a
+// History snapshot the latest block is simply that day. Returns null if there's
+// no data yet (caller falls back to the Hours-Range-scoped list).
+function buildFullDayTimeList_() {
+  if (!timeRanges.length) return null;
+  var latest = timeRanges[timeRanges.length - 1];
+  var dayStart = parseDateTimePartPak(extractRangePartsPak(latest).start);
+  if (!dayStart) return null;
+  dayStart.setHours(0, 0, 0, 0);
+  var list = [];
+  for (var b = 0; b < 96; b++) {
+    var s = new Date(dayStart.getTime() + b * 15 * 60000);
+    var e = new Date(s.getTime() + 15 * 60000);
+    list.push(formatDatePak(s) + ' - ' + formatDatePak(e));
+  }
+  return list;
+}
+
 function applyLocalFiltersPak() {
   var hoursRange = parseInt($('hoursRange').value, 10) || 3;
   var windowMinutes = parseInt($('timeWindow').value, 10);
@@ -47,7 +73,7 @@ function applyLocalFiltersPak() {
     return true;
   });
   var baseRows = generateMainRows_(filteredData, targetTimeList);
-  
+
   var activeTrendCharts = [];
   if (trendSplitState.enabled && trendSplitState.charts) {
     activeTrendCharts = trendSplitState.charts.filter(function(c) { return c.length > 0; });
@@ -66,8 +92,17 @@ function applyLocalFiltersPak() {
     trendAreaKeysList = [[]];
   }
 
-  var tableData = baseRows;
-  if (windowMinutes !== 15) { tableData = getAggregatedDataPak(baseRows, windowMinutes); }
+  // Data Table: always the full day, independent of Hours Range (only the
+  // Bonus filter still applies) — falls back to the Hours-Range-scoped list
+  // if there's no data yet to derive "today" from.
+  var tableTimeList = buildFullDayTimeList_() || targetTimeList;
+  var tableSourceData = rawSideData.filter(function(row) {
+    return selectedBonuses.length === 0 || selectedBonuses.indexOf(row.bonus) !== -1;
+  });
+  var tableBaseRows = generateMainRows_(tableSourceData, tableTimeList);
+
+  var tableData = tableBaseRows;
+  if (windowMinutes !== 15) { tableData = getAggregatedDataPak(tableBaseRows, windowMinutes); }
   currentMainRows = tableData;
   renderMainTablePak(currentMainRows);
   renderChartsPak(baseRows, trendRowsList, trendTitles, trendAreaKeysList, filteredData, targetTimeList);
