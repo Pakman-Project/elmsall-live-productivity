@@ -113,6 +113,10 @@ var lastRealPayload = null;
 var sideSortMetric = 'performance';
 var hiddenBonusAreas = [];
 var hiddenVolumeAreas = [];
+// Deferred per-page rendering: inputs from the last applyLocalFiltersPak() pass,
+// plus which pages still need building. Pages are rendered on first view.
+var pageRenderCtx = null;
+var pageDirty = [true, true, true, true];
 var currentPage = 0;
 var totalPages = 4;
 var startX = 0;

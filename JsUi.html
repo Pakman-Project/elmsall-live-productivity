@@ -101,6 +101,31 @@
     wrapper.style.transform = 'translateX(' + currentTranslate + 'px)'; 
   }
 
+  // ── Deferred page rendering ────────────────────────────────────────────────
+  // applyLocalFiltersPak() stashes its computed inputs and marks every page
+  // dirty; each page's own render runs the first time that page is shown.
+  function markAllPagesDirty_() {
+    for (var i = 0; i < pageDirty.length; i++) { pageDirty[i] = true; }
+  }
+
+  function renderPageIfNeeded_(index) {
+    if (!pageRenderCtx) return;
+    if (index < 0 || index >= pageDirty.length) return;
+    if (!pageDirty[index]) return;
+
+    var c = pageRenderCtx;
+    if (index === 0) {
+      renderChartsPak(c.baseRows, c.trendRowsList, c.trendTitles, c.trendAreaKeysList, c.filteredData, c.targetTimeList);
+    } else if (index === 1) {
+      renderVolumePagePak(c.baseRows);
+    } else if (index === 2) {
+      renderSideTablesPak(c.rowsLimit);
+    } else if (index === 3) {
+      renderMainTablePak(currentMainRows);
+    }
+    pageDirty[index] = false;
+  }
+
   function goToPage(index) {
     if (index < 0 || index >= totalPages) return;
     currentPage = index;
@@ -109,6 +134,9 @@
     setSliderPosition();
     updateDots();
     setArrowState();
+    // Build this page's content if it hasn't been rendered since the last
+    // data/filter change, before sizing its charts.
+    renderPageIfNeeded_(index);
     resizeCharts();
   }
 

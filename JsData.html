@@ -104,9 +104,24 @@ function applyLocalFiltersPak() {
   var tableData = tableBaseRows;
   if (windowMinutes !== 15) { tableData = getAggregatedDataPak(tableBaseRows, windowMinutes); }
   currentMainRows = tableData;
-  renderMainTablePak(currentMainRows);
-  renderChartsPak(baseRows, trendRowsList, trendTitles, trendAreaKeysList, filteredData, targetTimeList);
-  renderSideTablesPak(rowsLimit);
+
+  // Only the page the user is actually looking at is rendered now; the other
+  // three are marked dirty and built when first shown (see renderPageIfNeeded_).
+  // Rendering all four up front meant building ~13 charts and every table on
+  // load, even though only one page is visible.
+  invalidateChartCommon_();
+  pageRenderCtx = {
+    baseRows: baseRows,
+    trendRowsList: trendRowsList,
+    trendTitles: trendTitles,
+    trendAreaKeysList: trendAreaKeysList,
+    filteredData: filteredData,
+    targetTimeList: targetTimeList,
+    rowsLimit: rowsLimit
+  };
+  markAllPagesDirty_();
+  renderPageIfNeeded_(currentPage);
+
   saveUserPreferences();
 }
 

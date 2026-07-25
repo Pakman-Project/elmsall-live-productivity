@@ -127,16 +127,15 @@
     }
   }
 
-  function renderChartsPak(rows, trendRowsList, trendTitles, trendAreaKeysList, rawFilteredData, rawTimeList) {
-    if (areaGroupChart) areaGroupChart.destroy();
-    if (overviewVolChart) overviewVolChart.destroy();
-    for (var ti = 0; ti < trendCharts.length; ti++) { if (trendCharts[ti]) trendCharts[ti].destroy(); }
-    trendCharts = [];
-    if (perfChart) perfChart.destroy();
-    for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
-    volumeCharts = [];
-    
-    if (!rows || rows.length === 0) { return; }
+  // Aggregation + shared axis/tooltip config, used by BOTH the Overall page's
+  // charts and the Volume page's. Cached per applyLocalFiltersPak() pass so that
+  // deferring one page's render doesn't mean recomputing this for the other.
+  var _chartCommon = null;
+  function invalidateChartCommon_() { _chartCommon = null; }
+
+  function getChartCommon_(rows) {
+    if (_chartCommon) return _chartCommon;
+    if (!rows || rows.length === 0) return null;
 
     var wm = parseInt($('timeWindow').value, 10);
     var agg = getAggregatedDataPak(rows, wm);
@@ -145,12 +144,30 @@
     var rl = agg.map(function(r) { return r.rangeLabel; });
     var pieData = agg.map(function(r) { return r.pieVol; });
     var topUpData = agg.map(function(r) { return r.topUpVol; });
-    
+
     var yMax = Math.ceil((agg.map(function(r){return r.performance;}).length ? Math.max.apply(null, agg.map(function(r){return r.performance;})) : 100) / 10) * 10 + 10;
     var xTicksConfig = { color: CHART_MUTED(), maxRotation: 45, minRotation: 45, autoSkip: true, callback: function(value) { return trimTimeLabelPak(this.getLabelForValue(value)); } };
     if (hRange >= 24) { xTicksConfig.maxTicksLimit = 24; } else if (hRange >= 12) { xTicksConfig.maxTicksLimit = 12; } else if (hRange >= 6) { xTicksConfig.maxTicksLimit = 8; }
     var xOpt = { ticks: xTicksConfig, grid: { color: CHART_GRID() }, title: { display: true, text: 'Date & Time', color: CHART_MUTED(), font: { size: 12 } } };
     var tOpt = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) : ''); } } };
+
+    _chartCommon = { agg: agg, labels: labels, rl: rl, pieData: pieData, topUpData: topUpData,
+                     yMax: yMax, xOpt: xOpt, tOpt: tOpt, wm: wm, hRange: hRange };
+    return _chartCommon;
+  }
+
+  function renderChartsPak(rows, trendRowsList, trendTitles, trendAreaKeysList, rawFilteredData, rawTimeList) {
+    if (areaGroupChart) areaGroupChart.destroy();
+    if (overviewVolChart) overviewVolChart.destroy();
+    for (var ti = 0; ti < trendCharts.length; ti++) { if (trendCharts[ti]) trendCharts[ti].destroy(); }
+    trendCharts = [];
+    if (perfChart) perfChart.destroy();
+
+    var _c = getChartCommon_(rows);
+    if (!_c) { return; }
+    var agg = _c.agg, labels = _c.labels, rl = _c.rl, pieData = _c.pieData,
+        topUpData = _c.topUpData, yMax = _c.yMax, xOpt = _c.xOpt, tOpt = _c.tOpt,
+        wm = _c.wm, hRange = _c.hRange;
 
     // --- 1. VOLUME ---
     var overviewTitleEl = $('overviewVolChart').closest('.card.panel').querySelector('h2');
@@ -278,7 +295,17 @@
         } } });
       })(ti);
     }
+  }
 
-    renderVolumeChartsPak(agg, xOpt, tOpt);
+  // Volume page (page 1) is rendered separately so it can be deferred until the
+  // page is actually shown — see renderPageIfNeeded_ in JsUi.
+  function renderVolumePagePak(rows) {
+    var c = getChartCommon_(rows);
+    if (!c) {
+      for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
+      volumeCharts = [];
+      return;
+    }
+    renderVolumeChartsPak(c.agg, c.xOpt, c.tOpt);
   }
 </script>
