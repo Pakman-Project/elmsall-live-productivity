@@ -157,8 +157,11 @@ function captureCurrentPageCanvas_() {
     }
 
     var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
-    // Measure AFTER relaxing, so this is the full content size.
-    var w = Math.ceil(page.scrollWidth);
+    // Height from scrollHeight (the whole page, including what is scrolled out
+    // of view) but width from clientWidth, NOT scrollWidth. On pages with a
+    // horizontally scrollable table, scrollWidth is wider than the cards, so
+    // using it padded the export with a broad empty strip down the right.
+    var w = Math.ceil(page.clientWidth);
     var h = Math.ceil(page.scrollHeight);
 
     return html2canvas(page, {

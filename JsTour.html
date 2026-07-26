@@ -55,6 +55,10 @@ var TOUR_STEPS = [
     body: 'Give the “Breakdown” button a click to see deployed heads split by work area.' },
   { part: 2, page: 0, target: '#breakdownOverlay .breakdown-close', modal: true,
     interactive: { sel: '#breakdownOverlay .breakdown-close', type: 'click' },
+    action: function () {
+      var ov = $('breakdownOverlay');
+      if (ov && !ov.classList.contains('active') && typeof showHeadBreakdown === 'function') showHeadBreakdown();
+    },
     cleanup: function () { if (typeof closeBreakdown === 'function') closeBreakdown(); },
     title: 'Head breakdown by area',
     body: 'Here it is — deployed heads by work area. Change the From/To range at the top to re-slice it. When you’re done, click the × to close.' },
@@ -75,6 +79,10 @@ var TOUR_STEPS = [
     body: 'Click “Groups” to build your own work-area comparisons.' },
   { part: 3, page: 0, target: '#areaGroupOverlay .breakdown-close', modal: true,
     interactive: { sel: '#areaGroupOverlay .breakdown-close', type: 'click' },
+    action: function () {
+      var ov = $('areaGroupOverlay');
+      if (ov && !ov.classList.contains('active') && typeof openAreaGroups === 'function') openAreaGroups();
+    },
     cleanup: function () { if (typeof closeAreaGroups === 'function') closeAreaGroups(); },
     title: 'Groups editor',
     body: 'Build up to 7 groups of work areas, toggle each group’s line/trend, then Apply — the work-area chart updates to match. Click the × to close when you’re ready.' },
@@ -167,8 +175,14 @@ var TOUR_STEPS = [
     interactive: { sel: '#shareBtn', type: 'click' },
     title: 'Share what you are looking at',
     body: 'Found something worth passing on? Click the share button to get a link, or an image of the page.' },
-  { part: 7, page: 0, target: '#shareOverlay .share-url-row', modal: true,
+  { part: 7, page: 0, target: '#shareOverlay .breakdown-close', modal: true,
     interactive: { sel: '#shareOverlay .breakdown-close', type: 'click' },
+    // Reached forwards the dialog is already open; reached BACKWARDS (from the
+    // next part) it is not, and the step would have had nothing to point at.
+    action: function () {
+      var ov = $('shareOverlay');
+      if (ov && !ov.classList.contains('active') && typeof openShareMenu === 'function') openShareMenu();
+    },
     cleanup: function () { if (typeof closeShareMenu === 'function') closeShareMenu(); },
     title: 'A link, or a picture',
     body: 'The link reopens this exact view for whoever you send it to — same page, same day, same bonus filter. Or download the page as an image: it captures the WHOLE page, including anything scrolled out of sight, stamped with the time of the data. Click the × to close.' },
