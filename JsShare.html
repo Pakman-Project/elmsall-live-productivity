@@ -1,0 +1,250 @@
+<script>
+// ============================================================================
+// Sharing: a deep link to the current view, and an image of the current page.
+//
+// The dashboard runs inside a sandboxed iframe, so it can neither read nor
+// rewrite the address bar — "browse around then copy the URL" is impossible
+// here. Sharing is therefore explicit: this builds the URL from live state and
+// hands it over. WEB_APP_URL is supplied by doGet() for the same reason.
+// ============================================================================
+
+var PAGE_SLUGS = ['overall', 'volume', 'bonus', 'data'];
+
+// dd/MM/yyyy (as the archive dropdown labels them) -> yyyy-MM-dd for the URL,
+// because slashes need escaping and get mangled when links are pasted into
+// chat apps.
+function archiveNameToIsoDate_(name) {
+  var m = String(name || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? (m[3] + '-' + m[2] + '-' + m[1]) : '';
+}
+function isoDateToArchiveName_(iso) {
+  var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '';
+}
+
+function buildShareUrlPak() {
+  var base = (typeof WEB_APP_URL !== 'undefined' && WEB_APP_URL) ? WEB_APP_URL : '';
+  var params = [];
+
+  params.push('page=' + (PAGE_SLUGS[currentPage] || 'overall'));
+
+  if (selectedBonuses.length > 0) {
+    params.push('bonus=' + encodeURIComponent(selectedBonuses.join(',')));
+  }
+
+  // Only pin a date when viewing a history snapshot; Live is the default and
+  // should stay live for whoever opens the link.
+  if (currentArchiveUrl) {
+    var sel = $('archiveSelect');
+    var iso = archiveNameToIsoDate_(sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].textContent : '');
+    if (iso) params.push('date=' + iso);
+  }
+
+  if (!base) return '';
+  return base + (base.indexOf('?') === -1 ? '?' : '&') + params.join('&');
+}
+
+function openShareMenu() {
+  var url = buildShareUrlPak();
+  var input = $('shareUrlInput');
+  var hint = $('shareHint');
+  if (input) input.value = url;
+  if (hint) {
+    hint.textContent = url
+      ? ''
+      : 'The web app URL is unavailable here, so a link cannot be built. Deep links work once the dashboard is opened from its deployed URL.';
+    hint.className = url ? 'share-hint' : 'share-hint warn';
+  }
+  var img = $('shareImgHint');
+  if (img) { img.textContent = ''; img.className = 'share-hint'; }
+  var ov = $('shareOverlay');
+  if (ov) ov.classList.add('active');
+}
+
+function closeShareMenu() {
+  var ov = $('shareOverlay');
+  if (ov) ov.classList.remove('active');
+}
+
+function setShareHint_(elId, msg, kind) {
+  var el = $(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'share-hint' + (kind ? ' ' + kind : '');
+}
+
+function copyShareUrlPak() {
+  var input = $('shareUrlInput');
+  if (!input || !input.value) return;
+
+  // navigator.clipboard is often unavailable in a sandboxed frame, so fall back
+  // to selecting the field — the link is visible and copyable either way.
+  function fallback() {
+    input.focus();
+    input.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    setShareHint_('shareHint',
+      ok ? 'Link copied.' : 'Press Ctrl/Cmd+C to copy the selected link.',
+      ok ? 'ok' : '');
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(input.value)
+      .then(function () { setShareHint_('shareHint', 'Link copied.', 'ok'); })
+      .catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+// ---- Image capture ---------------------------------------------------------
+// html2canvas is loaded on demand rather than up front: it is a large library
+// and most sessions never export an image, so making everyone pay for it on
+// every page load would undo the load-time work.
+var _html2canvasLoading = null;
+function loadHtml2Canvas_() {
+  if (window.html2canvas) return Promise.resolve(window.html2canvas);
+  if (_html2canvasLoading) return _html2canvasLoading;
+  _html2canvasLoading = new Promise(function (resolve, reject) {
+    var sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    sc.onload = function () { resolve(window.html2canvas); };
+    sc.onerror = function () { reject(new Error('Could not load the image library.')); };
+    document.head.appendChild(sc);
+  });
+  return _html2canvasLoading;
+}
+
+// Captures the ENTIRE current page, including whatever is scrolled out of view.
+// Each .page is a fixed-height scroll container, so it is temporarily unclipped
+// to its full content height, captured, then restored.
+function captureCurrentPageCanvas_() {
+  return loadHtml2Canvas_().then(function (html2canvas) {
+    var pages = document.querySelectorAll('.page');
+    var page = pages[currentPage];
+    if (!page) throw new Error('Nothing to capture.');
+
+    var prev = {
+      height: page.style.height,
+      maxHeight: page.style.maxHeight,
+      overflow: page.style.overflow,
+      scrollTop: page.scrollTop
+    };
+    page.style.height = 'auto';
+    page.style.maxHeight = 'none';
+    page.style.overflow = 'visible';
+    page.scrollTop = 0;
+
+    var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
+
+    return html2canvas(page, {
+      backgroundColor: bg,
+      scale: Math.min(window.devicePixelRatio || 1, 2),
+      useCORS: true,
+      logging: false,
+      windowWidth: page.scrollWidth,
+      windowHeight: page.scrollHeight
+    }).then(function (canvas) {
+      page.style.height = prev.height;
+      page.style.maxHeight = prev.maxHeight;
+      page.style.overflow = prev.overflow;
+      page.scrollTop = prev.scrollTop;
+      return stampCaption_(canvas);
+    }).catch(function (err) {
+      page.style.height = prev.height;
+      page.style.maxHeight = prev.maxHeight;
+      page.style.overflow = prev.overflow;
+      page.scrollTop = prev.scrollTop;
+      throw err;
+    });
+  });
+}
+
+// A shared screenshot is much more useful with the page name and the data's
+// timestamp on it, so they are drawn onto a strip above the capture.
+function stampCaption_(src) {
+  try {
+    var pad = Math.round(src.width * 0.012);
+    var barH = Math.max(34, Math.round(src.width * 0.035));
+    var out = document.createElement('canvas');
+    out.width = src.width;
+    out.height = src.height + barH;
+    var ctx = out.getContext('2d');
+
+    var isLight = !document.documentElement.classList.contains('dark-theme');
+    ctx.fillStyle = isLight ? '#ffffff' : '#121212';
+    ctx.fillRect(0, 0, out.width, out.height);
+
+    var pageName = ['Overall Productivity', 'Volume', 'Bonus Numbers', 'Data Table'][currentPage] || '';
+    var stamp = ($('lastUpdateText') && $('lastUpdateText').textContent) || '';
+    var fontPx = Math.max(13, Math.round(barH * 0.42));
+
+    ctx.fillStyle = isLight ? '#1b2536' : '#ffffff';
+    ctx.font = '600 ' + fontPx + 'px Poppins, system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('E3 Live Productivity — ' + pageName, pad, barH / 2);
+
+    ctx.fillStyle = isLight ? '#5a6a86' : 'rgba(255,255,255,0.7)';
+    ctx.font = '400 ' + Math.round(fontPx * 0.85) + 'px Poppins, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(stamp, out.width - pad, barH / 2);
+    ctx.textAlign = 'left';
+
+    ctx.drawImage(src, 0, barH);
+    return out;
+  } catch (e) {
+    return src;  // caption is a nicety, never a reason to fail the export
+  }
+}
+
+function shareImageFilename_(ext) {
+  var slug = PAGE_SLUGS[currentPage] || 'view';
+  var d = new Date();
+  function p(n) { return String(n).padStart(2, '0'); }
+  return 'e3-' + slug + '-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+         '-' + p(d.getHours()) + p(d.getMinutes()) + '.' + ext;
+}
+
+function downloadViewImagePak() {
+  setShareHint_('shareImgHint', 'Capturing the full page…');
+  captureCurrentPageCanvas_().then(function (canvas) {
+    var url = canvas.toDataURL('image/jpeg', 0.92);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = shareImageFilename_('jpg');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setShareHint_('shareImgHint', 'Image downloaded.', 'ok');
+  }).catch(function (err) {
+    setShareHint_('shareImgHint', 'Could not create the image: ' + (err && err.message ? err.message : err), 'warn');
+  });
+}
+
+function copyViewImagePak() {
+  if (!(navigator.clipboard && window.ClipboardItem)) {
+    setShareHint_('shareImgHint',
+      'Copying images is not supported in this browser — use Download JPG instead.', 'warn');
+    return;
+  }
+  setShareHint_('shareImgHint', 'Capturing the full page…');
+  captureCurrentPageCanvas_().then(function (canvas) {
+    // PNG for the clipboard: JPEG is not a reliable clipboard image type.
+    canvas.toBlob(function (blob) {
+      if (!blob) {
+        setShareHint_('shareImgHint', 'Could not create the image.', 'warn');
+        return;
+      }
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        .then(function () { setShareHint_('shareImgHint', 'Image copied to the clipboard.', 'ok'); })
+        .catch(function () {
+          setShareHint_('shareImgHint',
+            'The browser blocked copying to the clipboard here — use Download JPG instead.', 'warn');
+        });
+    }, 'image/png');
+  }).catch(function (err) {
+    setShareHint_('shareImgHint', 'Could not create the image: ' + (err && err.message ? err.message : err), 'warn');
+  });
+}
+</script>

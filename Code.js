@@ -2,12 +2,41 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+// Deep-link + tour parameters are read here and sanitised at this boundary, so
+// nothing straight off the URL is ever interpolated into the page. Each is
+// exposed to the template as its own plain string rather than as JSON, which
+// avoids any escaping question inside the <script> block.
+var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'data'];
+
+function sanitizeParam_(e, name) {
+  return (e && e.parameter && e.parameter[name]) ? String(e.parameter[name]) : '';
+}
+
 function doGet(e) {
   var t = HtmlService.createTemplateFromFile('Index');
+
   // ?tour=1 forces the guided tour to run; ?tour=reset also clears the stored
-  // "already seen" flag first, reproducing a genuine first visit. Every caller
-  // that evaluates the Index template must set this or the template throws.
-  t.forceTour = (e && e.parameter && e.parameter.tour) ? String(e.parameter.tour) : '';
+  // "already seen" flag first, reproducing a genuine first visit.
+  t.forceTour = sanitizeParam_(e, 'tour');
+
+  // ?page=overall|volume|bonus|data — anything else is ignored.
+  var page = sanitizeParam_(e, 'page').toLowerCase();
+  t.deepPage = (DEEP_LINK_PAGES_.indexOf(page) !== -1) ? page : '';
+
+  // ?bonus=A1B,C2D — bonus codes are alphanumeric, so everything else is
+  // stripped rather than trusted.
+  t.deepBonus = sanitizeParam_(e, 'bonus').toUpperCase().replace(/[^A-Z0-9,]/g, '');
+
+  // ?date=YYYY-MM-DD — must match exactly, or it is dropped.
+  var date = sanitizeParam_(e, 'date');
+  t.deepDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
+
+  // The page lives in a sandboxed iframe and cannot see the address bar, so the
+  // "Copy link" button needs the real web-app URL handed to it.
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (err) {}
+  t.webAppUrl = url;
+
   return t.evaluate()
     .setTitle('E3 Live Productivity')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

@@ -27,6 +27,13 @@
          'reset' clears the stored "already seen" flag first. Empty = normal. -->
     <script>
       var TOUR_FORCE = '<?= forceTour ?>';
+      // Deep-link state, sanitised server-side in doGet(). Empty when absent.
+      var DEEP_PAGE  = '<?= deepPage ?>';
+      var DEEP_BONUS = '<?= deepBonus ?>';
+      var DEEP_DATE  = '<?= deepDate ?>';
+      // The page cannot read the address bar from inside its iframe, so the
+      // web-app URL is handed in for "Copy link" to build on.
+      var WEB_APP_URL = '<?= webAppUrl ?>';
     </script>
 
     <?!= include('Styles'); ?>
@@ -352,6 +359,38 @@
       </div>
     </div>
 
+    <div id="shareOverlay" class="breakdown-overlay" onclick="closeShareMenu()">
+      <div class="breakdown-modal share-modal" onclick="event.stopPropagation()">
+        <div class="breakdown-header">
+          <div>
+            <h2>Share this view</h2>
+            <p class="breakdown-subtitle">A link that reopens the page, day and bonus filter you are looking at — or an image of the whole page.</p>
+          </div>
+          <button class="breakdown-close" onclick="closeShareMenu()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="breakdown-body">
+          <label class="share-label" for="shareUrlInput">Link to this view</label>
+          <div class="share-url-row">
+            <input id="shareUrlInput" class="input share-url-input" type="text" readonly onclick="this.select()">
+            <button class="btn share-copy-btn" onclick="copyShareUrlPak()"><i class="fa-solid fa-copy"></i> Copy</button>
+          </div>
+          <div id="shareHint" class="share-hint"></div>
+
+          <div class="share-divider"></div>
+
+          <label class="share-label">Image of the current page</label>
+          <p class="share-note">Captures the whole page, including the part scrolled out of sight — not just what is on screen.</p>
+          <div class="share-img-row">
+            <button class="btn" onclick="downloadViewImagePak()"><i class="fa-solid fa-image"></i> Download JPG</button>
+            <button class="btn" onclick="copyViewImagePak()"><i class="fa-solid fa-clipboard"></i> Copy image</button>
+          </div>
+          <div id="shareImgHint" class="share-hint"></div>
+        </div>
+      </div>
+    </div>
+
     <div id="tourMenuOverlay" class="breakdown-overlay" onclick="closeTourMenu()">
       <div class="breakdown-modal tour-menu-modal" onclick="event.stopPropagation()">
         <div class="breakdown-header">
@@ -398,6 +437,7 @@
     <?!= include('JsUi'); ?>
     <?!= include('JsTourData'); ?>
     <?!= include('JsTour'); ?>
+    <?!= include('JsShare'); ?>
     <?!= include('JsInit'); ?>
   </body>
 </html>

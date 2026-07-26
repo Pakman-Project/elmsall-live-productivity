@@ -18,6 +18,21 @@
         sel.appendChild(opt);
       }
       if (previous) sel.value = previous;
+
+      // ?date=YYYY-MM-DD — match it against the snapshot list and switch to it.
+      // Has to happen here because the list is what maps a date to its URL.
+      if (typeof DEEP_DATE !== 'undefined' && DEEP_DATE && !_deepDateApplied) {
+        _deepDateApplied = true;
+        var wanted = isoDateToArchiveName_(DEEP_DATE);
+        for (var d = 0; d < links.length; d++) {
+          if (links[d].name === wanted) {
+            sel.value = links[d].url;
+            currentArchiveUrl = links[d].url;
+            loadDataPak(currentArchiveUrl);
+            break;
+          }
+        }
+      }
     }).withFailureHandler(function(err) {
       console.warn('Archive list failed to load:', err && err.message ? err.message : err);
     }).getArchiveLinks();
@@ -29,6 +44,11 @@
   // server round-trip. The cached view is always labelled "Updating..." while
   // fresh data is fetched in the background, and it still shows its own
   // "Last Update" timestamp — so it is never passed off as live data.
+  // Deep-link one-shots: the target page and date are applied once, not on
+  // every background refresh (which would yank the user back).
+  var _deepPageApplied = false;
+  var _deepDateApplied = false;
+
   var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v1';
   var PAYLOAD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;  // 6h: older than a shift is not worth showing
   var PAYLOAD_CACHE_MAX_CHARS = 3000000;              // stay well clear of the ~5MB localStorage quota
@@ -189,6 +209,13 @@
     if (data.note && String(data.note).trim() !== '') { noteEl.textContent = String(data.note).trim(); }
     else { noteEl.textContent = ''; }
     updateStaleWarning_();
+
+    // Switch to the linked page once there is something rendered to show.
+    if (typeof DEEP_PAGE !== 'undefined' && DEEP_PAGE && !_deepPageApplied) {
+      _deepPageApplied = true;
+      var idx = ['overall', 'volume', 'bonus', 'data'].indexOf(DEEP_PAGE);
+      if (idx !== -1) goToPage(idx);
+    }
   }
 
   // Retry the last attempted load (shown alongside the error status).
@@ -394,7 +421,17 @@
     setupSwipe();
     initPageScrollChrome_();
 
-    // ALWAYS start on Live so a stale archive is never auto-loaded.
+    // ── Deep link: apply anything the URL specified ──────────────────────
+    // Applied AFTER loadUserPreferences so an explicit link always wins over
+    // this browser's saved settings, while anything the link omits keeps the
+    // user's own preference.
+    if (typeof DEEP_BONUS !== 'undefined' && DEEP_BONUS) {
+      selectedBonuses = DEEP_BONUS.split(',').filter(function(b) { return b; });
+    }
+
+    // ALWAYS start on Live so a stale archive is never auto-loaded — unless the
+    // link explicitly asked for a dated snapshot (handled once the archive list
+    // arrives, since the date has to be matched against it).
     currentArchiveUrl = null;
 
     // Paint the last known LIVE view instantly from localStorage, then refresh

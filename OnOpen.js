@@ -19,6 +19,16 @@ function onOpen() {
 function showDashboardPreview_(width, height, title, forceTour) {
   var t = HtmlService.createTemplateFromFile('Index');
   t.forceTour = forceTour || '';
+  // Deep-link params only arrive via the web app's URL, but every template
+  // variable must still be defined here or evaluate() throws.
+  t.deepPage = '';
+  t.deepBonus = '';
+  t.deepDate = '';
+  // Still resolve the web-app URL so "Copy link" produces a shareable link even
+  // when the dashboard is opened from this preview dialog.
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (err) {}
+  t.webAppUrl = url;
   SpreadsheetApp.getUi().showModalDialog(
     t.evaluate().setWidth(width).setHeight(height), title);
 }
