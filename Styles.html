@@ -3250,41 +3250,123 @@ canvas {
    Mobile: reclaim vertical space once the page is scrolled.
    Driven by the `page-scrolled` class that JsUi puts on <body> when the active
    .page is scrolled off the top. Deliberately mobile-only — desktop has room.
+
+   Everything here animates between definite lengths (never to/from `auto`, and
+   never via `display`, which cannot transition) so the collapse and expand are
+   both smooth rather than snapping.
    ============================================================ */
 @media (max-width: 700px) {
   /* Only the ICONS collapse. The page names stay visible and tappable, so
      navigation is never lost — this just trades the icon's height for content. */
   .next-rail .rail-item .rail-icon {
     overflow: hidden;
-    transition: height 0.22s ease, max-height 0.22s ease,
-                opacity 0.18s ease, margin 0.22s ease;
+    transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.16s ease,
+                transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center top;
   }
   body.page-scrolled .next-rail .rail-item .rail-icon {
     height: 0;
-    max-height: 0;
     opacity: 0;
-    margin: 0;
+    /* Scaling as it collapses keeps the icon from looking squashed on the way out. */
+    transform: scaleY(0.6);
   }
+
+  /* The column gap would otherwise remain behind the collapsed icon. */
+  .next-rail .rail-item {
+    transition: gap 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.page-scrolled .next-rail .rail-item {
+    gap: 0;
+  }
+
   .next-rail {
-    transition: padding 0.22s ease;
+    transition: padding 0.26s cubic-bezier(0.4, 0, 0.2, 1);
   }
   body.page-scrolled .next-rail {
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding-top: 5px;
+    padding-bottom: 5px;
   }
-  /* With the icon pill gone, the active page is shown by its label alone. */
+
+  /* With the icon pill gone, the active page is marked on its label instead. */
   body.page-scrolled .next-rail .rail-item.active .rail-label {
     font-weight: 700;
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
-  /* The status and last-update line collapses too. The stale-data warning and
-     the note stay visible — they are exception states worth keeping on screen
-     even when space is tight. */
+  /* Status / last update slide away horizontally and fade, rather than being
+     display:none'd, which would snap. Fixed max-widths (not percentages or
+     auto) so both directions interpolate. The stale-data warning and the note
+     stay put — they are exception states worth keeping on screen. */
+  .next-header-meta {
+    transition: gap 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #status,
+  #lastUpdateText {
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 60vw;
+    transition: max-width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.16s ease;
+  }
+  body.page-scrolled .next-header-meta {
+    gap: 0;
+  }
   body.page-scrolled #status,
   body.page-scrolled #lastUpdateText {
-    display: none;
+    max-width: 0;
+    opacity: 0;
+  }
+}
+
+/* Honour the OS "reduce motion" setting: still collapse, just without the
+   animation. */
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  .next-rail,
+  .next-rail .rail-item,
+  .next-rail .rail-item .rail-icon,
+  .next-header-meta,
+  #status,
+  #lastUpdateText {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   Mobile: one dropdown text size everywhere.
+   The From/To selects were shrunk so a full "dd/mm/yyyy hh:mm" value fits;
+   every other dropdown now matches them so the controls read as one set
+   instead of two different sizes. Last in the cascade so it overrides the
+   earlier 14px mobile rules. Touch targets (min-height) are left alone.
+   ============================================================ */
+@media (max-width: 700px) {
+  .row-select,
+  select.input,
+  #archiveSelect,
+  #mainSortSelect,
+  #hoursRange,
+  #timeWindow,
+  #volumeChartMode,
+  #bonusViewMode,
+  #sharedRowsLimit,
+  .breakdown-time-select {
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 380px) {
+  .row-select,
+  select.input,
+  #archiveSelect,
+  #mainSortSelect,
+  #hoursRange,
+  #timeWindow,
+  #volumeChartMode,
+  #bonusViewMode,
+  #sharedRowsLimit,
+  .breakdown-time-select {
+    font-size: 9.5px;
   }
 }
 </style>
