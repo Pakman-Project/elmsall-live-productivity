@@ -1210,70 +1210,6 @@ canvas {
   display: block;
 }
 
-.page-arrows {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
-  z-index: 900;
-  padding: 0 6px;
-}
-
-.page-arrow {
-  pointer-events: auto;
-  width: 46px;
-  height: 110px;
-  border: none;
-  border-radius: 14px;
-  background: rgba(105, 167, 255, 0.5);
-  color: var(--text-soft-40);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.25s ease, background 0.25s ease, color 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
-  opacity: 0.06;
-  box-shadow: none;
-  backdrop-filter: blur(2px);
-}
-
-.page-arrow:hover,
-.page-arrow:focus-visible {
-  opacity: 0.65;
-  color: var(--text-soft-95);
-  background: rgba(105, 167, 255, 0.14);
-  transform: scale(1.02);
-  outline: none;
-}
-
-.page-arrow:active {
-  opacity: 0.8;
-  transform: scale(0.98);
-}
-
-.page-arrow i {
-  font-size: 18px;
-}
-
-.page-arrow.left {
-  margin-left: 8px;
-}
-
-.page-arrow.right {
-  margin-right: 8px;
-}
-
-.page-arrow.disabled {
-  opacity: 0;
-  pointer-events: none;
-  transform: none;
-  visibility: hidden;
-}
-
 .side-table th {
   cursor: pointer;
   transition: all 0.2s;
@@ -2540,18 +2476,6 @@ canvas {
     flex-wrap: wrap;
     row-gap: 6px;
   }
-  .page-arrow {
-    width: 36px;
-    height: 90px;
-    opacity: 0.12;
-  }
-  .page-arrow i {
-    font-size: 18px;
-  }
-  .page-arrow:hover,
-  .page-arrow:focus-visible {
-    opacity: 0.45;
-  }
   .chip {
     font-size: 13px;
     padding: 4px 10px;
@@ -2870,10 +2794,6 @@ canvas {
   .kpi,
   .span-12 {
     grid-column: span 12;
-  }
-  .page-arrow {
-    width: 36px;
-    height: 80px;
   }
   .breakdown-label {
     width: 100px;
@@ -3272,12 +3192,6 @@ canvas {
    pair off the right edge of the screen and clipped their text.
    ============================================================ */
 @media (max-width: 700px) {
-  /* Page arrows are redundant on touch: swiping and the nav rail both work. */
-  .page-arrows,
-  .page-arrow {
-    display: none !important;
-  }
-
   /* From/To: both pairs on one row, fully on-screen, text never clipped.
      The font is deliberately small — showing the whole "dd/mm/yyyy hh:mm"
      value matters more here than type size. */

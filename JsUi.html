@@ -84,13 +84,6 @@
     banner.classList.add('active');
   }
 
-  function setArrowState() {
-    var leftBtn = document.querySelector('.page-arrow.left');
-    var rightBtn = document.querySelector('.page-arrow.right');
-    if (leftBtn) leftBtn.classList.toggle('disabled', currentPage === 0);
-    if (rightBtn) rightBtn.classList.toggle('disabled', currentPage === totalPages - 1);
-  }
-
   function getSwipeWidth() { 
     var container = $('swipeContainer'); 
     return container ? container.clientWidth : window.innerWidth; 
@@ -133,7 +126,6 @@
     prevTranslate = currentTranslate;
     setSliderPosition();
     updateDots();
-    setArrowState();
     // Build this page's content if it hasn't been rendered since the last
     // data/filter change, before sizing its charts.
     renderPageIfNeeded_(index);
