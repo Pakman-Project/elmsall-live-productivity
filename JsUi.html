@@ -94,6 +94,34 @@
     wrapper.style.transform = 'translateX(' + currentTranslate + 'px)'; 
   }
 
+  // ── Mobile: collapse chrome once the page is scrolled ─────────────────────
+  // Phones have little vertical room, so the nav rail and the status /
+  // last-update line hide as soon as the user scrolls away from the top, and
+  // come back when they return. Each .page is its own scroll container, so the
+  // listener is bound per page and reads whichever one is currently showing.
+  var PAGE_SCROLL_CHROME_THRESHOLD = 4;  // a few px of slack for iOS overscroll
+
+  function updatePageScrollChrome_() {
+    // Never collapse during the tour: several steps ring the rail or scroll an
+    // element into view, and a hidden target measures 0x0 and gets no ring.
+    if (typeof tourActive !== 'undefined' && tourActive) {
+      document.body.classList.remove('page-scrolled');
+      return;
+    }
+    var pages = document.querySelectorAll('.page');
+    var el = pages[currentPage];
+    var scrolled = !!el && el.scrollTop > PAGE_SCROLL_CHROME_THRESHOLD;
+    document.body.classList.toggle('page-scrolled', scrolled);
+  }
+
+  function initPageScrollChrome_() {
+    var pages = document.querySelectorAll('.page');
+    for (var i = 0; i < pages.length; i++) {
+      pages[i].addEventListener('scroll', updatePageScrollChrome_, { passive: true });
+    }
+  }
+
+
   // ── Deferred page rendering ────────────────────────────────────────────────
   // applyLocalFiltersPak() stashes its computed inputs and marks every page
   // dirty; each page's own render runs the first time that page is shown.
@@ -130,6 +158,7 @@
     // data/filter change, before sizing its charts.
     renderPageIfNeeded_(index);
     resizeCharts();
+    updatePageScrollChrome_();
   }
 
   // Highlights the nav item for the current page. Targets .rail-item directly
