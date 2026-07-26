@@ -3496,4 +3496,18 @@ canvas {
     font-size: 16px;
   }
 }
+
+/* ============================================================
+   Desktop: Volume page control alignment.
+   Matches the Bonus page, where the display control sits on the left and the
+   time controls sit on the right. Scoped to desktop so the mobile 2-per-row
+   stacking (where Display Mode already takes its own full-width row) is
+   untouched — order:-1 there would jump it above Hours Range / Time Window.
+   ============================================================ */
+@media (min-width: 701px) {
+  .volume-controls .vol-control-group-wide {
+    order: -1;
+    margin-right: auto;
+  }
+}
 </style>
