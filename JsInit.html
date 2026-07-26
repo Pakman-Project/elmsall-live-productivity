@@ -150,11 +150,13 @@
         if (!blockGroup[tr]) blockGroup[tr] = {};
         blockGroup[tr][qualified[i].bonus] = true;
       }
+      // A block with a single qualifying operator counts normally. Previously it
+      // contributed 0 to the head count while that operator's hours still
+      // counted in the numerator, which inflated the productivity figure.
       var totalDisplayCount = 0;
       var bgKeys = Object.keys(blockGroup);
       for (var i = 0; i < bgKeys.length; i++) {
-        var cnt = Object.keys(blockGroup[bgKeys[i]]).length;
-        totalDisplayCount += (cnt === 1 ? 0 : cnt);
+        totalDisplayCount += Object.keys(blockGroup[bgKeys[i]]).length;
       }
       var tD = totalDisplayCount / 4;
 

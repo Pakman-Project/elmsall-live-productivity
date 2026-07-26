@@ -104,7 +104,9 @@ function applyLocalFiltersPak() {
   var tableSourceData = rawSideData.filter(function(row) {
     return selectedBonuses.length === 0 || selectedBonuses.indexOf(row.bonus) !== -1;
   });
-  var tableBaseRows = generateMainRows_(tableSourceData, tableTimeList);
+  // Raw on purpose: no threshold filtering, so the Data Table shows exactly what
+  // the database holds. Every other page keeps the threshold applied.
+  var tableBaseRows = generateMainRows_(tableSourceData, tableTimeList, { applyThreshold: false });
 
   var tableData = tableBaseRows;
   if (windowMinutes !== 15) { tableData = getAggregatedDataPak(tableBaseRows, windowMinutes); }
@@ -130,11 +132,18 @@ function applyLocalFiltersPak() {
   saveUserPreferences();
 }
 
-function generateMainRows_(data, timeList) {
+// opts.applyThreshold (default true): drop rows whose standard hours for the
+// block are at or below the threshold, from BOTH the hours and the head count.
+// The charts want that filtering; the Data Table deliberately does not, so it
+// stays a raw view of what is actually in the database.
+function generateMainRows_(data, timeList, opts) {
+  var applyThreshold = !(opts && opts.applyThreshold === false);
   var rows = [];
   timeList.forEach(function(tr) {
     var blockData = data.filter(function(r) { return r.timeRange === tr; });
-    var qualifiedData = blockData.filter(function(r) { return (r.value || 0) > currentThreshold; });
+    var qualifiedData = applyThreshold
+      ? blockData.filter(function(r) { return (r.value || 0) > currentThreshold; })
+      : blockData;
     var stdHours = qualifiedData.reduce(function(sum, r) { return sum + (r.value || 0); }, 0);
     var pieTotal = blockData.reduce(function(sum, r) { return sum + (r.pie || 0); }, 0);
     var topUpTotal = blockData.reduce(function(sum, r) { return sum + (r.topUp || 0); }, 0);
@@ -155,8 +164,7 @@ function generateMainRows_(data, timeList) {
     } else {
       var uniqueCount = 0;
       for (var key in bonuses) { if (bonuses.hasOwnProperty(key)) uniqueCount++; }
-      var displayCount = uniqueCount === 1 ? 0 : uniqueCount;
-      hourDeployed = displayCount / 4;
+      hourDeployed = uniqueCount / 4;
     }
     var performance = hourDeployed !== 0 ? (stdHours / hourDeployed) * 100 : 0;
     rows.push({ dateTime: tr, bonusNumber: bonusNumber, hourDeployed: hourDeployed, stdHours: stdHours, pieVol: pieTotal, topUpVol: topUpTotal, e3PackingVol: e3PackingTotal, parcelSortationVol: parcelSortationTotal, parcelInductVol: parcelInductTotal, inboundDecantingVol: inboundDecantingTotal, osrDecantingVol: osrDecantingTotal, bcrInductingVol: bcrInductingTotal, e1e2InductingVol: e1e2InductingTotal, performance: performance, rawBonusSet: bonuses });
