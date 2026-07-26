@@ -580,6 +580,8 @@
   }
 
   function resetTrendSplit() {
+    // Collapsing back to a single chart discards every split the user configured.
+    if (!confirm('Reset back to a single deployment trend chart?\n\nThe split charts you have set up will be lost.')) return;
     trendSplitState = { enabled: false, charts: [] };
     closeTrendSplit();
     applyLocalFiltersPak();
@@ -682,6 +684,8 @@
   }
 
   function resetAreaGroups() {
+    // Destructive and not undoable — the user may have built up several groups.
+    if (!confirm('Reset all area groups back to the default set?\n\nAny groups you have built here will be lost.')) return;
     areaGroupState = defaultAreaGroupState_();
     closeAreaGroups();
     applyLocalFiltersPak();

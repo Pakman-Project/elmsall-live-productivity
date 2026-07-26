@@ -72,6 +72,29 @@
     }
   }
 
+  // Renders a KPI card's change vs the previous hour. `unit` is 'pp' for the
+  // percentage KPI (a change in a percentage is percentage POINTS, not a
+  // percentage of a percentage) and '' for plain counts.
+  function setKpiTrend_(elId, current, previous, prevHasData, unit) {
+    var el = $(elId);
+    if (!el) return;
+    if (!prevHasData) { el.style.display = 'none'; return; }
+
+    var delta = current - previous;
+    var rounded = (unit === 'pp') ? Math.round(delta) : delta;
+    if (rounded === 0) {
+      el.className = 'kpi-trend flat';
+      el.innerHTML = '<i class="fa-solid fa-minus"></i> no change';
+    } else {
+      var up = rounded > 0;
+      el.className = 'kpi-trend ' + (up ? 'up' : 'down');
+      el.innerHTML = '<i class="fa-solid fa-arrow-' + (up ? 'up' : 'down') + '"></i> ' +
+                     Math.abs(rounded) + (unit === 'pp' ? 'pp' : '');
+    }
+    el.title = 'vs previous hour (' + (unit === 'pp' ? Math.round(previous) + '%' : previous) + ')';
+    el.style.display = 'inline-flex';
+  }
+
   // Renders a full dashboard payload (real OR demo/tour data) into the UI: KPI
   // cards, notes, and all charts/tables via applyLocalFiltersPak(). Kept separate
   // from loadDataPak so the tour can re-apply the real payload when it finishes.
@@ -88,46 +111,65 @@
     $('thresholdDisplay').textContent = currentThreshold || '-';
     $('lastUpdateText').textContent = 'Last Update: ' + (data.lastRefresh || '-');
 
-    var last4Times = {};
-    var last4Slice = timeRanges.slice(-4);
-    for (var i = 0; i < last4Slice.length; i++) { last4Times[last4Slice[i]] = true; }
-    var lastHourRawData = rawSideData.filter(function(r) { return last4Times[r.timeRange]; });
+    // KPI figures for one hour-sized window (4 x 15-min blocks). Computing this
+    // for the last hour AND the hour before it gives the trend indicators
+    // something to compare against.
+    function computeHourKpis_(blockSlice) {
+      var times = {};
+      for (var i = 0; i < blockSlice.length; i++) { times[blockSlice[i]] = true; }
+      var rows = rawSideData.filter(function(r) { return times[r.timeRange]; });
 
-    var headSet = {};
-    for (var i = 0; i < lastHourRawData.length; i++) { headSet[lastHourRawData[i].bonus] = true; }
-    var uniqueHeadsLastHour = Object.keys(headSet).length;
-    $('headDeployed').textContent = uniqueHeadsLastHour;
+      var headSet = {};
+      for (var i = 0; i < rows.length; i++) { headSet[rows[i].bonus] = true; }
 
-    var headHoursLastHour = {};
-    for (var i = 0; i < lastHourRawData.length; i++) {
-      var bonus = lastHourRawData[i].bonus;
-      if (!headHoursLastHour[bonus]) headHoursLastHour[bonus] = 0;
-      headHoursLastHour[bonus] += (lastHourRawData[i].value || 0);
-    }
-    var hourTarget = currentThreshold * 4;
-    var countAboveThreshold = 0;
-    var headKeys = Object.keys(headHoursLastHour);
-    for (var i = 0; i < headKeys.length; i++) {
-      if (headHoursLastHour[headKeys[i]] >= hourTarget) { countAboveThreshold++; }
-    }
-    $('headAbove20').textContent = countAboveThreshold;
+      var headHours = {};
+      for (var i = 0; i < rows.length; i++) {
+        var b = rows[i].bonus;
+        if (!headHours[b]) headHours[b] = 0;
+        headHours[b] += (rows[i].value || 0);
+      }
+      var target = currentThreshold * 4;
+      var above = 0;
+      var hk = Object.keys(headHours);
+      for (var i = 0; i < hk.length; i++) { if (headHours[hk[i]] >= target) above++; }
 
-    var tS = 0;
-    for (var i = 0; i < lastHourRawData.length; i++) { tS += (lastHourRawData[i].value || 0); }
-    var blockGroup = {};
-    for (var i = 0; i < lastHourRawData.length; i++) {
-      var tr = lastHourRawData[i].timeRange;
-      if (!blockGroup[tr]) blockGroup[tr] = {};
-      blockGroup[tr][lastHourRawData[i].bonus] = true;
+      var tS = 0;
+      for (var i = 0; i < rows.length; i++) { tS += (rows[i].value || 0); }
+      var blockGroup = {};
+      for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i].timeRange;
+        if (!blockGroup[tr]) blockGroup[tr] = {};
+        blockGroup[tr][rows[i].bonus] = true;
+      }
+      var totalDisplayCount = 0;
+      var bgKeys = Object.keys(blockGroup);
+      for (var i = 0; i < bgKeys.length; i++) {
+        var cnt = Object.keys(blockGroup[bgKeys[i]]).length;
+        totalDisplayCount += (cnt === 1 ? 0 : cnt);
+      }
+      var tD = totalDisplayCount / 4;
+
+      return {
+        heads: Object.keys(headSet).length,
+        above: above,
+        perf: tD > 0 ? (tS / tD) * 100 : 0,
+        hasData: rows.length > 0
+      };
     }
-    var totalDisplayCount = 0;
-    var bgKeys = Object.keys(blockGroup);
-    for (var i = 0; i < bgKeys.length; i++) {
-      var cnt = Object.keys(blockGroup[bgKeys[i]]).length;
-      totalDisplayCount += (cnt === 1 ? 0 : cnt);
-    }
-    var tD = totalDisplayCount / 4;
-    $('avgPerf').textContent = tD > 0 ? (((tS / tD) * 100).toFixed(0)) + '%' : '0%';
+
+    var thisHour = computeHourKpis_(timeRanges.slice(-4));
+    // Blocks -8..-5: the hour immediately before the one being displayed.
+    var prevHour = computeHourKpis_(timeRanges.slice(-8, -4));
+
+    $('headDeployed').textContent = thisHour.heads;
+    $('headAbove20').textContent = thisHour.above;
+    $('avgPerf').textContent = thisHour.perf > 0 ? thisHour.perf.toFixed(0) + '%' : '0%';
+
+    // Only show a trend when there is a real previous hour to compare with,
+    // otherwise the first hour of the day would read as a huge "increase".
+    setKpiTrend_('headDeployedTrend', thisHour.heads, prevHour.heads, prevHour.hasData, '');
+    setKpiTrend_('headAbove20Trend', thisHour.above, prevHour.above, prevHour.hasData, '');
+    setKpiTrend_('avgPerfTrend', thisHour.perf, prevHour.perf, prevHour.hasData, 'pp');
 
     applyLocalFiltersPak();
 
@@ -141,6 +183,67 @@
   // Retry the last attempted load (shown alongside the error status).
   function retryLoadPak() {
     loadDataPak(currentArchiveUrl);
+  }
+
+  // ── Auto-refresh: countdown + pause ────────────────────────────────────────
+  // The dashboard silently polled every 60s, so users had no idea whether it was
+  // about to update, or any way to hold it still while reading. A 1s ticker
+  // drives both the visible countdown and the poll itself.
+  var POLL_INTERVAL_MS = 60000;
+  var nextPollAt = 0;
+  var autoRefreshPaused = false;
+
+  function pollForUpdates_() {
+    if (lastRefreshTimestamp === null) return;
+    if (currentArchiveUrl) return;
+    google.script.run.withSuccessHandler(function(remoteTimestamp) {
+      if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) {
+        loadDataPak(currentArchiveUrl, true);
+      }
+    }).getLastRefreshTimestamp();
+  }
+
+  function refreshTick_() {
+    var el = $('refreshCountdown');
+
+    // Archive snapshots are static — nothing to poll for.
+    if (currentArchiveUrl) {
+      if (el) { el.textContent = ''; el.style.display = 'none'; }
+      return;
+    }
+    if (el) el.style.display = 'inline-flex';
+
+    if (autoRefreshPaused) {
+      if (el) el.textContent = 'Auto-refresh paused';
+      return;
+    }
+
+    var remaining = nextPollAt - Date.now();
+    if (remaining <= 0) {
+      nextPollAt = Date.now() + POLL_INTERVAL_MS;
+      remaining = POLL_INTERVAL_MS;
+      pollForUpdates_();
+    }
+    var secs = Math.ceil(remaining / 1000);
+    if (el) {
+      el.textContent = 'Next check ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+    }
+  }
+
+  function toggleAutoRefresh_() {
+    autoRefreshPaused = !autoRefreshPaused;
+    // Restart the countdown on resume rather than firing immediately.
+    if (!autoRefreshPaused) nextPollAt = Date.now() + POLL_INTERVAL_MS;
+    var btn = $('autoRefreshBtn');
+    if (btn) {
+      var icon = btn.querySelector('i');
+      if (icon) icon.className = autoRefreshPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
+      var label = autoRefreshPaused ? 'Resume auto-refresh' : 'Pause auto-refresh';
+      btn.setAttribute('title', label);
+      btn.setAttribute('aria-label', label);
+      btn.classList.toggle('paused', autoRefreshPaused);
+    }
+    refreshTick_();
   }
 
   // ── Stale-data warning ─────────────────────────────────────────────────────
@@ -177,7 +280,10 @@
     var overlay = $('loadingOverlay');
 
     if (!silent && !tourActive) {
-      if (overlay) overlay.classList.add('active');
+      // Skeleton placeholders instead of a full-screen blocking spinner: the
+      // user sees the real layout filling in rather than a blank wall.
+      document.body.classList.add('loading-skeleton');
+      if (overlay) overlay.classList.remove('active');
       $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Loading...';
     } else if (!tourActive) {
       $('status').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Updating...';
@@ -246,7 +352,8 @@
         $('status').innerHTML = '<span class="bad">Render Error: Check Console</span>';
       }
 
-      // GUARANTEE overlay removal outside the try/catch so it NEVER gets stuck
+      // GUARANTEE overlay/skeleton removal outside the try/catch so they NEVER get stuck
+      document.body.classList.remove('loading-skeleton');
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
 
     }).withFailureHandler(function(err) {
@@ -256,6 +363,7 @@
         $('status').innerHTML = '<span class="bad">Error: ' + escapeAttrPak(msg) + '</span>' +
           ' <button type="button" class="status-retry-btn" onclick="retryLoadPak()">Retry</button>';
       }
+      document.body.classList.remove('loading-skeleton');
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
     }).getDashboardData(urlToFetch);
   }
@@ -286,6 +394,7 @@
     if (paintedFromCache) {
       var lo = $('loadingOverlay');
       if (lo) lo.classList.remove('active');
+      document.body.classList.remove('loading-skeleton');
     }
 
     // Fire BOTH server round-trips in parallel — they don't depend on each
@@ -307,15 +416,10 @@
       loadDataPak(currentArchiveUrl);
     });
 
-    setInterval(function() {
-      if (lastRefreshTimestamp === null) return;
-      if (currentArchiveUrl) return;
-      google.script.run.withSuccessHandler(function(remoteTimestamp) {
-        if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) {
-          loadDataPak(currentArchiveUrl, true);
-        }
-      }).getLastRefreshTimestamp();
-    }, 60000);
+    // Drive the auto-refresh from a 1s ticker instead of a bare 60s interval, so
+    // the countdown can be shown and the whole thing can be paused.
+    nextPollAt = Date.now() + POLL_INTERVAL_MS;
+    setInterval(refreshTick_, 1000);
 
     // Re-evaluate staleness locally (no server call) so the warning appears
     // while the page is left open, not only on the next successful load.

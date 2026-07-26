@@ -202,6 +202,83 @@ body {
 }
 .status-retry-btn:hover { filter: brightness(1.1); }
 
+/* Shared empty state (main table, and the look other empty panels follow). */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 42px 20px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.empty-state i {
+  font-size: 26px;
+  opacity: 0.35;
+}
+
+/* KPI change vs the previous hour. */
+.kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.kpi-trend.up { color: var(--color-good); background: color-mix(in srgb, var(--color-good) 14%, transparent); }
+.kpi-trend.down { color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 14%, transparent); }
+.kpi-trend.flat { color: var(--muted); background: var(--w6); }
+.kpi-trend i { font-size: 9px; }
+
+/* Auto-refresh countdown in the header meta row. */
+.refresh-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.header-icon-btn.paused { color: var(--color-warn); }
+
+/* ── Skeleton loading ──────────────────────────────────────────────────────
+   Shown on a COLD first load only (a returning user is painted instantly from
+   the localStorage cache instead). Placeholders mirror the real layout so the
+   page doesn't visibly jump when the data lands. */
+@keyframes skelShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+body.loading-skeleton .kpi .value,
+body.loading-skeleton #thresholdDisplay {
+  color: transparent !important;
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, var(--w6) 25%, var(--w12) 37%, var(--w6) 63%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+  min-width: 64px;
+  display: inline-block;
+}
+body.loading-skeleton .kpi-trend { display: none !important; }
+/* Cover each chart panel with a shimmering block while the canvas is empty. */
+body.loading-skeleton .charts .card.panel { position: relative; min-height: 220px; }
+body.loading-skeleton .charts .card.panel::after {
+  content: '';
+  position: absolute;
+  left: 14px; right: 14px; top: 52px; bottom: 14px;
+  border-radius: 8px;
+  background-image: linear-gradient(90deg, var(--w4) 25%, var(--w10) 37%, var(--w4) 63%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+body.loading-skeleton canvas { visibility: hidden; }
+
 /* Pipeline-stall warning in the header meta row. */
 .stale-warning {
   display: inline-flex;

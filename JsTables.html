@@ -108,6 +108,37 @@ function renderMainTablePak(sourceRows) {
   var tbody = $('mainTable').querySelector('tbody');
   var cardList = $('mainCardList');
 
+  // Empty state: say WHY it's empty, since "no data at all" and "your filter
+  // excluded everything" need very different reactions from the user.
+  var emptyEl = $('mainTableEmpty');
+  var tableWrap = $('mainTable').closest('.table-wrap');
+  if (emptyEl) {
+    if (rows.length === 0) {
+      var why, icon;
+      if (q) {
+        why = 'No rows match &ldquo;' + escapeAttrPak($('search').value.trim()) + '&rdquo;.';
+        icon = 'fa-magnifying-glass';
+      } else if (selectedBonuses.length > 0) {
+        why = 'No rows for the bonus number(s) you are filtering by.';
+        icon = 'fa-filter';
+      } else {
+        why = 'No data has arrived for this day yet.';
+        icon = 'fa-ghost';
+      }
+      emptyEl.innerHTML = '<i class="fa-solid ' + icon + '"></i><span>' + why + '</span>';
+      emptyEl.style.display = 'flex';
+      if (tableWrap) tableWrap.style.display = 'none';
+      cardList.style.display = 'none';
+      tbody.innerHTML = '';
+      cardList.innerHTML = '';
+      $('status').textContent = '0 row(s) shown';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = '';
+    cardList.style.display = '';
+  }
+
   if (isCardModePak()) {
     tbody.innerHTML = '';
     cardList.innerHTML = rows.map(buildMainCardHtml_).join('');
@@ -542,7 +573,9 @@ function renderSideTablesPak(rowsLimit) {
       html += buildBonusPanel_(t.label, rows, rowsLimit);
     }
     if (!html) {
-      html = '<div class="card panel bonus-empty-panel"><i class="fa-solid fa-ghost"></i>No activity in the selected range</div>';
+      html = '<div class="card panel bonus-empty-panel"><i class="fa-solid ' +
+             (selectedBonuses.length > 0 ? 'fa-filter"></i>No activity for the bonus number(s) you are filtering by'
+                                         : 'fa-ghost"></i>No activity in the selected range') + '</div>';
     }
   } else {
     html = buildBonusPanel_('All Work Areas', computeBonusRows_(windowData, null), rowsLimit);
