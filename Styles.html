@@ -3250,38 +3250,15 @@ canvas {
    Mobile: reclaim vertical space once the page is scrolled.
    Driven by the `page-scrolled` class that JsUi puts on <body> when the active
    .page is scrolled off the top. Deliberately mobile-only — desktop has room.
-
-   Everything here animates between definite lengths (never to/from `auto`, and
-   never via `display`, which cannot transition) so the collapse and expand are
-   both smooth rather than snapping.
    ============================================================ */
 @media (max-width: 700px) {
-  /* Only the ICONS collapse. The page names stay visible and tappable, so
+  /* Only the ICONS are hidden. The page names stay visible and tappable, so
      navigation is never lost — this just trades the icon's height for content. */
-  .next-rail .rail-item .rail-icon {
-    overflow: hidden;
-    transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.16s ease,
-                transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-origin: center top;
-  }
   body.page-scrolled .next-rail .rail-item .rail-icon {
-    height: 0;
-    opacity: 0;
-    /* Scaling as it collapses keeps the icon from looking squashed on the way out. */
-    transform: scaleY(0.6);
-  }
-
-  /* The column gap would otherwise remain behind the collapsed icon. */
-  .next-rail .rail-item {
-    transition: gap 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+    display: none;
   }
   body.page-scrolled .next-rail .rail-item {
     gap: 0;
-  }
-
-  .next-rail {
-    transition: padding 0.26s cubic-bezier(0.4, 0, 0.2, 1);
   }
   body.page-scrolled .next-rail {
     padding-top: 5px;
@@ -3295,41 +3272,12 @@ canvas {
     text-underline-offset: 3px;
   }
 
-  /* Status / last update slide away horizontally and fade, rather than being
-     display:none'd, which would snap. Fixed max-widths (not percentages or
-     auto) so both directions interpolate. The stale-data warning and the note
-     stay put — they are exception states worth keeping on screen. */
-  .next-header-meta {
-    transition: gap 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  #status,
-  #lastUpdateText {
-    overflow: hidden;
-    white-space: nowrap;
-    max-width: 60vw;
-    transition: max-width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.16s ease;
-  }
-  body.page-scrolled .next-header-meta {
-    gap: 0;
-  }
+  /* The status and last-update line hides too. The stale-data warning and the
+     note stay visible — they are exception states worth keeping on screen even
+     when space is tight. */
   body.page-scrolled #status,
   body.page-scrolled #lastUpdateText {
-    max-width: 0;
-    opacity: 0;
-  }
-}
-
-/* Honour the OS "reduce motion" setting: still collapse, just without the
-   animation. */
-@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
-  .next-rail,
-  .next-rail .rail-item,
-  .next-rail .rail-item .rail-icon,
-  .next-header-meta,
-  #status,
-  #lastUpdateText {
-    transition: none;
+    display: none;
   }
 }
 
