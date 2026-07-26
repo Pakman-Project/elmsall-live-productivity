@@ -2,9 +2,13 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-function doGet() {
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
+function doGet(e) {
+  var t = HtmlService.createTemplateFromFile('Index');
+  // ?tour=1 forces the guided tour to run; ?tour=reset also clears the stored
+  // "already seen" flag first, reproducing a genuine first visit. Every caller
+  // that evaluates the Index template must set this or the template throws.
+  t.forceTour = (e && e.parameter && e.parameter.tour) ? String(e.parameter.tour) : '';
+  return t.evaluate()
     .setTitle('E3 Live Productivity')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

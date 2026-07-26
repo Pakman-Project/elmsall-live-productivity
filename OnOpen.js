@@ -8,23 +8,33 @@ function onOpen() {
     .addItem('Import Archive Links', 'refreshArchiveLinks')
     .addItem('Preview Dashboard (Dev)', 'previewDashboard')
     .addItem('Preview Dashboard (Mobile)', 'previewDashboardMobile')
+    .addItem('Preview Dashboard (First-time / Tour)', 'previewDashboardFirstTime')
     .addToUi();
 }
 
+// The preview runs inside a sandboxed modal-dialog iframe, so clearing the
+// tour's "seen" flag from a browser console is unreliable — the console is
+// usually pointed at the wrong frame. forceTour lets the caller drive it
+// instead: '' normal, '1' force the tour, 'reset' clear the flag then run it.
+function showDashboardPreview_(width, height, title, forceTour) {
+  var t = HtmlService.createTemplateFromFile('Index');
+  t.forceTour = forceTour || '';
+  SpreadsheetApp.getUi().showModalDialog(
+    t.evaluate().setWidth(width).setHeight(height), title);
+}
+
 function previewDashboard() {
-  var html = HtmlService.createTemplateFromFile('Index')
-    .evaluate()
-    .setWidth(1400)
-    .setHeight(850);
-  SpreadsheetApp.getUi().showModalDialog(html, 'E3 Live Productivity — Dev Preview');
+  showDashboardPreview_(1400, 850, 'E3 Live Productivity — Dev Preview', '');
 }
 
 function previewDashboardMobile() {
-  var html = HtmlService.createTemplateFromFile('Index')
-    .evaluate()
-    .setWidth(680)
-    .setHeight(1300);
-  SpreadsheetApp.getUi().showModalDialog(html, 'E3 Live Productivity — Mobile Preview');
+  showDashboardPreview_(680, 1300, 'E3 Live Productivity — Mobile Preview', '');
+}
+
+// Reproduces what a brand-new user sees: clears the "tour seen" flag so the
+// tour auto-starts exactly as it does on a genuine first visit.
+function previewDashboardFirstTime() {
+  showDashboardPreview_(1400, 850, 'E3 Live Productivity — First-time (Tour)', 'reset');
 }
 
 function confirmRunDailyAutomation() {

@@ -624,9 +624,38 @@ function placeTourTooltip_(step) {
 }
 
 function maybeAutoStartTour_() {
-  var seen = '1';
-  try { seen = localStorage.getItem(TOUR_SEEN_KEY); } catch (e) {}
-  if (seen) return;
+  // TOUR_FORCE comes from the ?tour= parameter / the preview menu. It exists
+  // because this app usually runs inside a sandboxed iframe, where clearing the
+  // "seen" flag from a browser console is unreliable — the console is almost
+  // always pointed at the wrong frame, so the key never actually gets removed.
+  var forced = (typeof TOUR_FORCE !== 'undefined') ? String(TOUR_FORCE || '') : '';
+
+  if (forced === 'reset') {
+    try { localStorage.removeItem(TOUR_SEEN_KEY); } catch (e) {}
+  }
+  if (forced === '1' || forced === 'reset') {
+    setTimeout(function() { startTour(true); }, 500);
+    return;
+  }
+
+  var seen = null;
+  try {
+    seen = localStorage.getItem(TOUR_SEEN_KEY);
+  } catch (e) {
+    // Storage blocked: we cannot tell whether this user has already seen the
+    // tour, so stay quiet rather than replaying it on every single load.
+    console.info('[tour] localStorage unavailable — auto-start skipped.');
+    return;
+  }
+
+  if (seen) {
+    console.info('[tour] Auto-start skipped: "' + TOUR_SEEN_KEY + '" is set, so this ' +
+                 'browser has seen the tour. Use the Sheets menu ' +
+                 '"Preview Dashboard (First-time / Tour)", or add ?tour=reset to the ' +
+                 'web-app URL, to replay the first-visit experience.');
+    return;
+  }
+
   setTimeout(function() { startTour(true); }, 500);
 }
 

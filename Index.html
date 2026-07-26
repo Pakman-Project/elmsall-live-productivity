@@ -23,6 +23,12 @@
       })();
     </script>
 
+    <!-- Set by doGet()/the preview menu. '1' forces the guided tour to run,
+         'reset' clears the stored "already seen" flag first. Empty = normal. -->
+    <script>
+      var TOUR_FORCE = '<?= forceTour ?>';
+    </script>
+
     <?!= include('Styles'); ?>
   </head>
   <body>
