@@ -340,8 +340,13 @@ function startTour(isAuto, startIndex) {
 
   try { renderDashboardPayload_(buildTourDummyData_()); } catch (e) { console.warn('Tour demo render failed', e); }
 
+  // Clear BOTH loading indicators. The tour renders its own demo data, so the
+  // cold-load skeleton must come off too — otherwise an auto-started tour on a
+  // first visit spends its opening steps pointing at shimmer placeholders and
+  // canvases hidden by the skeleton CSS until the real fetch happens to land.
   var lo = $('loadingOverlay');
   if (lo) lo.classList.remove('active');
+  document.body.classList.remove('loading-skeleton');
 
   $('tourOverlay').classList.add('active');
 
