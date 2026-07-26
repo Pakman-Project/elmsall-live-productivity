@@ -30,8 +30,11 @@ var TOUR_STEPS = [
     title: 'Welcome 👋',
     body: 'This is E3 Live Productivity — a live view of warehouse output across every E3 work area. This tour walks you through each page using example data while your real data loads in the background. We’ll have you click things as we go!' },
   { part: 1, page: 0, target: '.refresh-btn',
-    title: 'Live & auto-refreshing',
-    body: 'The dashboard refreshes on its own every minute. Tap here any time to refresh immediately.' },
+    title: 'Refresh any time',
+    body: 'The dashboard keeps itself up to date, but tap here whenever you want to pull the very latest figures immediately.' },
+  { part: 1, page: 0, target: '#autoRefreshBtn',
+    title: 'Auto-refresh — and how to pause it',
+    body: 'The dashboard checks for new data every minute on its own. Hover this button to see how long until the next check, or click it to pause updating — handy when you are reading a number and don’t want it changing under you. Click again to resume.' },
   { part: 1, page: 0, target: '#archiveSelect',
     title: 'Live vs history',
     body: 'Stay on “Live” for today, or pick a saved snapshot from this dropdown to look back at an earlier day.' },
@@ -143,11 +146,11 @@ var TOUR_STEPS = [
     },
     title: 'Expand a row',
     body: 'Click a row (its header, on mobile) to expand the per-operator detail behind that time block.' },
-  { part: 6, page: 3, target: '.main-detail-content',
+  { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content',
     title: 'Per-operator detail',
     body: 'Each expanded row lists every operator in that block with their volumes and productivity. The bonus numbers in here are clickable too.' },
-  { part: 6, page: 3, target: '.main-detail-content .clickable-bonus',
-    interactive: { sel: '.main-detail-content .clickable-bonus', type: 'click' },
+  { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
+    interactive: { sel: '.main-detail-row.open .main-detail-content .clickable-bonus', type: 'click' },
     title: 'Filter from the detail',
     body: 'Just like on the Bonus page, click an operator here to filter the whole dashboard to them.' },
   { part: 6, page: 3, target: '#activeFilterBanner',
@@ -271,6 +274,57 @@ function setPageScrollTop_(index, value) {
   if (pages[index]) pages[index].scrollTop = value;
 }
 
+// The tour's steps assume a known starting state — e.g. 4.2 asks the user to
+// pick "Stacked Area" and 5.2 to pick "Overall". If the user's SAVED preference
+// already had those values, selecting them again fires no change event, so the
+// interactive step could never be completed (Next is disabled on those steps).
+// Worse, a saved "Overall" bonus mode hides the work-area chips entirely, so
+// step 5.4 had nothing to ring.
+//
+// So the tour snapshots the user's state, forces tour-friendly defaults, and
+// restores everything on exit. saveUserPreferences() is a no-op while the tour
+// runs, so none of this temporary state can leak into their saved settings.
+var tourSavedState = null;
+
+function applyTourDefaults_() {
+  tourSavedState = {
+    bonusViewMode: $('bonusViewMode') ? $('bonusViewMode').value : null,
+    volumeChartMode: $('volumeChartMode') ? $('volumeChartMode').value : null,
+    hiddenBonusAreas: hiddenBonusAreas.slice(),
+    hiddenVolumeAreas: hiddenVolumeAreas.slice(),
+    selectedBonuses: selectedBonuses.slice(),
+    sideSortMetric: sideSortMetric,
+    expandedRowKey: expandedRowKey,
+    sortState: { key: sortState.key, dir: sortState.dir }
+  };
+
+  if ($('bonusViewMode')) $('bonusViewMode').value = 'area';
+  if ($('volumeChartMode')) $('volumeChartMode').value = 'separate';
+  hiddenBonusAreas = [];
+  hiddenVolumeAreas = [];
+  selectedBonuses = [];
+  sideSortMetric = 'performance';
+  expandedRowKey = null;
+  sortState.key = 'dateTime';
+  sortState.dir = 'asc';
+}
+
+function restoreTourState_() {
+  if (!tourSavedState) return;
+  var st = tourSavedState;
+  tourSavedState = null;
+
+  if (st.bonusViewMode !== null && $('bonusViewMode')) $('bonusViewMode').value = st.bonusViewMode;
+  if (st.volumeChartMode !== null && $('volumeChartMode')) $('volumeChartMode').value = st.volumeChartMode;
+  hiddenBonusAreas = st.hiddenBonusAreas;
+  hiddenVolumeAreas = st.hiddenVolumeAreas;
+  selectedBonuses = st.selectedBonuses;
+  sideSortMetric = st.sideSortMetric;
+  expandedRowKey = st.expandedRowKey;
+  sortState.key = st.sortState.key;
+  sortState.dir = st.sortState.dir;
+}
+
 function startTour(isAuto, startIndex) {
   if (tourActive) return;
   tourActive = true;
@@ -279,6 +333,10 @@ function startTour(isAuto, startIndex) {
   tourReturnScroll = getActivePageScrollTop_();
 
   document.querySelectorAll('.kpi-tooltip.open').forEach(function(t) { t.classList.remove('open'); });
+
+  // Must happen BEFORE the demo render so the demo data is drawn with the
+  // tour's expected control values.
+  applyTourDefaults_();
 
   try { renderDashboardPayload_(buildTourDummyData_()); } catch (e) { console.warn('Tour demo render failed', e); }
 
@@ -312,7 +370,10 @@ function endTour_() {
 
   try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch (e) {}
 
-  expandedRowKey = null;
+  // Put the user's own settings back before re-rendering their real data.
+  restoreTourState_();
+  renderBonusChips();
+  updateClearBtnVisibility();
 
   var payload = pendingRealData || lastRealPayload;
   pendingRealData = null;

@@ -33,6 +33,9 @@ function toggleTheme_() {
 }
 
 function saveUserPreferences() {
+  // The tour temporarily forces controls to known defaults so its steps work.
+  // Never let that temporary state overwrite the user's real saved preferences.
+  if (typeof tourActive !== 'undefined' && tourActive) return;
   try {
     var prefs = {
       hoursRange: $('hoursRange').value,

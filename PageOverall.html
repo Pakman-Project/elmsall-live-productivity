@@ -108,7 +108,21 @@
       </div>
 
       <!-- Populated dynamically with 1-7 chart panels by renderChartsPak();
-           display:contents makes the panels flow directly in the .charts grid -->
-      <div class="trend-charts-wrap" id="trendChartsWrap"></div>
+           display:contents makes the panels flow directly in the .charts grid.
+           The panel below is a placeholder so the trend section's title and
+           Split button are present from the first paint instead of popping in
+           once data arrives — renderChartsPak clears this wrapper and replaces
+           it with the real panels. -->
+      <div class="trend-charts-wrap" id="trendChartsWrap">
+        <div class="card panel">
+          <div class="mini-table-title">
+            <h2>Deployment Trend</h2>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
+            </div>
+          </div>
+          <canvas></canvas>
+        </div>
+      </div>
     </div>
 </div>

@@ -278,27 +278,6 @@ body.loading-skeleton .charts .card.panel::after {
   animation: skelShimmer 1.4s ease-in-out infinite;
 }
 body.loading-skeleton canvas { visibility: hidden; }
-/* The Overall page's trend panels are created dynamically by renderChartsPak,
-   so unlike the static chart cards they don't exist during a cold load — the
-   section would simply pop into existence once data arrived. Give the empty
-   wrapper a placeholder card so the layout is complete from the first paint. */
-body.loading-skeleton .trend-charts-wrap {
-  display: block;
-  position: relative;
-  min-height: 220px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-}
-body.loading-skeleton .trend-charts-wrap::after {
-  content: '';
-  position: absolute;
-  left: 14px; right: 14px; top: 52px; bottom: 14px;
-  border-radius: 8px;
-  background-image: linear-gradient(90deg, var(--w4) 25%, var(--w10) 37%, var(--w4) 63%);
-  background-size: 200% 100%;
-  animation: skelShimmer 1.4s ease-in-out infinite;
-}
 
 /* Pipeline-stall warning in the header meta row. */
 .stale-warning {
