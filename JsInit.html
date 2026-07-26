@@ -133,13 +133,22 @@
       var hk = Object.keys(headHours);
       for (var i = 0; i < hk.length; i++) { if (headHours[hk[i]] >= target) above++; }
 
+      // Productivity counts only rows that clear the threshold — i.e. an
+      // operator whose total standard hours for a 15-min block is at or below
+      // the threshold is treated as not really working that block, and is
+      // excluded from BOTH the standard hours and the head count so the ratio
+      // stays consistent. This matches generateMainRows_, which the Data
+      // Table's Productivity % column uses; previously the KPI summed every row
+      // and so disagreed with the table.
+      var qualified = rows.filter(function(r) { return (r.value || 0) > currentThreshold; });
+
       var tS = 0;
-      for (var i = 0; i < rows.length; i++) { tS += (rows[i].value || 0); }
+      for (var i = 0; i < qualified.length; i++) { tS += (qualified[i].value || 0); }
       var blockGroup = {};
-      for (var i = 0; i < rows.length; i++) {
-        var tr = rows[i].timeRange;
+      for (var i = 0; i < qualified.length; i++) {
+        var tr = qualified[i].timeRange;
         if (!blockGroup[tr]) blockGroup[tr] = {};
-        blockGroup[tr][rows[i].bonus] = true;
+        blockGroup[tr][qualified[i].bonus] = true;
       }
       var totalDisplayCount = 0;
       var bgKeys = Object.keys(blockGroup);
