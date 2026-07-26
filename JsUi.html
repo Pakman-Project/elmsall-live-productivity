@@ -95,9 +95,10 @@
   }
 
   // ── Mobile: collapse chrome once the page is scrolled ─────────────────────
-  // Phones have little vertical room, so the nav rail and the status /
+  // Phones have little vertical room, so the rail ICONS and the status /
   // last-update line hide as soon as the user scrolls away from the top, and
-  // come back when they return. Each .page is its own scroll container, so the
+  // come back when they return. The page NAMES stay visible and tappable, so
+  // navigation is never lost. Each .page is its own scroll container, so the
   // listener is bound per page and reads whichever one is currently showing.
   var PAGE_SCROLL_CHROME_THRESHOLD = 4;  // a few px of slack for iOS overscroll
 

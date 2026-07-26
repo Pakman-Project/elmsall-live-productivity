@@ -349,7 +349,7 @@ function startTour(isAuto, startIndex) {
   document.body.classList.remove('loading-skeleton');
 
   // The mobile chrome auto-hides on scroll; make sure it is restored before the
-  // tour starts, since several steps ring the nav rail and a hidden target
+  // tour starts, since the rail icons are a tour target and a hidden element
   // measures 0x0 and would get no ring.
   if (typeof updatePageScrollChrome_ === 'function') updatePageScrollChrome_();
 

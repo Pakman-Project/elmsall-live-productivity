@@ -3249,31 +3249,39 @@ canvas {
 /* ============================================================
    Mobile: reclaim vertical space once the page is scrolled.
    Driven by the `page-scrolled` class that JsUi puts on <body> when the active
-   .page is scrolled off the top. Deliberately mobile-only — desktop has the
-   room, and the rail is the primary navigation there.
+   .page is scrolled off the top. Deliberately mobile-only — desktop has room.
    ============================================================ */
 @media (max-width: 700px) {
-  .next-rail {
+  /* Only the ICONS collapse. The page names stay visible and tappable, so
+     navigation is never lost — this just trades the icon's height for content. */
+  .next-rail .rail-item .rail-icon {
     overflow: hidden;
-    max-height: 200px;
-    transition: max-height 0.22s ease, opacity 0.18s ease,
-                padding 0.22s ease, box-shadow 0.18s ease;
+    transition: height 0.22s ease, max-height 0.22s ease,
+                opacity 0.18s ease, margin 0.22s ease;
   }
-  body.page-scrolled .next-rail {
+  body.page-scrolled .next-rail .rail-item .rail-icon {
+    height: 0;
     max-height: 0;
     opacity: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    box-shadow: none;
-    pointer-events: none;
+    margin: 0;
+  }
+  .next-rail {
+    transition: padding 0.22s ease;
+  }
+  body.page-scrolled .next-rail {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  /* With the icon pill gone, the active page is shown by its label alone. */
+  body.page-scrolled .next-rail .rail-item.active .rail-label {
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   /* The status and last-update line collapses too. The stale-data warning and
      the note stay visible — they are exception states worth keeping on screen
      even when space is tight. */
-  .next-header-meta {
-    transition: max-height 0.22s ease, opacity 0.18s ease;
-  }
   body.page-scrolled #status,
   body.page-scrolled #lastUpdateText {
     display: none;
