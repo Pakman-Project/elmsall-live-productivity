@@ -3474,13 +3474,16 @@ canvas {
   }
 
   /* Scrolled: shrink the header search controls to claw back space. */
+  /* #bonusSearch is targeted by id, not by class: the base mobile rule uses an
+     id selector (and !important padding), which outranks any class-based
+     override no matter how many classes it chains. */
   body.page-scrolled .next-header-controls #archiveSelect,
-  body.page-scrolled .next-header-controls .search-input-wrap .input {
+  body.page-scrolled .next-header-controls #bonusSearch {
     height: 30px;
-    min-height: 30px;
+    min-height: 30px !important;
     font-size: 12px;
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
   }
   body.page-scrolled .next-header-controls #archiveSelect {
     min-width: 90px;
@@ -3489,7 +3492,7 @@ canvas {
   /* iOS zooms the page when a field under 16px is focused. Restoring 16px on
      focus keeps the shrunken look without triggering that zoom. */
   body.page-scrolled .next-header-controls #archiveSelect:focus,
-  body.page-scrolled .next-header-controls .search-input-wrap .input:focus {
+  body.page-scrolled .next-header-controls #bonusSearch:focus {
     font-size: 16px;
   }
 }
