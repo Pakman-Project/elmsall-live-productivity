@@ -645,10 +645,16 @@
     var mode = cb.dataset.mode;
     var g = _areaGroupDraft[i];
     g[mode] = cb.checked;
-    // At least one of Line / Trend Line must stay selected
+    // Exactly one of Line / Trend Line must always stay selected. Rather than
+    // refusing the click and snapping the box back on (which just reads as
+    // broken), hand the selection over: unchecking the last one turns the OTHER
+    // on, so the pair behaves like a toggle you can flip from either side.
     if (!g.showLine && !g.showTrend) {
-      g[mode] = true;
-      cb.checked = true;
+      var other = (mode === 'showLine') ? 'showTrend' : 'showLine';
+      g[other] = true;
+      var otherCb = document.querySelector(
+        '#areaGroupEditor input[data-group="' + i + '"][data-mode="' + other + '"]');
+      if (otherCb) otherCb.checked = true;
     }
   }
 
