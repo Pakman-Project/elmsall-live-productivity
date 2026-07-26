@@ -216,16 +216,23 @@
           <div class="page">
             <div class="bonus-page-controls">
               <div class="bonus-controls">
-                <label for="bonusViewMode">Display Mode:</label>
-                <select id="bonusViewMode" class="row-select" onchange="refreshBonusTables()">
-                  <option value="area" selected>By Work Area</option>
-                  <option value="overall">Overall</option>
-                </select>
-                <select id="sharedRowsLimit" class="row-select" onchange="applyLocalFiltersPak()">
-                  <option value="10" selected>10 Rows</option>
-                  <option value="15">15 Rows</option>
-                  <option value="20">20 Rows</option>
-                </select>
+                <div class="bonus-control-group">
+                  <label for="bonusViewMode">Display Mode:</label>
+                  <select id="bonusViewMode" class="row-select" onchange="refreshBonusTables()">
+                    <option value="area" selected>By Work Area</option>
+                    <option value="overall">Overall</option>
+                  </select>
+                </div>
+                <div class="bonus-control-group">
+                  <!-- Labelled for the stacked mobile layout; hidden on desktop,
+                       where each option already reads "10 Rows" etc. -->
+                  <label for="sharedRowsLimit" class="bonus-rows-label">Rows:</label>
+                  <select id="sharedRowsLimit" class="row-select" onchange="applyLocalFiltersPak()">
+                    <option value="10" selected>10 Rows</option>
+                    <option value="15">15 Rows</option>
+                    <option value="20">20 Rows</option>
+                  </select>
+                </div>
               </div>
               <div class="breakdown-time-bar bonus-time-bar">
                 <div class="time-row time-row-from">

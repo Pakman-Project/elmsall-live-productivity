@@ -3377,4 +3377,120 @@ canvas {
     flex: 0 0 auto;
   }
 }
+
+/* ============================================================
+   Bonus page + chip refinements
+   ============================================================ */
+
+/* The eye / eye-slash icons are different widths, so toggling a chip changed
+   its width and reflowed the whole chip block into different rows. Reserving a
+   fixed box keeps every chip the same size in both states. */
+.bonus-area-chip i {
+  width: 1.15em;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+/* Three equal columns — the bonus number no longer takes half the table.
+   Overrides the earlier 50/25/25 rule. */
+.side-table th:nth-child(1),
+.side-table td:nth-child(1),
+.side-table th:nth-child(2),
+.side-table td:nth-child(2),
+.side-table th:nth-child(3),
+.side-table td:nth-child(3) {
+  width: 33.33%;
+}
+
+/* Compact bonus tables: half the vertical padding of the global th/td rule. */
+.side-table th,
+.side-table td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* Desktop keeps label-beside-select; the Rows label is redundant there because
+   each option already reads "10 Rows". */
+.bonus-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bonus-rows-label {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  /* Bonus page controls laid out like the Volume page: label above its
+     dropdown, same label size, and the four dropdowns aligned 2 x 2. The two
+     wrappers collapse with display:contents so their children become direct
+     grid items. */
+  .bonus-page-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    align-items: end;
+  }
+  .bonus-controls,
+  .bonus-page-controls .bonus-time-bar {
+    display: contents;
+  }
+  /* The time bar's own panel styling would show through display:contents. */
+  .bonus-page-controls .bonus-time-bar {
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .bonus-control-group,
+  .bonus-page-controls .time-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    width: auto;
+    min-width: 0;
+    flex: initial;
+  }
+  .bonus-rows-label {
+    display: block;
+  }
+  .bonus-control-group > label,
+  .bonus-page-controls .time-row .breakdown-time-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin: 0;
+    min-width: 0;
+  }
+  .bonus-control-group > .row-select,
+  .bonus-page-controls .time-row .breakdown-time-select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: initial;
+  }
+  #bonusAreaToggles {
+    grid-column: 1 / -1;
+  }
+
+  /* Scrolled: shrink the header search controls to claw back space. */
+  body.page-scrolled .next-header-controls #archiveSelect,
+  body.page-scrolled .next-header-controls .search-input-wrap .input {
+    height: 30px;
+    min-height: 30px;
+    font-size: 12px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  body.page-scrolled .next-header-controls #archiveSelect {
+    min-width: 90px;
+    max-width: 120px;
+  }
+  /* iOS zooms the page when a field under 16px is focused. Restoring 16px on
+     focus keeps the shrunken look without triggering that zoom. */
+  body.page-scrolled .next-header-controls #archiveSelect:focus,
+  body.page-scrolled .next-header-controls .search-input-wrap .input:focus {
+    font-size: 16px;
+  }
+}
 </style>
