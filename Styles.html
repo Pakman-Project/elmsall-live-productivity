@@ -3264,4 +3264,71 @@ canvas {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* ============================================================
+   Mobile final overrides — intentionally LAST in the cascade.
+   Earlier max-width:700px blocks re-impose min-width:130px and larger padding
+   on the From/To selects, which (combined with flex-wrap:nowrap) pushed the
+   pair off the right edge of the screen and clipped their text.
+   ============================================================ */
+@media (max-width: 700px) {
+  /* Page arrows are redundant on touch: swiping and the nav rail both work. */
+  .page-arrows,
+  .page-arrow {
+    display: none !important;
+  }
+
+  /* From/To: both pairs on one row, fully on-screen, text never clipped.
+     The font is deliberately small — showing the whole "dd/mm/yyyy hh:mm"
+     value matters more here than type size. */
+  .breakdown-time-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .time-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+  .breakdown-time-label {
+    font-size: 10px;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+  .time-row .breakdown-time-select,
+  .breakdown-time-select {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    box-sizing: border-box;
+    font-size: 10.5px;
+    /* Right padding leaves room for the native dropdown arrow so the value
+       is never rendered underneath it. */
+    padding: 9px 18px 9px 6px;
+  }
+  .breakdown-range-badge,
+  .breakdown-time-sep {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .breakdown-time-label { font-size: 9px; }
+  .time-row .breakdown-time-select,
+  .breakdown-time-select {
+    font-size: 9.5px;
+    padding: 9px 16px 9px 4px;
+  }
+}
 </style>
