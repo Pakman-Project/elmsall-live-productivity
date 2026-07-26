@@ -3343,7 +3343,6 @@ canvas {
 @media (max-width: 700px) {
   .row-select,
   select.input,
-  #archiveSelect,
   #mainSortSelect,
   #hoursRange,
   #timeWindow,
@@ -3358,7 +3357,6 @@ canvas {
 @media (max-width: 380px) {
   .row-select,
   select.input,
-  #archiveSelect,
   #mainSortSelect,
   #hoursRange,
   #timeWindow,
@@ -3367,6 +3365,68 @@ canvas {
   #sharedRowsLimit,
   .breakdown-time-select {
     font-size: 9.5px;
+  }
+}
+
+/* ============================================================
+   Mobile: Live/History dropdown, and the active-filter banner.
+   ============================================================ */
+@media (max-width: 700px) {
+  /* The Live/History select sits beside "Filter by Bonus..." in the header and
+     is the same kind of control, so it matches that input rather than the
+     smaller size used by the in-page dropdowns. 16px also avoids iOS zooming
+     the page when the control is focused. */
+  .next-header #archiveSelect,
+  #archiveSelect {
+    font-size: 16px;
+  }
+
+  /* Active-filter banner: one row that never grows. Previously the chips
+     wrapped, so selecting several bonus numbers pushed the banner taller and
+     taller and shoved the page down. They now sit in a horizontally scrollable
+     strip, with a fade at the right edge hinting there is more to scroll. */
+  .active-filter-banner {
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .active-filter-banner > i {
+    font-size: 11px;
+  }
+  /* Just the count on a phone — the sentence around it costs more room than it
+     is worth once the chips themselves say what is filtered. */
+  .afb-word {
+    display: none;
+  }
+  .active-filter-banner-text {
+    white-space: nowrap;
+    flex: 0 0 auto;
+    font-size: 12px;
+  }
+  .active-filter-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1 1 0;
+    min-width: 0;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+  }
+  .active-filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .active-filter-chips .chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .active-filter-clear-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    flex: 0 0 auto;
   }
 }
 </style>
