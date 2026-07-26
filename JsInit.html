@@ -439,7 +439,14 @@
     // while the page is left open, not only on the next successful load.
     setInterval(updateStaleWarning_, 60000);
 
-    // First-visit guided tour (shows demo data while the real data loads).
+  });
+
+  // Registered as its OWN DOMContentLoaded listener rather than as the last
+  // line of the one above. Listeners run independently, so if anything in the
+  // main init throws, a first-time visitor still gets the tour instead of it
+  // silently never appearing.
+  document.addEventListener('DOMContentLoaded', function() {
+    // Shows demo data while the real data keeps loading in the background.
     maybeAutoStartTour_();
   });
 
