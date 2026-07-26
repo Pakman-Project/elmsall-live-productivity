@@ -278,6 +278,27 @@ body.loading-skeleton .charts .card.panel::after {
   animation: skelShimmer 1.4s ease-in-out infinite;
 }
 body.loading-skeleton canvas { visibility: hidden; }
+/* The Overall page's trend panels are created dynamically by renderChartsPak,
+   so unlike the static chart cards they don't exist during a cold load — the
+   section would simply pop into existence once data arrived. Give the empty
+   wrapper a placeholder card so the layout is complete from the first paint. */
+body.loading-skeleton .trend-charts-wrap {
+  display: block;
+  position: relative;
+  min-height: 220px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+body.loading-skeleton .trend-charts-wrap::after {
+  content: '';
+  position: absolute;
+  left: 14px; right: 14px; top: 52px; bottom: 14px;
+  border-radius: 8px;
+  background-image: linear-gradient(90deg, var(--w4) 25%, var(--w10) 37%, var(--w4) 63%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
 
 /* Pipeline-stall warning in the header meta row. */
 .stale-warning {
@@ -2595,22 +2616,36 @@ canvas {
     flex: 1 1 100%;
   }
 
-  /* From/To time-bar: each becomes a real full-width row instead of the
-     desktop display:contents pass-through, so From/arrow and To/badge
-     always split onto two deliberate lines instead of wrapping mid-pair. */
+  /* From/To time-bar: keep BOTH pairs on a single row on mobile. The selects
+     shrink to share the width; the range badge is hidden because there simply
+     isn't room for it next to two date/time selects on a phone. */
+  .breakdown-time-bar {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+  }
   .time-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
+    gap: 6px;
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
   }
   .breakdown-time-label {
-    min-width: 32px;
+    min-width: 0;
     flex-shrink: 0;
   }
   .time-row .breakdown-time-select {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     max-width: none;
+  }
+  .breakdown-range-badge {
+    display: none;
+  }
+  .breakdown-time-sep {
+    display: none;
   }
   .breakdown-modal {
     width: 95%;

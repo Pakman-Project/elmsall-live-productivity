@@ -203,18 +203,25 @@
     }).getLastRefreshTimestamp();
   }
 
-  function refreshTick_() {
-    var el = $('refreshCountdown');
+  // The countdown lives in the auto-refresh button's tooltip rather than as
+  // header text — the header meta row was getting crowded, and the countdown is
+  // only interesting when you go looking for it.
+  function setAutoRefreshTooltip_(text) {
+    var btn = $('autoRefreshBtn');
+    if (!btn) return;
+    btn.setAttribute('title', text);
+    btn.setAttribute('aria-label', text);
+  }
 
+  function refreshTick_() {
     // Archive snapshots are static — nothing to poll for.
     if (currentArchiveUrl) {
-      if (el) { el.textContent = ''; el.style.display = 'none'; }
+      setAutoRefreshTooltip_('Auto-refresh (not used for history snapshots)');
       return;
     }
-    if (el) el.style.display = 'inline-flex';
 
     if (autoRefreshPaused) {
-      if (el) el.textContent = 'Auto-refresh paused';
+      setAutoRefreshTooltip_('Auto-refresh paused — click to resume');
       return;
     }
 
@@ -225,9 +232,8 @@
       pollForUpdates_();
     }
     var secs = Math.ceil(remaining / 1000);
-    if (el) {
-      el.textContent = 'Next check ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
-    }
+    setAutoRefreshTooltip_('Pause auto-refresh — next check in ' +
+      Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0'));
   }
 
   function toggleAutoRefresh_() {
@@ -238,12 +244,9 @@
     if (btn) {
       var icon = btn.querySelector('i');
       if (icon) icon.className = autoRefreshPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
-      var label = autoRefreshPaused ? 'Resume auto-refresh' : 'Pause auto-refresh';
-      btn.setAttribute('title', label);
-      btn.setAttribute('aria-label', label);
       btn.classList.toggle('paused', autoRefreshPaused);
     }
-    refreshTick_();
+    refreshTick_();  // refreshes the tooltip text for the new state
   }
 
   // ── Stale-data warning ─────────────────────────────────────────────────────

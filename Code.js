@@ -477,6 +477,28 @@ function getDashboardData(archiveUrl) {
     }
   }
 
+  // ── Hold the timeline to the newest block that actually HAS data ──────────
+  // timeRanges is generated from Front!B2 / wall-clock, which runs ahead of the
+  // database: the upstream pipeline publishes a 15-min block roughly 15-30 min
+  // after it closes. That made the whole dashboard's time axis roll forward into
+  // blocks with no rows yet — empty tail on every chart, empty rows in the data
+  // table, and (worst) the "last hour" KPIs silently averaging over empty blocks,
+  // which dragged the numbers and their trends down.
+  //
+  // Trimming the trailing empty blocks here fixes all of those at once and keeps
+  // every consumer consistent, because they all derive their windows from
+  // timeRanges. Blocks earlier in the day with no data are left in place — only
+  // the unpublished tail is removed.
+  var presentTR = {};
+  for (var pi = 0; pi < rawSideData.length; pi++) { presentTR[rawSideData[pi].timeRange] = true; }
+  var newestWithData = -1;
+  for (var ti2 = timeRanges.length - 1; ti2 >= 0; ti2--) {
+    if (presentTR[timeRanges[ti2]]) { newestWithData = ti2; break; }
+  }
+  if (newestWithData >= 0 && newestWithData < timeRanges.length - 1) {
+    timeRanges = timeRanges.slice(0, newestWithData + 1);
+  }
+
   var displayTime = sheet.getRange(CONFIG.DATETIME_CELL).getDisplayValue();
   if (archiveUrl) {
     var archiveDateObj = new Date(lastRefresh.getFullYear(), lastRefresh.getMonth(), lastRefresh.getDate() - 1);

@@ -92,10 +92,15 @@ function applyLocalFiltersPak() {
     trendAreaKeysList = [[]];
   }
 
-  // Data Table: always the full day, independent of Hours Range (only the
-  // Bonus filter still applies) — falls back to the Hours-Range-scoped list
-  // if there's no data yet to derive "today" from.
+  // Data Table: the full day, independent of Hours Range (only the Bonus filter
+  // still applies) — but ONLY blocks that actually exist in the database. Blocks
+  // in the future, and any the pipeline has not published, are dropped rather
+  // than shown as empty rows. Presence is judged against the UNFILTERED data so
+  // the table keeps the same shape when a bonus filter is applied.
   var tableTimeList = buildFullDayTimeList_() || targetTimeList;
+  var presentBlocks = {};
+  for (var pb = 0; pb < rawSideData.length; pb++) { presentBlocks[rawSideData[pb].timeRange] = true; }
+  tableTimeList = tableTimeList.filter(function(tr) { return presentBlocks[tr]; });
   var tableSourceData = rawSideData.filter(function(row) {
     return selectedBonuses.length === 0 || selectedBonuses.indexOf(row.bonus) !== -1;
   });
