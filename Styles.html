@@ -41,6 +41,15 @@
 
   --tour-mask: rgba(0, 0, 0, 0.45);
   --control-bg: #ffffff;
+
+  /* Precomputed alpha tints. Defined per theme instead of using color-mix(),
+     which html2canvas cannot parse — it made image export fail entirely. */
+  --accent-10: rgba(0, 122, 122, 0.10);
+  --accent-14: rgba(0, 122, 122, 0.14);
+  --accent-15: rgba(0, 122, 122, 0.15);
+  --accent-22: rgba(0, 122, 122, 0.22);
+  --good-14: rgba(60, 105, 57, 0.14);
+  --bad-14: rgba(211, 47, 47, 0.14);
 }
 
 .dark-theme {
@@ -83,6 +92,13 @@
 
   --tour-mask: rgba(0, 0, 0, 0.62);
   --control-bg: #2c272d;
+
+  --accent-10: rgba(0, 147, 147, 0.10);
+  --accent-14: rgba(0, 147, 147, 0.14);
+  --accent-15: rgba(0, 147, 147, 0.15);
+  --accent-22: rgba(0, 147, 147, 0.22);
+  --good-14: rgba(161, 211, 153, 0.14);
+  --bad-14: rgba(244, 67, 54, 0.14);
 }
 /* === end theme tokens === */
 
@@ -231,8 +247,8 @@ body {
   white-space: nowrap;
   line-height: 1.4;
 }
-.kpi-trend.up { color: var(--color-good); background: color-mix(in srgb, var(--color-good) 14%, transparent); }
-.kpi-trend.down { color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 14%, transparent); }
+.kpi-trend.up { color: var(--color-good); background: var(--good-14); }
+.kpi-trend.down { color: var(--color-bad); background: var(--bad-14); }
 .kpi-trend.flat { color: var(--muted); background: var(--w6); }
 .kpi-trend i { font-size: 9px; }
 
@@ -420,10 +436,10 @@ body.loading-skeleton canvas { visibility: hidden; }
   border-radius: 8px;
 }
 .next-rail .rail-item:hover { color: var(--text); }
-.next-rail .rail-item:hover .rail-icon { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.next-rail .rail-item:hover .rail-icon { background: var(--accent-10); }
 .next-rail .rail-item.active { color: var(--accent); }
 .next-rail .rail-item.active .rail-icon {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  background: var(--accent-15);
   color: var(--accent);
 }
 
@@ -1294,12 +1310,12 @@ canvas {
   transition: background 0.15s, color 0.15s;
 }
 .main-detail-table th.detail-sortable:hover {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: var(--accent-14);
   color: var(--text);
 }
 .main-detail-table th.active-sort {
   color: var(--text);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: var(--accent-22);
   border-bottom: 2px solid var(--accent);
 }
 .main-detail-table th.active-sort::after {

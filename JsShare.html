@@ -125,37 +125,58 @@ function captureCurrentPageCanvas_() {
     var page = pages[currentPage];
     if (!page) throw new Error('Nothing to capture.');
 
-    var prev = {
-      height: page.style.height,
-      maxHeight: page.style.maxHeight,
-      overflow: page.style.overflow,
-      scrollTop: page.scrollTop
-    };
-    page.style.height = 'auto';
-    page.style.maxHeight = 'none';
-    page.style.overflow = 'visible';
+    // Unclipping the page alone is not enough: its ancestors (.swipe-wrapper,
+    // .swipe-container, .wrap) are fixed-height with overflow hidden, and they
+    // clip the capture too — which cut the last rows off tall pages. Every
+    // ancestor up to <body> is relaxed for the duration of the capture and put
+    // back afterwards.
+    var touched = [];
+    function relax(el, styles) {
+      var saved = {};
+      for (var k in styles) { saved[k] = el.style[k]; el.style[k] = styles[k]; }
+      touched.push({ el: el, saved: saved });
+    }
+
+    relax(page, { height: 'auto', maxHeight: 'none', overflow: 'visible' });
+    var savedScroll = page.scrollTop;
     page.scrollTop = 0;
 
+    var node = page.parentElement;
+    while (node && node !== document.body) {
+      relax(node, { height: 'auto', maxHeight: 'none', overflow: 'visible' });
+      node = node.parentElement;
+    }
+    relax(document.body, { overflow: 'visible', height: 'auto' });
+
+    function restore() {
+      for (var i = 0; i < touched.length; i++) {
+        var t = touched[i];
+        for (var k in t.saved) { t.el.style[k] = t.saved[k]; }
+      }
+      page.scrollTop = savedScroll;
+    }
+
     var bg = getComputedStyle(document.body).backgroundColor || '#ffffff';
+    // Measure AFTER relaxing, so this is the full content size.
+    var w = Math.ceil(page.scrollWidth);
+    var h = Math.ceil(page.scrollHeight);
 
     return html2canvas(page, {
       backgroundColor: bg,
       scale: Math.min(window.devicePixelRatio || 1, 2),
       useCORS: true,
       logging: false,
-      windowWidth: page.scrollWidth,
-      windowHeight: page.scrollHeight
+      width: w,
+      height: h,
+      windowWidth: w,
+      windowHeight: h,
+      scrollX: 0,
+      scrollY: 0
     }).then(function (canvas) {
-      page.style.height = prev.height;
-      page.style.maxHeight = prev.maxHeight;
-      page.style.overflow = prev.overflow;
-      page.scrollTop = prev.scrollTop;
+      restore();
       return stampCaption_(canvas);
     }).catch(function (err) {
-      page.style.height = prev.height;
-      page.style.maxHeight = prev.maxHeight;
-      page.style.overflow = prev.overflow;
-      page.scrollTop = prev.scrollTop;
+      restore();
       throw err;
     });
   });

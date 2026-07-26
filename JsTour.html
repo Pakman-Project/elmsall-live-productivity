@@ -162,19 +162,30 @@ var TOUR_STEPS = [
     title: 'Export to CSV',
     body: 'Clicking “Download raw data” exports every individual entry as a CSV — handy for pivoting in Excel.' },
 
-  // ===== Part 7 — Your settings are remembered =============================
-  { part: 7, page: 0, target: '.kpi-controls-row',
+  // ===== Part 7 — Sharing ==================================================
+  { part: 7, page: 0, target: '#shareBtn',
+    interactive: { sel: '#shareBtn', type: 'click' },
+    title: 'Share what you are looking at',
+    body: 'Found something worth passing on? Click the share button to get a link, or an image of the page.' },
+  { part: 7, page: 0, target: '#shareOverlay .share-url-row', modal: true,
+    interactive: { sel: '#shareOverlay .breakdown-close', type: 'click' },
+    cleanup: function () { if (typeof closeShareMenu === 'function') closeShareMenu(); },
+    title: 'A link, or a picture',
+    body: 'The link reopens this exact view for whoever you send it to — same page, same day, same bonus filter. Or download the page as an image: it captures the WHOLE page, including anything scrolled out of sight, stamped with the time of the data. Click the × to close.' },
+
+  // ===== Part 8 — Your settings are remembered =============================
+  { part: 8, page: 0, target: '.kpi-controls-row',
     title: 'It remembers your setup',
     body: 'You don’t have to set things up twice. Your Hours Range and Time Window are saved in this browser and come back automatically next time you open the dashboard.' },
-  { part: 7, page: 0, target: null,
+  { part: 8, page: 0, target: null,
     title: 'What else is saved',
     body: 'Also remembered: the Volume and Bonus display modes, which work areas you’ve hidden with the chips, your Area Groups and split trend charts, and how many rows the bonus tables show. Your bonus-number filter is NOT saved — every visit starts showing everyone.' },
-  { part: 7, page: 0, target: '#themeToggleBtn',
+  { part: 8, page: 0, target: '#themeToggleBtn',
     title: 'Light or dark',
     body: 'This button switches between light and dark mode — that’s remembered too, so the dashboard always opens the way you like it.' },
 
-  // ===== Part 8 — Wrap up ===================================================
-  { part: 8, page: 0, target: null,
+  // ===== Part 9 — Wrap up ===================================================
+  { part: 9, page: 0, target: null,
     title: 'You’re all set ✅',
     body: 'That’s the tour! Your real live data is ready now. You can replay this any time from the “?” button in the header.' }
 ];
@@ -199,14 +210,15 @@ var TOUR_PART_TITLES = {
   4: 'Volume page',
   5: 'Bonus Numbers page',
   6: 'Data Table page',
-  7: 'Your saved settings',
-  8: 'Wrap up'
+  7: 'Sharing a view',
+  8: 'Your saved settings',
+  9: 'Wrap up'
 };
 
 // Parts that are skipped in the "?" replay menu — the wrap-up is just a
 // closing note, so it isn't worth jumping to on its own. It still runs at the
 // end of a full tour.
-var TOUR_MENU_HIDDEN_PARTS = { 8: true };
+var TOUR_MENU_HIDDEN_PARTS = { 9: true };
 
 function firstStepIndexOfPart_(part) {
   for (var i = 0; i < TOUR_STEPS.length; i++) {
