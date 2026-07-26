@@ -98,6 +98,9 @@ var TREND_CHART_LABELS = ['Chart A', 'Chart B', 'Chart C', 'Chart D', 'Chart E',
 var perfChart = null;
 var volumeCharts = [];
 var sortState = { key: 'dateTime', dir: 'asc' };
+// Sort for the per-entry detail table shown when a Data Table row is expanded.
+// key === null means the default: chronological, then by bonus.
+var detailSortState = { key: null, dir: 'asc' };
 var expandedRowKey = null;
 var currentArchiveUrl = null;
 var lastRefreshTimestamp = null;

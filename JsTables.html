@@ -291,8 +291,67 @@ function buildMainRowDetail(rowData) {
     return '<div class="main-detail-empty">No individual data found for this period.</div>';
   }
 
-  var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryRowsPak);
+  var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryDetailPak);
   return isCardModePak() ? buildMainDetailCardsHtml_(entryRows) : buildMainDetailTableHtml_(entryRows);
+}
+
+// Columns of the expanded-row detail table. Mirrors buildEntryDetailRowHtml_'s
+// cell order — keep the two in step.
+var DETAIL_TABLE_COLUMNS = [
+  { key: 'timeRange',           label: 'Time Block',          type: 'time' },
+  { key: 'bonus',               label: 'Bonus Number',        type: 'text' },
+  { key: 'hourDeployed',        label: 'Est. Hours Deployed', type: 'num' },
+  { key: 'stdHours',            label: 'Standard Hours',      type: 'num' },
+  { key: 'pieVol',              label: 'PiE',                 type: 'num' },
+  { key: 'topUpVol',            label: 'Top Up',              type: 'num' },
+  { key: 'e3PackingVol',        label: 'E3 Packing',          type: 'num' },
+  { key: 'parcelInductVol',     label: 'Parcel Induct',       type: 'num' },
+  { key: 'parcelSortationVol',  label: 'Parcel Sortation',    type: 'num' },
+  { key: 'inboundDecantingVol', label: 'Inbound Decanting',   type: 'num' },
+  { key: 'osrDecantingVol',     label: 'OSR Decanting',       type: 'num' },
+  { key: 'bcrInductingVol',     label: 'BCR Inducting',       type: 'num' },
+  { key: 'e1e2InductingVol',    label: 'E1/E2 Inducting',     type: 'num' },
+  { key: 'performance',         label: 'Productivity %',      type: 'num' }
+];
+
+// Sorts the expanded row's per-entry table. With no column chosen it falls back
+// to compareEntryRowsPak (chronological, then bonus), which is also what the CSV
+// export uses — so the default order stays consistent between the two.
+function compareEntryDetailPak(a, b) {
+  var key = detailSortState.key;
+  if (!key) return compareEntryRowsPak(a, b);
+
+  var col = null;
+  for (var i = 0; i < DETAIL_TABLE_COLUMNS.length; i++) {
+    if (DETAIL_TABLE_COLUMNS[i].key === key) { col = DETAIL_TABLE_COLUMNS[i]; break; }
+  }
+  var type = col ? col.type : 'num';
+
+  var result;
+  if (type === 'time') {
+    var da = parseDateTimePartPak(extractRangePartsPak(a.timeRange).start);
+    var db = parseDateTimePartPak(extractRangePartsPak(b.timeRange).start);
+    result = (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+  } else if (type === 'text') {
+    result = safeTextPak(a[key]).localeCompare(safeTextPak(b[key]));
+  } else {
+    result = (Number(a[key]) || 0) - (Number(b[key]) || 0);
+  }
+  // Ties keep the natural chronological/bonus order rather than jumping around.
+  if (result === 0) return compareEntryRowsPak(a, b);
+  return detailSortState.dir === 'asc' ? result : -result;
+}
+
+function setDetailSort(key) {
+  if (detailSortState.key === key) {
+    detailSortState.dir = detailSortState.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    detailSortState.key = key;
+    detailSortState.dir = 'desc';
+  }
+  // Re-render the table; the expanded row is rebuilt from expandedRowKey, so
+  // the open row stays open with its detail re-sorted.
+  renderMainTablePak(currentMainRows);
 }
 
 function buildEntryDetailCardHtml_(r) {
@@ -351,20 +410,15 @@ function buildEntryDetailRowHtml_(r) {
 function buildMainDetailTableHtml_(entryRows) {
   var html = '<div class="table-wrap main-detail-table-wrap">';
   html += '<table class="main-detail-table"><thead><tr>';
-  html += '<th class="no-sort">Time Block</th>';
-  html += '<th class="no-sort">Bonus Number</th>';
-  html += '<th class="no-sort">Est. Hours Deployed</th>';
-  html += '<th class="no-sort">Standard Hours</th>';
-  html += '<th class="no-sort">PiE</th>';
-  html += '<th class="no-sort">Top Up</th>';
-  html += '<th class="no-sort">E3 Packing</th>';
-  html += '<th class="no-sort">Parcel Induct</th>';
-  html += '<th class="no-sort">Parcel Sortation</th>';
-  html += '<th class="no-sort">Inbound Decanting</th>';
-  html += '<th class="no-sort">OSR Decanting</th>';
-  html += '<th class="no-sort">BCR Inducting</th>';
-  html += '<th class="no-sort">E1/E2 Inducting</th>';
-  html += '<th class="no-sort">Productivity %</th>';
+  for (var c = 0; c < DETAIL_TABLE_COLUMNS.length; c++) {
+    var col = DETAIL_TABLE_COLUMNS[c];
+    var cls = 'detail-sortable';
+    if (detailSortState.key === col.key) cls += ' active-sort ' + detailSortState.dir;
+    // stopPropagation: the header sits inside the expandable row, and without it
+    // the click would bubble up and collapse the row being sorted.
+    html += '<th class="' + cls + '" onclick="event.stopPropagation();setDetailSort(\'' + col.key + '\')">' +
+            col.label + '</th>';
+  }
   html += '</tr></thead><tbody>';
   html += entryRows.map(buildEntryDetailRowHtml_).join('');
   html += '</tbody></table></div>';

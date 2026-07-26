@@ -1350,6 +1350,32 @@ canvas {
   content: ' \25BC';
 }
 
+/* Expanded-row detail table: sortable sub-headers, matching #mainTable's
+   affordance and indicators. */
+.main-detail-table th.detail-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.main-detail-table th.detail-sortable:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+.main-detail-table th.active-sort {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-bottom: 2px solid var(--accent);
+}
+.main-detail-table th.active-sort::after {
+  content: '';
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.8;
+}
+.main-detail-table th.active-sort.asc::after { content: ' B2'; }
+.main-detail-table th.active-sort.desc::after { content: ' BC'; }
+
 .breakdown-overlay {
   position: fixed;
   top: 0;
