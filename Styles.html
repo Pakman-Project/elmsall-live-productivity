@@ -42,6 +42,13 @@
   --tour-mask: rgba(0, 0, 0, 0.45);
   --control-bg: #ffffff;
 
+  /* Data Table frozen columns. A pinned cell has to be opaque, so the row-hover
+     and expanded-row tints are pre-blended against --panel here rather than
+     layered as alpha — otherwise a hovered row would look striped where the
+     frozen columns meet the scrolling ones. */
+  --table-freeze-hover: #fafcff;
+  --table-freeze-expanded: #f7fafe;
+
   /* Precomputed alpha tints. Defined per theme instead of using color-mix(),
      which html2canvas cannot parse — it made image export fail entirely. */
   --accent-10: rgba(0, 122, 122, 0.10);
@@ -92,6 +99,9 @@
 
   --tour-mask: rgba(0, 0, 0, 0.62);
   --control-bg: #2c272d;
+
+  --table-freeze-hover: #212328;
+  --table-freeze-expanded: #23262c;
 
   --accent-10: rgba(0, 147, 147, 0.10);
   --accent-14: rgba(0, 147, 147, 0.14);
@@ -2287,6 +2297,68 @@ canvas {
 #mainTable th:nth-child(14), #mainTable td:nth-child(14),
 .main-detail-table th:nth-child(14), .main-detail-table td:nth-child(14) {
   width: 120px;
+}
+
+/* ── Frozen identity columns on the Data Table ───────────────────────────────
+   #mainTable is 1770px wide against a viewport that is almost always narrower,
+   so Date Time and Bonus Number scrolled out of sight well before the
+   right-hand volume columns arrived. That left the reader looking at a row of
+   numbers with no way to tell which time block or operator they belonged to,
+   and no way to check without scrolling back. Pinning the two identity columns
+   keeps that anchor on screen.
+
+   Scoped to #mainTable and to its data rows only: the expanded detail row is a
+   single colspan cell that also sits at :nth-child(1), and pinning that would
+   drag the entire nested per-entry table sideways with the horizontal scroll.
+   Mobile is untouched — under 900px the table is replaced by .main-card-list. */
+#mainTable thead th:nth-child(1),
+#mainTable thead th:nth-child(2),
+#mainTable tbody tr:not(.main-detail-row) > td:nth-child(1),
+#mainTable tbody tr:not(.main-detail-row) > td:nth-child(2) {
+  position: sticky;
+  /* Table cells are transparent by default; a pinned one must be opaque or the
+     columns sliding underneath show straight through it. */
+  background: var(--panel);
+}
+
+#mainTable thead th:nth-child(1),
+#mainTable tbody tr:not(.main-detail-row) > td:nth-child(1) {
+  left: 0;
+}
+
+/* 260px is the width given to column 1 in the shared width block above; the two
+   must stay in step or the columns will overlap. The shadow draws the freeze
+   line, so it is obvious which columns are being held still. */
+#mainTable thead th:nth-child(2),
+#mainTable tbody tr:not(.main-detail-row) > td:nth-child(2) {
+  left: 260px;
+  box-shadow: 1px 0 0 var(--border);
+}
+
+#mainTable tbody tr:not(.main-detail-row) > td:nth-child(1),
+#mainTable tbody tr:not(.main-detail-row) > td:nth-child(2) {
+  z-index: 4;
+}
+
+/* The two header corners are pinned in both directions, so they must sit above
+   both the remaining headers (z-index 10) and the pinned body cells. */
+#mainTable thead th:nth-child(1),
+#mainTable thead th:nth-child(2) {
+  z-index: 20;
+}
+
+/* Row hover and the expanded highlight are translucent tints, which have no
+   effect over an opaque pinned cell — these are the same tints pre-blended, so
+   a hovered row still reads as one continuous band across the freeze line.
+   !important because the rules they mirror use it too. */
+#mainTable tbody tr.main-expandable-row:hover > td:nth-child(1),
+#mainTable tbody tr.main-expandable-row:hover > td:nth-child(2) {
+  background: var(--table-freeze-hover) !important;
+}
+
+#mainTable tbody tr.main-expandable-row.expanded > td:nth-child(1),
+#mainTable tbody tr.main-expandable-row.expanded > td:nth-child(2) {
+  background: var(--table-freeze-expanded) !important;
 }
 
 .main-expandable-row {
