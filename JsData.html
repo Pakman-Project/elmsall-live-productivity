@@ -63,26 +63,8 @@ function applyLocalFiltersPak() {
   var hoursRange = parseInt($('hoursRange').value, 10) || 3;
   var windowMinutes = parseInt($('timeWindow').value, 10);
   var rowsLimit = parseInt($('sharedRowsLimit').value, 10) || 10;
-
-  // Keep the control card's layout in step with the mode before reading it.
-  if (typeof updateControlPanelMode_ === 'function') updateControlPanelMode_();
-
-  // History mode uses an explicit From/To range; live mode keeps the rolling
-  // "last N hours" window. A rolling window has no meaning on a finished day.
-  var targetTimeList;
-  var overallFrom = $('overallFrom');
-  var overallTo = $('overallTo');
-  if (currentArchiveUrl && overallFrom && overallTo &&
-      overallFrom.options.length && overallTo.options.length) {
-    var all = timeRanges.slice(-96);
-    var fIdx = overallFrom.selectedIndex;
-    var tIdx = overallTo.selectedIndex;
-    if (fIdx < 0) fIdx = 0;
-    if (tIdx < fIdx) tIdx = fIdx;
-    targetTimeList = all.slice(fIdx, tIdx + 1);
-  } else {
-    targetTimeList = timeRanges.slice(-(hoursRange * 4));
-  }
+  var blocksToKeep = hoursRange * 4;
+  var targetTimeList = timeRanges.slice(-blocksToKeep);
   var targetTimeRanges = {};
   for (var i = 0; i < targetTimeList.length; i++) { targetTimeRanges[targetTimeList[i]] = true; }
   var filteredData = rawSideData.filter(function(row) {
