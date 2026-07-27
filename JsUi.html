@@ -11,12 +11,34 @@
     }
   }
 
+  // Clearing throws away a selection that may have taken a while to build, from
+  // a small X in the header or a "Clear all" in the banner — both easy to hit
+  // by accident. There is no confirm here on purpose: a prompt on every clear
+  // would be tiresome for the common case where the user meant it. An undo
+  // costs nothing when it is not wanted.
   function clearAllBonuses() {
     if (selectedBonuses.length === 0) return;
+    var previous = selectedBonuses.slice();
     selectedBonuses = [];
     renderBonusChips();
     updateClearBtnVisibility();
     applyLocalFiltersPak();
+
+    showToastPak(
+      'Cleared ' + previous.length + ' bonus filter' + (previous.length === 1 ? '' : 's') + '.',
+      {
+        icon: 'fa-filter-circle-xmark',
+        action: {
+          label: 'Undo',
+          onClick: function () {
+            selectedBonuses = previous;
+            renderBonusChips();
+            updateClearBtnVisibility();
+            applyLocalFiltersPak();
+          }
+        }
+      }
+    );
   }
 
   // ── Bonus search ───────────────────────────────────────────────────────────

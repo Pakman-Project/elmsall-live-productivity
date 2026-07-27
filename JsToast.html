@@ -1,0 +1,109 @@
+<script>
+// ============================================================================
+// Transient confirmations.
+//
+// Several actions on this dashboard complete with no visible sign that they
+// happened. Clearing every bonus filter wipes the banner and redraws four
+// pages, so the one thing the user was looking at disappears — which reads
+// like the page broke rather than like the filter cleared. Downloading the raw
+// CSV hands the file to the browser and says nothing.
+//
+// The #status element in the header is the existing place for messages, but it
+// is also where the row count and the load state live, so writing to it either
+// gets overwritten a moment later or overwrites something the user needed.
+// These are separate, out of the way, and self-dismissing.
+//
+// Deliberately NOT used for the share dialog, which has its own inline hints
+// next to the buttons they describe — closer to the action than a corner toast.
+// ============================================================================
+
+var TOAST_DEFAULT_MS = 4000;
+// Long enough to notice, reach for, and click. An undo the user cannot get to
+// in time is worse than none, because they will trust it next time and lose.
+var TOAST_UNDO_MS = 8000;
+
+var _toastTimer = null;
+
+function toastHost_() {
+  var host = document.getElementById('toastHost');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'toastHost';
+    host.className = 'toast-host';
+    // Polite, not assertive: these confirm something the user just did, so they
+    // should wait their turn rather than interrupt whatever is being read.
+    host.setAttribute('role', 'status');
+    host.setAttribute('aria-live', 'polite');
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+function dismissToast_() {
+  var host = document.getElementById('toastHost');
+  if (!host) return;
+  clearTimeout(_toastTimer);
+  _toastTimer = null;
+  var toast = host.querySelector('.toast');
+  if (!toast) return;
+  toast.classList.remove('in');
+  // Let the transition run before the node goes, but only if it is still the
+  // one on screen — a replacement may have arrived in the meantime.
+  setTimeout(function () {
+    if (toast.parentNode === host) host.removeChild(toast);
+  }, 200);
+}
+
+// `action` is optional: { label: 'Undo', onClick: fn }. Showing a toast
+// replaces any toast already up, rather than stacking — these confirm the last
+// thing the user did, and a queue of them just gets in the way.
+function showToastPak(message, opts) {
+  opts = opts || {};
+  var host = toastHost_();
+  host.innerHTML = '';
+  clearTimeout(_toastTimer);
+
+  var toast = document.createElement('div');
+  toast.className = 'toast' + (opts.kind ? ' toast-' + opts.kind : '');
+
+  var icon = document.createElement('i');
+  icon.className = 'fa-solid ' + (opts.icon || 'fa-circle-check');
+  icon.setAttribute('aria-hidden', 'true');
+  toast.appendChild(icon);
+
+  var text = document.createElement('span');
+  text.className = 'toast-text';
+  text.textContent = message;
+  toast.appendChild(text);
+
+  var life = opts.durationMs || TOAST_DEFAULT_MS;
+
+  if (opts.action && typeof opts.action.onClick === 'function') {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-action';
+    btn.textContent = opts.action.label || 'Undo';
+    btn.addEventListener('click', function () {
+      dismissToast_();
+      opts.action.onClick();
+    });
+    toast.appendChild(btn);
+    life = opts.durationMs || TOAST_UNDO_MS;
+  }
+
+  var close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'toast-close';
+  close.setAttribute('aria-label', 'Dismiss');
+  close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+  close.addEventListener('click', dismissToast_);
+  toast.appendChild(close);
+
+  host.appendChild(toast);
+  // Next frame, so the browser has laid the element out and the entry
+  // transition actually runs instead of being skipped.
+  requestAnimationFrame(function () { toast.classList.add('in'); });
+
+  _toastTimer = setTimeout(dismissToast_, life);
+}
+</script>

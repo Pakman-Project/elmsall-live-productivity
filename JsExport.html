@@ -51,7 +51,11 @@ function buildExportTimestampPak_() {
 
 function downloadRawDataCsvPak() {
   if (!rawSideData || rawSideData.length === 0) {
-    $('status').innerHTML = '<span class="bad">No data available to export.</span>';
+    // A toast rather than #status: that element also carries the row count and
+    // the load state, so a message written there is overwritten by the next
+    // render — often before it has been read.
+    showToastPak('There is no data loaded to export yet.',
+      { kind: 'warn', icon: 'fa-triangle-exclamation' });
     return;
   }
 
@@ -69,5 +73,12 @@ function downloadRawDataCsvPak() {
   document.body.removeChild(link);
 
   setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+
+  // Browsers drop a download into the shelf or the downloads folder with no
+  // in-page sign it happened, and the row count says how much was exported —
+  // useful confirmation that the full dataset came out, not just the filtered
+  // view the user is looking at.
+  showToastPak('Exported ' + entryRows.length.toLocaleString() + ' rows to CSV.',
+    { icon: 'fa-file-csv' });
 }
 </script>
