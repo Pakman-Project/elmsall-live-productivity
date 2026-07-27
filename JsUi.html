@@ -268,17 +268,53 @@
   // listener is bound per page and reads whichever one is currently showing.
   var PAGE_SCROLL_CHROME_THRESHOLD = 4;  // a few px of slack for iOS overscroll
 
+  // Back-to-top appears much later than the chrome collapse. Anything near the
+  // 4px mark would put a button on screen for a scroll the user can undo with
+  // one flick; roughly a screen's worth of travel is where scrolling back
+  // starts to be a chore.
+  var PAGE_SCROLL_TOP_BTN_THRESHOLD = 400;
+
   function updatePageScrollChrome_() {
     // Never collapse during the tour: several steps ring the rail or scroll an
     // element into view, and a hidden target measures 0x0 and gets no ring.
+    // The back-to-top button is hidden for the same reason — it would float
+    // over the tour's spotlight.
     if (typeof tourActive !== 'undefined' && tourActive) {
       document.body.classList.remove('page-scrolled');
+      document.body.classList.remove('page-scrolled-far');
       return;
     }
     var pages = document.querySelectorAll('.page');
     var el = pages[currentPage];
-    var scrolled = !!el && el.scrollTop > PAGE_SCROLL_CHROME_THRESHOLD;
-    document.body.classList.toggle('page-scrolled', scrolled);
+    var top = el ? el.scrollTop : 0;
+    document.body.classList.toggle('page-scrolled', top > PAGE_SCROLL_CHROME_THRESHOLD);
+    document.body.classList.toggle('page-scrolled-far', top > PAGE_SCROLL_TOP_BTN_THRESHOLD);
+  }
+
+  // Each .page is its own scroll container, so this scrolls the page currently
+  // showing rather than the window — which never scrolls at all.
+  function scrollCurrentPageToTop_() {
+    var pages = document.querySelectorAll('.page');
+    var el = pages[currentPage];
+    if (!el) return;
+
+    var reduceMotion = false;
+    try {
+      reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {}
+
+    if (el.scrollTo && !reduceMotion) {
+      el.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      el.scrollTop = 0;
+    }
+
+    // The button fades out once the page reaches the top, and focus on a
+    // visibility:hidden element is dropped to <body> — which would send the
+    // next Tab back to the very start of the document. Hand focus to the
+    // current page's rail item instead, which is where the view now is.
+    var railItem = document.querySelectorAll('.next-rail .rail-item')[currentPage];
+    if (railItem) { try { railItem.focus(); } catch (e) {} }
   }
 
   function initPageScrollChrome_() {

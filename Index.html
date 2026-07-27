@@ -313,6 +313,16 @@
       </div>
     </div>
 
+    <!-- Fixed to the viewport, so it sits outside .wrap deliberately: each .page
+         is its own scroll container and this must not scroll away with one.
+         Being outside .page also keeps it out of the share image export, which
+         captures the page element only. -->
+    <button type="button" id="backToTopBtn" class="back-to-top"
+            onclick="scrollCurrentPageToTop_()"
+            title="Back to top" aria-label="Back to top">
+      <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
     <div id="trendSplitOverlay" class="breakdown-overlay" onclick="closeTrendSplit()">
       <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
         <div class="breakdown-header">
