@@ -1,0 +1,189 @@
+<script>
+// ============================================================================
+// Shared keyboard behaviour for every overlay on the page.
+//
+// The overlays were built as plain divs toggled with an `active` class, so they
+// could only be dismissed by clicking the backdrop or the X. A keyboard user
+// had no way out at all, Tab wandered off into the dashboard behind the modal,
+// and after closing, focus was left stranded on <body> — so the next Tab
+// restarted from the top of the page rather than the control they came from.
+//
+// This watches the `class` attribute of each overlay and reacts, rather than
+// editing every open/close function. The existing openers stay untouched, and
+// anything that opens an overlay later gets the behaviour for free.
+//
+// The guided tour is excluded throughout: it runs its own overlay and its own
+// Escape handler (tourKeydown_), and two handlers racing for one Escape press
+// would close a modal AND the tour in a single keystroke.
+// ============================================================================
+
+var MODAL_OVERLAY_IDS_ = [
+  'breakdownOverlay', 'trendSplitOverlay', 'areaGroupOverlay',
+  'shareOverlay', 'tourMenuOverlay'
+];
+
+// Each overlay's own close function, so Escape takes exactly the same path as
+// the X button — several of them do more than drop the class.
+var MODAL_CLOSERS_ = {
+  breakdownOverlay:  function () { closeBreakdown(); },
+  trendSplitOverlay: function () { closeTrendSplit(); },
+  areaGroupOverlay:  function () { closeAreaGroups(); },
+  shareOverlay:      function () { closeShareMenu(); },
+  tourMenuOverlay:   function () { closeTourMenu(); }
+};
+
+var MODAL_FOCUSABLE_SEL_ = 'a[href], button:not([disabled]), input:not([disabled]),' +
+  ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Open overlays, oldest first. A stack rather than a scan of MODAL_OVERLAY_IDS_
+// because "topmost" means most recently opened, not wherever it sits in the
+// array — the tour menu can open on top of another modal.
+var _modalStack_ = [];
+
+// What had focus before each modal opened, keyed by overlay id.
+var _modalReturnFocus_ = {};
+
+function isAnyModalOpen_() {
+  return _modalStack_.length > 0;
+}
+
+// offsetParent is null for anything display:none, which is how the share modal
+// hides its hint rows — those must not be Tab stops.
+function isModalItemVisible_(el) {
+  return !!(el && (el.offsetParent !== null || el === document.activeElement));
+}
+
+function modalFocusables_(overlay) {
+  var modal = overlay.querySelector('.breakdown-modal') || overlay;
+  var all = modal.querySelectorAll(MODAL_FOCUSABLE_SEL_);
+  var out = [];
+  for (var i = 0; i < all.length; i++) {
+    if (isModalItemVisible_(all[i])) out.push(all[i]);
+  }
+  return out;
+}
+
+function focusFirstInModal_(overlay) {
+  var items = modalFocusables_(overlay);
+  var target = null;
+  for (var i = 0; i < items.length; i++) {
+    // Skip the close X when choosing where to land: opening a dialog with focus
+    // sitting on "Close" reads as though it is asking to be dismissed.
+    if (!items[i].classList.contains('breakdown-close')) { target = items[i]; break; }
+  }
+  if (!target) target = items[0];
+  if (!target) {
+    // Nothing focusable (an empty breakdown, say) — focus the dialog itself so
+    // Escape and the Tab trap still have somewhere to act from.
+    target = overlay.querySelector('.breakdown-modal');
+  }
+  if (target) { try { target.focus(); } catch (e) {} }
+}
+
+// Keeps Tab inside the topmost dialog. Without this, tabbing past the last
+// button silently moved focus onto the dashboard behind the backdrop, where the
+// user could operate controls they could not see.
+function trapModalTab_(e, overlay) {
+  var items = modalFocusables_(overlay);
+  if (items.length === 0) return;
+  var modal = overlay.querySelector('.breakdown-modal') || overlay;
+  var first = items[0];
+  var last = items[items.length - 1];
+  var active = document.activeElement;
+  var inside = modal.contains(active);
+
+  if (e.shiftKey && (active === first || !inside)) {
+    e.preventDefault();
+    try { last.focus(); } catch (err) {}
+  } else if (!e.shiftKey && (active === last || !inside)) {
+    e.preventDefault();
+    try { first.focus(); } catch (err) {}
+  }
+}
+
+function modalKeydown_(e) {
+  if (typeof tourActive !== 'undefined' && tourActive) return;
+  if (_modalStack_.length === 0) return;
+
+  var id = _modalStack_[_modalStack_.length - 1];
+  var overlay = document.getElementById(id);
+  if (!overlay) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    var close = MODAL_CLOSERS_[id];
+    if (close) { close(); } else { overlay.classList.remove('active'); }
+    return;
+  }
+
+  if (e.key === 'Tab') { trapModalTab_(e, overlay); }
+}
+
+function onModalClassChange_(overlay, id) {
+  var isOpen = overlay.classList.contains('active');
+  var idx = _modalStack_.indexOf(id);
+
+  if (isOpen && idx === -1) {
+    _modalReturnFocus_[id] = document.activeElement;
+    _modalStack_.push(id);
+    // Several modals fill their body from the opener AFTER adding the class, so
+    // wait a tick before looking for something to focus.
+    setTimeout(function () {
+      if (overlay.classList.contains('active')) focusFirstInModal_(overlay);
+    }, 0);
+  } else if (!isOpen && idx !== -1) {
+    _modalStack_.splice(idx, 1);
+    var ret = _modalReturnFocus_[id];
+    delete _modalReturnFocus_[id];
+    // Only if it is still in the document — a re-render can replace the element
+    // that opened the modal, and focusing a detached node throws focus to <body>.
+    if (ret && document.contains(ret) && typeof ret.focus === 'function') {
+      try { ret.focus(); } catch (e) {}
+    }
+  }
+}
+
+// Arrow-key page navigation is only appropriate when the arrows mean nothing
+// else. In a text field they move the caret, in a <select> they change the
+// value, and behind a modal the page should hold still — in all three cases
+// sliding the whole dashboard sideways is never what the user asked for.
+function isPageArrowNavAllowed_(e) {
+  if (typeof tourActive !== 'undefined' && tourActive) return false;
+  if (isAnyModalOpen_()) return false;
+  var t = e.target;
+  if (!t) return true;
+  if (t.isContentEditable) return false;
+  var tag = (t.tagName || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'OPTION') return false;
+  return true;
+}
+
+function initModalKeyboard_() {
+  for (var i = 0; i < MODAL_OVERLAY_IDS_.length; i++) {
+    var id = MODAL_OVERLAY_IDS_[i];
+    var overlay = document.getElementById(id);
+    if (!overlay) continue;
+
+    // Announce it as a dialog. Accurate only because the Tab trap above really
+    // does confine focus — aria-modal on an untrapped dialog misleads.
+    var modal = overlay.querySelector('.breakdown-modal');
+    if (modal) {
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      if (!modal.hasAttribute('tabindex')) modal.setAttribute('tabindex', '-1');
+    }
+
+    (function (overlayEl, overlayId) {
+      new MutationObserver(function () { onModalClassChange_(overlayEl, overlayId); })
+        .observe(overlayEl, { attributes: true, attributeFilter: ['class'] });
+    })(overlay, id);
+  }
+
+  // Capture phase so Escape is handled before anything inside the modal can
+  // swallow it.
+  document.addEventListener('keydown', modalKeydown_, true);
+}
+
+document.addEventListener('DOMContentLoaded', initModalKeyboard_);
+</script>

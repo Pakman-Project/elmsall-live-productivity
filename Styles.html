@@ -1369,6 +1369,21 @@ canvas {
   transform: scale(1) translateY(0);
 }
 
+/* Focus is now trapped inside an open dialog and Tab is a real way to move
+   around it, so where focus sits has to be visible. :focus-visible keeps this
+   off mouse clicks. The dialog container itself is only a focus target when it
+   holds nothing focusable, and does not want a ring of its own. */
+.breakdown-modal :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.breakdown-modal:focus,
+.breakdown-modal:focus-visible {
+  outline: none;
+}
+
 .breakdown-header {
   display: flex;
   justify-content: space-between;

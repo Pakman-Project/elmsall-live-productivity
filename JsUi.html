@@ -279,9 +279,13 @@
     container.addEventListener('mouseup', touchEnd);
     container.addEventListener('mouseleave', touchEnd);
     container.addEventListener('mousemove', touchMove);
-    document.addEventListener('keydown', function(e) { 
-      if (e.key === 'ArrowRight') goToPage(currentPage + 1); 
-      if (e.key === 'ArrowLeft') goToPage(currentPage - 1); 
+    document.addEventListener('keydown', function(e) {
+      // Guarded (see isPageArrowNavAllowed_): the arrows used to slide the whole
+      // dashboard sideways even while the user was moving the caret in the
+      // search box or picking an option in a dropdown.
+      if (!isPageArrowNavAllowed_(e)) return;
+      if (e.key === 'ArrowRight') goToPage(currentPage + 1);
+      if (e.key === 'ArrowLeft') goToPage(currentPage - 1);
     });
     window.addEventListener('resize', function() {
       currentTranslate = -currentPage * getSwipeWidth();
