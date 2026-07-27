@@ -592,14 +592,55 @@ body.loading-skeleton canvas { visibility: hidden; }
 }
 
 .search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 10px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text);
 }
 
-.search-item:hover {
+/* `.active` is the keyboard cursor and is kept identical to :hover, so moving
+   between the mouse and the arrow keys doesn't change what "the row I am on"
+   looks like. Mouse movement reassigns `.active`, so the two never disagree. */
+.search-item:hover,
+.search-item.active {
   background: var(--w8);
+}
+
+.search-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Already part of the filter. Selecting it again removes it, so this is a
+   toggle state rather than a disabled one — hence normal text colour. */
+.search-item.picked .search-item-name {
+  font-weight: 600;
+}
+
+.search-item-check {
+  color: var(--accent);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* An unmatched query used to just close the list, which reads as the search
+   having broken rather than as "nothing matches". */
+.search-empty,
+.search-more {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.search-more {
+  border-top: 1px solid var(--w8);
+  font-style: italic;
 }
 
 .active-filter-banner {

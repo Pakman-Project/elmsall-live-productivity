@@ -19,25 +19,191 @@
     applyLocalFiltersPak();
   }
 
+  // ── Bonus search ───────────────────────────────────────────────────────────
+  // The suggestion list is a real combobox: arrow keys move through it, Enter
+  // picks, Escape closes. Previously it was mouse-only — the keyboard could put
+  // a caret in the box but never reach a suggestion — and an unmatched query
+  // just made the list vanish, which reads as the search having broken rather
+  // than as "nothing matches that".
+
+  // Long lists are capped so a one- or two-character query doesn't build (and
+  // the browser doesn't lay out) hundreds of rows on every keystroke.
+  var SEARCH_MAX_VISIBLE = 50;
+
+  var _searchMatches = [];   // the bonus numbers currently listed, in order
+  var _searchActiveIdx = -1; // highlighted row, or -1 for none
+
+  function renderSearchDropdown_(matches, total, query) {
+    var dropdown = $('searchDropdown');
+    var html = '';
+
+    if (matches.length === 0) {
+      // Say so, rather than silently closing.
+      html = '<div class="search-empty">No bonus numbers match &ldquo;' +
+             safeTextPak(query) + '&rdquo;</div>';
+    } else {
+      for (var i = 0; i < matches.length; i++) {
+        var b = matches[i];
+        var picked = selectedBonuses.indexOf(b) !== -1;
+        html += '<div class="search-item' + (picked ? ' picked' : '') + '"' +
+                ' id="searchItem' + i + '"' +
+                ' role="option" aria-selected="' + (picked ? 'true' : 'false') + '"' +
+                ' data-idx="' + i + '"' +
+                ' title="' + (picked ? 'Already filtering by this — select to remove' : 'Add to the filter') + '">' +
+                '<span class="search-item-name">' + safeTextPak(b) + '</span>' +
+                (picked ? '<i class="fa-solid fa-check search-item-check"></i>' : '') +
+                '</div>';
+      }
+      if (total > matches.length) {
+        html += '<div class="search-more">' + (total - matches.length) +
+                ' more match — keep typing to narrow the list</div>';
+      }
+    }
+
+    dropdown.innerHTML = html;
+    dropdown.classList.add('active');
+    $('bonusSearch').setAttribute('aria-expanded', 'true');
+  }
+
+  function closeSearchDropdown_() {
+    var dropdown = $('searchDropdown');
+    if (dropdown) dropdown.classList.remove('active');
+    _searchMatches = [];
+    _searchActiveIdx = -1;
+    var input = $('bonusSearch');
+    if (input) {
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  function setSearchActive_(idx) {
+    var dropdown = $('searchDropdown');
+    var items = dropdown.querySelectorAll('.search-item');
+    if (items.length === 0) return;
+
+    // Wrap around: from the last row, Down returns to the first.
+    if (idx < 0) idx = items.length - 1;
+    if (idx >= items.length) idx = 0;
+    _searchActiveIdx = idx;
+
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle('active', i === idx);
+    }
+    // The highlighted row is often below the fold of the 250px-tall list.
+    if (items[idx].scrollIntoView) {
+      items[idx].scrollIntoView({ block: 'nearest' });
+    }
+    $('bonusSearch').setAttribute('aria-activedescendant', items[idx].id);
+  }
+
+  function runSearchQuery_() {
+    var input = $('bonusSearch');
+    var q = input.value.toLowerCase().trim();
+    if (!q) { closeSearchDropdown_(); return; }
+
+    var all = allBonusList.filter(function(b) {
+      return String(b).toLowerCase().indexOf(q) !== -1;
+    });
+    _searchMatches = all.slice(0, SEARCH_MAX_VISIBLE);
+    _searchActiveIdx = -1;
+    renderSearchDropdown_(_searchMatches, all.length, input.value.trim());
+  }
+
   function initBonusSearch() {
     var input = $('bonusSearch');
     var dropdown = $('searchDropdown');
-    input.addEventListener('input', function() {
-      var q = input.value.toLowerCase().trim();
-      if (!q) { dropdown.classList.remove('active'); return; }
-      var matches = allBonusList.filter(function(b) { return b.toLowerCase().indexOf(q) !== -1; });
-      if (matches.length === 0) { dropdown.classList.remove('active'); return; }
-      dropdown.innerHTML = matches.map(function(m) {
-        return '<div class="search-item" onclick="selectBonus(\'' + m.replace(/'/g, "\\'") + '\')">' + m + '</div>';
-      }).join('');
-      dropdown.classList.add('active');
-    });
+
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-expanded', 'false');
+    input.setAttribute('aria-controls', 'searchDropdown');
+    dropdown.setAttribute('role', 'listbox');
+
+    input.addEventListener('input', runSearchQuery_);
+
     input.addEventListener('focus', function() {
-      if (input.value.trim()) input.dispatchEvent(new Event('input'));
+      if (input.value.trim()) runSearchQuery_();
     });
+
+    input.addEventListener('keydown', function(e) {
+      var open = dropdown.classList.contains('active');
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        // Reopen on Down if the list was dismissed but the query is still there.
+        if (!open) {
+          if (input.value.trim()) { runSearchQuery_(); open = true; }
+          else return;
+        }
+        if (_searchMatches.length === 0) return;
+        e.preventDefault();
+        setSearchActive_(_searchActiveIdx + (e.key === 'ArrowDown' ? 1 : -1));
+        return;
+      }
+
+      if (!open) return;
+
+      if (e.key === 'Enter') {
+        // With nothing highlighted, take the first match — the common case is
+        // "type enough to be unique, press Enter".
+        var idx = _searchActiveIdx >= 0 ? _searchActiveIdx : 0;
+        if (_searchMatches.length > idx) {
+          e.preventDefault();
+          chooseSearchResult_(_searchMatches[idx]);
+        }
+      } else if (e.key === 'Escape') {
+        // Swallowed so it closes only the list; a second press can then reach
+        // anything else listening for Escape.
+        e.preventDefault();
+        e.stopPropagation();
+        closeSearchDropdown_();
+      } else if (e.key === 'Tab') {
+        closeSearchDropdown_();
+      }
+    });
+
+    // Delegated rather than an inline onclick carrying the bonus number through
+    // an HTML attribute and a JS string literal — a name containing a quote or
+    // backslash used to break that round trip.
+    dropdown.addEventListener('mousedown', function(e) {
+      var item = e.target.closest('.search-item');
+      if (!item) return;
+      // mousedown, not click: the input would otherwise blur first and the
+      // document listener below would close the list out from under the click.
+      e.preventDefault();
+      var idx = parseInt(item.dataset.idx, 10);
+      if (!isNaN(idx) && _searchMatches[idx] !== undefined) {
+        chooseSearchResult_(_searchMatches[idx]);
+      }
+    });
+
+    dropdown.addEventListener('mousemove', function(e) {
+      var item = e.target.closest('.search-item');
+      if (!item) return;
+      var idx = parseInt(item.dataset.idx, 10);
+      if (!isNaN(idx) && idx !== _searchActiveIdx) setSearchActive_(idx);
+    });
+
     document.addEventListener('click', function(e) {
-      if (!e.target.closest('.bonus-search-container')) dropdown.classList.remove('active');
+      if (!e.target.closest('.bonus-search-container')) closeSearchDropdown_();
     });
+  }
+
+  // Picking a row toggles it: an entry already in the filter is shown with a
+  // tick and choosing it again removes it, so the list doubles as a view of
+  // what is currently applied.
+  function chooseSearchResult_(bonus) {
+    var input = $('bonusSearch');
+    if (selectedBonuses.indexOf(bonus) !== -1) {
+      removeBonus(bonus);
+      // Keep the list up so the tick visibly clears, and so several can be
+      // toggled in a row without retyping.
+      runSearchQuery_();
+      input.focus();
+      return;
+    }
+    selectBonus(bonus);
+    input.focus();
   }
 
   function selectBonus(bonus) {
@@ -48,7 +214,7 @@
       applyLocalFiltersPak();
     }
     $('bonusSearch').value = '';
-    $('searchDropdown').classList.remove('active');
+    closeSearchDropdown_();
   }
 
   function removeBonus(bonus) {
