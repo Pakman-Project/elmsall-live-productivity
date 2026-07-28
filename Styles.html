@@ -1651,10 +1651,11 @@ canvas {
   .toast-host {
     left: 12px;
     right: 12px;
-    /* Clears the back-to-top button (16px up, 42px tall). On desktop the toast
-       is left-anchored and narrow, so the two never meet — but a full-width
-       toast would sit directly under the button, hiding its own Dismiss. */
-    bottom: 68px;
+    /* Stacked above the back-to-top button (30px up, 42px tall, plus a gap).
+       On desktop the toast is left-anchored and narrow so the two never meet,
+       but a full-width toast would sit directly under the button and hide its
+       own Dismiss. */
+    bottom: calc(84px + env(safe-area-inset-bottom));
   }
   .toast {
     max-width: none;
@@ -1722,12 +1723,22 @@ body.page-scrolled-far .back-to-top {
   }
 }
 
-/* Tucked closer to the corner on a phone, where screen edges are scarce — but
-   kept at 42px, comfortably above the 44px-ish minimum for a thumb target. */
+/* On a phone the bottom edge is contested: an iPhone's home indicator and the
+   collapsing browser toolbars both live there, and a button at 16px sat inside
+   the swipe-up gesture strip, so dismissing the app and pressing the button
+   were the same movement.
+
+   env(safe-area-inset-bottom) is included for correctness but is INERT as
+   deployed: HtmlService serves this document inside an iframe, and the safe-area
+   insets only ever resolve against the top-level document — so they read 0 here
+   however notched the handset is. The literal 30px is what actually does the
+   work; the env() term only starts contributing if this page is ever served
+   outside the Apps Script frame. The same caveat applies to the existing
+   .page and .tour-tooltip rules that use it. */
 @media (max-width: 700px) {
   .back-to-top {
     right: 14px;
-    bottom: 16px;
+    bottom: calc(30px + env(safe-area-inset-bottom));
     width: 42px;
     height: 42px;
   }
