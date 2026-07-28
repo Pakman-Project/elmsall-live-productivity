@@ -613,6 +613,7 @@ function renderBonusAreaToggles_(mode) {
     containerId: 'bonusAreaToggles',
     visible: mode === 'area',
     hiddenKeys: hiddenBonusAreas,
+    orderKeys: (typeof areaKeyOrderForZone_ === 'function') ? areaKeyOrderForZone_('bonus') : null,
     onToggle: 'toggleBonusArea'
   });
 }

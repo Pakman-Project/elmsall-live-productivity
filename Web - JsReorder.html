@@ -88,6 +88,42 @@ function reorderLabelFor_(el, key) {
   return h2 ? h2.textContent.trim() : key;
 }
 
+// The work-area keys of a zone, in the order the user has arranged its panels.
+// Read from the SAVED order rather than the live DOM, because the chips are
+// rendered before the panels they describe on the Bonus page — at that moment
+// the container still holds the previous render's panels, and on a first load
+// it holds nothing at all.
+function areaKeyOrderForZone_(zoneKey) {
+  var saved = chartOrderState[zoneKey];
+  if (!Array.isArray(saved)) return null;
+  var out = [];
+  for (var i = 0; i < saved.length; i++) {
+    var k = saved[i];
+    if (zoneKey === 'volume' && k.indexOf('vol') === 0) {
+      var idx = parseInt(k.slice(3), 10);
+      if (VOLUME_TYPES[idx]) out.push(VOLUME_TYPES[idx].key);
+    } else if (zoneKey === 'bonus' && k.indexOf('bonus-') === 0) {
+      out.push(k.slice(6));
+    }
+  }
+  return out;
+}
+
+// Reorders the chips already on screen to match, without a full re-render.
+// Moving a panel in edit mode updates the saved order immediately, but the
+// chips are only rebuilt on the next filter change — so without this they would
+// disagree with the panels for as long as the user stayed in edit mode.
+function reorderChipsToMatch_(containerId, zoneKey) {
+  var host = document.getElementById(containerId);
+  if (!host) return;
+  var order = areaKeyOrderForZone_(zoneKey);
+  if (!order || !order.length) return;
+  for (var i = 0; i < order.length; i++) {
+    var chip = host.querySelector('[data-area-key="' + order[i] + '"]');
+    if (chip) host.appendChild(chip);
+  }
+}
+
 // ---- Applying and saving an order -----------------------------------------
 
 function defaultOrderFor_(zoneKey) {
@@ -201,6 +237,8 @@ function moveReorderItem_(key, delta) {
       if (delta < 0) container.insertBefore(items[i], items[target]);
       else container.insertBefore(items[target], items[i]);
       captureChartOrder_();
+      reorderChipsToMatch_('volumeAreaToggles', 'volume');
+      reorderChipsToMatch_('bonusAreaToggles', 'bonus');
       refreshReorderBars_();
       // Keep the panel the user is working on in view — it has just jumped a
       // full panel's height, which on a phone is most of the screen.

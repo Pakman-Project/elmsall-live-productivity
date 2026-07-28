@@ -108,6 +108,7 @@
       containerId: 'volumeAreaToggles',
       visible: mode === 'separate',
       hiddenKeys: hiddenVolumeAreas,
+      orderKeys: (typeof areaKeyOrderForZone_ === 'function') ? areaKeyOrderForZone_('volume') : null,
       onToggle: 'toggleVolumeArea'
     });
   }

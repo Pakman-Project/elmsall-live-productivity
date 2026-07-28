@@ -4361,8 +4361,13 @@ body.page-scrolled-far .back-to-top {
     max-width: none;
     flex: initial;
   }
+  /* Match the Volume page's gap between the controls and the chips. Volume sits
+     in a 14px grid with the chips pulled up 4px, giving 10px; this grid's row
+     gap is 8px, so 2px of margin closes the difference. Without it the Bonus
+     chips sat visibly tighter to their dropdowns than the Volume ones. */
   #bonusAreaToggles {
     grid-column: 1 / -1;
+    margin-top: 2px;
   }
 
   /* Scrolled: shrink the header search controls to claw back space. */

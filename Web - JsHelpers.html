@@ -223,11 +223,29 @@ function renderAreaToggleChips_(opts) {
   if (!opts.visible) return;
 
   var hidden = opts.hiddenKeys || [];
+
+  // The chips are a legend for the panels below them, so they follow whatever
+  // order the user has arranged those panels into. Falls back to the authored
+  // VOLUME_TYPES order when the caller has no arrangement to offer, and appends
+  // anything the arrangement does not mention so no area can go missing.
+  var ordered = [];
+  var byAreaKey = {};
+  for (var bk = 0; bk < VOLUME_TYPES.length; bk++) { byAreaKey[VOLUME_TYPES[bk].key] = VOLUME_TYPES[bk]; }
+  if (opts.orderKeys && opts.orderKeys.length) {
+    for (var o = 0; o < opts.orderKeys.length; o++) {
+      var got = byAreaKey[opts.orderKeys[o]];
+      if (got && ordered.indexOf(got) === -1) ordered.push(got);
+    }
+  }
+  for (var d = 0; d < VOLUME_TYPES.length; d++) {
+    if (ordered.indexOf(VOLUME_TYPES[d]) === -1) ordered.push(VOLUME_TYPES[d]);
+  }
+
   var html = '';
-  for (var v = 0; v < VOLUME_TYPES.length; v++) {
-    var t = VOLUME_TYPES[v];
+  for (var v = 0; v < ordered.length; v++) {
+    var t = ordered[v];
     var off = hidden.indexOf(t.key) !== -1;
-    html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" onclick="' + opts.onToggle + '(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
+    html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" data-area-key="' + escapeAttrPak(t.key) + '" onclick="' + opts.onToggle + '(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
             '<span class="breakdown-dot" style="background:' + t.color + '"></span>' + t.label +
             '<i class="fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>';
   }
