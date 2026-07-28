@@ -177,6 +177,27 @@ function loadUserPreferences() {
   }
 }
 
+// Everything the dashboard remembers lives under two localStorage keys. Without
+// this the only way out of a layout someone disliked — a chart order, a set of
+// groups, a hidden work area they had forgotten about — was devtools.
+//
+// The page is reloaded rather than the state being unwound in memory: there are
+// a dozen module-level variables holding preference state, and re-deriving them
+// all correctly is far more likely to go wrong than simply starting again.
+function resetAllSettingsPak() {
+  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes and row counts all go back to their defaults. Your data is untouched, and other people are unaffected.')) return;
+  try {
+    localStorage.removeItem('e3_dashboard_prefs_v1');
+    localStorage.removeItem('e3_dashboard_payload_v1');
+  } catch (e) {
+    console.warn('Could not clear saved settings', e);
+  }
+  // The tour's "already seen" flag is deliberately NOT cleared: someone
+  // resetting their layout has not forgotten the tour, and replaying it
+  // unasked would be a strange thing to happen.
+  location.reload();
+}
+
 function isCardModePak() {
   return window.matchMedia('(max-width: 700px)').matches;
 }
