@@ -566,8 +566,21 @@ function buildBonusPanel_(title, allRows, rowsLimit) {
     .sort(function (a, b) { return b[metric] - a[metric]; })
     .slice(0, rowsLimit);
 
+  // Anything the pill colours green is excluded from Unproductive, however
+  // short the list gets. The upper bound used to be a flat 100%, but green
+  // starts at APP_CONFIG.thresholds.good (80%) — so every operator between 80%
+  // and 100% appeared here with a green badge next to them, calling them
+  // unproductive. In a work area with only a handful of heads there was often
+  // nobody below 80%, so the table filled with green rows.
+  //
+  // The test goes through perfClassPak rather than comparing against the
+  // threshold directly, so this table and the colour it displays can never
+  // drift apart if the thresholds are retuned.
   var underRows = allRows
-    .filter(function (r) { return r.performance >= minUnderPerf && r.performance < 100; })
+    .filter(function (r) {
+      return r.performance >= minUnderPerf &&
+             perfClassPak(r.performance) !== APP_CONFIG.classes.good;
+    })
     .sort(function (a, b) { return a[metric] - b[metric]; })
     .slice(0, rowsLimit);
 
