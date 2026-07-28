@@ -1686,6 +1686,65 @@ canvas {
   }
 }
 
+/* ── Pull to refresh (mobile) ────────────────────────────────────────────────
+   Sits below the toasts and above the page content. Fixed to the viewport
+   rather than to .page, so it does not scroll away with the content being
+   pulled, and so it stays out of the share image export. */
+.ptr-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  margin-left: -18px;
+  z-index: 9000;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  color: var(--muted);
+  font-size: 13px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  /* Follows the finger, so no transition on transform — it would lag behind the
+     gesture and feel broken. Only the colour change is animated. */
+  transition: color 0.15s ease, border-color 0.15s ease;
+  pointer-events: none;
+}
+
+.ptr-indicator.visible {
+  display: flex;
+}
+
+/* Armed: releasing now will refresh. The arrow is flipped by the transform in
+   ptrRender_, so this only has to carry the colour. */
+.ptr-indicator.ready {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.ptr-indicator.spinning {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.ptr-indicator.spinning i {
+  animation: ptrSpin 0.8s linear infinite;
+}
+
+@keyframes ptrSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Belt and braces: the gesture is already gated on the same breakpoint in JS,
+   but nothing should be able to put this on a desktop screen. */
+@media (min-width: 701px) {
+  .ptr-indicator {
+    display: none !important;
+  }
+}
+
 /* ── Back to top ─────────────────────────────────────────────────────────────
    The Data Table runs to 192 rows and the Volume page stacks nine charts, and
    every control that governs them sits at the very top. Getting back to change
