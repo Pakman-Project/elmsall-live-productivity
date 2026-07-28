@@ -1,5 +1,20 @@
 <style>
 :root {
+  /* Tells the browser which way this document leans, so the parts it draws
+     itself follow the theme: the popup list a <select> opens, the caret and
+     focus ring inside form controls, the default canvas colour behind the page,
+     and scrollbars anywhere our own rules do not reach. Without it those all
+     stayed light while the dashboard around them went dark — most obvious on a
+     phone, where every dropdown opens as a full-height native picker.
+
+     Bound to the app's own toggle rather than to prefers-color-scheme, so it
+     tracks the theme button rather than the operating system.
+
+     Unlike <meta name="theme-color">, this works inside the Apps Script iframe:
+     color-scheme applies per document, whereas theme-color is only honoured on
+     the top-level one. */
+  color-scheme: light;
+
   /* NEXT design system (Material 3 --mat-sys-* palette), light = default.
      Dark theme lives under .dark-theme on <html>. */
   --bg: #f5f5f5;                    /* --mat-sys-background */
@@ -74,6 +89,8 @@
 }
 
 .dark-theme {
+  color-scheme: dark;
+
   --bg: #121212;
   --panel: #1e1e1e;                 /* --mat-sys-surface */
   --border: rgba(255, 255, 255, 0.23);
