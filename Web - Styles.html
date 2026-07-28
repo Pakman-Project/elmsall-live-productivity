@@ -4862,4 +4862,93 @@ textarea:focus-visible {
 .bonus-area-chip:focus-visible {
   outline-offset: 1px;
 }
+
+/* ══ Print ══════════════════════════════════════════════════════════════════
+   A dashboard on a wall or handed over at shift change is a real use, and the
+   screen layout prints badly: the page is a fixed-height flex column with four
+   horizontally-translated pages inside it, so a browser printing it produces
+   one viewport-sized slice of whichever page happened to be showing.
+
+   This unwinds the geometry rather than restyling anything: heights become
+   auto, the swipe transform is dropped, and only the page currently on screen
+   is printed — printing all four would be four pages of someone else's
+   context. Everything that exists to be clicked is hidden, since none of it
+   means anything on paper.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  /* Interactive chrome: nothing here can be used on paper. */
+  .next-rail,
+  .next-header-actions,
+  .header-menu-btn,
+  .next-header-controls,
+  .back-to-top,
+  .toast-host,
+  .ptr-indicator,
+  .tour-overlay,
+  .breakdown-overlay,
+  #loadingOverlay,
+  .reorder-bar,
+  .main-sort-mobile,
+  .breakdown-btn,
+  #downloadRawDataBtn {
+    display: none !important;
+  }
+
+  /* The header keeps its identity and its timestamp, but a black bar costs a
+     lot of toner for no information. */
+  .next-header {
+    background: #fff !important;
+    color: #000 !important;
+    border-bottom: 1px solid #000;
+    height: auto;
+    padding: 0 0 8px;
+  }
+  .next-logo,
+  .next-header-title,
+  .next-header-meta,
+  .next-header-meta * {
+    color: #000 !important;
+  }
+
+  /* Unwind the fixed-height, horizontally-translated page container so the
+     content can flow onto as many sheets as it needs. */
+  html, body, .wrap, .app-body, .app-main,
+  .swipe-container, .swipe-wrapper, .page {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    transform: none !important;
+  }
+
+  /* Only what is on screen. The other three are laid out off to the side and
+     would otherwise print as blank or half-drawn sheets. */
+  .page { display: none !important; }
+  .page.print-active { display: block !important; }
+
+  /* Keep a card and its chart on one sheet where the paper allows. */
+  .card.panel,
+  .kpi {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .table-wrap {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Frozen columns are a scrolling affordance; on paper they just overlap. */
+  #mainTable > thead > tr > th:nth-child(1),
+  #mainTable > thead > tr > th:nth-child(2),
+  #mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
+  #mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
+    position: static !important;
+  }
+
+  thead { display: table-header-group; }
+}
+
 </style>

@@ -412,6 +412,34 @@
     });
   }
 
+  // The print stylesheet prints only .page.print-active. Which page that is can
+  // only be known at print time, so it is stamped on just before the dialog
+  // opens and cleared afterwards — leaving the class behind would make the
+  // marker go stale the moment the user changed page.
+  function initPrintPage_() {
+    function mark() {
+      var pages = document.querySelectorAll('.page');
+      for (var i = 0; i < pages.length; i++) {
+        pages[i].classList.toggle('print-active', i === currentPage);
+      }
+    }
+    function unmark() {
+      var marked = document.querySelectorAll('.page.print-active');
+      for (var i = 0; i < marked.length; i++) { marked[i].classList.remove('print-active'); }
+    }
+    window.addEventListener('beforeprint', mark);
+    window.addEventListener('afterprint', unmark);
+    // Safari has never fired beforeprint; matchMedia('print') is what works
+    // there, and is harmless where both are supported because mark() is
+    // idempotent.
+    try {
+      var mq = window.matchMedia('print');
+      if (mq.addEventListener) {
+        mq.addEventListener('change', function (e) { if (e.matches) mark(); else unmark(); });
+      }
+    } catch (e) {}
+  }
+
   function initHeaderMenu_() {
     document.addEventListener('click', function (e) {
       if (!document.body.classList.contains('header-menu-open')) return;
