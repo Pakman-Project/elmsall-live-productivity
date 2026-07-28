@@ -129,6 +129,38 @@
     return 'Productivity % - ' + names.join(' vs ');
   }
 
+  // Legend clicks in Combined / Stacked mode hide and show a work area.
+  //
+  // The chart was already toggling visibility, but only inside itself: the
+  // dashboard rebuilds every chart on each auto-refresh, so a hidden area came
+  // straight back a minute later. The click is now written through to
+  // hiddenVolumeAreas — the same state the Separate-mode chips use — so it
+  // survives a refresh, is saved with the user's preferences, and means the
+  // same thing whichever mode they switch to.
+  //
+  // The chart is updated in place rather than through applyLocalFiltersPak,
+  // which would rebuild every chart on the page for what is a one-series
+  // change, and would visibly stutter.
+  function onVolumeLegendClick_(e, legendItem, legend) {
+    e.stopPropagation();
+    e.preventDefault();
+    var index = legendItem.datasetIndex;
+    var ci = legend.chart;
+
+    if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; }
+    else { ci.show(index); legendItem.hidden = false; }
+
+    var ds = ci.data.datasets[index];
+    var key = ds && ds.__areaKey;
+    if (!key) return;
+
+    var nowHidden = !ci.isDatasetVisible(index);
+    var at = hiddenVolumeAreas.indexOf(key);
+    if (nowHidden && at === -1) { hiddenVolumeAreas.push(key); }
+    else if (!nowHidden && at !== -1) { hiddenVolumeAreas.splice(at, 1); }
+    saveUserPreferences();
+  }
+
   // ── Volume page: build charts as they come into view ───────────────────────
   // Separate Charts mode draws one chart per work area — up to nine. On a phone
   // barely one fits on screen at a time, yet all nine Chart.js instances were
@@ -258,9 +290,15 @@
       var datasets = [];
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
-        datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(isStacked ? 0.6 : 0.1)), tension: 0.35, pointRadius: 2, fill: isStacked });
+        // Hidden areas stay in the dataset list rather than being filtered
+        // out. Chart.js builds its legend from the datasets, so removing one
+        // would remove the only control for bringing it back — it is marked
+        // hidden instead, which the legend shows struck through.
+        datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(isStacked ? 0.6 : 0.1)), tension: 0.35, pointRadius: 2, fill: isStacked,
+          hidden: hiddenVolumeAreas.indexOf(volType.key) !== -1,
+          __areaKey: volType.key });
       }
-      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: CHART_TEXT(), usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis } } });
+      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: CHART_TEXT(), usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: onVolumeLegendClick_ }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis } } });
       volumeCharts.push(chart);
     }
   }

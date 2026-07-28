@@ -561,8 +561,20 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
   var minUnderPerf = (currentThreshold / 0.25) * 100;
   var metric = sideSortMetric;
 
+  // Anything the pill colours red is kept out of Productive, however short the
+  // list gets — the mirror of the rule that keeps green out of Unproductive. A
+  // table headed "Productive" listing someone with a red badge contradicts
+  // itself, and in a work area with only a handful of heads the tail of the
+  // ranking was filling it with exactly that.
+  //
+  // Tested through perfClassPak rather than against the threshold directly, so
+  // the table and the badge beside it cannot drift apart if the thresholds are
+  // retuned.
   var topRows = allRows
     .slice()
+    .filter(function (r) {
+      return perfClassPak(r.performance) !== APP_CONFIG.classes.bad;
+    })
     .sort(function (a, b) { return b[metric] - a[metric]; })
     .slice(0, rowsLimit);
 
