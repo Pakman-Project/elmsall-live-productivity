@@ -441,10 +441,13 @@
         <div class="tour-tip-step" id="tourStepCounter"></div>
         <h3 id="tourTipTitle"></h3>
         <p id="tourTipBody"></p>
-        <div class="tour-click-hint" id="tourClickHint" style="display:none;"><i class="fa-solid fa-hand-pointer"></i>Click the highlighted control to continue.</div>
+        <div class="tour-progress" aria-hidden="true"><span id="tourProgressBar"></span></div>
         <div class="tour-tip-actions">
           <button class="tour-skip" id="tourSkipBtn" type="button">Skip tour</button>
           <div class="tour-nav">
+            <button class="tour-pause" id="tourPauseBtn" type="button" aria-label="Pause the tour" title="Pause the tour">
+              <i class="fa-solid fa-pause" aria-hidden="true"></i>
+            </button>
             <button class="tour-back" id="tourBackBtn" type="button">Back</button>
             <button class="tour-next" id="tourNextBtn" type="button">Next</button>
           </div>

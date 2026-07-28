@@ -7,10 +7,18 @@
 // Steps are grouped into "parts" (part 1, 2, ...) with auto sub-numbering shown
 // as e.g. "PART 2 OF 7 · 2.3" so the tour never looks like "5 / 32".
 //
-// Interactive steps make the highlighted control genuinely clickable: the user
-// MUST click it to continue (the Next button is disabled), so the tour shows
-// exactly what each control does. Modal demos are closed by clicking the modal's
-// own × (also interactive). Non-interactive steps just explain, with Next.
+// The tour plays as a slideshow: every step shows for TOUR_STEP_MS and advances
+// on its own. Steps carrying an `interactive` config are DEMONSTRATED by the
+// tour itself partway through the step (see performStepDemo_), so the viewer
+// watches each control being used rather than being told to use it.
+//
+// It used to require the user to click the highlighted control before it would
+// move on. That read as an instruction rather than a demonstration, and it
+// could dead-end: when a step's target was not on screen — an empty suggestion
+// list, a panel that had not rendered — there was nothing to click and no way
+// forward but Skip. A missing target is now simply skipped past.
+//
+// Skip / Back / Next / Pause remain, and Space toggles pause.
 // ============================================================================
 
 var TOUR_SEEN_KEY = 'e3_tour_seen_v1';
@@ -28,7 +36,7 @@ var TOUR_STEPS = [
   // ===== Part 1 — Getting around ============================================
   { part: 1, page: 0, target: null,
     title: 'Welcome 👋',
-    body: 'This is E3 Live Productivity — a live view of warehouse output across every E3 work area. This tour walks you through each page using example data while your real data loads in the background. We’ll have you click things as we go!' },
+    body: 'This is E3 Live Productivity — a live view of warehouse output across every E3 work area. This tour plays itself using example data while your real data loads in the background — sit back and watch. Pause any time, step through with Back and Next, or skip out entirely.' },
   { part: 1, page: 0, target: '.refresh-btn',
     title: 'Refresh any time',
     body: 'The dashboard keeps itself up to date, but tap here whenever you want to pull the very latest figures immediately.' },
@@ -41,17 +49,17 @@ var TOUR_STEPS = [
   { part: 1, page: 0, target: '.bonus-search-container',
     interactive: { sel: '#bonusSearch', type: 'input', inputValue: 'A' },
     title: 'Filter by bonus number',
-    body: 'This box searches the operators on shift. Type any letter or number into it now — we will use it in a moment.' },
+    body: 'This box searches the operators on shift — watch a character being typed into it.' },
   { part: 1, page: 0, target: '#searchDropdown',
     interactive: { sel: '#searchDropdown .search-item', type: 'click' },
     action: function () { tourPrimeSearch_(); },
     title: 'Pick one from the list',
-    body: 'Arrow keys move through the suggestions and Enter picks one — or just click. Choose any operator to filter by them.' },
+    body: 'Suggestions appear as you type. Arrow keys move through them and Enter picks one — or just click. Watch one being chosen.' },
   { part: 1, page: 0, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
     cleanup: function () { tourClearFilter_(); },
     title: 'The filter follows you everywhere',
-    body: 'Every page, chart and table is now showing just that operator, and this banner says so wherever you go. Click “Clear all” to see everyone again.' },
+    body: 'Every page, chart and table is now showing just that operator, and this banner says so wherever you go. “Clear all” brings everyone back.' },
   { part: 1, page: 0, target: '.next-rail',
     title: 'Four pages',
     body: 'Overall, Volume, Bonus Numbers and Data Table. Click an icon in the rail to jump straight to a page, or swipe left and right to move between them.' },
@@ -63,7 +71,7 @@ var TOUR_STEPS = [
   { part: 2, page: 0, target: 'button[onclick="showHeadBreakdown()"]',
     interactive: { sel: 'button[onclick="showHeadBreakdown()"]', type: 'click' },
     title: 'Open the head breakdown',
-    body: 'Give the “Breakdown” button a click to see deployed heads split by work area.' },
+    body: 'The “Breakdown” button opens deployed heads split by work area — here it goes.' },
   { part: 2, page: 0, target: '#breakdownOverlay .breakdown-close', modal: true,
     interactive: { sel: '#breakdownOverlay .breakdown-close', type: 'click' },
     action: function () {
@@ -72,7 +80,7 @@ var TOUR_STEPS = [
     },
     cleanup: function () { if (typeof closeBreakdown === 'function') closeBreakdown(); },
     title: 'Head breakdown by area',
-    body: 'Here it is — deployed heads by work area. Change the From/To range at the top to re-slice it. When you’re done, click the × to close.' },
+    body: 'Deployed heads by work area. The From/To range at the top re-slices it, and the × closes it.' },
   { part: 2, page: 0, target: '.kpi-controls-row',
     title: 'Time controls',
     body: 'Change how many hours are shown and the window size (15 / 30 / 60 min). These stay in sync across every page.' },
@@ -87,27 +95,27 @@ var TOUR_STEPS = [
   { part: 3, page: 0, target: 'button[onclick="openAreaGroups()"]',
     interactive: { sel: 'button[onclick="openAreaGroups()"]', type: 'click' },
     title: 'Open Groups & Charts',
-    body: 'Click “Groups & Charts” — we’ll build a comparison together, and put your own settings back afterwards.' },
+    body: 'The “Groups & Charts” button opens next. We’ll build a comparison from scratch, then put your own settings back exactly as they were.' },
   { part: 3, page: 0, target: '#areaGroupEditor', modal: true,
     interactive: { sel: '#areaGroupEditor input[type="checkbox"]', type: 'click' },
     action: function () { tourOpenAreaGroups_(); },
     title: 'Step 1 — build a group',
-    body: 'A group is a set of work areas measured together as one line. Tick or untick any area to change what a group covers — go on, try one.' },
+    body: 'A group is a set of work areas measured together as one line. Ticking an area changes what that group covers.' },
   { part: 3, page: 0, target: '#addAreaGroupBtn', modal: true,
     interactive: { sel: '#addAreaGroupBtn', type: 'click' },
     action: function () { tourOpenAreaGroups_(); },
     title: 'Add another group',
-    body: 'Click “Add Group” for one more. You can build up to 7, and the same work area can appear in several.' },
+    body: '“Add Group” creates another. You can build up to 7, and the same work area can appear in several.' },
   { part: 3, page: 0, target: '#areaGroupSplitEditor', modal: true,
     interactive: { sel: '#areaGroupSplitEditor input[type="checkbox"]', type: 'click' },
     action: function () { tourOpenAreaGroups_(); },
     title: 'Step 2 — spread them over charts',
-    body: 'Chart A starts with everything and Chart B starts empty. Tick a group under Chart B to give it a chart of its own — that is what splits one crowded chart into two readable ones.' },
+    body: 'Chart A starts with everything and Chart B starts empty. Giving Chart B a group of its own is what splits one crowded chart into two readable ones.' },
   { part: 3, page: 0, target: '#areaGroupOverlay .modal-actions .btn:last-child', modal: true,
     interactive: { sel: '#areaGroupOverlay .modal-actions .btn:last-child', type: 'click' },
     action: function () { tourOpenAreaGroups_(); },
     title: 'Apply them together',
-    body: 'One Apply commits the groups and the charts at the same time. Click it and watch the section rebuild.' },
+    body: 'One Apply commits the groups and the charts at the same time — watch the section rebuild.' },
   { part: 3, page: 0, target: '#areaGroupChartsWrap',
     cleanup: function () { tourRestoreAreaGroups_(); },
     title: 'Titled by what they show',
@@ -120,7 +128,7 @@ var TOUR_STEPS = [
   { part: 4, page: 1, target: '#volumeChartMode',
     interactive: { sel: '#volumeChartMode', type: 'change', changeValue: 'stacked' },
     title: 'Change the display mode',
-    body: 'Use this dropdown to switch between separate charts, one combined line, or a stacked area. Choose “Stacked Area”.' },
+    body: 'This dropdown switches between separate charts, one combined line, and a stacked area. Here it moves to “Stacked Area”.' },
   { part: 4, page: 1, target: '.volume-charts',
     cleanup: function () { var s = $('volumeChartMode'); if (s) { s.value = 'separate'; applyLocalFiltersPak(); } },
     title: 'Stacked view',
@@ -133,7 +141,7 @@ var TOUR_STEPS = [
   { part: 5, page: 2, target: '#bonusViewMode',
     interactive: { sel: '#bonusViewMode', type: 'change', changeValue: 'overall' },
     title: 'By area or overall',
-    body: 'Switch between one table per work area, or a single overall ranking. Choose “Overall”.' },
+    body: 'This switches between one table per work area and a single overall ranking. Here it moves to “Overall”.' },
   { part: 5, page: 2, target: '#bonusTablesContainer',
     cleanup: function () { var s = $('bonusViewMode'); if (s) { s.value = 'area'; if (typeof refreshBonusTables === 'function') refreshBonusTables(); } },
     title: 'Overall ranking',
@@ -141,7 +149,7 @@ var TOUR_STEPS = [
   { part: 5, page: 2, target: '#bonusAreaToggles .bonus-area-chip',
     interactive: { sel: '#bonusAreaToggles .bonus-area-chip', type: 'click' },
     title: 'Show / hide work areas',
-    body: 'Each chip toggles a work area on or off. Click one to hide it.' },
+    body: 'Each chip toggles a work area on or off — watch one being hidden.' },
   { part: 5, page: 2, target: '#bonusAreaToggles',
     cleanup: function () { hiddenBonusAreas = []; if (typeof refreshBonusTables === 'function') refreshBonusTables(); },
     title: 'Areas filtered',
@@ -149,15 +157,15 @@ var TOUR_STEPS = [
   { part: 5, page: 2, target: '.side-table th[onclick^="setSideTableSort"]',
     interactive: { sel: '.side-table th[onclick^="setSideTableSort"]', type: 'click' },
     title: 'Sort the tables',
-    body: 'Click a column header — Standard Hours or Productivity % — to re-sort every table by it.' },
+    body: 'A column header — Standard Hours or Productivity % — re-sorts every table by it.' },
   { part: 5, page: 2, target: '.clickable-bonus',
     interactive: { sel: '.clickable-bonus', type: 'click' },
     title: 'Filter by an operator',
-    body: 'Every bonus number is clickable. Click one to filter the ENTIRE dashboard down to just that operator.' },
+    body: 'Every bonus number is clickable, and picking one filters the ENTIRE dashboard down to that operator.' },
   { part: 5, page: 2, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
     title: 'Site-wide filter',
-    body: 'This banner shows the active filter — every page now reflects only that operator. Click “Clear all” to remove it.' },
+    body: 'This banner shows the active filter — every page now reflects only that operator. “Clear all” removes it.' },
 
   // ===== Part 6 — Data Table page ==========================================
   { part: 6, page: 3, target: '.span-12 .mini-table-title',
@@ -170,7 +178,7 @@ var TOUR_STEPS = [
         : { sel: '#mainTable th', type: 'click' };
     },
     title: 'Sort any column',
-    body: 'Click a column header to sort by it (on mobile, use the sort dropdown). Try sorting by Productivity %.' },
+    body: 'A column header sorts by that column (on mobile, the sort dropdown does the same) — here it sorts by Productivity %.' },
   { part: 6, page: 3,
     interactive: function (isMobile) {
       // Desktop rows are clickable anywhere; mobile cards only toggle from their header.
@@ -179,19 +187,19 @@ var TOUR_STEPS = [
         : { sel: '.main-expandable-row', type: 'click' };
     },
     title: 'Expand a row',
-    body: 'Click a row (its header, on mobile) to expand the per-operator detail behind that time block.' },
+    body: 'A row expands to show the per-operator detail behind that time block — tap its header on mobile.' },
   { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content',
     title: 'Per-operator detail',
     body: 'Each expanded row lists every operator in that block with their volumes and productivity. The bonus numbers in here are clickable too.' },
   { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
     interactive: { sel: '.main-detail-row.open .main-detail-content .clickable-bonus', type: 'click' },
     title: 'Filter from the detail',
-    body: 'Just like on the Bonus page, click an operator here to filter the whole dashboard to them.' },
+    body: 'Just like on the Bonus page, an operator here filters the whole dashboard to them.' },
   { part: 6, page: 3, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
     cleanup: function () { expandedRowKey = null; },
     title: 'Filtered again',
-    body: 'Same site-wide filter, reached from the data table. Click “Clear all” to remove it.' },
+    body: 'Same site-wide filter, reached from the data table. “Clear all” removes it.' },
   { part: 6, page: 3, target: '#downloadRawDataBtn',
     title: 'Export to CSV',
     body: 'Clicking “Download raw data” exports every individual entry as a CSV — handy for pivoting in Excel.' },
@@ -200,7 +208,7 @@ var TOUR_STEPS = [
   { part: 7, page: 0, target: '#shareBtn',
     interactive: { sel: '#shareBtn', type: 'click' },
     title: 'Share what you are looking at',
-    body: 'Found something worth passing on? Click the share button to get a link, or an image of the page.' },
+    body: 'Found something worth passing on? The share button gives you a link, or an image of the page.' },
   { part: 7, page: 0, target: '#shareOverlay .breakdown-close', modal: true,
     interactive: { sel: '#shareOverlay .breakdown-close', type: 'click' },
     // Reached forwards the dialog is already open; reached BACKWARDS (from the
@@ -231,11 +239,11 @@ var TOUR_STEPS = [
     action: function () { tourEnterReorder_(); },
     interactive: { sel: '.reorder-bar .reorder-btn:not([disabled])', type: 'click' },
     title: 'Move a panel',
-    body: 'Every panel now carries a bar showing its position, with arrows to move it earlier or later. Click one of the arrows and watch the panel move. No dragging, so it works the same on a phone and never fights with scrolling.' },
+    body: 'Every panel now carries a bar showing its position, with arrows to move it earlier or later — watch one move. No dragging, so it works the same on a phone and never fights with scrolling.' },
   { part: 8, page: 0, target: '.toast',
     interactive: { sel: '.toast-action-primary', type: 'click' },
     title: 'Finish when you are done',
-    body: 'This message stays up for as long as rearrange mode is on, so you always know where you are. Press “Done” to finish — or “Reset order” to put everything back. It works the same on the Volume and Bonus pages.',
+    body: 'This message stays up for as long as rearrange mode is on, so you always know where you are. “Done” finishes, “Reset order” puts everything back. It works the same on the Volume and Bonus pages.',
     cleanup: function () { tourRestoreReorder_(); } },
 
   // ===== Part 9 — Your settings are remembered =============================
@@ -252,7 +260,7 @@ var TOUR_STEPS = [
   // ===== Part 10 — Wrap up ==================================================
   { part: 10, page: 0, target: null,
     title: 'You’re all set ✅',
-    body: 'That’s the tour! Your real live data is ready now. You can replay this any time from the “?” button in the header.' }
+    body: 'That’s the tour — your real live data is ready now. Replay it any time, or jump to a single section, from the “?” button in the header.' }
 ];
 
 // Pre-compute part sub-numbering + total parts for the "PART 2 OF 7 · 2.3" label.
@@ -445,7 +453,8 @@ function startTour(isAuto, startIndex) {
 
 function endTour_() {
   if (!tourActive) return;
-  disarmInteractive_();
+  clearTourTimers_();
+  currentInteractiveCfg = null;
   runStepCleanup_();
   tourActive = false;
 
@@ -494,7 +503,8 @@ function runStepCleanup_() {
 }
 
 function tourKeydown_(e) {
-  if (e.key === 'Escape') { endTour_(); }
+  if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); toggleTourPause_(); }
+  else if (e.key === 'Escape') { endTour_(); }
   else if (e.key === 'ArrowRight') { tourNext_(); }
   else if (e.key === 'ArrowLeft' && tourStepIndex > 0) { showTourStep_(tourStepIndex - 1); }
 }
@@ -596,84 +606,152 @@ function tourRestoreReorder_() {
   }
 }
 
-// ---- Interactive-step wiring -------------------------------------------------
-var _tourGuardClick = null;
-var _tourChangeListener = null;
-var _tourInputListener = null;
-var _tourAdvanceScheduled = false;
+// ---- Slideshow playback ------------------------------------------------------
+// The tour plays itself. It used to require the user to click each highlighted
+// control before it would move on, which read as an instruction rather than a
+// demonstration and — worse — could strand them: if a step's target was not on
+// screen (an empty suggestion list, a panel that had not rendered yet) there
+// was nothing to click and no way forward but Skip.
+//
+// Now every step shows for a fixed time and the tour performs the demonstration
+// itself. A missing target is simply skipped over, so no step can dead-end.
 
-function armInteractive_(step) {
+var TOUR_STEP_MS = 5000;
+// The demonstration fires partway through, so the ring is on screen briefly
+// before anything moves — otherwise the change has happened before the user has
+// worked out where to look.
+var TOUR_DEMO_AT_MS = 1600;
+
+var _tourTimer = null;
+var _tourDemoTimer = null;
+var _tourPaused = false;
+var _tourStepStartedAt = 0;
+var _tourStepTotalMs = 0;
+var _tourDemoPending = false;
+var _tourDemoAtMs = 0;
+
+function clearTourTimers_() {
+  if (_tourTimer) { clearTimeout(_tourTimer); _tourTimer = null; }
+  if (_tourDemoTimer) { clearTimeout(_tourDemoTimer); _tourDemoTimer = null; }
+}
+
+// Performs a step's demonstration WITHOUT advancing — the timer owns advancing.
+// Every failure here is non-fatal on purpose: a demonstration that cannot run
+// should cost the viewer a dull step, not a broken tour.
+function performStepDemo_(step) {
   var cfg = resolveInteractive_(step);
-  currentInteractiveCfg = cfg;
   if (!cfg) return;
-
-  _tourGuardClick = function(e) {
-    var t = e.target;
-    if (t.closest && t.closest('.tour-tooltip')) return;
-    if (t.closest && t.closest(cfg.sel)) {
-      if (cfg.type === 'click') scheduleInteractiveAdvance_(60);
-      return; // let the control's native handler run
-    }
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  document.addEventListener('click', _tourGuardClick, true);
-
-  if (cfg.type === 'change') {
-    _tourChangeListener = function(e) {
-      if (e.target.closest && e.target.closest(cfg.sel)) scheduleInteractiveAdvance_(150);
-    };
-    document.addEventListener('change', _tourChangeListener, true);
-  }
-
-  // 'input' waits for the field to actually contain something, so the step is
-  // satisfied by typing rather than by a click. The delay is longer than the
-  // others on purpose: it gives the suggestion list time to appear, so the
-  // next step has something to point at.
-  if (cfg.type === 'input') {
-    _tourInputListener = function(e) {
-      if (e.target.closest && e.target.closest(cfg.sel) &&
-          String(e.target.value || '').trim() !== '') {
-        scheduleInteractiveAdvance_(400);
-      }
-    };
-    document.addEventListener('input', _tourInputListener, true);
-  }
-}
-
-function disarmInteractive_() {
-  if (_tourGuardClick) { document.removeEventListener('click', _tourGuardClick, true); _tourGuardClick = null; }
-  if (_tourChangeListener) { document.removeEventListener('change', _tourChangeListener, true); _tourChangeListener = null; }
-  if (_tourInputListener) { document.removeEventListener('input', _tourInputListener, true); _tourInputListener = null; }
-  currentInteractiveCfg = null;
-}
-
-function scheduleInteractiveAdvance_(delay) {
-  if (_tourAdvanceScheduled) return;
-  _tourAdvanceScheduled = true;
-  var fromIndex = tourStepIndex;
-  setTimeout(function() {
-    _tourAdvanceScheduled = false;
-    if (tourActive && tourStepIndex === fromIndex) showTourStep_(tourStepIndex + 1);
-  }, delay || 60);
-}
-
-// Keyboard-only fallback (ArrowRight) still replicates the interaction.
-function triggerInteractive_(step) {
-  var cfg = currentInteractiveCfg || resolveInteractive_(step);
-  if (!cfg) { showTourStep_(tourStepIndex + 1); return; }
   var el = document.querySelector(cfg.sel);
-  if (!el) { disarmInteractive_(); showTourStep_(tourStepIndex + 1); return; }
-  if (cfg.type === 'change') { el.value = cfg.changeValue; el.dispatchEvent(new Event('change', { bubbles: true })); }
-  else if (cfg.type === 'input') { el.value = cfg.inputValue || 'A'; el.dispatchEvent(new Event('input', { bubbles: true })); }
-  else { el.click(); }
-  scheduleInteractiveAdvance_(cfg.type === 'click' ? 120 : 250);
+  if (!el) return;
+  try {
+    if (cfg.type === 'change') {
+      el.value = cfg.changeValue;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (cfg.type === 'input') {
+      el.value = cfg.inputValue || 'A';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      el.click();
+    }
+  } catch (e) {
+    console.warn('Tour demo failed', e);
+  }
+}
+
+function setTourProgress_(pct, durationMs) {
+  var bar = $('tourProgressBar');
+  if (!bar) return;
+  bar.style.transition = durationMs ? ('width ' + durationMs + 'ms linear') : 'none';
+  bar.style.width = pct + '%';
+}
+
+function freezeTourProgress_() {
+  var bar = $('tourProgressBar');
+  if (!bar || !bar.parentElement) return;
+  var w = bar.getBoundingClientRect().width;
+  var total = bar.parentElement.getBoundingClientRect().width || 1;
+  setTourProgress_(Math.min(100, (w / total) * 100), 0);
+}
+
+function startStepPlayback_(step) {
+  clearTourTimers_();
+  _tourStepTotalMs = TOUR_STEP_MS;
+  _tourDemoPending = !!step.interactive;
+  _tourDemoAtMs = TOUR_DEMO_AT_MS;
+  _tourStepStartedAt = Date.now();
+
+  setTourProgress_(0, 0);
+  if (_tourPaused) return;
+  scheduleTourTimers_(_tourStepTotalMs, _tourDemoPending ? _tourDemoAtMs : -1);
+}
+
+function scheduleTourTimers_(remainingMs, demoInMs) {
+  var startedIndex = tourStepIndex;
+  var stepAtStart = tourCurrentStep;
+
+  if (demoInMs >= 0) {
+    _tourDemoTimer = setTimeout(function () {
+      _tourDemoTimer = null;
+      if (!tourActive || tourStepIndex !== startedIndex) return;
+      _tourDemoPending = false;
+      performStepDemo_(stepAtStart);
+      // The demonstration may have opened a modal or re-rendered a panel, so
+      // the ring needs re-measuring against whatever is there now.
+      setTimeout(function () {
+        if (tourActive && tourStepIndex === startedIndex) placeTourTooltip_(stepAtStart);
+      }, 260);
+    }, demoInMs);
+  }
+
+  _tourTimer = setTimeout(function () {
+    _tourTimer = null;
+    if (!tourActive || tourStepIndex !== startedIndex) return;
+    showTourStep_(tourStepIndex + 1);
+  }, remainingMs);
+
+  setTourProgress_(100, remainingMs);
+}
+
+function pauseTour_() {
+  if (_tourPaused) return;
+  _tourPaused = true;
+  var elapsed = Date.now() - _tourStepStartedAt;
+  _tourStepTotalMs = Math.max(0, _tourStepTotalMs - elapsed);
+  if (_tourDemoPending) _tourDemoAtMs = Math.max(0, _tourDemoAtMs - elapsed);
+  clearTourTimers_();
+  freezeTourProgress_();
+  updateTourPauseBtn_();
+}
+
+function resumeTour_() {
+  if (!_tourPaused) return;
+  _tourPaused = false;
+  updateTourPauseBtn_();
+  _tourStepStartedAt = Date.now();
+  // A step paused right at its end would otherwise flick past on resume.
+  if (_tourStepTotalMs < 400) _tourStepTotalMs = 400;
+  scheduleTourTimers_(_tourStepTotalMs, _tourDemoPending ? _tourDemoAtMs : -1);
+}
+
+function toggleTourPause_() {
+  if (_tourPaused) resumeTour_(); else pauseTour_();
+}
+
+function updateTourPauseBtn_() {
+  var btn = $('tourPauseBtn');
+  if (!btn) return;
+  var icon = btn.querySelector('i');
+  if (icon) icon.className = _tourPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
+  var label = _tourPaused ? 'Resume the tour' : 'Pause the tour';
+  btn.setAttribute('aria-label', label);
+  btn.setAttribute('title', label);
 }
 
 function tourNext_() {
-  var step = tourCurrentStep;
-  if (step && step.interactive) triggerInteractive_(step);
-  else showTourStep_(tourStepIndex + 1);
+  // Manual override of the timer — the slideshow advances on its own, but a
+  // viewer who has read the step should not have to sit through the rest of it.
+  clearTourTimers_();
+  showTourStep_(tourStepIndex + 1);
 }
 
 // ---- Rendering ---------------------------------------------------------------
@@ -710,7 +788,9 @@ function showTourStep_(i) {
   if (i < 0) i = 0;
   if (i >= TOUR_STEPS.length) { endTour_(); return; }
 
-  disarmInteractive_();
+  clearTourTimers_();
+  currentInteractiveCfg = null;
+  _tourPaused = false;
   runStepCleanup_();
 
   tourStepIndex = i;
@@ -727,19 +807,22 @@ function showTourStep_(i) {
   var isLast = (i === TOUR_STEPS.length - 1);
   var interactive = !!step.interactive;
 
-  $('tourClickHint').style.display = interactive ? 'inline-block' : 'none';
   $('tourBackBtn').disabled = (i === 0);
   $('tourNextBtn').textContent = isLast ? 'Done' : 'Next';
-  // Interactive steps require the real click — Next is disabled there.
-  $('tourNextBtn').disabled = interactive;
+  // Always available now: nothing has to be clicked for the tour to progress.
+  $('tourNextBtn').disabled = false;
   $('tourSkipBtn').style.visibility = isLast ? 'hidden' : 'visible';
+  updateTourPauseBtn_();
 
   var delay = pageChanged ? 400 : 0;
   setTimeout(function() {
     if (step.action) { try { step.action(); } catch (e) { console.warn('Tour action failed', e); } }
     tourStepCleanup = step.cleanup || null;
 
-    if (interactive) armInteractive_(step);
+    // Resolved for the ring's benefit — the selector is often the control the
+    // step is about — but nothing is armed to listen for a click any more.
+    currentInteractiveCfg = interactive ? resolveInteractive_(step) : null;
+    startStepPlayback_(step);
 
     var selector = step.target || (currentInteractiveCfg && currentInteractiveCfg.sel);
     var firstEl = selector ? document.querySelector(selector) : null;
@@ -850,8 +933,12 @@ function maybeAutoStartTour_() {
   var next = $('tourNextBtn');
   var back = $('tourBackBtn');
   var skip = $('tourSkipBtn');
+  var pause = $('tourPauseBtn');
   if (next) next.addEventListener('click', function() { if (!next.disabled) tourNext_(); });
-  if (back) back.addEventListener('click', function() { if (tourStepIndex > 0) showTourStep_(tourStepIndex - 1); });
+  if (back) back.addEventListener('click', function() {
+    if (tourStepIndex > 0) { clearTourTimers_(); showTourStep_(tourStepIndex - 1); }
+  });
   if (skip) skip.addEventListener('click', function() { endTour_(); });
+  if (pause) pause.addEventListener('click', toggleTourPause_);
 })();
 </script>

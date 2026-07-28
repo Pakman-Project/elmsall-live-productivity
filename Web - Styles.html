@@ -4036,6 +4036,43 @@ body.page-scrolled-far .back-to-top {
   0%, 100% { box-shadow: 0 0 0 3px rgba(105, 167, 255, 0.95); }
   50%      { box-shadow: 0 0 0 6px rgba(105, 167, 255, 0.35); }
 }
+/* Slideshow timer. The bar is driven by a CSS width transition rather than a
+   rAF loop: the browser keeps it smooth on its own, and pausing is just a
+   matter of freezing the width where it stands. */
+.tour-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--w8);
+  overflow: hidden;
+  margin: 14px 0 4px;
+}
+
+.tour-progress > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.tour-pause {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.tour-pause:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .tour-click-hint {
   display: inline-block;
   margin-top: 10px;
