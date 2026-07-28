@@ -557,7 +557,7 @@ function buildBonusMiniTable_(rows, metric) {
   return html;
 }
 
-function buildBonusPanel_(title, allRows, rowsLimit) {
+function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
   var minUnderPerf = (currentThreshold / 0.25) * 100;
   var metric = sideSortMetric;
 
@@ -584,7 +584,13 @@ function buildBonusPanel_(title, allRows, rowsLimit) {
     .sort(function (a, b) { return a[metric] - b[metric]; })
     .slice(0, rowsLimit);
 
-  var html = '<div class="card panel">';
+  // Tagged for the rearrange feature. Only in By Work Area mode: Overall mode
+  // renders a single panel, and there is nothing to reorder against.
+  var reorderAttrs = reorderKey
+    ? ' data-reorder-key="bonus-' + escapeAttrPak(reorderKey) + '"' +
+      ' data-reorder-label="' + escapeAttrPak(title) + '"'
+    : '';
+  var html = '<div class="card panel"' + reorderAttrs + '>';
   html += '<div class="mini-table-title"><h2>' + safeTextPak(title) + '</h2><span class="tag">' + allRows.length + ' head' + (allRows.length !== 1 ? 's' : '') + '</span></div>';
   html += '<div class="bonus-two-tables">';
   html += '<div><div class="bonus-table-caption good"><i class="fa-solid fa-arrow-trend-up"></i> Productive</div>';
@@ -656,7 +662,7 @@ function renderSideTablesPak(rowsLimit) {
       if (hiddenBonusAreas.indexOf(t.key) !== -1) continue;
       var rows = computeBonusRows_(windowData, t.stdKey);
       if (rows.length === 0) continue;
-      html += buildBonusPanel_(t.label, rows, rowsLimit);
+      html += buildBonusPanel_(t.label, rows, rowsLimit, t.key);
     }
     if (!html) {
       html = '<div class="card panel bonus-empty-panel"><i class="fa-solid ' +
@@ -668,6 +674,10 @@ function renderSideTablesPak(rowsLimit) {
   }
 
   container.innerHTML = html;
+
+  // These panels are rebuilt from an HTML string on every render, so a saved
+  // order has to be re-applied each time rather than once at startup.
+  if (typeof refreshDynamicReorderZone_ === 'function') refreshDynamicReorderZone_();
 }
 
 function setSideTableSort(metric) {

@@ -1,6 +1,6 @@
 <script>
 // ============================================================================
-// Rearranging the chart panels (Overall and Volume pages).
+// Rearranging the panels on the Overall, Volume and Bonus pages.
 //
 // WHY BUTTONS AND NOT DRAG-AND-DROP
 //
@@ -21,13 +21,17 @@
 // and does not depend on DOM position at save time.
 // ============================================================================
 
-// Which containers can be rearranged, and what to call them. The Data Table is
-// deliberately absent — it is one table, with nothing to reorder. The Bonus
-// page is absent too: its panels are generated per work area and already
-// ordered by the area chips, so a second ordering would just contradict them.
+// Which containers can be rearranged. The Data Table is deliberately absent:
+// it is a single table, with nothing to reorder against.
 var REORDER_ZONES_ = [
   { zoneKey: 'overall', containerId: 'page1Charts' },
-  { zoneKey: 'volume',  containerId: 'volumeChartsContainer' }
+  { zoneKey: 'volume',  containerId: 'volumeChartsContainer' },
+  // The Bonus page's panels are generated per work area and rebuilt on every
+  // render, so unlike the other two zones its members come and go: an area with
+  // no activity in the selected window produces no panel at all. applyChartOrder_
+  // copes with that already — it only moves keys that are present, and appends
+  // anything the saved order does not mention.
+  { zoneKey: 'bonus',   containerId: 'bonusTablesContainer' }
 ];
 
 // { overall: ['overviewVol','perf',...], volume: ['vol0','vol3',...] }
@@ -167,6 +171,13 @@ function refreshOddCentering_() {
   if (panels.length > 0 && panels.length % 2 === 1) {
     panels[panels.length - 1].classList.add('chart-center-odd');
   }
+}
+
+// Called after any render that rebuilds a zone's contents from scratch, which
+// discards both the applied order and any edit-mode bars inside it.
+function refreshDynamicReorderZone_() {
+  applyChartOrder_();
+  if (_reorderMode) refreshReorderBars_();
 }
 
 // Called by renderChartsPak once it has rebuilt the trend panels, since that
