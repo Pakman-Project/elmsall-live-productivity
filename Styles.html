@@ -52,6 +52,10 @@
   /* Edge cue for horizontally scrollable tables. */
   --scroll-shadow: rgba(0, 0, 0, 0.28);
 
+  /* Expanded-row drawer on the Data Table. Light needs far less than dark: on
+     white, 5% already separates the drawer from the row above it. */
+  --detail-recess: rgba(0, 0, 0, 0.05);
+
   /* Productivity bars on the Bonus tables. Faint enough to sit behind the
      figure without competing with it — the bar is for the shape of the
      ranking, the number is still what you read. */
@@ -114,6 +118,8 @@
   --table-freeze-expanded: #23262c;
 
   --scroll-shadow: rgba(0, 0, 0, 0.6);
+
+  --detail-recess: rgba(0, 0, 0, 0.22);
 
   --perf-bar-good: rgba(161, 211, 153, 0.18);
   --perf-bar-warn: rgba(255, 157, 92, 0.18);
@@ -2655,43 +2661,51 @@ body.page-scrolled-far .back-to-top {
    and no way to check without scrolling back. Pinning the two identity columns
    keeps that anchor on screen.
 
-   Scoped to #mainTable and to its data rows only: the expanded detail row is a
-   single colspan cell that also sits at :nth-child(1), and pinning that would
-   drag the entire nested per-entry table sideways with the horizontal scroll.
-   Mobile is untouched — under 900px the table is replaced by .main-card-list. */
-#mainTable thead th:nth-child(1),
-#mainTable thead th:nth-child(2),
-#mainTable tbody tr:not(.main-detail-row) > td:nth-child(1),
-#mainTable tbody tr:not(.main-detail-row) > td:nth-child(2) {
+   Every combinator here is a CHILD combinator, not a descendant one. The
+   expanded per-entry table is a whole <table> nested inside a cell of this one,
+   so its own thead/tbody/tr are all descendants of #mainTable — a descendant
+   selector reaches straight into it and pins its first two columns as well,
+   which is exactly what happened: they turned opaque white and floated over the
+   detail row's recessed background while the rest of it stayed grey.
+
+   The :not(.main-detail-row) guard is still needed for a different reason: that
+   row's single colspan cell is also at :nth-child(1), and pinning it would drag
+   the entire nested table sideways with the horizontal scroll.
+
+   Mobile is untouched — under 700px the table is replaced by .main-card-list. */
+#mainTable > thead > tr > th:nth-child(1),
+#mainTable > thead > tr > th:nth-child(2),
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
   position: sticky;
   /* Table cells are transparent by default; a pinned one must be opaque or the
      columns sliding underneath show straight through it. */
   background: var(--panel);
 }
 
-#mainTable thead th:nth-child(1),
-#mainTable tbody tr:not(.main-detail-row) > td:nth-child(1) {
+#mainTable > thead > tr > th:nth-child(1),
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1) {
   left: 0;
 }
 
 /* 260px is the width given to column 1 in the shared width block above; the two
    must stay in step or the columns will overlap. The shadow draws the freeze
    line, so it is obvious which columns are being held still. */
-#mainTable thead th:nth-child(2),
-#mainTable tbody tr:not(.main-detail-row) > td:nth-child(2) {
+#mainTable > thead > tr > th:nth-child(2),
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
   left: 260px;
   box-shadow: 1px 0 0 var(--border);
 }
 
-#mainTable tbody tr:not(.main-detail-row) > td:nth-child(1),
-#mainTable tbody tr:not(.main-detail-row) > td:nth-child(2) {
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
   z-index: 4;
 }
 
 /* The two header corners are pinned in both directions, so they must sit above
    both the remaining headers (z-index 10) and the pinned body cells. */
-#mainTable thead th:nth-child(1),
-#mainTable thead th:nth-child(2) {
+#mainTable > thead > tr > th:nth-child(1),
+#mainTable > thead > tr > th:nth-child(2) {
   z-index: 20;
 }
 
@@ -2753,10 +2767,15 @@ body.page-scrolled-far .back-to-top {
   display: table-row;
 }
 
+/* The expanded drawer sits recessed below its row. The shade was a hardcoded
+   18% black, which reads as a gentle recess against a dark panel but as a heavy
+   grey wash over a white one — it was only ever tuned for dark mode. It is now
+   a per-theme token: barely-there in light, where white already provides the
+   contrast, and deeper in dark, where it has to work against #1e1e1e. */
 .main-detail-td {
   padding: 0 !important;
-  border-bottom: 2px solid rgba(105, 167, 255, 0.2) !important;
-  background: rgba(0, 0, 0, 0.18) !important;
+  border-bottom: 2px solid var(--border) !important;
+  background: var(--detail-recess) !important;
 }
 
 .main-detail-content {
