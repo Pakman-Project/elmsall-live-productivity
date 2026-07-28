@@ -87,6 +87,10 @@ var TOUR_STEPS = [
     title: 'Groups editor',
     body: 'Build up to 7 groups of work areas, toggle each group’s line/trend, then Apply — the work-area chart updates to match. Click the × to close when you’re ready.' },
 
+  { part: 3, page: 0, target: 'button[onclick="openAreaGroupSplit()"]',
+    title: 'One chart, or several',
+    body: 'With more than a few groups, a single chart gets crowded. “Split” spreads them across up to seven charts — you choose which groups go on each one, and a group can appear on more than one. Groups and Split work together: Groups decides what a group contains, Split decides where it is drawn.' },
+
   // ===== Part 4 — Volume page ==============================================
   { part: 4, page: 1, target: '.volume-controls',
     title: 'Volume page',
@@ -187,19 +191,47 @@ var TOUR_STEPS = [
     title: 'A link, or a picture',
     body: 'The link reopens this exact view for whoever you send it to — same page, same day, same bonus filter. Or download the page as an image: it captures the WHOLE page, including anything scrolled out of sight, stamped with the time of the data. Click the × to close.' },
 
-  // ===== Part 8 — Your settings are remembered =============================
-  { part: 8, page: 0, target: '.kpi-controls-row',
+  // ===== Part 8 — Arranging the layout =====================================
+  { part: 8, page: 0, target: '#reorderBtn',
+    // On a phone this button lives inside the burger menu, so the ring would
+    // have nothing visible to point at. Opening the menu first puts it on
+    // screen for both layouts; the cleanup on the last step closes it again.
+    action: function () {
+      if (window.matchMedia('(max-width: 700px)').matches &&
+          !document.body.classList.contains('header-menu-open') &&
+          typeof toggleHeaderMenu_ === 'function') {
+        toggleHeaderMenu_(true);
+      }
+    },
+    title: 'Arrange the layout',
+    body: 'Not everyone reads these pages in the same order. The pen button turns on rearrange mode, where you can move the panels around to suit how you work.' },
+  { part: 8, page: 0, target: '.reorder-bar',
+    action: function () {
+      if (typeof setReorderMode_ === 'function' && !_reorderMode) setReorderMode_(true);
+    },
+    title: 'Move a panel',
+    body: 'Every panel gets a bar showing its position, with arrows to move it earlier or later. It works the same on a phone as on a desktop — no dragging, so it never fights with scrolling or swiping between pages.' },
+  { part: 8, page: 0, target: '.toast',
+    title: 'Finish when you are done',
+    body: 'The message at the bottom stays up while rearrange mode is on. Press “Done” there to finish, or “Reset order” to put everything back the way it started. Your layout is saved as you go — and it applies to the Volume and Bonus pages too.',
+    cleanup: function () {
+      if (typeof setReorderMode_ === 'function' && _reorderMode) setReorderMode_(false);
+      if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false);
+    } },
+
+  // ===== Part 9 — Your settings are remembered =============================
+  { part: 9, page: 0, target: '.kpi-controls-row',
     title: 'It remembers your setup',
     body: 'You don’t have to set things up twice. Your Hours Range and Time Window are saved in this browser and come back automatically next time you open the dashboard.' },
-  { part: 8, page: 0, target: null,
+  { part: 9, page: 0, target: null,
     title: 'What else is saved',
-    body: 'Also remembered: the Volume and Bonus display modes, which work areas you’ve hidden with the chips, your Area Groups and split trend charts, and how many rows the bonus tables show. Your bonus-number filter is NOT saved — every visit starts showing everyone.' },
-  { part: 8, page: 0, target: '#themeToggleBtn',
+    body: 'Also remembered: the Volume and Bonus display modes, which work areas you’ve hidden with the chips, your Area Groups and split charts, the panel order you arranged, and how many rows the bonus tables show. Your bonus-number filter is NOT saved — every visit starts showing everyone.' },
+  { part: 9, page: 0, target: '#themeToggleBtn',
     title: 'Light or dark',
     body: 'This button switches between light and dark mode — that’s remembered too, so the dashboard always opens the way you like it.' },
 
-  // ===== Part 9 — Wrap up ===================================================
-  { part: 9, page: 0, target: null,
+  // ===== Part 10 — Wrap up ==================================================
+  { part: 10, page: 0, target: null,
     title: 'You’re all set ✅',
     body: 'That’s the tour! Your real live data is ready now. You can replay this any time from the “?” button in the header.' }
 ];
@@ -225,14 +257,15 @@ var TOUR_PART_TITLES = {
   5: 'Bonus Numbers page',
   6: 'Data Table page',
   7: 'Sharing a view',
-  8: 'Your saved settings',
-  9: 'Wrap up'
+  8: 'Arranging the layout',
+  9: 'Your saved settings',
+  10: 'Wrap up'
 };
 
 // Parts that are skipped in the "?" replay menu — the wrap-up is just a
 // closing note, so it isn't worth jumping to on its own. It still runs at the
 // end of a full tour.
-var TOUR_MENU_HIDDEN_PARTS = { 9: true };
+var TOUR_MENU_HIDDEN_PARTS = { 10: true };
 
 function firstStepIndexOfPart_(part) {
   for (var i = 0; i < TOUR_STEPS.length; i++) {
