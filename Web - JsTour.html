@@ -7,10 +7,12 @@
 // Steps are grouped into "parts" (part 1, 2, ...) with auto sub-numbering shown
 // as e.g. "PART 2 OF 7 · 2.3" so the tour never looks like "5 / 32".
 //
-// The tour plays as a slideshow: every step shows for TOUR_STEP_MS and advances
-// on its own. Steps carrying an `interactive` config are DEMONSTRATED by the
-// tour itself partway through the step (see performStepDemo_), so the viewer
-// watches each control being used rather than being told to use it.
+// The tour plays as a slideshow. Each step shows for its own duration — a
+// five-second floor plus reading time, see stepDurationMs_ — and advances on
+// its own. Steps carrying an `interactive` config, or a `demo` function, are
+// DEMONSTRATED by the tour in the closing stretch of the step (see
+// performStepDemo_), so the viewer reads what is coming, watches it happen,
+// and moves on.
 //
 // It used to require the user to click the highlighted control before it would
 // move on. That read as an instruction rather than a demonstration, and it
@@ -18,7 +20,8 @@
 // list, a panel that had not rendered — there was nothing to click and no way
 // forward but Skip. A missing target is now simply skipped past.
 //
-// Skip / Back / Next / Pause remain, and Space toggles pause.
+// Skip / Back / Next / Pause remain, Space toggles pause, and one button
+// cycles the playback speed through 1x, 1.5x and 2x.
 // ============================================================================
 
 var TOUR_SEEN_KEY = 'e3_tour_seen_v1';
@@ -113,7 +116,7 @@ var TOUR_STEPS = [
           if (!tourActive) return;
           flashDemoTarget_(box);
           setTimeout(function () { try { box.click(); } catch (e) {} }, 200);
-        }, n * 800);
+        }, n * 450);
       });
     },
     title: 'Step 1 — build a group',
@@ -641,10 +644,10 @@ var TOUR_STEP_CAP_MS = 14000;
 // ~200 words per minute, the usual comfortable rate for short on-screen prose.
 var TOUR_MS_PER_WORD = 300;
 
-// The demonstration fires partway through, so the ring is on screen briefly
-// before anything moves — otherwise the change has happened before the user has
-// worked out where to look.
-var TOUR_DEMO_AT_MS = 1600;
+// The demonstration fires in the CLOSING stretch of a step: the viewer reads
+// what is about to happen, watches it happen, and moves on. Firing it early
+// left the rest of the step sitting on an already-changed screen.
+var TOUR_DEMO_TAIL_MS = 1500;
 
 // Playback speed. Divides every duration, so 2x halves both the step length and
 // the wait before the demonstration.
@@ -703,13 +706,28 @@ function typeIntoDemo_(el, value, perCharMs) {
   })();
 }
 
+// A full press-release-click sequence, not just .click().
+//
+// Some controls here deliberately listen for mousedown rather than click — the
+// search suggestions do, because the input would otherwise blur first and close
+// the list out from under the click. element.click() dispatches ONLY a click
+// event, so those handlers never ran and the tour appeared to select nothing:
+// that is why the filter step showed a dropdown and then moved on having
+// applied no filter at all.
 function demoClick_(sel) {
   var el = document.querySelector(sel);
   if (!el) return false;
   flashDemoTarget_(el);
   // Slightly after the flash, so the cue is seen before the effect.
   setTimeout(function () {
-    try { el.click(); } catch (e) { console.warn('Tour demo click failed', e); }
+    try {
+      var opts = { bubbles: true, cancelable: true, view: window };
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.click();
+    } catch (e) {
+      try { el.click(); } catch (e2) { console.warn('Tour demo click failed', e2); }
+    }
   }, 220);
   return true;
 }
@@ -746,6 +764,23 @@ function performStepDemo_(step) {
   }
 }
 
+// Brings a ringed element into view, in the page or inside a scrolling modal.
+// 'nearest' inside a modal so the dialog is nudged just enough rather than
+// yanked to centre, which looks like a jump when the control was already
+// mostly visible.
+function scrollTourTargetIntoView_(el, insideModal) {
+  if (!el || !el.scrollIntoView) return;
+  try {
+    el.scrollIntoView({
+      block: insideModal ? 'nearest' : 'center',
+      inline: 'nearest',
+      behavior: 'smooth'
+    });
+  } catch (e) {
+    try { el.scrollIntoView(); } catch (e2) {}
+  }
+}
+
 function setTourProgress_(pct, durationMs) {
   var bar = $('tourProgressBar');
   if (!bar) return;
@@ -771,7 +806,10 @@ function startStepPlayback_(step) {
   clearTourTimers_();
   _tourStepTotalMs = stepDurationMs_(step);
   _tourDemoPending = !!(step.interactive || step.demo);
-  _tourDemoAtMs = Math.round(TOUR_DEMO_AT_MS / tourSpeed_());
+  // Scaled with speed so the tail keeps its proportion, and floored so a short
+  // step still shows the ring before acting on it.
+  var tail = Math.round(TOUR_DEMO_TAIL_MS / tourSpeed_());
+  _tourDemoAtMs = Math.max(500, _tourStepTotalMs - tail);
   _tourStepStartedAt = Date.now();
 
   setTourProgress_(0, 0);
@@ -789,10 +827,16 @@ function scheduleTourTimers_(remainingMs, demoInMs) {
       if (!tourActive || tourStepIndex !== startedIndex) return;
       _tourDemoPending = false;
       performStepDemo_(stepAtStart);
-      // The demonstration may have opened a modal or re-rendered a panel, so
-      // the ring needs re-measuring against whatever is there now.
+      // The demonstration may have opened a modal, re-rendered a panel or moved
+      // one — so the ring needs re-measuring, and whatever it now points at may
+      // have ended up off screen.
       setTimeout(function () {
-        if (tourActive && tourStepIndex === startedIndex) placeTourTooltip_(stepAtStart);
+        if (!tourActive || tourStepIndex !== startedIndex) return;
+        var sel = stepAtStart.target ||
+                  (currentInteractiveCfg && currentInteractiveCfg.sel);
+        var el = sel ? document.querySelector(sel) : null;
+        if (el) scrollTourTargetIntoView_(el, !!stepAtStart.modal);
+        placeTourTooltip_(stepAtStart);
       }, 260);
     }, demoInMs);
   }
@@ -952,14 +996,21 @@ function showTourStep_(i) {
     var selector = step.target || (currentInteractiveCfg && currentInteractiveCfg.sel);
     var firstEl = selector ? document.querySelector(selector) : null;
     if (firstEl && !step.modal) {
-      try { firstEl.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (e) {}
+      scrollTourTargetIntoView_(firstEl, false);
       setTimeout(function() { placeTourTooltip_(step); }, 220);
     } else {
       placeTourTooltip_(step);
       // Modals scale in over ~0.3s — re-measure the close-button ring once the
       // modal has settled so the highlight lands squarely on the ×.
       if (step.modal) {
-        setTimeout(function() { if (tourCurrentStep === step) placeTourTooltip_(step); }, 400);
+        // Modal bodies scroll independently, and a ringed control can easily sit
+        // below their fold — the editors in Groups & Charts are taller than the
+        // dialog. Scrolled once the modal has finished scaling in.
+        setTimeout(function() {
+          if (tourCurrentStep !== step) return;
+          if (firstEl) scrollTourTargetIntoView_(firstEl, true);
+          placeTourTooltip_(step);
+        }, 400);
         setTimeout(function() { if (tourCurrentStep === step) placeTourTooltip_(step); }, 700);
       }
     }

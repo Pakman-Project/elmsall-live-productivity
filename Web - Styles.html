@@ -3104,9 +3104,22 @@ body.page-scrolled-far .back-to-top {
 #mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
 #mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
   position: sticky;
-  /* Table cells are transparent by default; a pinned one must be opaque or the
-     columns sliding underneath show straight through it. */
+}
+
+/* Table cells are transparent by default and a pinned one must be opaque, or
+   the columns sliding underneath show straight through it. Header and body
+   need DIFFERENT opaque colours though: painting the two frozen header cells
+   with the panel colour left "Date Time" and "Unique Bonus Number" sitting on
+   white while every other header sat on grey, so the header row looked like it
+   simply stopped after the second column. */
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
   background: var(--panel);
+}
+
+#mainTable > thead > tr > th:nth-child(1),
+#mainTable > thead > tr > th:nth-child(2) {
+  background: var(--surface-dropdown-2);
 }
 
 #mainTable > thead > tr > th:nth-child(1),
