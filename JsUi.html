@@ -528,14 +528,26 @@
 
   function setupSwipe() {
     var container = $('swipeContainer');
-    container.style.cursor = 'grab';
+
+    // Touch only. Drag-to-page with a mouse is not a desktop idiom — a click
+    // and drag inside a chart or across a table is a selection or a hover, not
+    // a request to change page, and the 15px threshold could not reliably tell
+    // the difference. Desktop navigates by the rail (and the arrow keys, which
+    // are unaffected).
+    //
+    // Dropping the mouse bindings also removes a subtler problem: browsers
+    // synthesise mousedown/mousemove/mouseup after a tap, so on a touchscreen
+    // every swipe was being processed twice, once through each pathway.
     container.addEventListener('touchstart', touchStart(), { passive: true });
     container.addEventListener('touchend', touchEnd);
     container.addEventListener('touchmove', touchMove, { passive: true });
-    container.addEventListener('mousedown', touchStart());
-    container.addEventListener('mouseup', touchEnd);
-    container.addEventListener('mouseleave', touchEnd);
-    container.addEventListener('mousemove', touchMove);
+
+    // The grab cursor advertised a drag that no longer exists, so it is only
+    // set where a coarse pointer is present — where it is invisible anyway,
+    // but harmless — and left alone on desktop.
+    var coarse = false;
+    try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+    if (coarse) container.style.cursor = 'grab';
     document.addEventListener('keydown', function(e) {
       // Guarded (see isPageArrowNavAllowed_): the arrows used to slide the whole
       // dashboard sideways even while the user was moving the caret in the
