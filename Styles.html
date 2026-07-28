@@ -49,6 +49,9 @@
   --table-freeze-hover: #fafcff;
   --table-freeze-expanded: #f7fafe;
 
+  /* Edge cue for horizontally scrollable tables. */
+  --scroll-shadow: rgba(0, 0, 0, 0.28);
+
   /* Precomputed alpha tints. Defined per theme instead of using color-mix(),
      which html2canvas cannot parse — it made image export fail entirely. */
   --accent-10: rgba(0, 122, 122, 0.10);
@@ -102,6 +105,8 @@
 
   --table-freeze-hover: #212328;
   --table-freeze-expanded: #23262c;
+
+  --scroll-shadow: rgba(0, 0, 0, 0.6);
 
   --accent-10: rgba(0, 147, 147, 0.10);
   --accent-14: rgba(0, 147, 147, 0.14);
@@ -818,6 +823,60 @@ body.loading-skeleton canvas { visibility: hidden; }
 .page::-webkit-scrollbar-thumb {
   background-color: var(--border);
   border-radius: 3px;
+}
+
+/* ── Scrollbars everywhere else ──────────────────────────────────────────────
+   Only .page was themed, so every other scrolling area — the tables, the modal
+   bodies, the search suggestions — fell back to the browser's default bar. In
+   dark mode that meant a chunky light-grey scrollbar sitting inside a dark
+   panel, which is the single most obvious place the reskin stopped short. */
+.table-wrap,
+.breakdown-body,
+.search-dropdown,
+.main-detail-table-wrap,
+.tour-menu-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.table-wrap::-webkit-scrollbar,
+.breakdown-body::-webkit-scrollbar,
+.search-dropdown::-webkit-scrollbar,
+.main-detail-table-wrap::-webkit-scrollbar,
+.tour-menu-list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb,
+.breakdown-body::-webkit-scrollbar-thumb,
+.search-dropdown::-webkit-scrollbar-thumb,
+.main-detail-table-wrap::-webkit-scrollbar-thumb,
+.tour-menu-list::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
+.table-wrap::-webkit-scrollbar-track,
+.breakdown-body::-webkit-scrollbar-track,
+.search-dropdown::-webkit-scrollbar-track,
+.main-detail-table-wrap::-webkit-scrollbar-track,
+.tour-menu-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── "There is more to the right" ────────────────────────────────────────────
+   The Data Table is far wider than the panel holding it, but with overlay
+   scrollbars (the default on macOS, and on Windows while not scrolling) there
+   was nothing on screen to say so — the columns simply appeared to end.
+
+   An INSET shadow is used rather than a positioned overlay because it paints
+   against the scroll container's padding box and therefore stays put while the
+   content moves under it. Right edge only: the left edge is already marked by
+   the frozen columns' divider, and those cells are opaque so they would cover
+   an inset shadow anyway. */
+.table-wrap.has-scroll-x:not(.at-scroll-end) {
+  box-shadow: inset -16px 0 16px -16px var(--scroll-shadow);
 }
 
 .grid {

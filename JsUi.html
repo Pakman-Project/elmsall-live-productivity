@@ -339,6 +339,36 @@
     if (railItem) { try { railItem.focus(); } catch (e) {} }
   }
 
+  // ── Horizontal scroll cue on tables ────────────────────────────────────────
+  // Marks a .table-wrap with whether it can scroll sideways at all and whether
+  // it has reached the right-hand end, which is what the edge shadow keys off.
+  // A couple of pixels of slack absorbs fractional scroll positions from
+  // display scaling, which otherwise leave "at the end" permanently false.
+  var SCROLL_EDGE_SLACK = 2;
+
+  function updateScrollEdges_(el) {
+    if (!el || !el.classList || !el.classList.contains('table-wrap')) return;
+    var max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle('has-scroll-x', max > SCROLL_EDGE_SLACK);
+    el.classList.toggle('at-scroll-end', el.scrollLeft >= max - SCROLL_EDGE_SLACK);
+  }
+
+  function refreshScrollEdgesAll_() {
+    var wraps = document.querySelectorAll('.table-wrap');
+    for (var i = 0; i < wraps.length; i++) { updateScrollEdges_(wraps[i]); }
+  }
+
+  function initScrollEdges_() {
+    // Capture phase: scroll events do not bubble, so a single delegated
+    // listener only works on the way down. The alternative — binding to each
+    // .table-wrap — would need rebinding after every table re-render, since
+    // most of them are rebuilt from HTML strings on each filter change.
+    document.addEventListener('scroll', function (e) {
+      updateScrollEdges_(e.target);
+    }, true);
+    window.addEventListener('resize', refreshScrollEdgesAll_);
+  }
+
   function initPageScrollChrome_() {
     var pages = document.querySelectorAll('.page');
     for (var i = 0; i < pages.length; i++) {
@@ -370,6 +400,9 @@
       renderMainTablePak(currentMainRows);
     }
     pageDirty[index] = false;
+    // Tables are rebuilt from HTML strings, so their scroll geometry is only
+    // knowable once the new markup is in the document.
+    setTimeout(refreshScrollEdgesAll_, 0);
   }
 
   function goToPage(index) {
