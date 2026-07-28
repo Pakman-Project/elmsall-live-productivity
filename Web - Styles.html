@@ -436,14 +436,24 @@ body.loading-skeleton #mainTableWrapper::after {
   font-weight: 600;
   white-space: nowrap;
 }
+/* The NEXT wordmark, inlined as SVG. currentColor rather than the file's own
+   white, so it follows the header's text colour instead of assuming the bar
+   will always be black. */
 .next-logo {
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
   color: #fff;
   text-decoration: none;
   line-height: 1;
   transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.next-logo svg {
+  height: 19px;
+  /* Width follows the 100:24 viewBox rather than being fixed, so the mark
+     cannot be stretched if the height is ever changed. */
+  width: auto;
+  display: block;
 }
 .next-logo:hover {
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
@@ -609,6 +619,8 @@ body.loading-skeleton #mainTableWrapper::after {
     white-space: normal;
   }
   .next-header-title { font-size: 17px; }
+  /* Scaled with the title so the two keep their relative weight on a phone. */
+  .next-logo svg { height: 15px; }
   .next-header-controls #archiveSelect { flex: 0 0 auto; min-width: 110px; max-width: 150px; }
   .next-header-controls .bonus-search-container { flex: 1 1 auto; width: auto; }
 
