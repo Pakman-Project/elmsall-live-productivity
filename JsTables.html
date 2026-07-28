@@ -521,9 +521,27 @@ function buildBonusRowHtml_(r) {
     ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
     (isActive ? 'Click to remove filter' : 'Click to filter main view') +
     '</span></span></td>' +
-    '<td>' + numPak(r.standardHour, 1) + '</td>' +
-    '<td><span class="pill ' + perfClassPak(r.performance) + '">' + Math.round(normalizePerfPak(r.performance)) + '%</span></td>' +
+    '<td class="num">' + numPak(r.standardHour, 1) + '</td>' +
+    buildPerfCellHtml_(r.performance) +
     '</tr>';
+}
+
+// The productivity cell, with the figure drawn as a bar behind it. These tables
+// are a ranking — "who is at the top, who is at the bottom" — and a column of
+// numbers makes that a reading exercise, where a bar makes the shape of the
+// distribution visible at a glance: whether the top ten are close together or
+// one person is far ahead, and how steep the drop-off is.
+function buildPerfCellHtml_(performance) {
+  var perf = normalizePerfPak(performance);
+  // 100% fills the cell. Anything above that is genuinely exceptional and is
+  // let run to the full width rather than rescaling every other bar down to
+  // accommodate it — the number beside it still says how far above.
+  var width = Math.max(0, Math.min(perf, 100));
+  var cls = perfClassPak(performance);
+  return '<td class="perf-cell">' +
+    '<span class="perf-bar ' + cls + '" style="width:' + width.toFixed(1) + '%"></span>' +
+    '<span class="pill ' + cls + '">' + Math.round(perf) + '%</span>' +
+    '</td>';
 }
 
 function buildBonusMiniTable_(rows, metric) {

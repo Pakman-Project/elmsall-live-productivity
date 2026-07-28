@@ -52,6 +52,13 @@
   /* Edge cue for horizontally scrollable tables. */
   --scroll-shadow: rgba(0, 0, 0, 0.28);
 
+  /* Productivity bars on the Bonus tables. Faint enough to sit behind the
+     figure without competing with it — the bar is for the shape of the
+     ranking, the number is still what you read. */
+  --perf-bar-good: rgba(60, 105, 57, 0.16);
+  --perf-bar-warn: rgba(204, 75, 0, 0.16);
+  --perf-bar-bad: rgba(211, 47, 47, 0.14);
+
   /* Precomputed alpha tints. Defined per theme instead of using color-mix(),
      which html2canvas cannot parse — it made image export fail entirely. */
   --accent-10: rgba(0, 122, 122, 0.10);
@@ -107,6 +114,10 @@
   --table-freeze-expanded: #23262c;
 
   --scroll-shadow: rgba(0, 0, 0, 0.6);
+
+  --perf-bar-good: rgba(161, 211, 153, 0.18);
+  --perf-bar-warn: rgba(255, 157, 92, 0.18);
+  --perf-bar-bad: rgba(244, 67, 54, 0.20);
 
   --accent-10: rgba(0, 147, 147, 0.10);
   --accent-14: rgba(0, 147, 147, 0.14);
@@ -1034,6 +1045,52 @@ table {
 .side-table {
   min-width: 100%;
   width: 100%;
+}
+
+/* ── Productivity bars on the Bonus tables ───────────────────────────────────
+   These tables answer "who is at the top and who is at the bottom", which a
+   column of percentages turns into a reading exercise. The bar makes the shape
+   of the ranking visible at a glance — whether the top ten are bunched together
+   or one person is far ahead, and how steep the drop-off is.
+
+   Drawn as a background layer behind the existing pill rather than replacing
+   it: the exact figure is still the thing being read, the bar just gives it
+   somewhere to sit. */
+.side-table .perf-cell {
+  position: relative;
+}
+
+.perf-bar {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 0 3px 3px 0;
+  /* Behind the pill, and out of the way of clicks on the row. */
+  z-index: 0;
+  pointer-events: none;
+}
+
+.perf-cell .pill {
+  position: relative;
+  z-index: 1;
+}
+
+.perf-bar.good { background: var(--perf-bar-good); }
+.perf-bar.warn { background: var(--perf-bar-warn); }
+.perf-bar.bad  { background: var(--perf-bar-bad); }
+
+/* Standard Hours is a quantity, so it gets the same right alignment as the
+   Data Table's numeric columns — the two tables sit on the same screen and
+   should not disagree about how a number is presented. */
+.side-table td.num {
+  text-align: right;
+  padding-right: 14px;
+}
+
+.side-table th:nth-child(2) {
+  text-align: right;
+  padding-right: 14px;
 }
 
 th,
