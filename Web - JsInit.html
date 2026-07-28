@@ -421,6 +421,9 @@
     setupSwipe();
     initPageScrollChrome_();
     initScrollEdges_();
+    // After loadUserPreferences above, so a saved chart order is already in
+    // chartOrderState and can be applied on this first pass.
+    initChartReorder_();
 
     // ── Deep link: apply anything the URL specified ──────────────────────
     // Applied AFTER loadUserPreferences so an explicit link always wins over

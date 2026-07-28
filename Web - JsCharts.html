@@ -209,7 +209,14 @@
     // driven by JS (not :nth-child) so it stays correct no matter which areas
     // are hidden, not just when every panel is shown.
     if (mode === 'separate' && visibleIndices.length % 2 === 1) {
-      var lastVisibleEl = $('volPanel' + visibleIndices[visibleIndices.length - 1]);
+      // DOM order, not VOLUME_TYPES order. The panels can be rearranged, so
+      // "last" has to mean last on screen — indexing back into VOLUME_TYPES
+      // would centre whichever panel happens to be last in the data model.
+      var domPanels = container.querySelectorAll('.vol-chart-panel');
+      var lastVisibleEl = null;
+      for (var dp = 0; dp < domPanels.length; dp++) {
+        if (domPanels[dp].style.display !== 'none') lastVisibleEl = domPanels[dp];
+      }
       if (lastVisibleEl) lastVisibleEl.classList.add('vol-span-full');
     }
 
@@ -408,6 +415,12 @@
           syncToTargets(trendCharts[idx], others, event, elements);
         } } });
       })(ti);
+    }
+
+    // The trend panels have just been replaced, and the odd-panel centering was
+    // decided against the old ones — recompute it against what is there now.
+    if (typeof refreshChartLayoutAfterRender_ === 'function') {
+      refreshChartLayoutAfterRender_();
     }
   }
 

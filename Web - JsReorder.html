@@ -1,0 +1,311 @@
+<script>
+// ============================================================================
+// Rearranging the chart panels (Overall and Volume pages).
+//
+// WHY BUTTONS AND NOT DRAG-AND-DROP
+//
+// Drag is the obvious answer on desktop and the wrong one here, because these
+// pages already spend their touch budget. A finger on a .page can mean three
+// things: swipe sideways to change page, scroll vertically, or pull down to
+// refresh. Adding "press and hold to pick a chart up" makes a fourth, and the
+// only way to tell it apart from the other three is a long-press — which is
+// invisible to anyone who has not been told about it, and which fights
+// scrolling for the whole duration of the press.
+//
+// Explicit move buttons behave identically on a phone and a desktop, need no
+// gesture arbitration at all, work from the keyboard, and can be operated
+// one-handed. The cost is that moving a chart several places takes several
+// taps. For a layout someone sets once, that is the right trade.
+//
+// Order is stored per zone as a list of stable keys, so it survives a re-render
+// and does not depend on DOM position at save time.
+// ============================================================================
+
+// Which containers can be rearranged, and what to call them. The Data Table is
+// deliberately absent — it is one table, with nothing to reorder. The Bonus
+// page is absent too: its panels are generated per work area and already
+// ordered by the area chips, so a second ordering would just contradict them.
+var REORDER_ZONES_ = [
+  { zoneKey: 'overall', containerId: 'page1Charts' },
+  { zoneKey: 'volume',  containerId: 'volumeChartsContainer' }
+];
+
+// { overall: ['overviewVol','perf',...], volume: ['vol0','vol3',...] }
+var chartOrderState = {};
+
+var _reorderMode = false;
+
+// ---- Identifying the movable panels ---------------------------------------
+
+// Stable keys, assigned once. Derived from the canvas each panel owns rather
+// than from position, so an order saved today still means the same thing after
+// panels are added or the markup is reshuffled.
+function reorderItemsInZone_(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return [];
+  var out = [];
+  for (var i = 0; i < container.children.length; i++) {
+    var el = container.children[i];
+    if (el.hasAttribute && el.hasAttribute('data-reorder-key')) out.push(el);
+  }
+  return out;
+}
+
+function tagReorderItems_() {
+  var overall = document.getElementById('page1Charts');
+  if (overall) {
+    for (var i = 0; i < overall.children.length; i++) {
+      var el = overall.children[i];
+      var key = null;
+      if (el.id === 'trendChartsWrap') key = 'trend';
+      else if (el.querySelector && el.querySelector('#overviewVolChart')) key = 'overviewVol';
+      else if (el.querySelector && el.querySelector('#perfChart')) key = 'perf';
+      else if (el.querySelector && el.querySelector('#areaGroupChart')) key = 'areaGroup';
+      if (key) {
+        el.setAttribute('data-reorder-key', key);
+        el.setAttribute('data-reorder-label', reorderLabelFor_(el, key));
+      }
+    }
+  }
+
+  // Volume: only the chart panels. The controls row and the area chips above
+  // them are not panels and must stay where they are.
+  for (var v = 0; v < VOLUME_TYPES.length; v++) {
+    var p = document.getElementById('volPanel' + v);
+    if (!p) continue;
+    p.setAttribute('data-reorder-key', 'vol' + v);
+    p.setAttribute('data-reorder-label', VOLUME_TYPES[v].label);
+  }
+}
+
+function reorderLabelFor_(el, key) {
+  if (key === 'trend') return 'Deployment Trend';
+  var h2 = el.querySelector('h2');
+  return h2 ? h2.textContent.trim() : key;
+}
+
+// ---- Applying and saving an order -----------------------------------------
+
+function defaultOrderFor_(zoneKey) {
+  var zone = null;
+  for (var i = 0; i < REORDER_ZONES_.length; i++) {
+    if (REORDER_ZONES_[i].zoneKey === zoneKey) zone = REORDER_ZONES_[i];
+  }
+  if (!zone) return [];
+  return reorderItemsInZone_(zone.containerId).map(function (el) {
+    return el.getAttribute('data-reorder-key');
+  });
+}
+
+// Moves elements with appendChild, which relocates rather than copies. Only
+// tagged panels are touched, so anything else in the container (the Volume
+// page's controls and chips) keeps its place at the top.
+function applyChartOrder_() {
+  for (var z = 0; z < REORDER_ZONES_.length; z++) {
+    var zone = REORDER_ZONES_[z];
+    var container = document.getElementById(zone.containerId);
+    if (!container) continue;
+    var wanted = chartOrderState[zone.zoneKey];
+    if (!wanted || !wanted.length) continue;
+
+    var byKey = {};
+    var present = reorderItemsInZone_(zone.containerId);
+    for (var i = 0; i < present.length; i++) {
+      byKey[present[i].getAttribute('data-reorder-key')] = present[i];
+    }
+    for (var k = 0; k < wanted.length; k++) {
+      var el = byKey[wanted[k]];
+      if (el) container.appendChild(el);
+    }
+    // Anything saved order does not mention (a panel added in a later version)
+    // keeps its relative position by falling to the end rather than vanishing.
+    for (var m = 0; m < present.length; m++) {
+      if (wanted.indexOf(present[m].getAttribute('data-reorder-key')) === -1) {
+        container.appendChild(present[m]);
+      }
+    }
+  }
+  refreshOddCentering_();
+}
+
+function captureChartOrder_() {
+  for (var z = 0; z < REORDER_ZONES_.length; z++) {
+    var zone = REORDER_ZONES_[z];
+    chartOrderState[zone.zoneKey] = reorderItemsInZone_(zone.containerId)
+      .map(function (el) { return el.getAttribute('data-reorder-key'); });
+  }
+  saveUserPreferences();
+}
+
+// ---- Keeping the odd-panel centering honest -------------------------------
+// The Overall grid centres a lone trailing panel when the count is odd. That
+// was decided while building the trend charts, on the assumption they came
+// last — which stops being true the moment anything is moved, so it is
+// recomputed here from actual DOM order instead.
+function overallPanelsInDomOrder_() {
+  var zone = document.getElementById('page1Charts');
+  if (!zone) return [];
+  var out = [];
+  for (var i = 0; i < zone.children.length; i++) {
+    var ch = zone.children[i];
+    // .trend-charts-wrap is display:contents, so its children are laid out as
+    // if they were the grid's own — flatten it to match what is on screen.
+    if (ch.id === 'trendChartsWrap') {
+      for (var j = 0; j < ch.children.length; j++) {
+        if (ch.children[j].classList.contains('panel')) out.push(ch.children[j]);
+      }
+    } else if (ch.classList.contains('panel')) {
+      out.push(ch);
+    }
+  }
+  return out;
+}
+
+function refreshOddCentering_() {
+  var panels = overallPanelsInDomOrder_();
+  for (var i = 0; i < panels.length; i++) panels[i].classList.remove('chart-center-odd');
+  if (panels.length > 0 && panels.length % 2 === 1) {
+    panels[panels.length - 1].classList.add('chart-center-odd');
+  }
+}
+
+// Called by renderChartsPak once it has rebuilt the trend panels, since that
+// replaces the elements the centering was computed against.
+function refreshChartLayoutAfterRender_() {
+  refreshOddCentering_();
+  if (_reorderMode) refreshReorderBars_();
+}
+
+// ---- Edit mode ------------------------------------------------------------
+
+function moveReorderItem_(key, delta) {
+  for (var z = 0; z < REORDER_ZONES_.length; z++) {
+    var zone = REORDER_ZONES_[z];
+    var items = reorderItemsInZone_(zone.containerId);
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].getAttribute('data-reorder-key') !== key) continue;
+      var target = i + delta;
+      if (target < 0 || target >= items.length) return;   // already at an end
+      var container = document.getElementById(zone.containerId);
+      if (delta < 0) container.insertBefore(items[i], items[target]);
+      else container.insertBefore(items[target], items[i]);
+      captureChartOrder_();
+      refreshReorderBars_();
+      // Keep the panel the user is working on in view — it has just jumped a
+      // full panel's height, which on a phone is most of the screen.
+      try { items[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+      return;
+    }
+  }
+}
+
+function removeReorderBars_() {
+  var bars = document.querySelectorAll('.reorder-bar');
+  for (var i = 0; i < bars.length; i++) {
+    if (bars[i].parentNode) bars[i].parentNode.removeChild(bars[i]);
+  }
+}
+
+function refreshReorderBars_() {
+  removeReorderBars_();
+  if (!_reorderMode) return;
+
+  for (var z = 0; z < REORDER_ZONES_.length; z++) {
+    var zone = REORDER_ZONES_[z];
+    var items = reorderItemsInZone_(zone.containerId);
+    for (var i = 0; i < items.length; i++) {
+      var el = items[i];
+      var key = el.getAttribute('data-reorder-key');
+      var label = el.getAttribute('data-reorder-label') || key;
+
+      var bar = document.createElement('div');
+      bar.className = 'reorder-bar';
+      bar.innerHTML =
+        '<span class="reorder-pos">' + (i + 1) + '/' + items.length + '</span>' +
+        '<span class="reorder-label">' + safeTextPak(label) + '</span>' +
+        '<button type="button" class="reorder-btn" data-key="' + escapeAttrPak(key) + '" data-dir="-1"' +
+          (i === 0 ? ' disabled' : '') +
+          ' title="Move earlier" aria-label="Move ' + escapeAttrPak(label) + ' earlier">' +
+          '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i></button>' +
+        '<button type="button" class="reorder-btn" data-key="' + escapeAttrPak(key) + '" data-dir="1"' +
+          (i === items.length - 1 ? ' disabled' : '') +
+          ' title="Move later" aria-label="Move ' + escapeAttrPak(label) + ' later">' +
+          '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>';
+      el.insertBefore(bar, el.firstChild);
+    }
+  }
+}
+
+function toggleReorderMode_() {
+  setReorderMode_(!_reorderMode);
+}
+
+function setReorderMode_(on) {
+  _reorderMode = !!on;
+  document.body.classList.toggle('reorder-mode', _reorderMode);
+
+  var btn = $('reorderBtn');
+  if (btn) {
+    btn.classList.toggle('active', _reorderMode);
+    var label = _reorderMode ? 'Done rearranging' : 'Rearrange charts';
+    btn.setAttribute('title', label);
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', _reorderMode ? 'true' : 'false');
+    var icon = btn.querySelector('i');
+    if (icon) icon.className = _reorderMode ? 'fa-solid fa-check' : 'fa-solid fa-arrow-up-wide-short';
+  }
+
+  refreshReorderBars_();
+
+  if (_reorderMode) {
+    showToastPak('Use the arrows on each chart to move it. Your layout is saved automatically.',
+      { icon: 'fa-arrow-up-wide-short', durationMs: 5000,
+        action: { label: 'Reset order', onClick: resetChartOrder_ } });
+  } else {
+    captureChartOrder_();
+    // The grid reflows on leaving edit mode (the trend section collapses back
+    // to display:contents), so the charts need to re-measure.
+    resizeCharts();
+  }
+}
+
+function resetChartOrder_() {
+  chartOrderState = {};
+  for (var z = 0; z < REORDER_ZONES_.length; z++) {
+    var zone = REORDER_ZONES_[z];
+    var container = document.getElementById(zone.containerId);
+    if (!container) continue;
+    var defaults = _reorderDefaults_[zone.zoneKey] || [];
+    for (var k = 0; k < defaults.length; k++) {
+      var el = container.querySelector('[data-reorder-key="' + defaults[k] + '"]');
+      if (el) container.appendChild(el);
+    }
+  }
+  captureChartOrder_();
+  refreshReorderBars_();
+  refreshOddCentering_();
+  showToastPak('Chart order reset to the default.', { icon: 'fa-rotate-left' });
+}
+
+// The as-authored order, captured before any saved order is applied, so Reset
+// has something true to return to.
+var _reorderDefaults_ = {};
+
+function initChartReorder_() {
+  tagReorderItems_();
+  for (var z = 0; z < REORDER_ZONES_.length; z++) {
+    _reorderDefaults_[REORDER_ZONES_[z].zoneKey] = defaultOrderFor_(REORDER_ZONES_[z].zoneKey);
+  }
+  applyChartOrder_();
+
+  // Delegated: the bars are rebuilt after every move, so per-button listeners
+  // would have to be rebound each time.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.reorder-btn') : null;
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    e.stopPropagation();
+    moveReorderItem_(btn.getAttribute('data-key'), parseInt(btn.getAttribute('data-dir'), 10));
+  });
+}
+</script>

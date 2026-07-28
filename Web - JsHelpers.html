@@ -47,6 +47,7 @@ function saveUserPreferences() {
       hiddenVolumeAreas: hiddenVolumeAreas,
       trendSplitState: trendSplitState,
       areaGroups: areaGroupState,
+      chartOrder: chartOrderState,
       theme: currentTheme
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
@@ -100,6 +101,25 @@ function loadUserPreferences() {
         .map(function(c) { return c.filter(function(k) { return validTrendKeys[k]; }); })
         .slice(0, MAX_TREND_CHARTS);
       trendSplitState = { enabled: !!prefs.trendSplitState.enabled, charts: cleanedTrendCharts };
+    }
+
+    // Only keys this build knows about, and no duplicates — a stale or hand-
+    // edited entry must not be able to drop a chart off the page or list one
+    // twice. Anything missing from a saved order is appended by applyChartOrder_.
+    if (prefs.chartOrder && typeof prefs.chartOrder === 'object') {
+      var cleanOrder = {};
+      var zoneKeys = Object.keys(prefs.chartOrder);
+      for (var zk = 0; zk < zoneKeys.length; zk++) {
+        var list = prefs.chartOrder[zoneKeys[zk]];
+        if (!Array.isArray(list)) continue;
+        var seenKeys = {};
+        cleanOrder[zoneKeys[zk]] = list.filter(function (k) {
+          if (typeof k !== 'string' || seenKeys[k]) return false;
+          seenKeys[k] = true;
+          return true;
+        });
+      }
+      chartOrderState = cleanOrder;
     }
 
     if (Array.isArray(prefs.areaGroups)) {

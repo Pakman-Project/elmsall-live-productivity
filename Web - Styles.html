@@ -1686,6 +1686,108 @@ canvas {
   }
 }
 
+/* ── Rearrange mode ──────────────────────────────────────────────────────────
+   A bar pinned to the top of each movable panel, with the two move buttons.
+   Deliberately buttons rather than drag: see the reasoning in JsReorder. */
+.reorder-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px -4px 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--accent-10);
+  border: 1px dashed var(--accent);
+}
+
+.reorder-pos {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.reorder-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reorder-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.reorder-btn:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* At an end of the list. Kept visible rather than hidden so the buttons do not
+   move around under the user's finger as a panel travels up the page. */
+.reorder-btn[disabled] {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Marks out what is movable, so it is obvious the mode is on and which panels
+   it applies to. */
+body.reorder-mode #page1Charts > [data-reorder-key],
+body.reorder-mode #volumeChartsContainer > [data-reorder-key] {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+/* .trend-charts-wrap is normally display:contents, so it has no box of its own
+   and nothing to attach a bar to. In edit mode it becomes a real container
+   spanning the grid, which also makes it read correctly as "this whole section
+   moves as one unit". */
+body.reorder-mode .trend-charts-wrap {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+body.reorder-mode .trend-charts-wrap > .reorder-bar {
+  grid-column: 1 / -1;
+}
+
+.header-icon-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  /* Full-size tap targets on a phone, where these are the whole interaction. */
+  .reorder-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+  }
+  body.reorder-mode .trend-charts-wrap {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Pull to refresh (mobile) ────────────────────────────────────────────────
    Sits below the toasts and above the page content. Fixed to the viewport
    rather than to .page, so it does not scroll away with the content being
