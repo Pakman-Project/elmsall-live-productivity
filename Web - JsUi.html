@@ -369,6 +369,50 @@
     window.addEventListener('resize', refreshScrollEdgesAll_);
   }
 
+  // ── Mobile header menu ─────────────────────────────────────────────────────
+  // Six action buttons fit a desktop header and overrun a phone's, pushing into
+  // the "E3 Live Productivity" title. On mobile they collapse behind one
+  // button; on desktop the CSS leaves them inline and this never runs.
+  function toggleHeaderMenu_(force) {
+    var open = (typeof force === 'boolean')
+      ? force
+      : !document.body.classList.contains('header-menu-open');
+    document.body.classList.toggle('header-menu-open', open);
+
+    var btn = $('headerMenuBtn');
+    if (btn) {
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var icon = btn.querySelector('i');
+      if (icon) icon.className = open ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+    }
+  }
+
+  function initHeaderMenu_() {
+    document.addEventListener('click', function (e) {
+      if (!document.body.classList.contains('header-menu-open')) return;
+      // The button's own inline onclick has already run by now; leaving it
+      // alone here stops this from immediately undoing it.
+      if (e.target.closest && e.target.closest('#headerMenuBtn')) return;
+      // Anything else closes the menu — including a click on one of the
+      // actions, whose own handler has already fired.
+      toggleHeaderMenu_(false);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!document.body.classList.contains('header-menu-open')) return;
+      toggleHeaderMenu_(false);
+      var btn = $('headerMenuBtn');
+      if (btn) { try { btn.focus(); } catch (err) {} }
+    });
+
+    // Rotating to a width where the buttons are inline again would otherwise
+    // leave `header-menu-open` set, with nothing on screen to clear it.
+    window.addEventListener('resize', function () {
+      if (!window.matchMedia('(max-width: 700px)').matches) toggleHeaderMenu_(false);
+    });
+  }
+
   function initPageScrollChrome_() {
     var pages = document.querySelectorAll('.page');
     for (var i = 0; i < pages.length; i++) {

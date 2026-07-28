@@ -1686,6 +1686,94 @@ canvas {
   }
 }
 
+/* ── Mobile header menu ──────────────────────────────────────────────────────
+   Six action buttons sit comfortably in a desktop header and overrun a phone's,
+   crowding out the "E3 Live Productivity" title. Below 700px they collapse
+   behind one button and drop down as a labelled list.
+
+   Desktop is untouched: the toggle is hidden and .next-header-actions keeps the
+   inline row it has always had. */
+.header-menu-btn {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  /* The mobile header is a grid with named areas, and .next-header-left /
+     -right are display:contents — so this button is itself a grid item. It
+     takes over the "actions" cell that the button row used to occupy. */
+  .header-menu-btn {
+    display: flex;
+    grid-area: actions;
+    justify-self: end;
+  }
+
+  /* The dropdown is positioned against the header, so the header has to be the
+     containing block. */
+  .next-header {
+    position: relative;
+  }
+
+  .next-header-actions {
+    display: none;
+    /* grid-area must be cleared as well as position set. For an absolutely
+       positioned grid item whose containing block is the grid, the named area
+       becomes that containing block — so `right: 8px` would resolve against
+       the narrow actions cell rather than against the header. */
+    grid-area: auto;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 8px;
+    z-index: 4100;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 190px;
+    padding: 6px;
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  }
+
+  body.header-menu-open .next-header-actions {
+    display: flex;
+  }
+
+  /* Icon plus text, left-aligned — a column of unlabelled icons is a guessing
+     game, and there is room for the words once they are stacked. */
+  .next-header-actions .header-icon-btn {
+    width: 100%;
+    height: 42px;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  /* data-menu-label, NOT aria-label: the auto-refresh button rewrites its
+     aria-label every second with the countdown, which would make this item
+     jitter and change width once a second. */
+  .next-header-actions .header-icon-btn::after {
+    content: attr(data-menu-label);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .next-header-actions .header-icon-btn:hover,
+  .next-header-actions .header-icon-btn:focus-visible {
+    background: var(--accent-10);
+  }
+
+  /* The rearrange button's active state still has to read as "on" in here,
+     where it is a row rather than a round icon. */
+  .next-header-actions .header-icon-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+}
+
 /* ── Rearrange mode ──────────────────────────────────────────────────────────
    A bar pinned to the top of each movable panel, with the two move buttons.
    Deliberately buttons rather than drag: see the reasoning in JsReorder. */
