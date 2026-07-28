@@ -346,35 +346,12 @@
       </div>
     </div>
 
-    <div id="areaGroupSplitOverlay" class="breakdown-overlay" onclick="closeAreaGroupSplit()">
-      <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
-        <div class="breakdown-header">
-          <div>
-            <h2>Split Productivity by Work Area</h2>
-            <p class="breakdown-subtitle">Choose which area groups appear on each chart. The same group can appear on more than one chart (up to 7 charts). Edit the groups themselves with the Groups button.</p>
-          </div>
-          <button class="breakdown-close" onclick="closeAreaGroupSplit()" aria-label="Close">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-
-        <div class="breakdown-body">
-          <div id="areaGroupSplitEditor"></div>
-          <button class="btn" id="addAreaGroupSplitBtn" onclick="addAreaGroupSplitChart()"><i class="fa-solid fa-plus"></i> Add Chart</button>
-          <div class="modal-actions">
-            <button class="btn" onclick="resetAreaGroupSplit()" style="border-color: var(--color-bad); color: var(--color-bad);">Reset to Single</button>
-            <button class="btn" onclick="applyAreaGroupSplit()" style="background: var(--accent); color: #fff; border-color: var(--accent);">Apply</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div id="areaGroupOverlay" class="breakdown-overlay" onclick="closeAreaGroups()">
       <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
         <div class="breakdown-header">
           <div>
-            <h2>Area Groups</h2>
-            <p class="breakdown-subtitle">Choose which areas belong to each group. The same area can appear in multiple groups (up to 7 groups).</p>
+            <h2>Work Area Groups &amp; Charts</h2>
+            <p class="breakdown-subtitle">Build the groups you want to compare, then choose how many charts to spread them over. Both are applied together.</p>
           </div>
           <button class="breakdown-close" onclick="closeAreaGroups()" aria-label="Close">
             <i class="fa-solid fa-xmark"></i>
@@ -382,8 +359,22 @@
         </div>
 
         <div class="breakdown-body">
-          <div id="areaGroupEditor"></div>
-          <button class="btn" id="addAreaGroupBtn" onclick="addAreaGroup()"><i class="fa-solid fa-plus"></i> Add Group</button>
+          <div class="ag-step">
+            <h3 class="ag-step-title"><span class="ag-step-num">1</span> Build the groups</h3>
+            <p class="ag-step-hint">Pick the work areas each group covers, and whether it draws a line, a trend line, or both. The same area can appear in more than one group.</p>
+            <div id="areaGroupEditor"></div>
+            <button class="btn" id="addAreaGroupBtn" onclick="addAreaGroup()"><i class="fa-solid fa-plus"></i> Add Group</button>
+          </div>
+
+          <div class="ag-step-divider"></div>
+
+          <div class="ag-step">
+            <h3 class="ag-step-title"><span class="ag-step-num">2</span> Spread them over charts</h3>
+            <p class="ag-step-hint">One chart shows everything together. Add more to separate the groups out — the same group can appear on several charts. Leave this alone for a single chart.</p>
+            <div id="areaGroupSplitEditor"></div>
+            <button class="btn" id="addAreaGroupSplitBtn" onclick="addAreaGroupSplitChart()"><i class="fa-solid fa-plus"></i> Add Chart</button>
+          </div>
+
           <div class="modal-actions">
             <button class="btn" onclick="resetAreaGroups()" style="border-color: var(--color-bad); color: var(--color-bad);">Reset to Default</button>
             <button class="btn" onclick="applyAreaGroups()" style="background: var(--accent); color: #fff; border-color: var(--accent);">Apply</button>

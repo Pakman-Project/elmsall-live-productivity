@@ -926,35 +926,39 @@
     applyLocalFiltersPak();
   }
 
-  // ── Splitting the Work Area productivity chart ─────────────────────────────
-  // Mirrors the trend split, but the unit being distributed is an area GROUP
-  // rather than a work area — so the two features compose: Groups decides what
-  // a group contains, Split decides which chart it is drawn on.
+  // ── Groups & Charts: one dialog, two steps ─────────────────────────────────
+  // Groups decides what a group CONTAINS; charts decides where it is DRAWN.
+  // They were two buttons and two dialogs, which meant configuring one without
+  // being able to see the other — and the chart list is meaningless on its own,
+  // since it is a list of groups. Both drafts are edited together and committed
+  // by a single Apply.
+  //
+  // The chart list holds INDICES into the group draft, so it has to be kept in
+  // step as groups are added and removed — see removeAreaGroup below.
   var _areaGroupSplitDraft = null;
 
-  function openAreaGroupSplit() {
-    _areaGroupSplitDraft = (areaGroupSplitState.charts && areaGroupSplitState.charts.length > 0)
-      ? areaGroupSplitState.charts.map(function (c) { return c.slice(); })
-      : [[], []];
-    $('areaGroupSplitOverlay').classList.add('active');
-    renderAreaGroupSplitEditor();
-  }
-
-  function closeAreaGroupSplit() {
-    $('areaGroupSplitOverlay').classList.remove('active');
+  // Label and colour for a DRAFT group, matching what getPerfSplitGroups_ will
+  // produce once applied. Read from the draft, not the committed state, so step
+  // 2 describes the groups being edited rather than the ones still on screen.
+  function draftGroupMeta_(i) {
+    var g = _areaGroupDraft[i] || { keys: [] };
+    var labels = [];
+    for (var k = 0; k < (g.keys || []).length; k++) {
+      for (var v = 0; v < VOLUME_TYPES.length; v++) {
+        if (VOLUME_TYPES[v].key === g.keys[k]) { labels.push(VOLUME_TYPES[v].label); break; }
+      }
+    }
+    return {
+      label: labels.length ? labels.join(', ') : 'Group ' + (i + 1) + ' (empty)',
+      color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length],
+      empty: labels.length === 0
+    };
   }
 
   function renderAreaGroupSplitEditor() {
+    var host = $('areaGroupSplitEditor');
+    if (!host) return;
     var html = '';
-    // Labelled from the live groups, so the dialog names what the user actually
-    // configured ("PiE, Top Up") instead of an opaque "Group 2".
-    var groups = getPerfSplitGroups_();
-    if (groups.length === 0) {
-      $('areaGroupSplitEditor').innerHTML =
-        '<div class="breakdown-empty">No area groups are configured yet. Use the Groups button first.</div>';
-      $('addAreaGroupSplitBtn').style.display = 'none';
-      return;
-    }
     for (var i = 0; i < _areaGroupSplitDraft.length; i++) {
       html += '<div class="area-group-block">';
       html += '<div class="area-group-head">';
@@ -964,17 +968,32 @@
       }
       html += '</div>';
       html += '<div class="area-group-areas">';
-      for (var g = 0; g < groups.length; g++) {
+      for (var g = 0; g < _areaGroupDraft.length; g++) {
+        var meta = draftGroupMeta_(g);
         var checked = _areaGroupSplitDraft[i].indexOf(g) !== -1 ? 'checked' : '';
         html += '<label class="trend-split-cb"><input type="checkbox" data-chart="' + i + '" data-group="' + g + '" ' + checked + ' onchange="onAreaGroupSplitCbChange(this)">' +
-                '<span class="trend-split-dot" style="background:' + groups[g].color + '"></span>' +
-                '<span class="area-cb-text">' + safeTextPak(groups[g].label) + '</span></label>';
+                '<span class="trend-split-dot" data-split-dot="' + i + '-' + g + '" style="background:' + meta.color + '"></span>' +
+                '<span class="area-cb-text" data-split-label="' + i + '-' + g + '">' + safeTextPak(meta.label) + '</span></label>';
       }
       html += '</div></div>';
     }
-    $('areaGroupSplitEditor').innerHTML = html;
+    host.innerHTML = html;
     $('addAreaGroupSplitBtn').style.display =
       _areaGroupSplitDraft.length >= MAX_AREA_GROUP_CHARTS ? 'none' : '';
+  }
+
+  // Ticking an AREA in step 1 changes a group's name, which step 2 shows. Only
+  // the text is patched rather than re-rendering step 2, so focus is not pulled
+  // out of the checkbox the user is still working through.
+  function refreshSplitLabels_() {
+    if (!_areaGroupSplitDraft) return;
+    for (var i = 0; i < _areaGroupSplitDraft.length; i++) {
+      for (var g = 0; g < _areaGroupDraft.length; g++) {
+        var meta = draftGroupMeta_(g);
+        var el = document.querySelector('[data-split-label="' + i + '-' + g + '"]');
+        if (el) el.textContent = meta.label;
+      }
+    }
   }
 
   function onAreaGroupSplitCbChange(cb) {
@@ -997,34 +1016,6 @@
     renderAreaGroupSplitEditor();
   }
 
-  function applyAreaGroupSplit() {
-    // Sorted and de-duplicated so a chart's series always appear in group order
-    // regardless of the order the boxes were ticked in.
-    var cleaned = _areaGroupSplitDraft.map(function (list) {
-      var seen = {};
-      return list.filter(function (g) {
-        if (seen[g]) return false;
-        seen[g] = true;
-        return true;
-      }).sort(function (a, b) { return a - b; });
-    }).filter(function (list) { return list.length > 0; });
-
-    areaGroupSplitState = cleaned.length > 0
-      ? { enabled: true, charts: cleaned }
-      : { enabled: false, charts: [] };
-    saveUserPreferences();
-    closeAreaGroupSplit();
-    applyLocalFiltersPak();
-  }
-
-  function resetAreaGroupSplit() {
-    if (!confirm('Reset back to a single Productivity % by Work Area chart?\n\nThe split you have set up will be lost.')) return;
-    areaGroupSplitState = { enabled: false, charts: [] };
-    saveUserPreferences();
-    closeAreaGroupSplit();
-    applyLocalFiltersPak();
-  }
-
   var _areaGroupDraft = null;
 
   function openAreaGroups() {
@@ -1034,8 +1025,15 @@
     if (_areaGroupDraft.length === 0) {
       _areaGroupDraft = defaultAreaGroupState_();
     }
+    _areaGroupSplitDraft = (areaGroupSplitState.charts && areaGroupSplitState.charts.length > 0)
+      ? areaGroupSplitState.charts.map(function (c) { return c.slice(); })
+      // Not split yet: seed with the single chart that is actually on screen,
+      // holding every group. Starting from an empty list would misrepresent the
+      // current state as "nothing assigned anywhere".
+      : [_areaGroupDraft.map(function (_, gi) { return gi; })];
     $('areaGroupOverlay').classList.add('active');
     renderAreaGroupEditor();
+    renderAreaGroupSplitEditor();
   }
 
   function closeAreaGroups() {
@@ -1076,6 +1074,7 @@
     var idx = keys.indexOf(key);
     if (cb.checked && idx === -1) { keys.push(key); }
     else if (!cb.checked && idx !== -1) { keys.splice(idx, 1); }
+    refreshSplitLabels_();
   }
 
   function onAreaGroupModeChange(cb) {
@@ -1100,11 +1099,27 @@
     if (_areaGroupDraft.length >= MAX_AREA_GROUPS) return;
     _areaGroupDraft.push({ keys: [], showLine: true, showTrend: false });
     renderAreaGroupEditor();
+    renderAreaGroupSplitEditor();
   }
 
   function removeAreaGroup(i) {
     _areaGroupDraft.splice(i, 1);
+    // Step 2 stores group INDICES, so deleting a group shifts everything after
+    // it. Drop references to the deleted group and slide the later ones down,
+    // or every chart would silently start showing the wrong group.
+    if (_areaGroupSplitDraft) {
+      for (var c = 0; c < _areaGroupSplitDraft.length; c++) {
+        var remapped = [];
+        for (var k = 0; k < _areaGroupSplitDraft[c].length; k++) {
+          var g = _areaGroupSplitDraft[c][k];
+          if (g === i) continue;
+          remapped.push(g > i ? g - 1 : g);
+        }
+        _areaGroupSplitDraft[c] = remapped;
+      }
+    }
     renderAreaGroupEditor();
+    renderAreaGroupSplitEditor();
   }
 
   function applyAreaGroups() {
@@ -1123,14 +1138,38 @@
       cleaned = defaultAreaGroupState_();
     }
     areaGroupState = cleaned;
+
+    // Chart assignments are committed in the same Apply. Indices are clamped to
+    // the groups that actually survived the clean-up above — an empty group is
+    // dropped there, and a chart pointing past the end would draw nothing.
+    var charts = (_areaGroupSplitDraft || []).map(function (list) {
+      var seen = {};
+      return list.filter(function (g) {
+        if (g >= cleaned.length || seen[g]) return false;
+        seen[g] = true;
+        return true;
+      }).sort(function (a, b) { return a - b; });
+    }).filter(function (list) { return list.length > 0; });
+
+    // One chart holding everything IS the unsplit view, so it is stored as
+    // "not split" rather than as a one-chart split — that keeps the bonus-filter
+    // fallback and the panel heading behaving as they did before.
+    var isSingleFull = charts.length === 1 && charts[0].length === cleaned.length;
+    areaGroupSplitState = (charts.length > 0 && !isSingleFull)
+      ? { enabled: true, charts: charts }
+      : { enabled: false, charts: [] };
+
+    saveUserPreferences();
     closeAreaGroups();
     applyLocalFiltersPak();
   }
 
   function resetAreaGroups() {
     // Destructive and not undoable — the user may have built up several groups.
-    if (!confirm('Reset all area groups back to the default set?\n\nAny groups you have built here will be lost.')) return;
+    if (!confirm('Reset the work area groups AND go back to a single chart?\n\nAny groups you have built here will be lost.')) return;
     areaGroupState = defaultAreaGroupState_();
+    areaGroupSplitState = { enabled: false, charts: [] };
+    saveUserPreferences();
     closeAreaGroups();
     applyLocalFiltersPak();
   }

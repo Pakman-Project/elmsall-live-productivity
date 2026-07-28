@@ -389,8 +389,7 @@
           // section, and repeating them per chart would imply otherwise.
           if (agIdx === 0) {
             titleHtml += '<div style="display:flex; gap:5px; align-items:center;">' +
-              '<button class="breakdown-btn" onclick="openAreaGroupSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>' +
-              '<button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups</button></div>';
+              '<button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups &amp; Charts</button></div>';
           }
           panelEl.innerHTML = '<div class="mini-table-title">' + titleHtml + '</div>' +
                               '<canvas id="areaGroupChart' + (agIdx === 0 ? '' : '_' + agIdx) + '"></canvas>';

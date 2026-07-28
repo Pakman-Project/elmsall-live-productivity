@@ -19,7 +19,7 @@
 
 var MODAL_OVERLAY_IDS_ = [
   'breakdownOverlay', 'trendSplitOverlay', 'areaGroupOverlay',
-  'areaGroupSplitOverlay', 'shareOverlay', 'tourMenuOverlay'
+  'shareOverlay', 'tourMenuOverlay'
 ];
 
 // Each overlay's own close function, so Escape takes exactly the same path as
@@ -28,7 +28,6 @@ var MODAL_CLOSERS_ = {
   breakdownOverlay:  function () { closeBreakdown(); },
   trendSplitOverlay: function () { closeTrendSplit(); },
   areaGroupOverlay:  function () { closeAreaGroups(); },
-  areaGroupSplitOverlay: function () { closeAreaGroupSplit(); },
   shareOverlay:      function () { closeShareMenu(); },
   tourMenuOverlay:   function () { closeTourMenu(); }
 };

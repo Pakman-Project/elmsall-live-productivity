@@ -72,11 +72,11 @@ var TOUR_STEPS = [
     body: 'Two live charts: volume (PiE & Top Up as a stacked area) and overall productivity across all E3 areas over time.' },
   { part: 3, page: 0, target: '.charts > .card.panel:nth-child(3), .trend-charts-wrap > .card.panel', union: true,
     title: 'Overview charts (2 of 2)',
-    body: 'Productivity by work area, plus the deployment trend below it. The “Groups” button lets you choose which areas to compare.' },
+    body: 'Productivity by work area, plus the deployment trend below it. The “Groups & Charts” button lets you choose which areas to compare, and how many charts to spread them over.' },
   { part: 3, page: 0, target: 'button[onclick="openAreaGroups()"]',
     interactive: { sel: 'button[onclick="openAreaGroups()"]', type: 'click' },
     title: 'Open the Groups editor',
-    body: 'Click “Groups” to build your own work-area comparisons.' },
+    body: 'Click “Groups & Charts” to build your own work-area comparisons.' },
   { part: 3, page: 0, target: '#areaGroupOverlay .breakdown-close', modal: true,
     interactive: { sel: '#areaGroupOverlay .breakdown-close', type: 'click' },
     action: function () {
@@ -84,12 +84,8 @@ var TOUR_STEPS = [
       if (ov && !ov.classList.contains('active') && typeof openAreaGroups === 'function') openAreaGroups();
     },
     cleanup: function () { if (typeof closeAreaGroups === 'function') closeAreaGroups(); },
-    title: 'Groups editor',
-    body: 'Build up to 7 groups of work areas, toggle each group’s line/trend, then Apply — the work-area chart updates to match. Click the × to close when you’re ready.' },
-
-  { part: 3, page: 0, target: 'button[onclick="openAreaGroupSplit()"]',
-    title: 'One chart, or several',
-    body: 'With more than a few groups, a single chart gets crowded. “Split” spreads them across up to seven charts — you choose which groups go on each one, and a group can appear on more than one. Groups and Split work together: Groups decides what a group contains, Split decides where it is drawn.' },
+    title: 'Groups & charts editor',
+    body: 'Two steps in one place. Step 1 builds up to 7 groups of work areas, each drawing a line, a trend line, or both. Step 2 spreads those groups over as many as 7 charts — useful once a single chart gets crowded. Apply commits both. Click the × to close when you’re ready.' },
 
   // ===== Part 4 — Volume page ==============================================
   { part: 4, page: 1, target: '.volume-controls',
