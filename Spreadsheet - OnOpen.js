@@ -25,6 +25,8 @@ function showDashboardPreview_(width, height, title, forceTour) {
   t.deepPage = '';
   t.deepBonus = '';
   t.deepDate = '';
+  t.deepHours = '';
+  t.deepWindow = '';
   // Still resolve the web-app URL so "Copy link" produces a shareable link even
   // when the dashboard is opened from this preview dialog.
   var url = '';

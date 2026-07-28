@@ -7,6 +7,10 @@ function include(filename) {
 // exposed to the template as its own plain string rather than as JSON, which
 // avoids any escaping question inside the <script> block.
 var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'data'];
+// Mirrors the <option> values on the Hours Range and Time Window dropdowns. A
+// link cannot request a setting the UI does not offer.
+var DEEP_LINK_HOURS_ = ['3', '6', '9', '12', '24'];
+var DEEP_LINK_WINDOWS_ = ['15', '30', '60'];
 
 function sanitizeParam_(e, name) {
   return (e && e.parameter && e.parameter[name]) ? String(e.parameter[name]) : '';
@@ -30,6 +34,15 @@ function doGet(e) {
   // ?date=YYYY-MM-DD — must match exactly, or it is dropped.
   var date = sanitizeParam_(e, 'date');
   t.deepDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
+
+  // ?hours= and ?window= — the two time controls. Whitelisted against the exact
+  // option values rather than range-checked, so a link can only ever ask for a
+  // setting the dropdowns actually offer.
+  var hours = sanitizeParam_(e, 'hours');
+  t.deepHours = (DEEP_LINK_HOURS_.indexOf(hours) !== -1) ? hours : '';
+
+  var win = sanitizeParam_(e, 'window');
+  t.deepWindow = (DEEP_LINK_WINDOWS_.indexOf(win) !== -1) ? win : '';
 
   // The page lives in a sandboxed iframe and cannot see the address bar, so the
   // "Copy link" button needs the real web-app URL handed to it.

@@ -32,6 +32,13 @@ function buildShareUrlPak() {
     params.push('bonus=' + encodeURIComponent(selectedBonuses.join(',')));
   }
 
+  // Without these the recipient opened the right page with THEIR time settings,
+  // so a "look at this" link did not reproduce what the sender was looking at.
+  var hoursEl = $('hoursRange');
+  var windowEl = $('timeWindow');
+  if (hoursEl && hoursEl.value) params.push('hours=' + encodeURIComponent(hoursEl.value));
+  if (windowEl && windowEl.value) params.push('window=' + encodeURIComponent(windowEl.value));
+
   // Only pin a date when viewing a history snapshot; Live is the default and
   // should stay live for whoever opens the link.
   if (currentArchiveUrl) {

@@ -466,6 +466,19 @@
       selectedBonuses = DEEP_BONUS.split(',').filter(function(b) { return b; });
     }
 
+    // The time controls are synced across pages by data-sync, so setting the
+    // canonical control and mirroring it is what a real change does too.
+    if (typeof DEEP_HOURS !== 'undefined' && DEEP_HOURS) {
+      $('hoursRange').value = DEEP_HOURS;
+      var dlHours = document.querySelectorAll('[data-sync="hoursRange"]');
+      for (var dh = 0; dh < dlHours.length; dh++) { dlHours[dh].value = DEEP_HOURS; }
+    }
+    if (typeof DEEP_WINDOW !== 'undefined' && DEEP_WINDOW) {
+      $('timeWindow').value = DEEP_WINDOW;
+      var dlWins = document.querySelectorAll('[data-sync="timeWindow"]');
+      for (var dw = 0; dw < dlWins.length; dw++) { dlWins[dw].value = DEEP_WINDOW; }
+    }
+
     // ALWAYS start on Live so a stale archive is never auto-loaded — unless the
     // link explicitly asked for a dated snapshot (handled once the archive list
     // arrives, since the date has to be matched against it).
