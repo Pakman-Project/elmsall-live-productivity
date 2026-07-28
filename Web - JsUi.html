@@ -387,6 +387,31 @@
     }
   }
 
+  // "/" focuses the search, the convention on more or less every site with a
+  // search box. Guarded so it does not fire while the user is already typing
+  // somewhere, or while a dialog or the tour has the screen.
+  function initSearchShortcut_() {
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (typeof tourActive !== 'undefined' && tourActive) return;
+      if (typeof isAnyModalOpen_ === 'function' && isAnyModalOpen_()) return;
+      var t = e.target;
+      if (t && (t.isContentEditable ||
+                ['INPUT', 'TEXTAREA', 'SELECT'].indexOf((t.tagName || '').toUpperCase()) !== -1)) {
+        return;
+      }
+      var input = $('bonusSearch');
+      if (!input) return;
+      e.preventDefault();
+      if (window.matchMedia('(max-width: 700px)').matches &&
+          typeof toggleHeaderMenu_ === 'function') {
+        toggleHeaderMenu_(false);
+      }
+      input.focus();
+      input.select();
+    });
+  }
+
   function initHeaderMenu_() {
     document.addEventListener('click', function (e) {
       if (!document.body.classList.contains('header-menu-open')) return;
