@@ -5,6 +5,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Scripts')
     .addItem('Manual Archive', 'confirmRunDailyAutomation')
+    .addItem('Clean Up Data Tab (today only)', 'confirmDailyDataCleanup')
     .addItem('Import Archive Links', 'refreshArchiveLinks')
     .addItem('Preview Dashboard (Dev)', 'previewDashboard')
     .addItem('Preview Dashboard (Mobile)', 'previewDashboardMobile')
