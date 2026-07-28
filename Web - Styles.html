@@ -3241,8 +3241,28 @@ body.page-scrolled-far .back-to-top {
     flex: 1;
     min-width: 0;
   }
-  .vol-control-group-wide {
-    flex: 1 1 100%;
+  /* All three Volume controls share one row, with Display Mode first.
+     Previously Hours Range and Time Window took half each and Display Mode
+     dropped onto a second full-width row below them, which cost a whole row of
+     vertical space and put the control you change most often last.
+
+     `order` reorders them without touching the markup, so the desktop rule
+     further down the file (which also puts Display Mode first, via order: -1)
+     and the DOM order that the tab sequence follows both stay as they were.
+
+     flex-basis 0 with flex-grow 1 makes the three equal regardless of label
+     length; min-width: 0 is what actually lets them shrink below the intrinsic
+     width of a <select>, which otherwise refuses to compress and forces a wrap. */
+  .volume-controls {
+    flex-wrap: nowrap;
+  }
+  .volume-controls .vol-control-group {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .volume-controls .vol-control-group-wide {
+    flex: 1 1 0;
+    order: -1;
   }
 
   /* From/To time-bar: keep BOTH pairs on a single row on mobile. The selects
