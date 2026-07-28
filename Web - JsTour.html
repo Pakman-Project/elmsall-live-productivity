@@ -40,10 +40,23 @@ var TOUR_STEPS = [
   { part: 1, page: 0, target: null,
     title: 'Welcome 👋',
     body: 'This is E3 Live Productivity — a live view of warehouse output across every E3 work area. This tour plays itself using example data while your real data loads in the background — sit back and watch. Pause any time, step through with Back and Next, or skip out entirely.' },
+  // On a phone the action buttons live inside the burger menu, so it has to be
+  // opened BEFORE the steps that ring them — otherwise those steps point at
+  // display:none elements, which measure 0x0 and get no visible ring. The menu
+  // is opened here and held open across the two button steps below, then closed.
+  { part: 1, page: 0, target: '#headerMenuBtn', mobileOnly: true,
+    interactive: { sel: '#headerMenuBtn', type: 'click' },
+    title: 'Everything else lives here',
+    body: 'On a phone the action buttons fold into this menu — refresh, auto-refresh, rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
   { part: 1, page: 0, target: '.refresh-btn',
+    // Idempotent, and only does anything on mobile: this keeps the menu open
+    // when the step is reached forwards OR backwards.
+    action: function () { tourOpenHeaderMenuIfMobile_(); },
     title: 'Refresh any time',
     body: 'The dashboard keeps itself up to date, but tap here whenever you want to pull the very latest figures immediately.' },
   { part: 1, page: 0, target: '#autoRefreshBtn',
+    action: function () { tourOpenHeaderMenuIfMobile_(); },
+    cleanup: function () { if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false); },
     title: 'Auto-refresh — and how to pause it',
     body: 'The dashboard checks for new data every minute on its own. Hover this button to see how long until the next check, or click it to pause updating — handy when you are reading a number and don’t want it changing under you. Click again to resume.' },
   { part: 1, page: 0, target: '#archiveSelect',
@@ -63,19 +76,9 @@ var TOUR_STEPS = [
     cleanup: function () { tourClearFilter_(); },
     title: 'The filter follows you everywhere',
     body: 'Every page, chart and table is now showing just that operator, and this banner says so wherever you go. “Clear all” brings everyone back.' },
-  // Mobile-only chrome. Both of these arrived after the tour was written, so
-  // neither was mentioned anywhere. `mobileOnly` is honoured by showTourStep_,
-  // which skips past a step whose controls do not exist on this screen size —
-  // ringing a burger menu on a desktop would point at nothing.
-  { part: 1, page: 0, target: '#headerMenuBtn', mobileOnly: true,
-    interactive: { sel: '#headerMenuBtn', type: 'click' },
-    cleanup: function () { if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false); },
-    title: 'Everything else lives here',
-    body: 'On a phone the action buttons fold into this menu — refresh, auto-refresh, rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
   { part: 1, page: 0, target: '.next-rail', mobileOnly: true,
     title: 'Pull down to refresh',
-    body: 'Anywhere on a page, drag down from the top and let go to pull the latest figures — the same as the refresh button, without going into the menu for it.' },
-
+    body: 'Anywhere on a page, drag down from the top and let go to pull the latest figures — the same as the refresh button, without opening the menu for it.' },
   { part: 1, page: 0, target: '.next-rail',
     title: 'Four pages',
     body: 'Overall, Volume, Bonus Numbers and Data Table. Click an icon in the rail to jump straight to a page, or swipe left and right to move between them.' },
@@ -564,6 +567,15 @@ function tourReposition_() {
 // leaves someone's setup different from how they left it. Preferences are not
 // written during a tour either (saveUserPreferences bails while tourActive), so
 // nothing here can outlive the page.
+
+// Mobile only, and safe to call repeatedly. The header actions are inside the
+// burger menu on a phone, so any step ringing one of them has to make sure it
+// is open first — including when the step is reached by stepping backwards.
+function tourOpenHeaderMenuIfMobile_() {
+  if (!window.matchMedia('(max-width: 700px)').matches) return;
+  if (typeof toggleHeaderMenu_ !== 'function') return;
+  if (!document.body.classList.contains('header-menu-open')) toggleHeaderMenu_(true);
+}
 
 function tourPrimeSearch_() {
   var input = $('bonusSearch');
@@ -1082,8 +1094,17 @@ function placeTourTooltip_(step) {
 
   if (isTourMobile_()) {
     tip.style.left = ''; tip.style.top = ''; tip.style.transform = '';
+    // The tooltip is pinned to the bottom by CSS, which puts it straight over
+    // anything ringed in the lower half of the screen — and on a phone that is
+    // most of the page. Flip it to the top when the ring is low enough to be
+    // covered. Measured against the tooltip's real height rather than a
+    // guess, since the bodies vary a lot in length.
+    var tipHeight = tip.offsetHeight || 260;
+    var coversTarget = (rect.top + rect.height) > (window.innerHeight - tipHeight - 28);
+    tip.classList.toggle('pin-top', coversTarget);
     return;
   }
+  tip.classList.remove('pin-top');
 
   var margin = 14;
   var tipW = tip.offsetWidth;

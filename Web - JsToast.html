@@ -71,6 +71,17 @@ function dismissToast_() {
 // confirm the last thing the user did, and a queue of them just gets in the way.
 function showToastPak(message, opts) {
   opts = opts || {};
+
+  // A tour demonstrates real actions, and those actions raise real toasts —
+  // clearing the bonus filter in Part 1 raises an Undo. On a phone the toast
+  // and the tour tooltip both pin to the bottom of the screen, so the toast
+  // landed on top of the thing explaining it. Transient toasts are dropped
+  // while a tour is running; they are feedback for something the user did, and
+  // during a tour the user did not do it.
+  //
+  // Persistent ones are kept: rearrange mode's toast IS the mode's indicator,
+  // and Part 8 rings it deliberately.
+  if (typeof tourActive !== 'undefined' && tourActive && !opts.persist) return;
   var host = toastHost_();
   host.innerHTML = '';
   clearTimeout(_toastTimer);

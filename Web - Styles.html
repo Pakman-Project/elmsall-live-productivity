@@ -4210,6 +4210,13 @@ body.page-scrolled-far .back-to-top {
 
 @media (max-width: 700px) {
   /* Tooltip becomes a fixed bottom sheet; the element stays spotlit above it. */
+  /* Flipped to the top when the ringed element sits low enough that the
+     bottom-pinned tooltip would cover it. */
+  .tour-tooltip.pin-top {
+    top: calc(12px + env(safe-area-inset-top));
+    bottom: auto;
+  }
+
   .tour-tooltip {
     left: 12px;
     right: 12px;
