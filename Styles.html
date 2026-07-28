@@ -1058,6 +1058,19 @@ table {
    somewhere to sit. */
 .side-table .perf-cell {
   position: relative;
+  /* The bar grows from the left, so the figure is parked on the right where it
+     has a fixed edge to be read against. Left-aligned, it sat on top of the
+     start of its own bar and moved around as the bar changed length. */
+  text-align: right;
+}
+
+/* Over its own bar the pill's grey lozenge is doubled-up chrome — the bar is
+   already carrying the shape. Dropping it leaves the figure sitting cleanly on
+   the tint. */
+.side-table .perf-cell .pill {
+  background: transparent;
+  min-width: 0;
+  padding: 4px 0;
 }
 
 .perf-bar {

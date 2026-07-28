@@ -76,11 +76,22 @@ var BREAKDOWN_AREAS = [
   { key: 'e1e2Inducting', label: 'E1/E2 Inducting', color: '#38ada9' }
 ];
 
+// APP_CONFIG.colors is the CHART palette — saturated colours chosen to read as
+// distinct series against a plot background. It used to be pushed into
+// --color-good/warn/bad as inline styles on <html>, which beat both the :root
+// and the .dark-theme token blocks and so applied one palette to both themes.
+//
+// That is why warn text was unreadable in light mode: #ffcc66 is a mid-yellow
+// picked to glow on a dark plot, and on white it has a contrast ratio of about
+// 1.5:1. The stylesheet already carries proper per-theme values (#cc4b00 light,
+// #ff9d5c dark) which had simply never been allowed to take effect.
+//
+// The charts are unaffected — they read APP_CONFIG.colors directly rather than
+// through CSS, so the two palettes can now differ, which is the point: a
+// colour that works as a bar fill is not automatically a colour that works as
+// 11px text.
 function applyConfigToCSSPak() {
   var root = document.documentElement;
-  root.style.setProperty('--color-good', APP_CONFIG.colors.good);
-  root.style.setProperty('--color-warn', APP_CONFIG.colors.warn);
-  root.style.setProperty('--color-bad', APP_CONFIG.colors.bad);
   root.style.setProperty('--accent', APP_CONFIG.colors.accent);
 }
 
