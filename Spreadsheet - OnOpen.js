@@ -18,7 +18,7 @@ function onOpen() {
 // usually pointed at the wrong frame. forceTour lets the caller drive it
 // instead: '' normal, '1' force the tour, 'reset' clear the flag then run it.
 function showDashboardPreview_(width, height, title, forceTour) {
-  var t = HtmlService.createTemplateFromFile('Index');
+  var t = HtmlService.createTemplateFromFile('Web - Index');
   t.forceTour = forceTour || '';
   // Deep-link params only arrive via the web app's URL, but every template
   // variable must still be defined here or evaluate() throws.

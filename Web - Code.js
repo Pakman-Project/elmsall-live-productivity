@@ -13,7 +13,7 @@ function sanitizeParam_(e, name) {
 }
 
 function doGet(e) {
-  var t = HtmlService.createTemplateFromFile('Index');
+  var t = HtmlService.createTemplateFromFile('Web - Index');
 
   // ?tour=1 forces the guided tour to run; ?tour=reset also clears the stored
   // "already seen" flag first, reproducing a genuine first visit.
