@@ -68,7 +68,17 @@ function loadUserPreferences() {
 
     if (prefs.hoursRange) $('hoursRange').value = prefs.hoursRange;
     if (prefs.timeWindow) $('timeWindow').value = prefs.timeWindow;
-    if (prefs.volumeChartMode) $('volumeChartMode').value = prefs.volumeChartMode;
+    if (prefs.volumeChartMode) {
+      $('volumeChartMode').value = prefs.volumeChartMode;
+      // Apply the layout class now rather than waiting for the first render.
+      // Combined and Stacked show one chart, but the markup carries all nine
+      // panels — without this, someone whose saved mode is Combined watches
+      // nine skeletons shimmer and then collapse into a single chart.
+      var volContainer = $('volumeChartsContainer');
+      if (volContainer) {
+        volContainer.classList.toggle('combined-mode', prefs.volumeChartMode !== 'separate');
+      }
+    }
     if (prefs.sharedRowsLimit) $('sharedRowsLimit').value = prefs.sharedRowsLimit;
     if (prefs.bonusViewMode && $('bonusViewMode')) $('bonusViewMode').value = prefs.bonusViewMode;
 

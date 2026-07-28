@@ -344,6 +344,77 @@ body.loading-skeleton .charts .card.panel::after {
 }
 body.loading-skeleton canvas { visibility: hidden; }
 
+/* ── Skeletons on the other three pages ──────────────────────────────────────
+   Only the Overall page had them, so switching to Volume, Bonus or the Data
+   Table during a load — or landing on one via a deep link — showed a blank
+   area with nothing to say whether it was still loading or simply empty.
+
+   Volume gets the same panel treatment as the Overall charts. Its canvases are
+   already hidden by the global rule above; this adds the shimmer over them. */
+body.loading-skeleton .vol-chart-panel {
+  position: relative;
+  min-height: 220px;
+}
+
+body.loading-skeleton .vol-chart-panel::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 52px;
+  bottom: 14px;
+  border-radius: 8px;
+  background-image: linear-gradient(90deg, var(--w4) 25%, var(--w10) 37%, var(--w4) 63%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+
+/* Bonus and Data Table build their contents from data, so on a FIRST load these
+   containers are genuinely empty and have no height to overlay — hence the
+   min-height. On a reload they already hold the previous render, which is why
+   the children are hidden: the shimmer tint is translucent, and old rows
+   showing through a loading state would read as current data. */
+body.loading-skeleton #bonusTablesContainer,
+body.loading-skeleton #mainTableWrapper {
+  position: relative;
+  min-height: 320px;
+}
+
+body.loading-skeleton #bonusTablesContainer > *,
+body.loading-skeleton #mainTableWrapper > * {
+  visibility: hidden;
+}
+
+/* Absolute, so it is taken out of flow and does not become an extra cell in
+   the Bonus page's grid. */
+body.loading-skeleton #bonusTablesContainer::after,
+body.loading-skeleton #mainTableWrapper::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 12px;
+  background-image: linear-gradient(90deg, var(--w4) 25%, var(--w10) 37%, var(--w4) 63%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+
+/* The controls above each page stay live throughout — they are driven by the
+   user, not by the payload, and greying them out would suggest otherwise. */
+
+@media (prefers-reduced-motion: reduce) {
+  body.loading-skeleton .kpi .value,
+  body.loading-skeleton #thresholdDisplay,
+  body.loading-skeleton .charts .card.panel::after,
+  body.loading-skeleton .vol-chart-panel::after,
+  body.loading-skeleton #bonusTablesContainer::after,
+  body.loading-skeleton #mainTableWrapper::after {
+    animation: none;
+  }
+}
+
 /* Pipeline-stall warning in the header meta row. */
 .stale-warning {
   display: inline-flex;
