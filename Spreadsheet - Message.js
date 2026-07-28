@@ -106,7 +106,7 @@ if (
                   buttonList: {
                     buttons: [
                       {
-                        text: 'OPEN DASHBOARD',
+                        text: 'OPEN INTERFACE',
                         onClick: {
                           openLink: {
                             url: webAppUrl

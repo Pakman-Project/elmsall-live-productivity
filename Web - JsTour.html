@@ -39,8 +39,19 @@ var TOUR_STEPS = [
     title: 'Live vs history',
     body: 'Stay on “Live” for today, or pick a saved snapshot from this dropdown to look back at an earlier day.' },
   { part: 1, page: 0, target: '.bonus-search-container',
+    interactive: { sel: '#bonusSearch', type: 'input', inputValue: 'A' },
     title: 'Filter by bonus number',
-    body: 'Type a bonus number here to focus the whole dashboard on specific operators. Clear it to see everyone again.' },
+    body: 'This box searches the operators on shift. Type any letter or number into it now — we will use it in a moment.' },
+  { part: 1, page: 0, target: '#searchDropdown',
+    interactive: { sel: '#searchDropdown .search-item', type: 'click' },
+    action: function () { tourPrimeSearch_(); },
+    title: 'Pick one from the list',
+    body: 'Arrow keys move through the suggestions and Enter picks one — or just click. Choose any operator to filter by them.' },
+  { part: 1, page: 0, target: '#activeFilterBanner',
+    interactive: { sel: '.active-filter-clear-btn', type: 'click' },
+    cleanup: function () { tourClearFilter_(); },
+    title: 'The filter follows you everywhere',
+    body: 'Every page, chart and table is now showing just that operator, and this banner says so wherever you go. Click “Clear all” to see everyone again.' },
   { part: 1, page: 0, target: '.next-rail',
     title: 'Four pages',
     body: 'Overall, Volume, Bonus Numbers and Data Table. Click an icon in the rail to jump straight to a page, or swipe left and right to move between them.' },
@@ -75,17 +86,32 @@ var TOUR_STEPS = [
     body: 'Productivity by work area, plus the deployment trend below it. The “Groups & Charts” button lets you choose which areas to compare, and how many charts to spread them over.' },
   { part: 3, page: 0, target: 'button[onclick="openAreaGroups()"]',
     interactive: { sel: 'button[onclick="openAreaGroups()"]', type: 'click' },
-    title: 'Open the Groups editor',
-    body: 'Click “Groups & Charts” to build your own work-area comparisons.' },
-  { part: 3, page: 0, target: '#areaGroupOverlay .breakdown-close', modal: true,
-    interactive: { sel: '#areaGroupOverlay .breakdown-close', type: 'click' },
-    action: function () {
-      var ov = $('areaGroupOverlay');
-      if (ov && !ov.classList.contains('active') && typeof openAreaGroups === 'function') openAreaGroups();
-    },
-    cleanup: function () { if (typeof closeAreaGroups === 'function') closeAreaGroups(); },
-    title: 'Groups & charts editor',
-    body: 'Two steps in one place. Step 1 builds up to 7 groups of work areas, each drawing a line, a trend line, or both. Step 2 spreads those groups over as many as 7 charts — useful once a single chart gets crowded. Apply commits both. Click the × to close when you’re ready.' },
+    title: 'Open Groups & Charts',
+    body: 'Click “Groups & Charts” — we’ll build a comparison together, and put your own settings back afterwards.' },
+  { part: 3, page: 0, target: '#areaGroupEditor', modal: true,
+    interactive: { sel: '#areaGroupEditor input[type="checkbox"]', type: 'click' },
+    action: function () { tourOpenAreaGroups_(); },
+    title: 'Step 1 — build a group',
+    body: 'A group is a set of work areas measured together as one line. Tick or untick any area to change what a group covers — go on, try one.' },
+  { part: 3, page: 0, target: '#addAreaGroupBtn', modal: true,
+    interactive: { sel: '#addAreaGroupBtn', type: 'click' },
+    action: function () { tourOpenAreaGroups_(); },
+    title: 'Add another group',
+    body: 'Click “Add Group” for one more. You can build up to 7, and the same work area can appear in several.' },
+  { part: 3, page: 0, target: '#areaGroupSplitEditor', modal: true,
+    interactive: { sel: '#areaGroupSplitEditor input[type="checkbox"]', type: 'click' },
+    action: function () { tourOpenAreaGroups_(); },
+    title: 'Step 2 — spread them over charts',
+    body: 'Chart A starts with everything and Chart B starts empty. Tick a group under Chart B to give it a chart of its own — that is what splits one crowded chart into two readable ones.' },
+  { part: 3, page: 0, target: '#areaGroupOverlay .modal-actions .btn:last-child', modal: true,
+    interactive: { sel: '#areaGroupOverlay .modal-actions .btn:last-child', type: 'click' },
+    action: function () { tourOpenAreaGroups_(); },
+    title: 'Apply them together',
+    body: 'One Apply commits the groups and the charts at the same time. Click it and watch the section rebuild.' },
+  { part: 3, page: 0, target: '#areaGroupChartsWrap',
+    cleanup: function () { tourRestoreAreaGroups_(); },
+    title: 'Titled by what they show',
+    body: 'Each chart is named after the groups it draws — “Productivity % - PiE, Top Up vs E3 Packing” — so a split section says what is being compared instead of “Chart A”. Your own groups come back as we move on.' },
 
   // ===== Part 4 — Volume page ==============================================
   { part: 4, page: 1, target: '.volume-controls',
@@ -202,18 +228,15 @@ var TOUR_STEPS = [
     title: 'Arrange the layout',
     body: 'Not everyone reads these pages in the same order. The pen button turns on rearrange mode, where you can move the panels around to suit how you work.' },
   { part: 8, page: 0, target: '.reorder-bar',
-    action: function () {
-      if (typeof setReorderMode_ === 'function' && !_reorderMode) setReorderMode_(true);
-    },
+    action: function () { tourEnterReorder_(); },
+    interactive: { sel: '.reorder-bar .reorder-btn:not([disabled])', type: 'click' },
     title: 'Move a panel',
-    body: 'Every panel gets a bar showing its position, with arrows to move it earlier or later. It works the same on a phone as on a desktop — no dragging, so it never fights with scrolling or swiping between pages.' },
+    body: 'Every panel now carries a bar showing its position, with arrows to move it earlier or later. Click one of the arrows and watch the panel move. No dragging, so it works the same on a phone and never fights with scrolling.' },
   { part: 8, page: 0, target: '.toast',
+    interactive: { sel: '.toast-action-primary', type: 'click' },
     title: 'Finish when you are done',
-    body: 'The message at the bottom stays up while rearrange mode is on. Press “Done” there to finish, or “Reset order” to put everything back the way it started. Your layout is saved as you go — and it applies to the Volume and Bonus pages too.',
-    cleanup: function () {
-      if (typeof setReorderMode_ === 'function' && _reorderMode) setReorderMode_(false);
-      if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false);
-    } },
+    body: 'This message stays up for as long as rearrange mode is on, so you always know where you are. Press “Done” to finish — or “Reset order” to put everything back. It works the same on the Volume and Bonus pages.',
+    cleanup: function () { tourRestoreReorder_(); } },
 
   // ===== Part 9 — Your settings are remembered =============================
   { part: 9, page: 0, target: '.kpi-controls-row',
@@ -482,9 +505,101 @@ function tourReposition_() {
   _tourRepositionRaf = requestAnimationFrame(function() { placeTourTooltip_(tourCurrentStep); });
 }
 
+// ---- Try-it-yourself helpers ------------------------------------------------
+// Several steps let the user genuinely operate the dashboard. Anything they
+// change is snapshotted first and put back when the part ends, so a tour never
+// leaves someone's setup different from how they left it. Preferences are not
+// written during a tour either (saveUserPreferences bails while tourActive), so
+// nothing here can outlive the page.
+
+function tourPrimeSearch_() {
+  var input = $('bonusSearch');
+  if (!input) return;
+
+  // Reached backwards, the box is empty and the suggestion list is closed —
+  // seed it so the step has something to point at either way.
+  if (!input.value) {
+    input.value = String((allBonusList && allBonusList[0]) || 'A').charAt(0);
+  }
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+
+  // The previous step let the user type anything at all, and a query matching
+  // nothing leaves no suggestion to click — which would strand them on a step
+  // that cannot be completed. Fall back to a character that is guaranteed to
+  // match one of the loaded bonus numbers.
+  var dd = $('searchDropdown');
+  if (!dd || !dd.querySelector('.search-item')) {
+    input.value = String((allBonusList && allBonusList[0]) || 'A').charAt(0);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function tourClearFilter_() {
+  var input = $('bonusSearch');
+  if (input) input.value = '';
+  if (typeof closeSearchDropdown_ === 'function') closeSearchDropdown_();
+  // Cleared directly rather than through clearAllBonuses, which raises an Undo
+  // toast — useful normally, noise in the middle of a tour.
+  if (typeof selectedBonuses !== 'undefined' && selectedBonuses.length) {
+    selectedBonuses = [];
+    renderBonusChips();
+    updateClearBtnVisibility();
+    applyLocalFiltersPak();
+  }
+}
+
+var _tourSavedAreaGroups = null;
+var _tourSavedAreaSplit = null;
+
+function tourOpenAreaGroups_() {
+  if (_tourSavedAreaGroups === null) {
+    _tourSavedAreaGroups = JSON.parse(JSON.stringify(areaGroupState));
+    _tourSavedAreaSplit = JSON.parse(JSON.stringify(areaGroupSplitState));
+  }
+  var ov = $('areaGroupOverlay');
+  if (ov && !ov.classList.contains('active') && typeof openAreaGroups === 'function') {
+    openAreaGroups();
+  }
+}
+
+function tourRestoreAreaGroups_() {
+  if (typeof closeAreaGroups === 'function') closeAreaGroups();
+  if (_tourSavedAreaGroups === null) return;
+  areaGroupState = _tourSavedAreaGroups;
+  areaGroupSplitState = _tourSavedAreaSplit;
+  _tourSavedAreaGroups = null;
+  _tourSavedAreaSplit = null;
+  if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
+}
+
+var _tourSavedChartOrder = null;
+
+function tourEnterReorder_() {
+  if (_tourSavedChartOrder === null && typeof chartOrderState !== 'undefined') {
+    _tourSavedChartOrder = JSON.parse(JSON.stringify(chartOrderState));
+  }
+  if (typeof setReorderMode_ === 'function' && !_reorderMode) setReorderMode_(true);
+}
+
+function tourRestoreReorder_() {
+  if (typeof setReorderMode_ === 'function' && typeof _reorderMode !== 'undefined' && _reorderMode) {
+    setReorderMode_(false);
+  }
+  if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false);
+  if (_tourSavedChartOrder === null) return;
+  chartOrderState = _tourSavedChartOrder;
+  _tourSavedChartOrder = null;
+  if (typeof applyChartOrder_ === 'function') applyChartOrder_();
+  if (typeof reorderChipsToMatch_ === 'function') {
+    reorderChipsToMatch_('volumeAreaToggles', 'volume');
+    reorderChipsToMatch_('bonusAreaToggles', 'bonus');
+  }
+}
+
 // ---- Interactive-step wiring -------------------------------------------------
 var _tourGuardClick = null;
 var _tourChangeListener = null;
+var _tourInputListener = null;
 var _tourAdvanceScheduled = false;
 
 function armInteractive_(step) {
@@ -510,11 +625,26 @@ function armInteractive_(step) {
     };
     document.addEventListener('change', _tourChangeListener, true);
   }
+
+  // 'input' waits for the field to actually contain something, so the step is
+  // satisfied by typing rather than by a click. The delay is longer than the
+  // others on purpose: it gives the suggestion list time to appear, so the
+  // next step has something to point at.
+  if (cfg.type === 'input') {
+    _tourInputListener = function(e) {
+      if (e.target.closest && e.target.closest(cfg.sel) &&
+          String(e.target.value || '').trim() !== '') {
+        scheduleInteractiveAdvance_(400);
+      }
+    };
+    document.addEventListener('input', _tourInputListener, true);
+  }
 }
 
 function disarmInteractive_() {
   if (_tourGuardClick) { document.removeEventListener('click', _tourGuardClick, true); _tourGuardClick = null; }
   if (_tourChangeListener) { document.removeEventListener('change', _tourChangeListener, true); _tourChangeListener = null; }
+  if (_tourInputListener) { document.removeEventListener('input', _tourInputListener, true); _tourInputListener = null; }
   currentInteractiveCfg = null;
 }
 
@@ -535,8 +665,9 @@ function triggerInteractive_(step) {
   var el = document.querySelector(cfg.sel);
   if (!el) { disarmInteractive_(); showTourStep_(tourStepIndex + 1); return; }
   if (cfg.type === 'change') { el.value = cfg.changeValue; el.dispatchEvent(new Event('change', { bubbles: true })); }
+  else if (cfg.type === 'input') { el.value = cfg.inputValue || 'A'; el.dispatchEvent(new Event('input', { bubbles: true })); }
   else { el.click(); }
-  scheduleInteractiveAdvance_(cfg.type === 'change' ? 200 : 120);
+  scheduleInteractiveAdvance_(cfg.type === 'click' ? 120 : 250);
 }
 
 function tourNext_() {
