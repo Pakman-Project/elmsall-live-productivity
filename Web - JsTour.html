@@ -63,6 +63,19 @@ var TOUR_STEPS = [
     cleanup: function () { tourClearFilter_(); },
     title: 'The filter follows you everywhere',
     body: 'Every page, chart and table is now showing just that operator, and this banner says so wherever you go. “Clear all” brings everyone back.' },
+  // Mobile-only chrome. Both of these arrived after the tour was written, so
+  // neither was mentioned anywhere. `mobileOnly` is honoured by showTourStep_,
+  // which skips past a step whose controls do not exist on this screen size —
+  // ringing a burger menu on a desktop would point at nothing.
+  { part: 1, page: 0, target: '#headerMenuBtn', mobileOnly: true,
+    interactive: { sel: '#headerMenuBtn', type: 'click' },
+    cleanup: function () { if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false); },
+    title: 'Everything else lives here',
+    body: 'On a phone the action buttons fold into this menu — refresh, auto-refresh, rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
+  { part: 1, page: 0, target: '.next-rail', mobileOnly: true,
+    title: 'Pull down to refresh',
+    body: 'Anywhere on a page, drag down from the top and let go to pull the latest figures — the same as the refresh button, without going into the menu for it.' },
+
   { part: 1, page: 0, target: '.next-rail',
     title: 'Four pages',
     body: 'Overall, Volume, Bonus Numbers and Data Table. Click an icon in the rail to jump straight to a page, or swipe left and right to move between them.' },
@@ -522,6 +535,16 @@ function runStepCleanup_() {
   }
 }
 
+// A step can declare itself mobileOnly or desktopOnly; anything else runs
+// everywhere.
+function stepAppliesHere_(step) {
+  if (!step) return false;
+  var mobile = isTourMobile_();
+  if (step.mobileOnly && !mobile) return false;
+  if (step.desktopOnly && mobile) return false;
+  return true;
+}
+
 function tourKeydown_(e) {
   if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); toggleTourPause_(); }
   else if (e.key === 'Escape') { endTour_(); }
@@ -953,6 +976,16 @@ function positionSpotlight_(rect) {
 }
 
 function showTourStep_(i) {
+  if (i < 0) i = 0;
+  if (i >= TOUR_STEPS.length) { endTour_(); return; }
+
+  // Steps about mobile-only chrome are skipped on a desktop, and vice versa.
+  // Skipping in the direction of travel, so stepping Back through them does not
+  // bounce the viewer forwards again.
+  var forwards = (i >= tourStepIndex);
+  while (i >= 0 && i < TOUR_STEPS.length && !stepAppliesHere_(TOUR_STEPS[i])) {
+    i += forwards ? 1 : -1;
+  }
   if (i < 0) i = 0;
   if (i >= TOUR_STEPS.length) { endTour_(); return; }
 
