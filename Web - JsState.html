@@ -97,9 +97,21 @@ var BREAKDOWN_AREAS = [
 // through CSS, so the two palettes can now differ, which is the point: a
 // colour that works as a bar fill is not automatically a colour that works as
 // 11px text.
+// Every alpha of the accent used anywhere in the stylesheet. Derived here
+// rather than written out per theme so a tint cannot drift from the accent it
+// is a tint of — which is exactly what had happened: --accent was being set to
+// APP_CONFIG's blue at runtime while --accent-10/14/15/22 stayed the authored
+// teal, so accent borders and accent fills were two different colours.
+var ACCENT_ALPHAS = [4, 7, 8, 10, 14, 15, 18, 20, 22, 25, 28, 30, 35, 40, 45, 55, 65, 75, 95];
+
 function applyConfigToCSSPak() {
   var root = document.documentElement;
-  root.style.setProperty('--accent', APP_CONFIG.colors.accent);
+  var accent = APP_CONFIG.colors.accent;
+  root.style.setProperty('--accent', accent);
+  for (var i = 0; i < ACCENT_ALPHAS.length; i++) {
+    var a = ACCENT_ALPHAS[i];
+    root.style.setProperty('--accent-' + a, hexToRgbaPak(accent, a / 100));
+  }
 }
 
 var timeRanges = [];

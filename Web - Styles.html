@@ -86,10 +86,29 @@
 
   /* Precomputed alpha tints. Defined per theme instead of using color-mix(),
      which html2canvas cannot parse — it made image export fail entirely. */
+  /* Accent tints, one per alpha actually used in this file. These are the
+     AUTHORED values; applyConfigToCSSPak overwrites them at runtime from
+     APP_CONFIG.colors.accent so a tint can never disagree with the accent it is
+     supposed to be a tint OF. They stay here as the pre-JS fallback. */
+  --accent-4: rgba(0, 122, 122, 0.04);
+  --accent-7: rgba(0, 122, 122, 0.07);
+  --accent-8: rgba(0, 122, 122, 0.08);
   --accent-10: rgba(0, 122, 122, 0.10);
   --accent-14: rgba(0, 122, 122, 0.14);
   --accent-15: rgba(0, 122, 122, 0.15);
+  --accent-18: rgba(0, 122, 122, 0.18);
+  --accent-20: rgba(0, 122, 122, 0.20);
   --accent-22: rgba(0, 122, 122, 0.22);
+  --accent-25: rgba(0, 122, 122, 0.25);
+  --accent-28: rgba(0, 122, 122, 0.28);
+  --accent-30: rgba(0, 122, 122, 0.30);
+  --accent-35: rgba(0, 122, 122, 0.35);
+  --accent-40: rgba(0, 122, 122, 0.40);
+  --accent-45: rgba(0, 122, 122, 0.45);
+  --accent-55: rgba(0, 122, 122, 0.55);
+  --accent-65: rgba(0, 122, 122, 0.65);
+  --accent-75: rgba(0, 122, 122, 0.75);
+  --accent-95: rgba(0, 122, 122, 0.95);
   --good-14: rgba(60, 105, 57, 0.14);
   --bad-14: rgba(211, 47, 47, 0.14);
 }
@@ -151,10 +170,25 @@
   --perf-bar-warn: rgba(255, 157, 92, 0.18);
   --perf-bar-bad: rgba(244, 67, 54, 0.20);
 
+  --accent-4: rgba(0, 147, 147, 0.04);
+  --accent-7: rgba(0, 147, 147, 0.07);
+  --accent-8: rgba(0, 147, 147, 0.08);
   --accent-10: rgba(0, 147, 147, 0.10);
   --accent-14: rgba(0, 147, 147, 0.14);
   --accent-15: rgba(0, 147, 147, 0.15);
+  --accent-18: rgba(0, 147, 147, 0.18);
+  --accent-20: rgba(0, 147, 147, 0.20);
   --accent-22: rgba(0, 147, 147, 0.22);
+  --accent-25: rgba(0, 147, 147, 0.25);
+  --accent-28: rgba(0, 147, 147, 0.28);
+  --accent-30: rgba(0, 147, 147, 0.30);
+  --accent-35: rgba(0, 147, 147, 0.35);
+  --accent-40: rgba(0, 147, 147, 0.40);
+  --accent-45: rgba(0, 147, 147, 0.45);
+  --accent-55: rgba(0, 147, 147, 0.55);
+  --accent-65: rgba(0, 147, 147, 0.65);
+  --accent-75: rgba(0, 147, 147, 0.75);
+  --accent-95: rgba(0, 147, 147, 0.95);
   --good-14: rgba(161, 211, 153, 0.14);
   --bad-14: rgba(244, 67, 54, 0.14);
 }
@@ -792,8 +826,8 @@ body.loading-skeleton #mainTableWrapper::after {
   margin-bottom: 12px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: rgba(105, 167, 255, 0.14);
-  border: 1px solid rgba(105, 167, 255, 0.35);
+  background: var(--accent-14);
+  border: 1px solid var(--accent-35);
   color: var(--accent);
   font-size: 12px;
   font-weight: 700;
@@ -823,7 +857,7 @@ body.loading-skeleton #mainTableWrapper::after {
 
 .active-filter-clear-btn {
   background: transparent;
-  border: 1px solid rgba(105, 167, 255, 0.45);
+  border: 1px solid var(--accent-45);
   color: var(--accent);
   border-radius: 999px;
   padding: 3px 10px;
@@ -837,13 +871,13 @@ body.loading-skeleton #mainTableWrapper::after {
 }
 
 .active-filter-clear-btn:hover {
-  background: rgba(105, 167, 255, 0.22);
+  background: var(--accent-22);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  background: rgba(105, 167, 255, 0.15);
+  background: var(--accent-15);
   border: 1px solid var(--accent);
   color: var(--accent);
   padding: 2px 8px;
@@ -1075,7 +1109,7 @@ body.loading-skeleton #mainTableWrapper::after {
 }
 
 .kpi-tooltip:hover {
-  background: rgba(105, 167, 255, 0.2);
+  background: var(--accent-20);
   color: var(--accent);
 }
 
@@ -1563,8 +1597,10 @@ canvas {
   user-select: none;
 }
 
+/* Hovering a sortable header turned its text white on a light tint — the same
+   dark-theme leftover fixed elsewhere, and the last one in the file. */
 .side-table th:hover {
-  color: #fff;
+  color: var(--text);
   background: var(--w10);
 }
 
@@ -2435,8 +2471,8 @@ body.page-scrolled-far .back-to-top {
   gap: 5px;
   padding: 4px 10px;
   border-radius: 7px;
-  border: 1px solid rgba(105, 167, 255, 0.25);
-  background: rgba(105, 167, 255, 0.08);
+  border: 1px solid var(--accent-25);
+  background: var(--accent-8);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -2448,8 +2484,8 @@ body.page-scrolled-far .back-to-top {
 }
 
 .breakdown-btn:hover {
-  background: rgba(105, 167, 255, 0.18);
-  border-color: rgba(105, 167, 255, 0.45);
+  background: var(--accent-18);
+  border-color: var(--accent-45);
   transform: translateY(-1px);
 }
 
@@ -2591,8 +2627,8 @@ body.page-scrolled-far .back-to-top {
 }
 
 .breakdown-bonus-chip:hover {
-  background: rgba(105, 167, 255, 0.15);
-  border-color: rgba(105, 167, 255, 0.4);
+  background: var(--accent-15);
+  border-color: var(--accent-40);
   color: var(--accent);
   transform: translateY(-1px);
 }
@@ -2929,7 +2965,7 @@ body.page-scrolled-far .back-to-top {
 
 .bonus-area-chip:hover {
   border-color: var(--accent);
-  background: rgba(105, 167, 255, 0.10);
+  background: var(--accent-10);
 }
 
 .bonus-area-chip.off {
@@ -3209,11 +3245,11 @@ body.page-scrolled-far .back-to-top {
 }
 
 .main-expandable-row:hover > td {
-  background: rgba(105, 167, 255, 0.04) !important;
+  background: var(--accent-4) !important;
 }
 
 .main-expandable-row.expanded > td {
-  background: rgba(105, 167, 255, 0.07) !important;
+  background: var(--accent-7) !important;
   border-bottom-color: transparent !important;
 }
 
@@ -3672,8 +3708,8 @@ body.page-scrolled-far .back-to-top {
     cursor: pointer;
   }
   .main-card.expanded {
-    background: rgba(105, 167, 255, 0.07);
-    border-color: rgba(105, 167, 255, 0.3);
+    background: var(--accent-7);
+    border-color: var(--accent-30);
   }
   .main-card-head {
     display: flex;
@@ -3960,7 +3996,7 @@ body.page-scrolled-far .back-to-top {
   border-radius: 12px;
   border: 2px solid var(--accent);
   /* The huge spread box-shadow darkens the whole screen EXCEPT this rectangle. */
-  box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 22px rgba(105, 167, 255, 0.55);
+  box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 22px var(--accent-55);
   pointer-events: none;
   transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
 }
@@ -4074,8 +4110,8 @@ body.page-scrolled-far .back-to-top {
   animation: tourPulse 1.5s ease-in-out infinite;
 }
 @keyframes tourPulse {
-  0%, 100% { box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 0 3px rgba(105, 167, 255, 0.65); }
-  50%      { box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 0 8px rgba(105, 167, 255, 0.28); }
+  0%, 100% { box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 0 3px var(--accent-65); }
+  50%      { box-shadow: 0 0 0 9999px var(--tour-mask), 0 0 0 8px var(--accent-28); }
 }
 /* Modal-close (passthrough + interactive): ring-only highlight, no dark mask,
    so the opened modal stays fully visible while its close button pulses. */
@@ -4084,12 +4120,12 @@ body.page-scrolled-far .back-to-top {
 }
 .tour-overlay.passthrough.interactive .tour-spotlight {
   display: block;
-  box-shadow: 0 0 0 3px rgba(105, 167, 255, 0.95);
+  box-shadow: 0 0 0 3px var(--accent-95);
   animation: tourRing 1.4s ease-in-out infinite;
 }
 @keyframes tourRing {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(105, 167, 255, 0.95); }
-  50%      { box-shadow: 0 0 0 6px rgba(105, 167, 255, 0.35); }
+  0%, 100% { box-shadow: 0 0 0 3px var(--accent-95); }
+  50%      { box-shadow: 0 0 0 6px var(--accent-35); }
 }
 /* Slideshow timer. The bar is driven by a CSS width transition rather than a
    rAF loop: the browser keeps it smooth on its own, and pausing is just a
@@ -4117,9 +4153,9 @@ body.page-scrolled-far .back-to-top {
 }
 
 @keyframes tourDemoHit {
-  0%   { box-shadow: 0 0 0 0 rgba(105, 167, 255, 0.75); }
-  70%  { box-shadow: 0 0 0 10px rgba(105, 167, 255, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(105, 167, 255, 0); }
+  0%   { box-shadow: 0 0 0 0 var(--accent-75); }
+  70%  { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 .tour-speed {
