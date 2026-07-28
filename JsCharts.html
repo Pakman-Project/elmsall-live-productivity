@@ -112,6 +112,68 @@
     });
   }
 
+  // ── Volume page: build charts as they come into view ───────────────────────
+  // Separate Charts mode draws one chart per work area — up to nine. On a phone
+  // barely one fits on screen at a time, yet all nine Chart.js instances were
+  // constructed the moment the page was first shown. That is the single most
+  // expensive thing this dashboard does, and eight ninths of it was for charts
+  // the user had not scrolled to and might never reach.
+  var _volPendingBuilders = {};
+  var _volObserver = null;
+
+  function teardownVolumeLazyLoad_() {
+    if (_volObserver) { _volObserver.disconnect(); _volObserver = null; }
+    _volPendingBuilders = {};
+  }
+
+  function buildVolumeChartAt_(idx) {
+    var build = _volPendingBuilders[idx];
+    if (!build) return;
+    // Removed first: a chart must never be built twice, and building one is
+    // slow enough for a second observer callback to arrive meanwhile.
+    delete _volPendingBuilders[idx];
+    build();
+  }
+
+  // The image export captures the whole page including everything scrolled out
+  // of sight, so a chart still waiting on the observer would come out as a
+  // blank panel. Forcing the remainder is cheap and only happens on an explicit
+  // export. Also the fallback where IntersectionObserver is unavailable.
+  function buildAllPendingVolumeCharts_() {
+    var keys = Object.keys(_volPendingBuilders);
+    for (var i = 0; i < keys.length; i++) { buildVolumeChartAt_(keys[i]); }
+    if (_volObserver) { _volObserver.disconnect(); _volObserver = null; }
+  }
+
+  function observeVolumePanels_() {
+    if (typeof IntersectionObserver === 'undefined') {
+      buildAllPendingVolumeCharts_();
+      return;
+    }
+    _volObserver = new IntersectionObserver(function (entries) {
+      for (var i = 0; i < entries.length; i++) {
+        if (!entries[i].isIntersecting) continue;
+        buildVolumeChartAt_(parseInt(entries[i].target.dataset.volIndex, 10));
+        _volObserver.unobserve(entries[i].target);
+      }
+    }, {
+      // Measured against the viewport rather than the .page scroll container.
+      // An intersection rect is clipped by every scrolling ancestor, so this
+      // already reports nothing while the Volume page is swiped off to the
+      // side — no need to name a root. The margin builds each chart shortly
+      // before it arrives, so scrolling never lands on an empty panel.
+      rootMargin: '250px 0px',
+      threshold: 0
+    });
+    var pending = Object.keys(_volPendingBuilders);
+    for (var k = 0; k < pending.length; k++) {
+      var panel = $('volPanel' + pending[k]);
+      if (!panel) continue;
+      panel.dataset.volIndex = pending[k];
+      _volObserver.observe(panel);
+    }
+  }
+
   function renderVolumeChartsPak(agg, xOpt, tOpt) {
     var labels = agg.map(function(r) { return r.dateTime; });
     var rl = agg.map(function(r) { return r.rangeLabel; });
@@ -122,6 +184,9 @@
     else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - E3 Stacked Area Chart' : 'Volume - E3 Combined Line Chart'; }
     for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
     volumeCharts = [];
+    // Drop any builders left over from the previous render before queueing new
+    // ones, or a stale closure could later build a chart from old data.
+    teardownVolumeLazyLoad_();
 
     renderVolumeAreaToggles_(mode);
 
@@ -154,10 +219,17 @@
     if (mode === 'separate') {
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
         if (hiddenVolumeAreas.indexOf(VOLUME_TYPES[i].key) !== -1) continue;
+        // The series data is mapped now — it is cheap, and doing it here keeps
+        // `agg` out of the closure. Only the Chart.js construction, which is
+        // the expensive half, is deferred to observeVolumePanels_ below.
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
-        var chart = new Chart($('volChart' + i), { type: 'line', data: { labels: labels, datasets: [{ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } });
-        volumeCharts.push(chart);
+        (function (idx, vType, series) {
+          _volPendingBuilders[idx] = function () {
+            volumeCharts.push(new Chart($('volChart' + idx), { type: 'line', data: { labels: labels, datasets: [{ label: vType.label, data: series, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } }));
+          };
+        })(i, volType, dataArr);
       }
+      observeVolumePanels_();
     } else {
       var datasets = [];
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
@@ -346,6 +418,7 @@
     if (!c) {
       for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
       volumeCharts = [];
+      teardownVolumeLazyLoad_();
       return;
     }
     renderVolumeChartsPak(c.agg, c.xOpt, c.tOpt);

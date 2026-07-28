@@ -125,6 +125,14 @@ function captureCurrentPageCanvas_() {
     var page = pages[currentPage];
     if (!page) throw new Error('Nothing to capture.');
 
+    // Volume charts are built as they scroll into view, but this captures the
+    // whole page including everything below the fold — so anything still
+    // waiting on the observer has to be built first or it exports as a blank
+    // panel. No-op on the other pages and when they are all already built.
+    if (typeof buildAllPendingVolumeCharts_ === 'function') {
+      buildAllPendingVolumeCharts_();
+    }
+
     // Unclipping the page alone is not enough: its ancestors (.swipe-wrapper,
     // .swipe-container, .wrap) are fixed-height with overflow hidden, and they
     // clip the capture too — which cut the last rows off tall pages. Every
