@@ -9,6 +9,56 @@
   function CHART_GRID()  { return _isLightTheme_() ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"; }
   // Area-fill shading: keep it minimal in light mode so charts stay clean.
   function CHART_FILL_A(a) { return _isLightTheme_() ? +(a * 0.35).toFixed(3) : a; }
+  function CHART_CROSSHAIR() { return _isLightTheme_() ? "rgba(0,0,0,0.38)" : "rgba(255,255,255,0.45)"; }
+
+  // ── Hover crosshair ────────────────────────────────────────────────────────
+  // The charts already sync on hover: pointing at 14:30 on the volume chart
+  // activates 14:30 on the productivity chart and every trend chart too. But a
+  // tooltip is drawn next to the cursor on the chart under the mouse and
+  // floats at some unrelated height on all the others, so "these are all
+  // showing the same 15-minute block" was something the reader had to take on
+  // trust. A vertical rule at the active index makes the connection visible,
+  // and doubles as a straight edge for reading a value off the axis.
+  //
+  // Driven by getActiveElements() rather than by mouse position, so it follows
+  // the existing sync for free — including on charts the pointer is nowhere
+  // near — instead of needing its own coordinate plumbing.
+  var e3CrosshairPlugin = {
+    id: 'e3Crosshair',
+    afterDatasetsDraw: function (chart) {
+      // Cartesian charts only: a vertical rule means nothing on a doughnut, and
+      // chartArea for those is not a plot box.
+      var type = chart.config && chart.config.type;
+      if (type !== 'line' && type !== 'bar') return;
+
+      var active = chart.getActiveElements();
+      if (!active || active.length === 0) return;
+      var el = active[0].element;
+      var area = chart.chartArea;
+      if (!el || !area) return;
+
+      // A hidden dataset can leave an active element parked outside the plot.
+      var x = el.x;
+      if (!(x >= area.left && x <= area.right)) return;
+
+      var ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      // Dashed, thin and low contrast: this is a reading aid sitting on top of
+      // the data, and it must not be mistaken for a series of its own.
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = CHART_CROSSHAIR();
+      ctx.moveTo(x, area.top);
+      ctx.lineTo(x, area.bottom);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  // afterDatasetsDraw runs before the tooltip is painted, so the line passes
+  // under the tooltip rather than across it.
+  if (typeof Chart !== 'undefined') { Chart.register(e3CrosshairPlugin); }
 
   // Every render rebuilds all ~13 charts from scratch. Animating that on a
   // background auto-refresh makes the whole dashboard look like it's stuttering
