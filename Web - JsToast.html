@@ -23,6 +23,10 @@ var TOAST_DEFAULT_MS = 4000;
 var TOAST_UNDO_MS = 8000;
 
 var _toastTimer = null;
+// Set by a toast that wants to know when its close button is used. Only the X
+// fires it — a timeout or being replaced by another toast does not, because
+// those are not the user saying "I am finished with this".
+var _toastOnClose = null;
 
 function toastHost_() {
   var host = document.getElementById('toastHost');
@@ -40,6 +44,7 @@ function toastHost_() {
 }
 
 function dismissToast_() {
+  _toastOnClose = null;
   var host = document.getElementById('toastHost');
   if (!host) return;
   clearTimeout(_toastTimer);
@@ -54,14 +59,22 @@ function dismissToast_() {
   }, 200);
 }
 
-// `action` is optional: { label: 'Undo', onClick: fn }. Showing a toast
-// replaces any toast already up, rather than stacking — these confirm the last
-// thing the user did, and a queue of them just gets in the way.
+// Options:
+//   action    {label, onClick}          - a single button, kept for callers
+//                                         that predate `actions`
+//   actions   [{label, onClick, primary}] - one or more buttons
+//   persist   true                      - never auto-dismiss; for a toast that
+//                                         reflects a mode the user is still in
+//   onClose   fn                        - the close button was pressed
+//
+// Showing a toast replaces any toast already up rather than stacking — these
+// confirm the last thing the user did, and a queue of them just gets in the way.
 function showToastPak(message, opts) {
   opts = opts || {};
   var host = toastHost_();
   host.innerHTML = '';
   clearTimeout(_toastTimer);
+  _toastOnClose = opts.onClose || null;
 
   var toast = document.createElement('div');
   toast.className = 'toast' + (opts.kind ? ' toast-' + opts.kind : '');
@@ -78,25 +91,35 @@ function showToastPak(message, opts) {
 
   var life = opts.durationMs || TOAST_DEFAULT_MS;
 
-  if (opts.action && typeof opts.action.onClick === 'function') {
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'toast-action';
-    btn.textContent = opts.action.label || 'Undo';
-    btn.addEventListener('click', function () {
-      dismissToast_();
-      opts.action.onClick();
-    });
-    toast.appendChild(btn);
-    life = opts.durationMs || TOAST_UNDO_MS;
+  var actions = opts.actions || (opts.action ? [opts.action] : []);
+  for (var a = 0; a < actions.length; a++) {
+    (function (action) {
+      if (typeof action.onClick !== 'function') return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toast-action' + (action.primary ? ' toast-action-primary' : '');
+      btn.textContent = action.label || 'Undo';
+      btn.addEventListener('click', function () {
+        // Dismiss first: the handler may put a fresh toast up, and clearing
+        // afterwards would take that one down with it.
+        dismissToast_();
+        action.onClick();
+      });
+      toast.appendChild(btn);
+    })(actions[a]);
   }
+  if (actions.length > 0) life = opts.durationMs || TOAST_UNDO_MS;
 
   var close = document.createElement('button');
   close.type = 'button';
   close.className = 'toast-close';
   close.setAttribute('aria-label', 'Dismiss');
   close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-  close.addEventListener('click', dismissToast_);
+  close.addEventListener('click', function () {
+    var cb = _toastOnClose;
+    dismissToast_();
+    if (cb) cb();
+  });
   toast.appendChild(close);
 
   host.appendChild(toast);
@@ -104,6 +127,8 @@ function showToastPak(message, opts) {
   // transition actually runs instead of being skipped.
   requestAnimationFrame(function () { toast.classList.add('in'); });
 
-  _toastTimer = setTimeout(dismissToast_, life);
+  // A toast standing in for a mode has to stay until the mode ends; letting it
+  // time out would leave the user in that mode with nothing on screen saying so.
+  if (!opts.persist) _toastTimer = setTimeout(dismissToast_, life);
 }
 </script>

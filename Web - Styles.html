@@ -1640,6 +1640,39 @@ canvas {
   background: var(--w8);
 }
 
+/* The confirming action. Given a filled button rather than the underlined text
+   the secondary actions use, so "Done" is obviously the way out and does not
+   read as just another link in the sentence. */
+.toast-action-primary {
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  padding: 6px 12px;
+}
+
+.toast-action-primary:hover {
+  background: var(--accent);
+  filter: brightness(1.1);
+}
+
+/* A persistent toast can carry two actions plus a close button, which is more
+   than fits beside the text on a narrow phone — let it wrap onto its own line
+   rather than squeezing the buttons to nothing. */
+@media (max-width: 700px) {
+  .toast {
+    flex-wrap: wrap;
+  }
+  .toast-text {
+    flex: 1 1 100%;
+  }
+  .toast-action {
+    margin-left: auto;
+  }
+  .toast-action + .toast-action {
+    margin-left: 0;
+  }
+}
+
 .toast-close {
   flex-shrink: 0;
   background: none;

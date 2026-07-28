@@ -272,15 +272,37 @@ function setReorderMode_(on) {
   refreshReorderBars_();
 
   if (_reorderMode) {
-    showToastPak('Use the arrows on each chart to move it. Your layout is saved automatically.',
-      { icon: 'fa-pen-to-square', durationMs: 5000,
-        action: { label: 'Reset order', onClick: resetChartOrder_ } });
+    showRearrangeToast_();
   } else {
+    // Leaving by any route — Done, the close button, or the header button —
+    // takes the mode's toast with it.
+    dismissToast_();
     captureChartOrder_();
     // The grid reflows on leaving edit mode (the trend section collapses back
     // to display:contents), so the charts need to re-measure.
     resizeCharts();
   }
+}
+
+// The toast doubles as the mode's own control surface. On a phone the header
+// button that turns the mode on is behind the burger menu, so leaving the mode
+// would otherwise mean opening that menu again while the page is covered in
+// edit bars — this puts Done within reach of where the user is already working.
+//
+// It persists for the same reason: it is not a notification about something
+// that happened, it is the indicator that a mode is currently on.
+function showRearrangeToast_(prefix) {
+  showToastPak((prefix ? prefix + ' ' : '') +
+    'Rearrange mode: use the arrows on each panel to move it. Changes save as you go.', {
+    icon: 'fa-pen-to-square',
+    persist: true,
+    // Dismissing the mode's indicator means dismissing the mode.
+    onClose: function () { setReorderMode_(false); },
+    actions: [
+      { label: 'Reset order', onClick: resetChartOrder_ },
+      { label: 'Done', primary: true, onClick: function () { setReorderMode_(false); } }
+    ]
+  });
 }
 
 function resetChartOrder_() {
@@ -298,7 +320,10 @@ function resetChartOrder_() {
   captureChartOrder_();
   refreshReorderBars_();
   refreshOddCentering_();
-  showToastPak('Chart order reset to the default.', { icon: 'fa-rotate-left' });
+  // Re-raise the mode's toast rather than a transient one: a plain confirmation
+  // would replace it and leave the user in rearrange mode with no indicator and
+  // no way out but the header button.
+  showRearrangeToast_('Order reset.');
 }
 
 // The as-authored order, captured before any saved order is applied, so Reset
