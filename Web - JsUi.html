@@ -1030,7 +1030,11 @@
       // Not split yet: seed with the single chart that is actually on screen,
       // holding every group. Starting from an empty list would misrepresent the
       // current state as "nothing assigned anywhere".
-      : [_areaGroupDraft.map(function (_, gi) { return gi; })];
+      // Chart A holds every group — that IS the single chart currently on
+      // screen. Chart B is offered empty so the split is visible as something
+      // available rather than something to go looking for; it is dropped on
+      // Apply if left alone, so offering it costs nothing.
+      : [_areaGroupDraft.map(function (_, gi) { return gi; }), []];
     $('areaGroupOverlay').classList.add('active');
     renderAreaGroupEditor();
     renderAreaGroupSplitEditor();

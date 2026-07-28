@@ -113,6 +113,22 @@
     });
   }
 
+  // A chart's title is the groups it draws, so a split section says what each
+  // chart is FOR rather than "Chart A" / "Chart B".
+  //
+  // Falls back to the generic title past four groups: a bonus filter replaces
+  // the configured groups with one per active work area, and up to nine area
+  // names joined by "vs" would overrun the panel header and tell the reader
+  // nothing they cannot already see in the legend.
+  function areaGroupChartTitle_(groupsForChart) {
+    if (!groupsForChart || groupsForChart.length === 0 || groupsForChart.length > 4) {
+      return 'Productivity % by Work Area';
+    }
+    var names = [];
+    for (var i = 0; i < groupsForChart.length; i++) { names.push(groupsForChart[i].label); }
+    return 'Productivity % - ' + names.join(' vs ');
+  }
+
   // ── Volume page: build charts as they come into view ───────────────────────
   // Separate Charts mode draws one chart per work area — up to nine. On a phone
   // barely one fits on screen at a time, yet all nine Chart.js instances were
@@ -376,14 +392,11 @@
     areaGroupCharts = [];
     if (agWrap) {
       agWrap.innerHTML = '';
-      var agSplit = areaGroupBuckets.length > 1;
       for (var ag = 0; ag < areaGroupBuckets.length; ag++) {
         (function (agIdx) {
           var panelEl = document.createElement('div');
           panelEl.className = 'card panel';
-          var heading = agSplit
-            ? 'Productivity % - ' + (TREND_CHART_LABELS[agIdx] || ('Chart ' + (agIdx + 1)))
-            : 'Productivity % by Work Area';
+          var heading = areaGroupChartTitle_(areaGroupBuckets[agIdx]);
           var titleHtml = '<h2>' + safeTextPak(heading) + '</h2>';
           // Both buttons live on the first panel only: they configure the whole
           // section, and repeating them per chart would imply otherwise.

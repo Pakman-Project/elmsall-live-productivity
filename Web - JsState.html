@@ -64,17 +64,11 @@ function defaultAreaGroupState_() {
 
 var areaGroupState = defaultAreaGroupState_();
 
-// Which of the default groups each default chart draws — one group per chart,
-// so the two are compared side by side rather than overlaid on a single set of
-// axes. Indices into DEFAULT_AREA_GROUPS, so this only stays meaningful while
-// the two lists are the same length.
-var DEFAULT_AREA_GROUP_CHARTS = [[0], [1]];
-
+// One chart by default, carrying every group. The dialog still OFFERS a second,
+// empty chart as an affordance (see openAreaGroups) — but an empty chart is
+// dropped on Apply, so the default that actually renders stays a single chart.
 function defaultAreaGroupSplitState_() {
-  return {
-    enabled: true,
-    charts: DEFAULT_AREA_GROUP_CHARTS.map(function (c) { return c.slice(); })
-  };
+  return { enabled: false, charts: [] };
 }
 
 var BREAKDOWN_AREAS = [
