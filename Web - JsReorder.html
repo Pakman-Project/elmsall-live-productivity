@@ -251,15 +251,18 @@ function setReorderMode_(on) {
     btn.setAttribute('title', label);
     btn.setAttribute('aria-label', label);
     btn.setAttribute('aria-pressed', _reorderMode ? 'true' : 'false');
+    // Pen while off ("edit the layout"), tick while on ("done"). Both states
+    // need an icon of their own — leaving the pen in place would give no sign
+    // the mode had actually engaged.
     var icon = btn.querySelector('i');
-    if (icon) icon.className = _reorderMode ? 'fa-solid fa-check' : 'fa-solid fa-arrow-up-wide-short';
+    if (icon) icon.className = _reorderMode ? 'fa-solid fa-check' : 'fa-solid fa-pen-to-square';
   }
 
   refreshReorderBars_();
 
   if (_reorderMode) {
     showToastPak('Use the arrows on each chart to move it. Your layout is saved automatically.',
-      { icon: 'fa-arrow-up-wide-short', durationMs: 5000,
+      { icon: 'fa-pen-to-square', durationMs: 5000,
         action: { label: 'Reset order', onClick: resetChartOrder_ } });
   } else {
     captureChartOrder_();
