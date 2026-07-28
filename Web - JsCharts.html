@@ -56,9 +56,53 @@
     }
   };
 
+  // ── Empty state ────────────────────────────────────────────────────────────
+  // A chart with no data drew its axes and nothing else, which is indis-
+  // tinguishable from one that failed to load — and both happen: pick a narrow
+  // window at the start of a shift, or filter to an operator who was not on
+  // that area, and the plot is legitimately empty.
+  //
+  // Written as a plugin so it covers every chart on every page at once, rather
+  // than being bolted onto thirteen separate construction sites.
+  var e3EmptyStatePlugin = {
+    id: 'e3EmptyState',
+    afterDraw: function (chart) {
+      var ds = chart.data && chart.data.datasets;
+      if (!ds || ds.length === 0) return;
+
+      // "Empty" means no finite point anywhere in a VISIBLE dataset. A series
+      // the user has hidden via the legend does not count as data.
+      var hasData = false;
+      for (var d = 0; d < ds.length && !hasData; d++) {
+        if (!chart.isDatasetVisible(d)) continue;
+        var pts = ds[d].data || [];
+        for (var i = 0; i < pts.length; i++) {
+          var v = (pts[i] && typeof pts[i] === 'object') ? pts[i].y : pts[i];
+          if (v !== null && v !== undefined && isFinite(v)) { hasData = true; break; }
+        }
+      }
+      if (hasData) return;
+
+      var area = chart.chartArea;
+      if (!area) return;
+      var ctx = chart.ctx;
+      ctx.save();
+      ctx.fillStyle = CHART_MUTED();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '500 13px Poppins, system-ui, sans-serif';
+      ctx.fillText('No data in this range',
+                   (area.left + area.right) / 2, (area.top + area.bottom) / 2);
+      ctx.restore();
+    }
+  };
+
   // afterDatasetsDraw runs before the tooltip is painted, so the line passes
   // under the tooltip rather than across it.
-  if (typeof Chart !== 'undefined') { Chart.register(e3CrosshairPlugin); }
+  if (typeof Chart !== 'undefined') {
+    Chart.register(e3CrosshairPlugin);
+    Chart.register(e3EmptyStatePlugin);
+  }
 
   // Every render rebuilds all ~13 charts from scratch. Animating that on a
   // background auto-refresh makes the whole dashboard look like it's stuttering
