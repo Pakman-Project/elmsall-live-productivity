@@ -64,7 +64,7 @@ function tagReorderItems_() {
       if (el.id === 'trendChartsWrap') key = 'trend';
       else if (el.querySelector && el.querySelector('#overviewVolChart')) key = 'overviewVol';
       else if (el.querySelector && el.querySelector('#perfChart')) key = 'perf';
-      else if (el.querySelector && el.querySelector('#areaGroupChart')) key = 'areaGroup';
+      else if (el.id === 'areaGroupChartsWrap') key = 'areaGroup';
       if (key) {
         el.setAttribute('data-reorder-key', key);
         el.setAttribute('data-reorder-label', reorderLabelFor_(el, key));
@@ -84,6 +84,7 @@ function tagReorderItems_() {
 
 function reorderLabelFor_(el, key) {
   if (key === 'trend') return 'Deployment Trend';
+  if (key === 'areaGroup') return 'Productivity % by Work Area';
   var h2 = el.querySelector('h2');
   return h2 ? h2.textContent.trim() : key;
 }
@@ -190,7 +191,7 @@ function overallPanelsInDomOrder_() {
     var ch = zone.children[i];
     // .trend-charts-wrap is display:contents, so its children are laid out as
     // if they were the grid's own — flatten it to match what is on screen.
-    if (ch.id === 'trendChartsWrap') {
+    if (ch.id === 'trendChartsWrap' || ch.id === 'areaGroupChartsWrap') {
       for (var j = 0; j < ch.children.length; j++) {
         if (ch.children[j].classList.contains('panel')) out.push(ch.children[j]);
       }

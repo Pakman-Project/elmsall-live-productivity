@@ -279,7 +279,9 @@
   }
 
   function renderChartsPak(rows, trendRowsList, trendTitles, trendAreaKeysList, rawFilteredData, rawTimeList) {
-    if (areaGroupChart) areaGroupChart.destroy();
+    for (var agd = 0; agd < areaGroupCharts.length; agd++) { if (areaGroupCharts[agd]) areaGroupCharts[agd].destroy(); }
+    areaGroupCharts = [];
+    areaGroupChart = null;
     if (overviewVolChart) overviewVolChart.destroy();
     for (var ti = 0; ti < trendCharts.length; ti++) { if (trendCharts[ti]) trendCharts[ti].destroy(); }
     trendCharts = [];
@@ -307,13 +309,14 @@
         { label: 'Volume Top Up', data: topUpData, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true }
       ];
     }
-    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [areaGroupChart, perfChart].concat(trendCharts), event, elements); } } });
+    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 2. OVERALL PRODUCTIVITY ---
-    perfChart = new Chart($('perfChart'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [areaGroupChart, overviewVolChart].concat(trendCharts), event, elements); } } });
+    perfChart = new Chart($('perfChart'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
-    // --- 3. AREA GROUP ---
-    var areaGroupDatasets = [];
+    // --- 3. AREA GROUP (1 to MAX_AREA_GROUP_CHARTS charts) ---
+    var areaGroupBuckets = [];
+    var buildAreaGroupDatasets_ = function () { return []; };
     if (rawFilteredData && rawTimeList) {
       var perfGroups;
       if (selectedBonuses.length > 0) {
@@ -335,17 +338,76 @@
       }
       var perfSplitBase = generatePerfSplitRows_(rawFilteredData, rawTimeList, perfGroups);
       var perfSplitAgg = getAggregatedPerfSplitDataPak(perfSplitBase, wm, perfGroups);
-      perfGroups.forEach(function(group) {
-        var dataArr = perfSplitAgg.map(function(r) { return r[group.id] || 0; });
-        if (group.showLine) {
-          areaGroupDatasets.push({ label: group.label, data: dataArr, borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
+
+      // Datasets for ONE chart, from the groups assigned to it. A group still
+      // contributes a line, a trend line, or both — splitting decides which
+      // chart a group is drawn on, not how it is drawn.
+      buildAreaGroupDatasets_ = function (groupsForChart) {
+        var ds = [];
+        groupsForChart.forEach(function (group) {
+          var dataArr = perfSplitAgg.map(function (r) { return r[group.id] || 0; });
+          if (group.showLine) {
+            ds.push({ label: group.label, data: dataArr, borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
+          }
+          if (group.showTrend) {
+            ds.push({ label: group.label + ' (Trend)', data: linearTrendPak(dataArr), borderWidth: 2, borderColor: group.color, backgroundColor: 'transparent', borderDash: [6, 4], tension: 0, pointRadius: 0, fill: false });
+          }
+        });
+        return ds;
+      };
+
+      // Which groups land on which chart. A bonus filter replaces the user's
+      // configured groups with one per active work area, so an index-based
+      // split would be pointing at groups that no longer exist — in that case
+      // it collapses back to a single chart.
+      if (areaGroupSplitState.enabled && areaGroupSplitState.charts.length > 0 && selectedBonuses.length === 0) {
+        for (var ac = 0; ac < areaGroupSplitState.charts.length; ac++) {
+          var picked = [];
+          var idxList = areaGroupSplitState.charts[ac] || [];
+          for (var pi = 0; pi < idxList.length; pi++) {
+            if (perfGroups[idxList[pi]]) picked.push(perfGroups[idxList[pi]]);
+          }
+          if (picked.length > 0) areaGroupBuckets.push(picked);
         }
-        if (group.showTrend) {
-          areaGroupDatasets.push({ label: group.label + ' (Trend)', data: linearTrendPak(dataArr), borderWidth: 2, borderColor: group.color, backgroundColor: 'transparent', borderDash: [6, 4], tension: 0, pointRadius: 0, fill: false });
-        }
-      });
+      }
+      if (areaGroupBuckets.length === 0) areaGroupBuckets = [perfGroups];
     }
-    areaGroupChart = new Chart($('areaGroupChart'), { type: 'line', data: { labels: labels, datasets: areaGroupDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(areaGroupChart, [perfChart, overviewVolChart].concat(trendCharts), event, elements); } } });
+    var agWrap = $('areaGroupChartsWrap');
+    areaGroupCharts = [];
+    if (agWrap) {
+      agWrap.innerHTML = '';
+      var agSplit = areaGroupBuckets.length > 1;
+      for (var ag = 0; ag < areaGroupBuckets.length; ag++) {
+        (function (agIdx) {
+          var panelEl = document.createElement('div');
+          panelEl.className = 'card panel';
+          var heading = agSplit
+            ? 'Productivity % - ' + (TREND_CHART_LABELS[agIdx] || ('Chart ' + (agIdx + 1)))
+            : 'Productivity % by Work Area';
+          var titleHtml = '<h2>' + safeTextPak(heading) + '</h2>';
+          // Both buttons live on the first panel only: they configure the whole
+          // section, and repeating them per chart would imply otherwise.
+          if (agIdx === 0) {
+            titleHtml += '<div style="display:flex; gap:5px; align-items:center;">' +
+              '<button class="breakdown-btn" onclick="openAreaGroupSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>' +
+              '<button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups</button></div>';
+          }
+          panelEl.innerHTML = '<div class="mini-table-title">' + titleHtml + '</div>' +
+                              '<canvas id="areaGroupChart' + (agIdx === 0 ? '' : '_' + agIdx) + '"></canvas>';
+          agWrap.appendChild(panelEl);
+
+          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
+            var others = [perfChart, overviewVolChart].concat(trendCharts);
+            for (var oc = 0; oc < areaGroupCharts.length; oc++) { if (oc !== agIdx) others.push(areaGroupCharts[oc]); }
+            syncToTargets(areaGroupCharts[agIdx], others, event, elements);
+          } } });
+          areaGroupCharts.push(chart);
+        })(ag);
+      }
+      // Alias to the first chart: the tour and some sync arrays still speak of
+      // "the" area group chart.
+      areaGroupChart = areaGroupCharts[0] || null;
+    }
 
     // --- 4. TREND (1 to MAX_TREND_CHARTS charts) ---
     function buildTrendDatasets(aggData, areaKeys) {
@@ -411,7 +473,7 @@
         }
 
         trendCharts[idx] = new Chart($('trendChart_' + idx), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
-          var others = [areaGroupChart, perfChart, overviewVolChart];
+          var others = [perfChart, overviewVolChart].concat(areaGroupCharts);
           for (var k = 0; k < trendCharts.length; k++) { if (k !== idx && trendCharts[k]) others.push(trendCharts[k]); }
           syncToTargets(trendCharts[idx], others, event, elements);
         } } });

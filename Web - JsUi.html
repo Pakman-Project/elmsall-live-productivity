@@ -926,6 +926,105 @@
     applyLocalFiltersPak();
   }
 
+  // ── Splitting the Work Area productivity chart ─────────────────────────────
+  // Mirrors the trend split, but the unit being distributed is an area GROUP
+  // rather than a work area — so the two features compose: Groups decides what
+  // a group contains, Split decides which chart it is drawn on.
+  var _areaGroupSplitDraft = null;
+
+  function openAreaGroupSplit() {
+    _areaGroupSplitDraft = (areaGroupSplitState.charts && areaGroupSplitState.charts.length > 0)
+      ? areaGroupSplitState.charts.map(function (c) { return c.slice(); })
+      : [[], []];
+    $('areaGroupSplitOverlay').classList.add('active');
+    renderAreaGroupSplitEditor();
+  }
+
+  function closeAreaGroupSplit() {
+    $('areaGroupSplitOverlay').classList.remove('active');
+  }
+
+  function renderAreaGroupSplitEditor() {
+    var html = '';
+    // Labelled from the live groups, so the dialog names what the user actually
+    // configured ("PiE, Top Up") instead of an opaque "Group 2".
+    var groups = getPerfSplitGroups_();
+    if (groups.length === 0) {
+      $('areaGroupSplitEditor').innerHTML =
+        '<div class="breakdown-empty">No area groups are configured yet. Use the Groups button first.</div>';
+      $('addAreaGroupSplitBtn').style.display = 'none';
+      return;
+    }
+    for (var i = 0; i < _areaGroupSplitDraft.length; i++) {
+      html += '<div class="area-group-block">';
+      html += '<div class="area-group-head">';
+      html += '<h3>' + safeTextPak(TREND_CHART_LABELS[i] || ('Chart ' + (i + 1))) + '</h3>';
+      if (_areaGroupSplitDraft.length > 1) {
+        html += '<button class="btn area-group-remove" onclick="removeAreaGroupSplitChart(' + i + ')" title="Remove chart"><i class="fa-solid fa-trash"></i></button>';
+      }
+      html += '</div>';
+      html += '<div class="area-group-areas">';
+      for (var g = 0; g < groups.length; g++) {
+        var checked = _areaGroupSplitDraft[i].indexOf(g) !== -1 ? 'checked' : '';
+        html += '<label class="trend-split-cb"><input type="checkbox" data-chart="' + i + '" data-group="' + g + '" ' + checked + ' onchange="onAreaGroupSplitCbChange(this)">' +
+                '<span class="trend-split-dot" style="background:' + groups[g].color + '"></span>' +
+                '<span class="area-cb-text">' + safeTextPak(groups[g].label) + '</span></label>';
+      }
+      html += '</div></div>';
+    }
+    $('areaGroupSplitEditor').innerHTML = html;
+    $('addAreaGroupSplitBtn').style.display =
+      _areaGroupSplitDraft.length >= MAX_AREA_GROUP_CHARTS ? 'none' : '';
+  }
+
+  function onAreaGroupSplitCbChange(cb) {
+    var i = parseInt(cb.dataset.chart, 10);
+    var g = parseInt(cb.dataset.group, 10);
+    var list = _areaGroupSplitDraft[i];
+    var at = list.indexOf(g);
+    if (cb.checked && at === -1) { list.push(g); }
+    else if (!cb.checked && at !== -1) { list.splice(at, 1); }
+  }
+
+  function addAreaGroupSplitChart() {
+    if (_areaGroupSplitDraft.length >= MAX_AREA_GROUP_CHARTS) return;
+    _areaGroupSplitDraft.push([]);
+    renderAreaGroupSplitEditor();
+  }
+
+  function removeAreaGroupSplitChart(i) {
+    _areaGroupSplitDraft.splice(i, 1);
+    renderAreaGroupSplitEditor();
+  }
+
+  function applyAreaGroupSplit() {
+    // Sorted and de-duplicated so a chart's series always appear in group order
+    // regardless of the order the boxes were ticked in.
+    var cleaned = _areaGroupSplitDraft.map(function (list) {
+      var seen = {};
+      return list.filter(function (g) {
+        if (seen[g]) return false;
+        seen[g] = true;
+        return true;
+      }).sort(function (a, b) { return a - b; });
+    }).filter(function (list) { return list.length > 0; });
+
+    areaGroupSplitState = cleaned.length > 0
+      ? { enabled: true, charts: cleaned }
+      : { enabled: false, charts: [] };
+    saveUserPreferences();
+    closeAreaGroupSplit();
+    applyLocalFiltersPak();
+  }
+
+  function resetAreaGroupSplit() {
+    if (!confirm('Reset back to a single Productivity % by Work Area chart?\n\nThe split you have set up will be lost.')) return;
+    areaGroupSplitState = { enabled: false, charts: [] };
+    saveUserPreferences();
+    closeAreaGroupSplit();
+    applyLocalFiltersPak();
+  }
+
   var _areaGroupDraft = null;
 
   function openAreaGroups() {

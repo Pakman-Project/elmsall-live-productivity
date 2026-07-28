@@ -346,6 +346,29 @@
       </div>
     </div>
 
+    <div id="areaGroupSplitOverlay" class="breakdown-overlay" onclick="closeAreaGroupSplit()">
+      <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
+        <div class="breakdown-header">
+          <div>
+            <h2>Split Productivity by Work Area</h2>
+            <p class="breakdown-subtitle">Choose which area groups appear on each chart. The same group can appear on more than one chart (up to 7 charts). Edit the groups themselves with the Groups button.</p>
+          </div>
+          <button class="breakdown-close" onclick="closeAreaGroupSplit()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="breakdown-body">
+          <div id="areaGroupSplitEditor"></div>
+          <button class="btn" id="addAreaGroupSplitBtn" onclick="addAreaGroupSplitChart()"><i class="fa-solid fa-plus"></i> Add Chart</button>
+          <div class="modal-actions">
+            <button class="btn" onclick="resetAreaGroupSplit()" style="border-color: var(--color-bad); color: var(--color-bad);">Reset to Single</button>
+            <button class="btn" onclick="applyAreaGroupSplit()" style="background: var(--accent); color: #fff; border-color: var(--accent);">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="areaGroupOverlay" class="breakdown-overlay" onclick="closeAreaGroups()">
       <div class="breakdown-modal" onclick="event.stopPropagation()" style="max-width: 1150px;">
         <div class="breakdown-header">

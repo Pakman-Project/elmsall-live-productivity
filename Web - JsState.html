@@ -139,5 +139,13 @@ var currentTranslate = 0;
 var prevTranslate = 0;
 var isDragging = false;
 var animationID;
+// The Work Area productivity section can be one chart or several. areaGroupChart
+// is kept as an alias for the first, since the hover-sync arrays and the tour
+// both refer to "the" area group chart.
 var areaGroupChart = null;
+var areaGroupCharts = [];
+// charts[i] holds INDICES into the configured area groups, so one group can
+// appear on several charts — the same model trendSplitState uses.
+var areaGroupSplitState = { enabled: false, charts: [] };
+var MAX_AREA_GROUP_CHARTS = 7;
 </script>

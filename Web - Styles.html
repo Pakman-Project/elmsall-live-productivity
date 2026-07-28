@@ -1882,14 +1882,16 @@ body.reorder-mode #bonusTablesContainer > [data-reorder-key] {
    and nothing to attach a bar to. In edit mode it becomes a real container
    spanning the grid, which also makes it read correctly as "this whole section
    moves as one unit". */
-body.reorder-mode .trend-charts-wrap {
+body.reorder-mode .trend-charts-wrap,
+body.reorder-mode .area-group-charts-wrap {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
 }
 
-body.reorder-mode .trend-charts-wrap > .reorder-bar {
+body.reorder-mode .trend-charts-wrap > .reorder-bar,
+body.reorder-mode .area-group-charts-wrap > .reorder-bar {
   grid-column: 1 / -1;
 }
 
@@ -1905,7 +1907,8 @@ body.reorder-mode .trend-charts-wrap > .reorder-bar {
     height: 40px;
     font-size: 15px;
   }
-  body.reorder-mode .trend-charts-wrap {
+  body.reorder-mode .trend-charts-wrap,
+  body.reorder-mode .area-group-charts-wrap {
     grid-template-columns: 1fr;
   }
 }
@@ -2592,7 +2595,8 @@ body.page-scrolled-far .back-to-top {
 /* Deployment Trend charts — dynamically populated, 1 to MAX_TREND_CHARTS panels.
    display:contents makes the panels participate directly in the parent
    .charts grid, keeping every chart 2-per-row. */
-.trend-charts-wrap {
+.trend-charts-wrap,
+.area-group-charts-wrap {
   display: contents;
 }
 

@@ -97,14 +97,22 @@
         <canvas id="perfChart"></canvas>
       </div>
 
-      <div class="card panel">
-        <div class="mini-table-title">
-          <h2 id="areaGroupChartTitle">Productivity % by Work Area</h2>
-          <div style="display:flex; gap:5px; align-items:center;">
-            <button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups</button>
+      <!-- One panel by default, replaced by renderChartsPak with as many as the
+           split is configured for. display:contents lets the panels flow
+           directly in the .charts grid, exactly as the trend section does. The
+           panel below is the pre-render placeholder, so the title and buttons
+           are present from first paint rather than popping in with the data. -->
+      <div class="area-group-charts-wrap" id="areaGroupChartsWrap">
+        <div class="card panel">
+          <div class="mini-table-title">
+            <h2 id="areaGroupChartTitle">Productivity % by Work Area</h2>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button class="breakdown-btn" onclick="openAreaGroupSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
+              <button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups</button>
+            </div>
           </div>
+          <canvas id="areaGroupChart"></canvas>
         </div>
-        <canvas id="areaGroupChart"></canvas>
       </div>
 
       <!-- Populated dynamically with 1-7 chart panels by renderChartsPak();

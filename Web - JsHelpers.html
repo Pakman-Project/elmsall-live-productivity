@@ -47,6 +47,7 @@ function saveUserPreferences() {
       hiddenVolumeAreas: hiddenVolumeAreas,
       trendSplitState: trendSplitState,
       areaGroups: areaGroupState,
+      areaGroupSplit: areaGroupSplitState,
       chartOrder: chartOrderState,
       theme: currentTheme
     };
@@ -101,6 +102,26 @@ function loadUserPreferences() {
         .map(function(c) { return c.filter(function(k) { return validTrendKeys[k]; }); })
         .slice(0, MAX_TREND_CHARTS);
       trendSplitState = { enabled: !!prefs.trendSplitState.enabled, charts: cleanedTrendCharts };
+    }
+
+    // Group indices are validated against MAX_AREA_GROUPS rather than against
+    // the current group count: the groups themselves are restored further down
+    // this same function, so the real count is not known yet. An index pointing
+    // past the end is simply skipped at render time.
+    if (prefs.areaGroupSplit && typeof prefs.areaGroupSplit.enabled === 'boolean' &&
+        Array.isArray(prefs.areaGroupSplit.charts)) {
+      var cleanedAgCharts = prefs.areaGroupSplit.charts
+        .filter(function (c) { return Array.isArray(c); })
+        .map(function (c) {
+          return c.filter(function (n) {
+            return typeof n === 'number' && n >= 0 && n < MAX_AREA_GROUPS;
+          });
+        })
+        .slice(0, MAX_AREA_GROUP_CHARTS);
+      areaGroupSplitState = {
+        enabled: !!prefs.areaGroupSplit.enabled,
+        charts: cleanedAgCharts
+      };
     }
 
     // Only keys this build knows about, and no duplicates — a stale or hand-
