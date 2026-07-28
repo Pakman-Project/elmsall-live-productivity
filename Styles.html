@@ -3915,6 +3915,56 @@ body.page-scrolled-far .back-to-top {
 }
 
 /* ============================================================
+   Mobile: one dropdown size across every page.
+   The From/To selects on the Bonus page were already compact, but every other
+   dropdown — Hours Range and Time Window on Overall, all three on Volume,
+   Display Mode and Rows on Bonus, Sort on the Data Table — carried
+   min-height: 44px and roomier padding, so two different control sizes sat on
+   screen at once. They now match the From/To pair exactly.
+
+   The header is untouched by construction rather than by exception: every page
+   dropdown is .row-select, while the History picker in the black bar is
+   .input.header-input and matches none of these selectors.
+
+   #mainSortSelect is named explicitly because an id outranks a class no matter
+   how late this block sits, and .bonus-controls .row-select likewise — its
+   padding-right: 24px is a two-class selector that would otherwise survive.
+
+   Trade-off worth being explicit about: this drops these controls from a 44px
+   touch target to roughly 34px. That is the size the From/To selects have
+   always been, which is the basis for matching them, but it is below the usual
+   44px guideline.
+   ============================================================ */
+@media (max-width: 700px) {
+  .row-select,
+  .bonus-controls .row-select,
+  #mainSortSelect {
+    /* Identical to .breakdown-time-select below. The generous right padding
+       leaves room for the native arrow so a long value is never drawn under it. */
+    padding: 9px 18px 9px 6px;
+    border-radius: 8px;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+
+  /* The direction toggle shares a row with the sort dropdown, so it shrinks to
+     match — a 44px button beside a 34px select reads as a mistake. */
+  .main-sort-mobile .icon-btn {
+    width: 36px;
+    height: 36px;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .row-select,
+  .bonus-controls .row-select,
+  #mainSortSelect {
+    padding: 9px 16px 9px 4px;
+  }
+}
+
+/* ============================================================
    Mobile: Live/History dropdown, and the active-filter banner.
    ============================================================ */
 @media (max-width: 700px) {
