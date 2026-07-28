@@ -67,6 +67,12 @@
   /* Edge cue for horizontally scrollable tables. */
   --scroll-shadow: rgba(0, 0, 0, 0.28);
 
+  /* Sorted column header. The solid variant is the translucent one pre-blended
+     over --surface-dropdown-2, for the two frozen headers, which have to stay
+     opaque. */
+  --table-sort-bg: rgba(0, 0, 0, 0.06);
+  --table-sort-bg-solid: #e7e4e3;
+
   /* Expanded-row drawer on the Data Table. Light needs far less than dark: on
      white, 5% already separates the drawer from the row above it. */
   --detail-recess: rgba(0, 0, 0, 0.05);
@@ -135,6 +141,9 @@
   --table-freeze-expanded: #23262c;
 
   --scroll-shadow: rgba(0, 0, 0, 0.6);
+
+  --table-sort-bg: rgba(255, 255, 255, 0.10);
+  --table-sort-bg-solid: #413d42;
 
   --detail-recess: rgba(0, 0, 0, 0.22);
 
@@ -1480,8 +1489,8 @@ canvas {
 }
 
 .clickable-bonus:hover {
-  color: #fff;
-  background: rgba(105, 167, 255, 0.1);
+  color: var(--text);
+  background: var(--accent-10);
 }
 
 .clickable-bonus .filter-icon {
@@ -1495,9 +1504,10 @@ canvas {
 }
 
 .clickable-bonus.active {
-  color: #fff;
-  background: rgba(105, 167, 255, 0.2);
-  border-color: rgba(105, 167, 255, 0.4);
+  color: var(--text);
+  font-weight: 600;
+  background: var(--accent-14);
+  border-color: var(--accent);
 }
 
 .clickable-bonus.active .filter-icon {
@@ -1547,8 +1557,9 @@ canvas {
 }
 
 .side-table th.active-sort {
-  color: #fff;
-  background: rgba(105, 167, 255, 0.25);
+  color: var(--text);
+  font-weight: 700;
+  background: var(--table-sort-bg);
   border-bottom: 2px solid var(--accent);
 }
 
@@ -1589,10 +1600,29 @@ canvas {
   background: var(--w10);
 }
 
+/* The sorted column. `color: #fff` here was a leftover from the original dark
+   theme: in light mode it put white text on a pale header, which is why the
+   Date Time header — the default sort column, so permanently active — read as
+   a different colour from every other header, and in practice as missing.
+   It now uses the normal text colour, one step stronger than the --muted of an
+   inactive header, with the accent underline and the arrow carrying the rest
+   of the signal. */
 #mainTable th.active-sort {
-  color: #fff;
-  background: rgba(105, 167, 255, 0.25);
+  color: var(--text);
+  font-weight: 700;
+  background: var(--table-sort-bg);
   border-bottom: 2px solid var(--accent);
+}
+
+/* Columns 1 and 2 are frozen, and the rule that paints them opaque outranks the
+   one above (an id plus three elements and a pseudo-class beats an id, an
+   element and a class). Without this the sorted-column tint would be dropped
+   for exactly the column that is sorted by default. Pre-blended so the cell
+   stays opaque and the scrolling columns cannot show through it. */
+#mainTable > thead > tr > th:nth-child(1).active-sort,
+#mainTable > thead > tr > th:nth-child(2).active-sort {
+  background: var(--table-sort-bg-solid);
+  color: var(--text);
 }
 
 #mainTable th.active-sort::after {
