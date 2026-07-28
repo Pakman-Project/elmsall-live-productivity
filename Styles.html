@@ -4043,4 +4043,58 @@ body.page-scrolled-far .back-to-top {
   .share-copy-btn { width: 100%; }
   .share-img-row .btn { flex: 1 1 auto; }
 }
+
+/* ══ Keyboard focus ═════════════════════════════════════════════════════════
+   Last in the file on purpose. Several component rules set `outline: none` —
+   .input, .row-select, .breakdown-time-select, #mainSortSelect and others — to
+   suppress the browser's default ring, but nothing was put back in its place.
+   The result was that Tab moved an invisible cursor around the dashboard: a
+   keyboard user could not tell which control they were on, and the two
+   preceding rounds of keyboard work (Escape-to-close, the search combobox) made
+   that gap matter a great deal more.
+
+   These rules must come after the ones they correct, hence the position rather
+   than a home next to each component.
+
+   :focus-visible, not :focus, so the ring appears for keyboard and assistive
+   navigation but not when a mouse click lands on a button — which is the
+   behaviour people expect and the reason the outlines were removed in the first
+   place. Where a genuinely tailored ring already exists (the rail, modals,
+   toasts, back-to-top), that rule is more specific and still wins. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.btn:focus-visible,
+.input:focus-visible,
+.row-select:focus-visible,
+.breakdown-time-select:focus-visible,
+.header-icon-btn:focus-visible,
+.clickable-bonus:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  /* The ring is drawn outside the element, so anything clipped by an ancestor
+     with overflow:hidden would lose it. A matching glow guarantees the focused
+     control is identifiable even when the outline itself is cut off. */
+  box-shadow: 0 0 0 4px var(--accent-14);
+}
+
+/* Inputs and selects sit flush inside their containers, where an offset ring
+   collides with the neighbouring control. Drawn inside the border instead. */
+.input:focus-visible,
+.row-select:focus-visible,
+.breakdown-time-select:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: -1px;
+}
+
+/* The work-area chips are the one interactive control with no border of their
+   own when active, so the ring alone can look detached from them. */
+.bonus-area-chip:focus-visible {
+  outline-offset: 1px;
+}
 </style>
