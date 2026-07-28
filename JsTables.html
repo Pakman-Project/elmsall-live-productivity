@@ -156,17 +156,17 @@ function renderMainTablePak(sourceRows) {
       tr.innerHTML =
         '<td><span class="main-row-dt-cell">' + safeTextPak(r.dateTime) + '<i class="fa-solid fa-chevron-down main-row-chevron"></i></span></td>' +
         '<td>' + safeTextPak(r.bonusNumber) + '</td>' +
-        '<td>' + numPak(r.hourDeployed, 2) + '</td>' +
-        '<td>' + numPak(r.stdHours, 2) + '</td>' +
-        '<td>' + numPak(r.pieVol, 0) + '</td>' +
-        '<td>' + numPak(r.topUpVol, 0) + '</td>' +
-        '<td>' + numPak(r.e3PackingVol, 0) + '</td>' +
-        '<td>' + numPak(r.parcelInductVol, 0) + '</td>' +
-        '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
-        '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
-        '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
-        '<td>' + numPak(r.bcrInductingVol, 0) + '</td>' +
-        '<td>' + numPak(r.e1e2InductingVol, 0) + '</td>' +
+        numTdPak(r.hourDeployed, 2) +
+        numTdPak(r.stdHours, 2) +
+        numTdPak(r.pieVol, 0) +
+        numTdPak(r.topUpVol, 0) +
+        numTdPak(r.e3PackingVol, 0) +
+        numTdPak(r.parcelInductVol, 0) +
+        numTdPak(r.parcelSortationVol, 0) +
+        numTdPak(r.inboundDecantingVol, 0) +
+        numTdPak(r.osrDecantingVol, 0) +
+        numTdPak(r.bcrInductingVol, 0) +
+        numTdPak(r.e1e2InductingVol, 0) +
         '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
 
       (function (rowEl, rowData) {
@@ -197,7 +197,8 @@ function buildMainCardHtml_(r) {
   var isExpanded = expandedRowKey !== null && r.dateTime === expandedRowKey;
   var metricsHtml = MAIN_TABLE_METRIC_COLUMNS.map(function (m) {
     return '<div class="main-card-metric"><span class="main-card-metric-label">' + m.label + '</span>' +
-           '<span class="main-card-metric-value">' + numPak(r[m.key], 0) + '</span></div>';
+           '<span class="main-card-metric-value' + (Number(r[m.key]) ? '' : ' zero') + '">' +
+           numPak(r[m.key], 0) + '</span></div>';
   }).join('');
 
   return '<div class="main-card main-expandable-row' + (isExpanded ? ' expanded' : '') + '">' +
@@ -392,17 +393,17 @@ function buildEntryDetailRowHtml_(r) {
     ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
     (isActive ? 'Click to remove filter' : 'Click to filter main view') +
     '</span></span></td>' +
-    '<td>' + numPak(r.hourDeployed, 2) + '</td>' +
-    '<td>' + numPak(r.stdHours, 2) + '</td>' +
-    '<td>' + numPak(r.pieVol, 0) + '</td>' +
-    '<td>' + numPak(r.topUpVol, 0) + '</td>' +
-    '<td>' + numPak(r.e3PackingVol, 0) + '</td>' +
-    '<td>' + numPak(r.parcelInductVol, 0) + '</td>' +
-    '<td>' + numPak(r.parcelSortationVol, 0) + '</td>' +
-    '<td>' + numPak(r.inboundDecantingVol, 0) + '</td>' +
-    '<td>' + numPak(r.osrDecantingVol, 0) + '</td>' +
-    '<td>' + numPak(r.bcrInductingVol, 0) + '</td>' +
-    '<td>' + numPak(r.e1e2InductingVol, 0) + '</td>' +
+    numTdPak(r.hourDeployed, 2) +
+    numTdPak(r.stdHours, 2) +
+    numTdPak(r.pieVol, 0) +
+    numTdPak(r.topUpVol, 0) +
+    numTdPak(r.e3PackingVol, 0) +
+    numTdPak(r.parcelInductVol, 0) +
+    numTdPak(r.parcelSortationVol, 0) +
+    numTdPak(r.inboundDecantingVol, 0) +
+    numTdPak(r.osrDecantingVol, 0) +
+    numTdPak(r.bcrInductingVol, 0) +
+    numTdPak(r.e1e2InductingVol, 0) +
     '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>' +
     '</tr>';
 }

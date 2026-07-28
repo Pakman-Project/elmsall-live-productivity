@@ -986,6 +986,41 @@ td {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+  /* Poppins' default figures are proportional, so a 1 is narrower than a 7 and
+     nothing lines up vertically down a column of numbers. Tabular figures are
+     the whole reason a column of data reads as a column. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Numeric cells ───────────────────────────────────────────────────────────
+   #mainTable centred every cell, which puts 1,234 and 12 at different offsets;
+   the eye then has to read each number rather than run down the column. Right
+   alignment is what makes the digits stack — units over units, tens over tens.
+   Columns 1-2 (Date Time, Bonus Number) are labels, not quantities, and the
+   last column is a centred pill, so both keep their existing alignment. */
+#mainTable td.num,
+.main-detail-table td.num {
+  text-align: right;
+  padding-right: 16px;
+}
+
+#mainTable th:nth-child(n+3):nth-child(-n+13),
+.main-detail-table th:nth-child(n+3):nth-child(-n+13) {
+  text-align: right;
+  padding-right: 16px;
+}
+
+/* Eleven of the fourteen columns are volumes, and for any given operator all
+   but one or two are 0. At full contrast those zeros carry the same visual
+   weight as the figures that matter, so the table reads as a wall. Fading them
+   leaves the real numbers standing out on their own.
+
+   A missing value is NOT faded: it renders as "-", means something different,
+   and should stay legible. */
+#mainTable td.num.zero,
+.main-detail-table td.num.zero,
+.main-card-metric-value.zero {
+  color: var(--text-soft-40);
 }
 
 #mainTable th,

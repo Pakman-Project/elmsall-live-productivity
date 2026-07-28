@@ -159,6 +159,17 @@ function numPak(n, d) {
     : '-';
 }
 
+// A numeric table cell, tagged so CSS can treat it as one. Zeros get a marker
+// of their own: across the Data Table's eleven volume columns most cells are 0,
+// and at full contrast they crowd out the handful of figures that carry the
+// information. Only a true zero counts — a missing value renders as "-" and is
+// a different thing entirely, so it keeps normal weight.
+function numTdPak(n, d) {
+  var x = Number(n);
+  var isZero = Number.isFinite(x) && x === 0;
+  return '<td class="num' + (isZero ? ' zero' : '') + '">' + numPak(n, d) + '</td>';
+}
+
 function pctPak(n, d) {
   d = d !== undefined ? d : 1;
   if (typeof n === 'string' && n.indexOf('%') !== -1) {
