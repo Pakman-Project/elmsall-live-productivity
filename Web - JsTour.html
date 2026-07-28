@@ -97,8 +97,25 @@ var TOUR_STEPS = [
     title: 'Open Groups & Charts',
     body: 'The “Groups & Charts” button opens next. We’ll build a comparison from scratch, then put your own settings back exactly as they were.' },
   { part: 3, page: 0, target: '#areaGroupEditor', modal: true,
-    interactive: { sel: '#areaGroupEditor input[type="checkbox"]', type: 'click' },
     action: function () { tourOpenAreaGroups_(); },
+    // Two areas, staggered, so the group is visibly built up rather than one
+    // box silently flipping. data-key picks out the AREA checkboxes — the same
+    // block also holds the Line / Trend Line mode boxes, which are a different
+    // thing entirely.
+    demo: function () {
+      var boxes = document.querySelectorAll('#areaGroupEditor .area-group-block:first-child input[data-key]');
+      var pick = [];
+      for (var i = 0; i < boxes.length && pick.length < 2; i++) {
+        if (!boxes[i].checked) pick.push(boxes[i]);
+      }
+      pick.forEach(function (box, n) {
+        setTimeout(function () {
+          if (!tourActive) return;
+          flashDemoTarget_(box);
+          setTimeout(function () { try { box.click(); } catch (e) {} }, 200);
+        }, n * 800);
+      });
+    },
     title: 'Step 1 — build a group',
     body: 'A group is a set of work areas measured together as one line. Ticking an area changes what that group covers.' },
   { part: 3, page: 0, target: '#addAreaGroupBtn', modal: true,
@@ -616,11 +633,33 @@ function tourRestoreReorder_() {
 // Now every step shows for a fixed time and the tour performs the demonstration
 // itself. A missing target is simply skipped over, so no step can dead-end.
 
-var TOUR_STEP_MS = 5000;
+// A floor, not the whole budget — a step also gets time to be read. Long
+// bodies in Parts 3 and 8 were being pulled off screen mid-sentence at a flat
+// five seconds.
+var TOUR_STEP_FLOOR_MS = 5000;
+var TOUR_STEP_CAP_MS = 14000;
+// ~200 words per minute, the usual comfortable rate for short on-screen prose.
+var TOUR_MS_PER_WORD = 300;
+
 // The demonstration fires partway through, so the ring is on screen briefly
 // before anything moves — otherwise the change has happened before the user has
 // worked out where to look.
 var TOUR_DEMO_AT_MS = 1600;
+
+// Playback speed. Divides every duration, so 2x halves both the step length and
+// the wait before the demonstration.
+var TOUR_SPEEDS = [1, 1.5, 2];
+var _tourSpeedIdx = 0;
+function tourSpeed_() { return TOUR_SPEEDS[_tourSpeedIdx] || 1; }
+
+// Title and body together: the title is read too, and some are long enough to
+// matter.
+function stepDurationMs_(step) {
+  var text = ((step && step.title) || '') + ' ' + ((step && step.body) || '');
+  var words = text.split(/\s+/).filter(function (w) { return w.length > 0; }).length;
+  var ms = Math.max(TOUR_STEP_FLOOR_MS, words * TOUR_MS_PER_WORD);
+  return Math.round(Math.min(TOUR_STEP_CAP_MS, ms) / tourSpeed_());
+}
 
 var _tourTimer = null;
 var _tourDemoTimer = null;
@@ -638,20 +677,69 @@ function clearTourTimers_() {
 // Performs a step's demonstration WITHOUT advancing — the timer owns advancing.
 // Every failure here is non-fatal on purpose: a demonstration that cannot run
 // should cost the viewer a dull step, not a broken tour.
+// A visible cue on whatever the tour is about to operate. Without it a control
+// changes state with no indication of what caused it, which reads as the page
+// glitching rather than as a demonstration.
+function flashDemoTarget_(el) {
+  if (!el || !el.classList) return;
+  el.classList.remove('tour-demo-hit');
+  void el.offsetWidth;
+  el.classList.add('tour-demo-hit');
+  setTimeout(function () { el.classList.remove('tour-demo-hit'); }, 650);
+}
+
+// Types a value a character at a time so the suggestion list is seen filling
+// in, rather than appearing fully formed out of nowhere.
+function typeIntoDemo_(el, value, perCharMs) {
+  if (!el) return;
+  el.focus();
+  el.value = '';
+  var i = 0;
+  (function tick() {
+    if (!tourActive || i >= value.length) return;
+    el.value += value.charAt(i++);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(tick, perCharMs);
+  })();
+}
+
+function demoClick_(sel) {
+  var el = document.querySelector(sel);
+  if (!el) return false;
+  flashDemoTarget_(el);
+  // Slightly after the flash, so the cue is seen before the effect.
+  setTimeout(function () {
+    try { el.click(); } catch (e) { console.warn('Tour demo click failed', e); }
+  }, 220);
+  return true;
+}
+
+// Performs a step's demonstration WITHOUT advancing — the timer owns advancing.
+// Every failure here is non-fatal on purpose: a demonstration that cannot run
+// should cost the viewer a dull step, not a broken tour.
 function performStepDemo_(step) {
+  // A `demo` function is for anything that takes more than one action to show
+  // properly — ticking two boxes, or typing then choosing.
+  if (typeof step.demo === 'function') {
+    try { step.demo(); } catch (e) { console.warn('Tour demo failed', e); }
+    return;
+  }
+
   var cfg = resolveInteractive_(step);
   if (!cfg) return;
   var el = document.querySelector(cfg.sel);
   if (!el) return;
   try {
     if (cfg.type === 'change') {
-      el.value = cfg.changeValue;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+      flashDemoTarget_(el);
+      setTimeout(function () {
+        el.value = cfg.changeValue;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }, 220);
     } else if (cfg.type === 'input') {
-      el.value = cfg.inputValue || 'A';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      typeIntoDemo_(el, String(cfg.inputValue || 'A'), 180);
     } else {
-      el.click();
+      demoClick_(cfg.sel);
     }
   } catch (e) {
     console.warn('Tour demo failed', e);
@@ -663,6 +751,12 @@ function setTourProgress_(pct, durationMs) {
   if (!bar) return;
   bar.style.transition = durationMs ? ('width ' + durationMs + 'ms linear') : 'none';
   bar.style.width = pct + '%';
+  // Reading a layout property flushes the pending style change. Without it the
+  // browser coalesces "width: 0, no transition" and "width: 100%, transition"
+  // into a single computation and the bar simply jumps — which is why it only
+  // ever animated on the very first step, the one where the element had just
+  // been laid out for other reasons.
+  void bar.offsetWidth;
 }
 
 function freezeTourProgress_() {
@@ -675,9 +769,9 @@ function freezeTourProgress_() {
 
 function startStepPlayback_(step) {
   clearTourTimers_();
-  _tourStepTotalMs = TOUR_STEP_MS;
-  _tourDemoPending = !!step.interactive;
-  _tourDemoAtMs = TOUR_DEMO_AT_MS;
+  _tourStepTotalMs = stepDurationMs_(step);
+  _tourDemoPending = !!(step.interactive || step.demo);
+  _tourDemoAtMs = Math.round(TOUR_DEMO_AT_MS / tourSpeed_());
   _tourStepStartedAt = Date.now();
 
   setTourProgress_(0, 0);
@@ -735,6 +829,36 @@ function resumeTour_() {
 
 function toggleTourPause_() {
   if (_tourPaused) resumeTour_(); else pauseTour_();
+}
+
+function updateTourSpeedBtn_() {
+  var btn = $('tourSpeedBtn');
+  if (!btn) return;
+  btn.textContent = tourSpeed_() + '\u00d7';
+  var label = 'Playback speed ' + tourSpeed_() + '\u00d7 \u2014 click to change';
+  btn.setAttribute('aria-label', label);
+  btn.setAttribute('title', label);
+}
+
+// Re-times the CURRENT step as well as the ones after it, so the change is felt
+// immediately rather than at the next slide.
+function cycleTourSpeed_() {
+  var before = tourSpeed_();
+  _tourSpeedIdx = (_tourSpeedIdx + 1) % TOUR_SPEEDS.length;
+  updateTourSpeedBtn_();
+
+  if (_tourPaused || !tourActive) return;
+  var elapsed = Date.now() - _tourStepStartedAt;
+  var remaining = Math.max(300, (_tourStepTotalMs - elapsed) * (before / tourSpeed_()));
+  var demoIn = _tourDemoPending
+    ? Math.max(0, (_tourDemoAtMs - elapsed) * (before / tourSpeed_()))
+    : -1;
+  clearTourTimers_();
+  _tourStepStartedAt = Date.now();
+  _tourStepTotalMs = remaining;
+  _tourDemoAtMs = demoIn > 0 ? demoIn : 0;
+  freezeTourProgress_();
+  scheduleTourTimers_(remaining, demoIn);
 }
 
 function updateTourPauseBtn_() {
@@ -813,6 +937,7 @@ function showTourStep_(i) {
   $('tourNextBtn').disabled = false;
   $('tourSkipBtn').style.visibility = isLast ? 'hidden' : 'visible';
   updateTourPauseBtn_();
+  updateTourSpeedBtn_();
 
   var delay = pageChanged ? 400 : 0;
   setTimeout(function() {
@@ -934,6 +1059,8 @@ function maybeAutoStartTour_() {
   var back = $('tourBackBtn');
   var skip = $('tourSkipBtn');
   var pause = $('tourPauseBtn');
+  var speed = $('tourSpeedBtn');
+  if (speed) speed.addEventListener('click', cycleTourSpeed_);
   if (next) next.addEventListener('click', function() { if (!next.disabled) tourNext_(); });
   if (back) back.addEventListener('click', function() {
     if (tourStepIndex > 0) { clearTourTimers_(); showTourStep_(tourStepIndex - 1); }
