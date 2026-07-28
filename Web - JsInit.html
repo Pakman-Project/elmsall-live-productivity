@@ -129,7 +129,8 @@
     renderBonusChips();
     updateClearBtnVisibility();
     $('thresholdDisplay').textContent = currentThreshold || '-';
-    $('lastUpdateText').textContent = 'Last Update: ' + (data.lastRefresh || '-');
+    lastUpdateAbsText = 'Last Update: ' + (data.lastRefresh || '-');
+    renderLastUpdate_();
 
     // KPI figures for one hour-sized window (4 x 15-min blocks). Computing this
     // for the last hour AND the hour before it gives the trend indicators
@@ -295,6 +296,37 @@
   //
   // Threshold allows for the pipeline's own safety margin plus a missed run or
   // two, so a single late run doesn't cry wolf.
+  // ── "How old is this?" ─────────────────────────────────────────────────────
+  // The header showed a clock time — "Last Update: 14:30" — which answers the
+  // wrong question. At a glance nobody knows whether 14:30 was two minutes ago
+  // or two hours; they have to find the current time and subtract. The stale
+  // warning only spoke up past 45 minutes, so everything short of a genuine
+  // pipeline stall looked identical.
+  var lastUpdateAbsText = 'Last Update: -';
+
+  function relativeAgePak(ms) {
+    var mins = Math.floor(ms / 60000);
+    if (mins < 1) return 'just now';
+    if (mins === 1) return '1 min ago';
+    if (mins < 60) return mins + ' min ago';
+    var hrs = Math.floor(mins / 60);
+    var rem = mins % 60;
+    if (hrs < 24) return hrs + 'h' + (rem ? ' ' + rem + 'm' : '') + ' ago';
+    return Math.floor(hrs / 24) + 'd ago';
+  }
+
+  function renderLastUpdate_() {
+    var el = $('lastUpdateText');
+    if (!el) return;
+    // Archive snapshots are historical by definition — "3h ago" against a date
+    // the user deliberately chose would be noise.
+    if (currentArchiveUrl || lastRefreshTimestamp === null) {
+      el.textContent = lastUpdateAbsText;
+      return;
+    }
+    el.textContent = lastUpdateAbsText + ' · ' + relativeAgePak(Date.now() - lastRefreshTimestamp);
+  }
+
   var STALE_AFTER_MS = 45 * 60 * 1000;
 
   function updateStaleWarning_() {
@@ -479,7 +511,10 @@
 
     // Re-evaluate staleness locally (no server call) so the warning appears
     // while the page is left open, not only on the next successful load.
-    setInterval(updateStaleWarning_, 60000);
+    setInterval(function () {
+      updateStaleWarning_();
+      renderLastUpdate_();
+    }, 30000);
 
   });
 
