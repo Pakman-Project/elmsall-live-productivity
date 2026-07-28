@@ -64,6 +64,19 @@ function defaultAreaGroupState_() {
 
 var areaGroupState = defaultAreaGroupState_();
 
+// Which of the default groups each default chart draws — one group per chart,
+// so the two are compared side by side rather than overlaid on a single set of
+// axes. Indices into DEFAULT_AREA_GROUPS, so this only stays meaningful while
+// the two lists are the same length.
+var DEFAULT_AREA_GROUP_CHARTS = [[0], [1]];
+
+function defaultAreaGroupSplitState_() {
+  return {
+    enabled: true,
+    charts: DEFAULT_AREA_GROUP_CHARTS.map(function (c) { return c.slice(); })
+  };
+}
+
 var BREAKDOWN_AREAS = [
   { key: 'pie', label: 'PiE', color: '#69a7ff' },
   { key: 'topUp', label: 'Top Up', color: '#32d583' },
@@ -146,6 +159,6 @@ var areaGroupChart = null;
 var areaGroupCharts = [];
 // charts[i] holds INDICES into the configured area groups, so one group can
 // appear on several charts — the same model trendSplitState uses.
-var areaGroupSplitState = { enabled: false, charts: [] };
+var areaGroupSplitState = defaultAreaGroupSplitState_();
 var MAX_AREA_GROUP_CHARTS = 7;
 </script>

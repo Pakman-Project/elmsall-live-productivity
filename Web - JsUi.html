@@ -1166,9 +1166,9 @@
 
   function resetAreaGroups() {
     // Destructive and not undoable — the user may have built up several groups.
-    if (!confirm('Reset the work area groups AND go back to a single chart?\n\nAny groups you have built here will be lost.')) return;
+    if (!confirm('Reset the work area groups and charts back to the defaults?\n\nAny groups and charts you have built here will be lost.')) return;
     areaGroupState = defaultAreaGroupState_();
-    areaGroupSplitState = { enabled: false, charts: [] };
+    areaGroupSplitState = defaultAreaGroupSplitState_();
     saveUserPreferences();
     closeAreaGroups();
     applyLocalFiltersPak();
