@@ -466,6 +466,13 @@
     // user's own preference.
     if (typeof DEEP_BONUS !== 'undefined' && DEEP_BONUS) {
       selectedBonuses = DEEP_BONUS.split(',').filter(function(b) { return b; });
+      // A shared link can carry several bonus numbers — it may have been built
+      // before the limit existed, or by someone who has lifted it. This
+      // browser's setting wins: arriving in a state the UI itself refuses to
+      // produce is worse than losing part of someone else's filter.
+      if (!allowMultiBonusFilter && selectedBonuses.length > 1) {
+        selectedBonuses = selectedBonuses.slice(0, 1);
+      }
     }
 
     // The time controls are synced across pages by data-sync, so setting the

@@ -230,10 +230,7 @@
 
   function selectBonus(bonus) {
     if (selectedBonuses.indexOf(bonus) === -1) {
-      selectedBonuses.push(bonus);
-      renderBonusChips();
-      updateClearBtnVisibility();
-      applyLocalFiltersPak();
+      applyBonusPick_(bonus);
     }
     $('bonusSearch').value = '';
     closeSearchDropdown_();
@@ -246,14 +243,81 @@
     applyLocalFiltersPak();
   }
 
+  // ── One bonus number at a time ─────────────────────────────────────────────
+  // By default a pick REPLACES the filter rather than adding to it, and the
+  // view jumps to the top of Overall. The two go together: a bonus number can
+  // be picked from the Bonus page, from an expanded Data Table row or from the
+  // breakdown dialog, and in every one of those places the filter's real effect
+  // — the KPIs and charts on Overall — is somewhere the user cannot see. A
+  // filter that silently changes four pages you are not looking at is a filter
+  // people forget they applied.
+  //
+  // Both halves are lifted by the single setting in the "?" dialog, because
+  // they are two halves of one decision: someone comparing several people at
+  // once also wants to stay where they are while building the set.
+  function applyBonusPick_(bonus) {
+    if (allowMultiBonusFilter) {
+      selectedBonuses.push(bonus);
+    } else {
+      selectedBonuses = [bonus];
+    }
+    renderBonusChips();
+    updateClearBtnVisibility();
+    applyLocalFiltersPak();
+    focusOverallAfterFilter_();
+  }
+
+  function focusOverallAfterFilter_() {
+    // Someone building a multi-bonus set is deliberately staying put.
+    if (allowMultiBonusFilter) return;
+    // The tour drives these same controls. Yanking the page out from under a
+    // step would leave the spotlight ringing an element that is no longer on
+    // screen — the exact failure the slideshow rewrite was meant to end.
+    if (typeof tourActive !== 'undefined' && tourActive) return;
+
+    // The breakdown dialog is one of the places a bonus number is picked, and
+    // it covers the page being jumped to. Scrolling underneath it would look
+    // like nothing had happened.
+    var overlay = $('breakdownOverlay');
+    if (overlay && overlay.classList.contains('active') &&
+        typeof closeBreakdown === 'function') {
+      closeBreakdown();
+    }
+
+    if (currentPage !== 0) goToPage(0);
+    // keepFocus: the pick often comes from the header search box, and moving
+    // focus to the page rail mid-search would strand the user's typing.
+    scrollCurrentPageToTop_(true);
+  }
+
+  // Lifting the limit is a plain preference change. Re-imposing it has to
+  // reconcile a selection the new rule forbids, which it does by keeping the
+  // most recent pick — the one the user is most likely to still care about.
+  function setMultiBonusFilter_(allowed) {
+    allowMultiBonusFilter = !!allowed;
+
+    var cb = $('multiBonusToggle');
+    if (cb) cb.checked = allowMultiBonusFilter;
+
+    if (!allowMultiBonusFilter && selectedBonuses.length > 1) {
+      selectedBonuses = selectedBonuses.slice(-1);
+      renderBonusChips();
+      updateClearBtnVisibility();
+      applyLocalFiltersPak();
+    }
+
+    saveUserPreferences();
+  }
+
+  function onMultiBonusToggle_(el) {
+    setMultiBonusFilter_(el.checked);
+  }
+
   function toggleBonusFilter(bonus) {
-    if (selectedBonuses.indexOf(bonus) !== -1) { 
-      removeBonus(bonus); 
-    } else { 
-      selectedBonuses.push(bonus); 
-      renderBonusChips(); 
-      updateClearBtnVisibility(); 
-      applyLocalFiltersPak(); 
+    if (selectedBonuses.indexOf(bonus) !== -1) {
+      removeBonus(bonus);
+    } else {
+      applyBonusPick_(bonus);
     }
   }
 
@@ -315,7 +379,10 @@
 
   // Each .page is its own scroll container, so this scrolls the page currently
   // showing rather than the window — which never scrolls at all.
-  function scrollCurrentPageToTop_() {
+  // keepFocus leaves focus where it is. The back-to-top button needs the focus
+  // move below; a jump triggered by applying a filter does not, and would
+  // otherwise pull focus out of whatever control the user was using.
+  function scrollCurrentPageToTop_(keepFocus) {
     var pages = document.querySelectorAll('.page');
     var el = pages[currentPage];
     if (!el) return;
@@ -330,6 +397,8 @@
     } else {
       el.scrollTop = 0;
     }
+
+    if (keepFocus) return;
 
     // The button fades out once the page reaches the top, and focus on a
     // visibility:hidden element is dropped to <body> — which would send the

@@ -49,6 +49,7 @@ function saveUserPreferences() {
       areaGroups: areaGroupState,
       areaGroupSplit: areaGroupSplitState,
       chartOrder: chartOrderState,
+      allowMultiBonus: allowMultiBonusFilter,
       theme: currentTheme
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
@@ -80,6 +81,12 @@ function loadUserPreferences() {
       }
     }
     if (prefs.sharedRowsLimit) $('sharedRowsLimit').value = prefs.sharedRowsLimit;
+
+    // Strictly === true, so anything other than a deliberate opt-in leaves the
+    // one-at-a-time rule in force.
+    allowMultiBonusFilter = prefs.allowMultiBonus === true;
+    var multiCb = $('multiBonusToggle');
+    if (multiCb) multiCb.checked = allowMultiBonusFilter;
     if (prefs.bonusViewMode && $('bonusViewMode')) $('bonusViewMode').value = prefs.bonusViewMode;
 
     if (Array.isArray(prefs.hiddenBonusAreas)) {
@@ -185,7 +192,7 @@ function loadUserPreferences() {
 // a dozen module-level variables holding preference state, and re-deriving them
 // all correctly is far more likely to go wrong than simply starting again.
 function resetAllSettingsPak() {
-  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes and row counts all go back to their defaults. Your data is untouched, and other people are unaffected.')) return;
+  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes, row counts and the filtering setting all go back to their defaults. Your data is untouched, and other people are unaffected.')) return;
   try {
     localStorage.removeItem('e3_dashboard_prefs_v1');
     localStorage.removeItem('e3_dashboard_payload_v1');

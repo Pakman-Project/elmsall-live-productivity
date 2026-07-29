@@ -434,6 +434,20 @@
           </button>
           <div class="tour-menu-list" id="tourMenuList"></div>
 
+          <div class="tour-menu-settings">
+            <h3 class="tour-menu-sub">Filtering</h3>
+            <label class="setting-row" for="multiBonusToggle">
+              <input type="checkbox" id="multiBonusToggle" onchange="onMultiBonusToggle_(this)">
+              <span class="setting-text">
+                <span class="setting-label">Filter by several bonus numbers at once</span>
+                <span class="setting-hint">Normally picking a bonus number replaces whatever
+                  was filtered before, and takes you to the top of Overall so you can see what
+                  changed. Turn this on to build up a set of people instead, and stay on the
+                  page you are already on.</span>
+              </span>
+            </label>
+          </div>
+
           <div class="tour-menu-shortcuts">
             <h3 class="tour-menu-sub">Keyboard shortcuts</h3>
             <dl class="shortcut-list">
