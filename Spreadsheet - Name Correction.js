@@ -1,102 +1,204 @@
-function formatColumnCPeriodically() {
-  const sheetName = 'Data';
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+/************************************************************
+ * 'Data' TAB CORRECTION — column C names, column F hours
+ *
+ * This used to run only from a 5-minute time trigger, which left a window of
+ * up to five minutes where rows had landed on the Data tab but had NOT been
+ * corrected. Anything reading the tab in that window — the dashboard, or the
+ * processed-data build — saw raw column C values ("3.00E+03" instead of "3E3",
+ * "14:00" instead of "2PM"), so the same operator appeared as two different
+ * people and the numbers were wrong until the next tick.
+ *
+ * The fix is to correct rows as they land. Databricks delivers via doPost, so
+ * doPost calls correctDataRows_ on the block it has just written, inside the
+ * same lock as the append — there is no window at all any more.
+ *
+ * Everything here therefore comes in two forms:
+ *
+ *   correctDataRows_(sheet, startRow, numRows)  one block, for doPost
+ *   formatColumnCPeriodically()                 the whole tab, for a manual
+ *                                               run or a slow safety-net trigger
+ *
+ * The block form is what makes running on every POST affordable: its cost is
+ * set by the size of the batch, not by the size of the tab, so it stays
+ * constant as the day fills up.
+ ************************************************************/
 
-  if (!sheet) return;
+var DATA_SHEET_NAME_ = 'Data';
+// Column C (1-based) holds the bonus number / name being corrected.
+var NAME_COLUMN_ = 3;
+// Column F is derived, column G is its source: F = G / 60.
+var HOURS_OUT_COLUMN_ = 6;
+var HOURS_IN_COLUMN_ = 7;
 
-  const lastRow = sheet.getLastRow();
-  if (lastRow === 0) return;
+/**
+ * Written-out clock times that should be stored as the short shift codes the
+ * rest of the pipeline groups on. Hoisted to module scope: it used to be
+ * rebuilt on every call, which was invisible at one call per five minutes and
+ * is worth avoiding now that a correction runs on every delivery.
+ */
+var NAME_TIME_MAP_ = {
+  // AM
+  '00:00': '0AM',
+  '12:00': '0PM',
+  '01:00': '1AM', '1:00': '1AM',
+  '02:00': '2AM', '2:00': '2AM',
+  '03:00': '3AM', '3:00': '3AM',
+  '04:00': '4AM', '4:00': '4AM',
+  '05:00': '5AM', '5:00': '5AM',
+  '06:00': '6AM', '6:00': '6AM',
+  '07:00': '7AM', '7:00': '7AM',
+  '08:00': '8AM', '8:00': '8AM',
+  '09:00': '9AM', '9:00': '9AM',
+  // PM
+  '12:00 PM': '0PM', '12:00PM': '0PM',
+  '13:00': '1PM', '1:00 PM': '1PM', '1:00PM': '1PM',
+  '14:00': '2PM', '2:00 PM': '2PM', '2:00PM': '2PM',
+  '15:00': '3PM', '3:00 PM': '3PM', '3:00PM': '3PM',
+  '16:00': '4PM', '4:00 PM': '4PM', '4:00PM': '4PM',
+  '17:00': '5PM', '5:00 PM': '5PM', '5:00PM': '5PM',
+  '18:00': '6PM', '6:00 PM': '6PM', '6:00PM': '6PM',
+  '19:00': '7PM', '7:00 PM': '7PM', '7:00PM': '7PM',
+  '20:00': '8PM', '8:00 PM': '8PM', '8:00PM': '8PM',
+  '21:00': '9PM', '9:00 PM': '9PM', '9:00PM': '9PM'
+};
 
-  const range = sheet.getRange(1, 3, lastRow, 1);
-  const values = range.getDisplayValues();
+/**
+ * One displayed column C cell -> its corrected value.
+ */
+function correctNameValue_(display) {
+  // Trim whitespace AND convert to ALL CAPS.
+  var v = String(display === null || display === undefined ? '' : display).trim().toUpperCase();
+  if (!v) return '';
 
-  const timeMap = {
-    // AM
-    '00:00': '0AM',
-    '12:00': '0PM',
-    '01:00': '1AM', '1:00': '1AM',
-    '02:00': '2AM', '2:00': '2AM',
-    '03:00': '3AM', '3:00': '3AM',
-    '04:00': '4AM', '4:00': '4AM',
-    '05:00': '5AM', '5:00': '5AM',
-    '06:00': '6AM', '6:00': '6AM',
-    '07:00': '7AM', '7:00': '7AM',
-    '08:00': '8AM', '8:00': '8AM',
-    '09:00': '9AM', '9:00': '9AM',
-    // PM
-    '12:00 PM': '0PM', '12:00PM': '0PM',
-    '13:00': '1PM', '1:00 PM': '1PM', '1:00PM': '1PM',
-    '14:00': '2PM', '2:00 PM': '2PM', '2:00PM': '2PM',
-    '15:00': '3PM', '3:00 PM': '3PM', '3:00PM': '3PM',
-    '16:00': '4PM', '4:00 PM': '4PM', '4:00PM': '4PM',
-    '17:00': '5PM', '5:00 PM': '5PM', '5:00PM': '5PM',
-    '18:00': '6PM', '6:00 PM': '6PM', '6:00PM': '6PM',
-    '19:00': '7PM', '7:00 PM': '7PM', '7:00PM': '7PM',
-    '20:00': '8PM', '8:00 PM': '8PM', '8:00PM': '8PM',
-    '21:00': '9PM', '9:00 PM': '9PM', '9:00PM': '9PM'
-  };
+  // Fix scientific notation (e.g. 3.00E+03 -> 3E3). Sheets renders a bonus
+  // number that looks like a number in whatever notation it prefers, and the
+  // pipeline groups on the string, so "3E3" and "3.00E+03" would be two people.
+  var sciMatch = v.match(/^(\d+(?:\.\d+)?)E\+?(\d+)$/i);
+  if (sciMatch) {
+    // Strip the decimal point and any trailing zeros ("3.00" -> "3").
+    var base = sciMatch[1].replace(/\.?0+$/, '');
+    // Number() drops leading zeros from the exponent ("03" -> 3).
+    return base + 'E' + Number(sciMatch[2]);
+  }
 
-  const corrected = values.map(row => {
-    // Trim whitespace AND convert to ALL CAPS
-    let v = String(row[0]).trim().toUpperCase();
+  if (NAME_TIME_MAP_[v]) return NAME_TIME_MAP_[v];
 
-    if (!v) return [''];
-
-    // IMPROVED: Fix scientific notation (e.g., 3.00E+03 -> 3E3)
-    // This regex looks for numbers, an optional decimal, "E", an optional "+", and the exponent
-    const sciMatch = v.match(/^(\d+(?:\.\d+)?)E\+?(\d+)$/i);
-    if (sciMatch) {
-      let base = sciMatch[1];
-      // Strip the decimal point and any trailing zeros (e.g. "3.00" becomes "3")
-      base = base.replace(/\.?0+$/, ''); 
-      
-      // Convert exponent to a number to drop leading zeros (e.g. "03" becomes 3)
-      const exponent = Number(sciMatch[2]); 
-      return [`${base}E${exponent}`];
-    }
-
-    // Fix time conversions
-    if (timeMap[v]) {
-      return [timeMap[v]];
-    }
-
-    return [v];
-  });
-
-  // Write the values first
-  range.setValues(corrected);
-  // THEN force the column to Plain Text to stop Sheets from reverting 3E3 back to 3.00E+03
-  range.setNumberFormat('@'); 
-  calculateColumnF();
+  return v;
 }
 
+/**
+ * Corrects column C for a block of rows.
+ *
+ * The number format is forced to plain text AFTER the write. Without it Sheets
+ * re-reads "3E3" as a number and renders it straight back as 3.00E+03, undoing
+ * the correction on the way in.
+ */
+function correctNameColumn_(sheet, startRow, numRows) {
+  if (numRows < 1) return;
+  var range = sheet.getRange(startRow, NAME_COLUMN_, numRows, 1);
+  var display = range.getDisplayValues();
 
-function calculateColumnF() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Data');
-  if (!sheet) return;
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-
-  // Read Column G
-  const gValues = sheet.getRange(2, 7, lastRow - 1, 1).getValues();
-
-  // Calculate F = G / 60 (4 significant figures)
-  const fValues = gValues.map(([g]) => {
-    if (g === '' || g === null) return [''];
-
-    const num = Number(g);
-    if (isNaN(num)) return [''];
-
-    const result = num / 60;
-
-    // Return as number with 4 significant figures
-    return [Number(result.toPrecision(4))];
+  var corrected = display.map(function (row) {
+    return [correctNameValue_(row[0])];
   });
 
-  // Write results to Column F
-  sheet.getRange(2, 6, fValues.length, 1).setValues(fValues);
+  range.setValues(corrected);
+  range.setNumberFormat('@');
+}
 
-  // Optional: display up to 4 decimal places without trailing zeros
-  sheet.getRange(2, 6, fValues.length, 1).setNumberFormat('0.####');
+/**
+ * Recomputes column F (= G / 60, to 4 significant figures) for a block of rows.
+ */
+function calculateHoursColumn_(sheet, startRow, numRows) {
+  if (numRows < 1) return;
+  var gValues = sheet.getRange(startRow, HOURS_IN_COLUMN_, numRows, 1).getValues();
+
+  var fValues = gValues.map(function (row) {
+    var g = row[0];
+    if (g === '' || g === null || g === undefined) return [''];
+
+    var num = Number(g);
+    if (isNaN(num)) return [''];
+
+    return [Number((num / 60).toPrecision(4))];
+  });
+
+  var outRange = sheet.getRange(startRow, HOURS_OUT_COLUMN_, numRows, 1);
+  outRange.setValues(fValues);
+  // Up to 4 decimal places, without trailing zeros.
+  outRange.setNumberFormat('0.####');
+}
+
+/**
+ * Corrects one freshly-landed block. This is what doPost calls, and it is the
+ * whole point of the file: the block is corrected before the response returns,
+ * so nothing downstream can ever read it uncorrected.
+ *
+ * Safe to call again on the same rows — every step is idempotent, so a retry
+ * or an overlapping delivery cannot corrupt anything.
+ */
+function correctDataRows_(sheet, startRow, numRows) {
+  if (!sheet || numRows < 1) return;
+  // Row 1 is the header. A block starting there would be uppercased into a
+  // corrupted header, so clamp to the first data row.
+  if (startRow < 2) {
+    numRows -= (2 - startRow);
+    startRow = 2;
+    if (numRows < 1) return;
+  }
+  correctNameColumn_(sheet, startRow, numRows);
+  calculateHoursColumn_(sheet, startRow, numRows);
+}
+
+/**
+ * Whole-tab correction.
+ *
+ * Kept under its original name so an existing time trigger keeps working. It
+ * is no longer needed every 5 minutes — doPost corrects each delivery as it
+ * lands — but it remains useful as an occasional safety net, and as the repair
+ * for rows that arrived some other way (a manual paste, an import).
+ */
+function formatColumnCPeriodically() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  correctDataRows_(sheet, 2, lastRow - 1);
+}
+
+/**
+ * Column F alone, over the whole tab. Retained as a separate entry point
+ * because it was one before.
+ */
+function calculateColumnF() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  calculateHoursColumn_(sheet, 2, lastRow - 1);
+}
+
+/**
+ * Menu entry point: correct the whole tab now, and say what happened. Gives the
+ * user a way to repair rows that did not arrive through doPost without going
+ * to the script editor.
+ */
+function confirmFormatDataTab() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    'Correct the Data tab',
+    'Re-applies the column C name corrections and recalculates column F across ' +
+    'the whole Data tab.\n\nRows delivered by Databricks are already corrected ' +
+    'as they arrive — this is for rows added another way. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  formatColumnCPeriodically();
+  ui.alert('Data tab corrected.');
 }
