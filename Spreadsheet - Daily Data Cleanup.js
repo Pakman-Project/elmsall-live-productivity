@@ -63,7 +63,16 @@ function cleanupDateKey_(display) {
   return '';
 }
 
+// Wrapped in the pipeline lock. This function reads every row of Data into
+// memory, filters it, and writes the survivors back over the top - so a
+// delivery landing between the read and the write is erased without trace.
+// The window is small but it is 04:00-adjacent, not 04:00-exact, and
+// deliveries arrive every fifteen minutes.
 function dailyDataCleanup() {
+  return withPipelineLock_('dailyDataCleanup', dailyDataCleanup_);
+}
+
+function dailyDataCleanup_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Data');
   if (!sheet) {
@@ -141,7 +150,10 @@ function dailyDataCleanup() {
              '; removed ' + notToday + ' not-today (' + unreadable + ' unreadable), ' +
              dupes + ' duplicate, ' + blank + ' blank.');
 
-  forceRebuildProcessedData();
+  // Directly, not through forceRebuildProcessedData: the lock is already held
+  // by dailyDataCleanup above, and LockService locks are not reentrant.
+  var written = rebuildProcessedFromData_();
+  Logger.log('dailyDataCleanup: rebuilt Processed Data with ' + written + ' row(s).');
 }
 
 /** Menu wrapper - confirms first, since this deletes rows. */

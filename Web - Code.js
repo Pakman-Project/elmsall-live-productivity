@@ -577,7 +577,7 @@ function getLastRefreshTimestamp() {
 
 // ==========================================
 // SHARED PROCESSING HELPERS
-// Used by both updateProcessedData15mins() and forceRebuildProcessedData()
+// Used by rebuildProcessedFromData_() and the retained legacy incremental path.
 // ==========================================
 function computeProcessedAggregates_(dataValues) {
   var norm = function(v) { return String(v === null || v === undefined ? '' : v).trim(); };
@@ -706,13 +706,134 @@ function buildProcessedRows_(procData, existingRows, fullRebuild, sumF, sumE, di
   return output;
 }
 
+// 'Processed Data (15mins)' is A:C (keys) + D:V (19 derived columns).
+var PROC_TOTAL_COLS_ = 22;
+var PROC_OUTPUT_COLS_ = 19;
+
+// Anything that writes 'Data' or 'Processed Data (15mins)' takes this first.
+// Three things touch them — a delivery, the 04:00 cleanup, a manual rebuild —
+// and any two of them overlapping corrupts the tab: the cleanup rewrites every
+// row from an in-memory copy, so a delivery landing in the middle of it is
+// simply erased.
+var PIPELINE_LOCK_WAIT_MS_ = 30000;
+
+/**
+ * Runs fn with the pipeline lock held, if it can be had.
+ *
+ * Deliberately NOT fatal when the lock cannot be taken. Refusing to run means
+ * dropping a delivery or skipping a cleanup, which is a certain loss; running
+ * unserialised is a risk of one. The caller gets a log line either way.
+ */
+function withPipelineLock_(label, fn) {
+  var lock = LockService.getScriptLock();
+  var haveLock = false;
+  try {
+    haveLock = lock.tryLock(PIPELINE_LOCK_WAIT_MS_);
+  } catch (lockErr) {
+    haveLock = false;
+  }
+
+  if (!haveLock) {
+    Logger.log(label + ': could not take the pipeline lock within ' +
+               PIPELINE_LOCK_WAIT_MS_ + 'ms — proceeding unserialised.');
+  }
+
+  try {
+    return fn();
+  } finally {
+    if (haveLock) lock.releaseLock();
+  }
+}
+
+/**
+ * Rebuilds 'Processed Data (15mins)' from the 'Data' tab.
+ *
+ * This is what makes the pipeline one-directional. It used to be Databricks
+ * that wrote this tab, which meant Databricks had to read 'Data' back out of
+ * the sheet after Apps Script had corrected it — a round trip whose
+ * correctness depended entirely on the two sides' timing lining up. Deriving
+ * it here, in the same call that just corrected the rows, removes the round
+ * trip: the data is correct by construction because the correction happened
+ * a few lines earlier, in this same execution.
+ *
+ * Writes BEFORE clearing. The obvious order — clear the tab, then fill it —
+ * leaves the dashboard reading an empty sheet if anything fails in between,
+ * and on a path that now runs every fifteen minutes that is a real exposure
+ * rather than a theoretical one. Writing over the top and then clearing only
+ * the rows left dangling past the new end means the tab is never empty and
+ * never half-written.
+ *
+ * Returns the number of rows written.
+ */
+function rebuildProcessedFromData_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var frontSheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  var procSheet = ss.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
+  var dataSheet = ss.getSheetByName('Data');
+
+  if (!frontSheet || !procSheet || !dataSheet) {
+    throw new Error('rebuildProcessedFromData_: a required sheet is missing.');
+  }
+
+  var props = PropertiesService.getDocumentProperties();
+  var norm = function (v) { return String(v === null || v === undefined ? '' : v).trim(); };
+
+  var lastProcRow = procSheet.getLastRow();
+  var oldProcRowCount = lastProcRow > 1 ? lastProcRow - 1 : 0;
+  var lastDataRow = dataSheet.getLastRow();
+
+  var clearFrom = function (keepRows) {
+    if (oldProcRowCount > keepRows) {
+      procSheet.getRange(keepRows + 2, 1, oldProcRowCount - keepRows, PROC_TOTAL_COLS_)
+               .clearContent();
+    }
+  };
+
+  if (lastDataRow < 2) {
+    clearFrom(0);
+    props.setProperty('PROC_A2_LAST', '');
+    props.setProperty('DATA_LAST_ROW', '1');
+    return 0;
+  }
+
+  var divisor = Number(frontSheet.getRange('C2').getValue()) || 1;
+  var dataValues = dataSheet.getRange(2, 1, lastDataRow - 1, 10).getValues();
+
+  var aggregates = computeProcessedAggregates_(dataValues);
+  var sortedAC = aggregates.sortedAC;
+  var newProcRowCount = sortedAC.length;
+
+  if (newProcRowCount === 0) {
+    clearFrom(0);
+    props.setProperty('PROC_A2_LAST', '');
+    props.setProperty('DATA_LAST_ROW', String(lastDataRow));
+    return 0;
+  }
+
+  var headers = procSheet.getRange('D1:L1').getDisplayValues()[0].map(norm);
+  var outputDR = buildProcessedRows_(
+    sortedAC, null, true, aggregates.sumF, aggregates.sumE, divisor, headers);
+
+  procSheet.getRange(2, 1, newProcRowCount, 3).setValues(sortedAC);
+  if (outputDR.length > 0) {
+    procSheet.getRange(2, 4, outputDR.length, PROC_OUTPUT_COLS_).setValues(outputDR);
+  }
+  clearFrom(newProcRowCount);
+
+  props.setProperty('PROC_A2_LAST', norm(sortedAC[0][0]));
+  props.setProperty('DATA_LAST_ROW', String(lastDataRow));
+
+  return newProcRowCount;
+}
+
 function updateProcessedData15mins() {
-  // NO-OP: "Processed Data (15mins)" is now written directly by the Databricks
-  // pipeline. This entry point is intentionally neutered so a leftover time
-  // trigger or an accidental manual run can't race Databricks and corrupt the
-  // tab. The original implementation is preserved below under a *_LEGACY_UNUSED_
-  // name for reference / rollback but is never called.
-  Logger.log('updateProcessedData15mins: no-op — processing handled by Databricks.');
+  // NO-OP. 'Processed Data (15mins)' is derived from the 'Data' tab by
+  // rebuildProcessedFromData_, which doPost calls as each delivery lands.
+  // This entry point stays neutered so a leftover time trigger or an
+  // accidental manual run cannot race a delivery. The original incremental
+  // implementation is preserved below under a *_LEGACY_UNUSED_ name for
+  // reference / rollback but is never called.
+  Logger.log('updateProcessedData15mins: no-op — handled by rebuildProcessedFromData_.');
 }
 
 function updateProcessedData15mins_LEGACY_UNUSED_() {
