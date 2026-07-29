@@ -5,7 +5,12 @@
  *   1. Drop every row in A2:A whose date is not today (dd/mm/yyyy).
  *   2. Drop duplicate rows - identical across A:J.
  *   3. Sort what remains by column I.
- *   4. Rebuild 'Processed Data (15mins)' from the result.
+ *
+ * 'Processed Data (15mins)' is deliberately NOT touched. The Databricks
+ * notebook rebuilds it from the whole 'Data' tab at the end of every delivery,
+ * so it self-corrects within fifteen minutes of this running - and a second
+ * writer on that tab would only create the race this pipeline has spent
+ * enough time removing already.
  *
  * Notes on how this is written:
  *
@@ -130,9 +135,9 @@ function dailyDataCleanup() {
     // Sorted after writing, by column I, exactly as the sheet's own sort would.
     // This is a value sort: if column I holds TEXT rather than real datetimes,
     // the order is lexicographic, which for dd/mm/yyyy strings is not
-    // chronological. That is already how the rest of the pipeline orders these
-    // (see computeProcessedAggregates_ in Code.js), so it is left consistent
-    // rather than quietly made different here.
+    // chronological. That is already how the Databricks rebuild orders these
+    // (it sorts on the parsed window start, then bonus), so it is left
+    // consistent rather than quietly made different here.
     sheet.getRange(2, 1, kept.length, width)
          .sort({ column: CLEANUP_SORT_COLUMN_, ascending: true });
   }
@@ -141,7 +146,6 @@ function dailyDataCleanup() {
              '; removed ' + notToday + ' not-today (' + unreadable + ' unreadable), ' +
              dupes + ' duplicate, ' + blank + ' blank.');
 
-  forceRebuildProcessedData();
 }
 
 /** Menu wrapper - confirms first, since this deletes rows. */
@@ -150,7 +154,8 @@ function confirmDailyDataCleanup() {
   var resp = ui.alert(
     'Clean up Data tab',
     'This deletes every row in Data that is not dated today, removes duplicate ' +
-    'rows, sorts by column I, and rebuilds Processed Data.\n\nContinue?',
+    'rows and sorts by column I.\n\nProcessed Data is rebuilt by Databricks ' +
+    'within fifteen minutes and is not touched here.\n\nContinue?',
     ui.ButtonSet.YES_NO);
   if (resp !== ui.Button.YES) return;
   dailyDataCleanup();

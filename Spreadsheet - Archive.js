@@ -329,12 +329,6 @@ function startOfDay_(date) {
   return d;
 }
 
-function addDays_(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
 function log_(msg) {
   Logger.log(ARCHIVE_CFG.LOG_PREFIX + msg);
 }

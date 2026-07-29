@@ -169,20 +169,6 @@ function formatColumnCPeriodically() {
 }
 
 /**
- * Column F alone, over the whole tab. Retained as a separate entry point
- * because it was one before.
- */
-function calculateColumnF() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
-  if (!sheet) return;
-
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-
-  calculateHoursColumn_(sheet, 2, lastRow - 1);
-}
-
-/**
  * Menu entry point: correct the whole tab now, and say what happened. Gives the
  * user a way to repair rows that did not arrive through doPost without going
  * to the script editor.
