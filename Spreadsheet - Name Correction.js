@@ -1,33 +1,46 @@
 /************************************************************
  * 'Data' TAB CORRECTION — column C names, column F hours
  *
- * This used to run only from a 5-minute time trigger, which left a window of
- * up to five minutes where rows had landed on the Data tab but had NOT been
- * corrected. Anything reading the tab in that window — the dashboard, or the
- * processed-data build — saw raw column C values ("3.00E+03" instead of "3E3",
- * "14:00" instead of "2PM"), so the same operator appeared as two different
- * people and the numbers were wrong until the next tick.
+ * A SAFETY NET, not a step in the live pipeline. Read that first, because it
+ * used to be the opposite and the difference matters.
  *
- * The fix is to correct rows as they land. Databricks delivers via doPost, so
- * doPost calls correctDataRows_ on the block it has just written, inside the
- * same lock as the append — there is no window at all any more.
+ * Column C holds the bonus code. It used to arrive damaged: Databricks wrote
+ * the Data tab through the Sheets API with USER_ENTERED, which asks Sheets to
+ * INTERPRET each value, so "3E3" was stored as the number 3000 and read back
+ * as "3.00E+03", and "2PM" was stored as a time and read back as "14:00". One
+ * operator became two. This file existed to repair that afterwards, on a
+ * 5-minute trigger.
  *
- * Everything here therefore comes in two forms:
+ * It could never repair it in time. The Databricks notebook pivots the Data
+ * tab into 'Processed Data (15mins)' seconds after appending to it, so the
+ * newest 15-minute block — the one the live dashboard shows — was always
+ * pivoted before any trigger could fire.
  *
- *   correctDataRows_(sheet, startRow, numRows)  one block, for doPost
- *   formatColumnCPeriodically()                 the whole tab, for a manual
- *                                               run or a slow safety-net trigger
+ * Both causes are now fixed where the value enters, in the notebook:
  *
- * The block form is what makes running on every POST affordable: its cost is
- * set by the size of the batch, not by the size of the tab, so it stays
- * constant as the day fills up.
+ *   value_input_option='RAW'          stores exactly what is sent
+ *   upper(trim(PAYLOAD_BONUSCODE))    folds "mf5" and "MF5" together in SQL
+ *
+ * so nothing arriving through Databricks needs correcting at all. What is left
+ * for this file is rows that arrive some OTHER way — a manual paste, an
+ * import, a hand edit. Those are rare, so an hourly trigger is plenty; the
+ * 5-minute cadence was sized for a job this no longer does, and rewriting
+ * every cell of column C 288 times a day is pure overhead.
+ *
+ * Two forms:
+ *
+ *   correctDataRows_(sheet, startRow, numRows)  one block
+ *   formatColumnCPeriodically()                 the whole Data tab
+ *
+ * NOTE: this deliberately does NOT touch 'Processed Data (15mins)'. Databricks
+ * is the sole writer of that tab, and it rebuilds it in full every 15 minutes.
+ * A second writer editing its column C while the notebook is writing A2:V can
+ * pair one row's bonus code with another row's figures — and since the pivot
+ * key now folds case itself, there is nothing there to gain in exchange.
  ************************************************************/
 
 var DATA_SHEET_NAME_ = 'Data';
-var PROC_SHEET_NAME_ = 'Processed Data (15mins)';
-// Column C (1-based) holds the bonus number / name being corrected, on both
-// sheets — Processed Data's own column C is a straight copy of the bonus that
-// produced each pivoted row (see PROC_AREAS in the Databricks notebook).
+// Column C (1-based) holds the bonus number / name being corrected.
 var NAME_COLUMN_ = 3;
 // Column F is derived, column G is its source: F = G / 60.
 var HOURS_OUT_COLUMN_ = 6;
@@ -154,56 +167,36 @@ function correctDataRows_(sheet, startRow, numRows) {
 }
 
 /**
- * Whole-tab correction.
+ * Whole-tab correction, over 'Data' only. See the file header for why
+ * 'Processed Data (15mins)' is deliberately left alone.
  *
- * Kept under its original name so an existing time trigger keeps working. It
- * is no longer needed every 5 minutes — doPost corrects each delivery as it
- * lands — but it remains useful as an occasional safety net, and as the repair
- * for rows that arrived some other way (a manual paste, an import).
- *
- * Also corrects Processed Data (15mins)!C2:C. Databricks writes that tab RAW
- * now, so its column C should already be correct — this is a second safety
- * net, not a load-bearing step, for the same reason the Data-tab pass below
- * is one: a name correction here can never be undone by a later write the way
- * it used to be when the pivot read Data back through USER_ENTERED.
- *
- * Hours are NOT recalculated on Processed Data — D:L are the Databricks pivot
- * output (standard hours per work area), not a G/60 derivation like Data's
- * column F, so calculateHoursColumn_ does not apply here.
+ * Kept under its original name so an existing time trigger keeps working.
+ * Hourly is the right cadence: nothing arriving through Databricks needs this
+ * any more, so it exists for the occasional hand-added row.
  */
 function formatColumnCPeriodically() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
+  if (!sheet) return;
 
-  var dataSheet = ss.getSheetByName(DATA_SHEET_NAME_);
-  if (dataSheet) {
-    var dataLastRow = dataSheet.getLastRow();
-    if (dataLastRow >= 2) {
-      correctDataRows_(dataSheet, 2, dataLastRow - 1);
-    }
-  }
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
 
-  var procSheet = ss.getSheetByName(PROC_SHEET_NAME_);
-  if (procSheet) {
-    var procLastRow = procSheet.getLastRow();
-    if (procLastRow >= 2) {
-      correctNameColumn_(procSheet, 2, procLastRow - 1);
-    }
-  }
+  correctDataRows_(sheet, 2, lastRow - 1);
 }
 
 /**
- * Menu entry point: correct the whole tab now, and say what happened. Gives the
- * user a way to repair rows that did not arrive through doPost without going
- * to the script editor.
+ * Menu entry point: correct the whole tab now, and say what happened. Gives
+ * the user a way to repair hand-added rows without going to the script editor.
  */
 function confirmFormatDataTab() {
   var ui = SpreadsheetApp.getUi();
   var response = ui.alert(
     'Correct the Data tab',
     'Re-applies the column C name corrections and recalculates column F across ' +
-    'the whole Data tab, and re-applies the same column C name correction to ' +
-    'Processed Data (15mins).\n\nBoth are already correct as Databricks writes ' +
-    'them — this is a safety net for rows added another way. Continue?',
+    'the whole Data tab.\n\nRows delivered by Databricks are already correct as ' +
+    'they arrive — this is a safety net for rows added another way, such as a ' +
+    'manual paste. Processed Data is not touched; Databricks rebuilds it.\n\n' +
+    'Continue?',
     ui.ButtonSet.YES_NO
   );
 
