@@ -110,6 +110,19 @@ function archivePastDatesAndTrimLive_() {
   log_('Archive + live trim complete.');
 
   /* ---------------------------------------------------------
+   * REOPEN ANY OF TODAY'S WINDOWS THIS REWRITE ERASED
+   *
+   * The trim above rewrites every row of Data from an in-memory copy, so a
+   * Databricks append that landed between the read and the write is gone. Run
+   * immediately, in this same execution, so the ordering between the two
+   * systems never has to be coordinated. See reconcilePipelineStateWithData_.
+   * --------------------------------------------------------- */
+  var reopened = reconcilePipelineStateWithData_();
+  if (reopened > 0) {
+    log_(`Reopened ${reopened} window(s) erased by the trim; Databricks will refill them.`);
+  }
+
+  /* ---------------------------------------------------------
    * REFRESH ARCHIVE LINKS AT THE END
    * --------------------------------------------------------- */
   log_('Refreshing archive links...');

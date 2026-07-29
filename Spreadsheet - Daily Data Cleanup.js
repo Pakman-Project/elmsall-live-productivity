@@ -146,6 +146,16 @@ function dailyDataCleanup() {
              '; removed ' + notToday + ' not-today (' + unreadable + ' unreadable), ' +
              dupes + ' duplicate, ' + blank + ' blank.');
 
+  // The rewrite above replaces every row from an in-memory copy, so a
+  // Databricks append that landed between the read and the write has just been
+  // erased. Reopen those windows now, in this same execution, so Databricks
+  // refills them - see reconcilePipelineStateWithData_ for why this beats
+  // coordinating the two systems.
+  var reopened = reconcilePipelineStateWithData_();
+  if (reopened > 0) {
+    Logger.log('dailyDataCleanup: reopened ' + reopened +
+               ' window(s) erased by the rewrite; Databricks will refill them.');
+  }
 }
 
 /** Menu wrapper - confirms first, since this deletes rows. */

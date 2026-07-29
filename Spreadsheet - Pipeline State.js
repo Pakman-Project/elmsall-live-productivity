@@ -1,8 +1,19 @@
 /************************************************************
- * BACKFILL 'Pipeline State' FOR PAST DAYS
+ * 'Pipeline State' — the coverage record
  *
- * 'Pipeline State' (see Web - Code.js's rebuildProcessedFromData_ era notes,
- * and the Databricks notebook) is the record of which 15-min windows have
+ * Two tools live here, both about the tab the Databricks gap-scan reads to
+ * decide which 15-minute windows still need fetching:
+ *
+ *   reconcilePipelineStateWithData_()   re-opens windows a whole-tab rewrite
+ *                                       erased. Called by the archive and the
+ *                                       cleanup, immediately after each one
+ *                                       rewrites 'Data'.
+ *   confirmBackfillPipelineState()      menu tool to fill in past days that
+ *                                       predate the tab existing.
+ *
+ * ── BACKFILL ─────────────────────────────────────────────────────────────
+ *
+ * 'Pipeline State' is the record of which 15-min windows have
  * already been fetched. It only exists from the day it was introduced: it
  * seeds itself once from whatever the live job's first run found sitting on
  * 'Data', which only ever holds TODAY's rows - Archive.js trims everything
@@ -32,6 +43,116 @@ var PIPELINE_STATE_TAB_ = 'Pipeline State';
 var PIPELINE_STATE_HEADER_ = ['Window End (UTC)', 'Date Time Range', 'Rows Written', 'Recorded At (UTC)'];
 var PIPELINE_STATE_TZ_ = 'Europe/London';
 var PIPELINE_STATE_WINDOW_MS_ = 15 * 60 * 1000;
+// Column I of 'Data' holds the Date Time Range — the join key between a row
+// and the window it belongs to, and the same string 'Pipeline State' records
+// in its column B. Both are written from one value in the notebook, so they
+// match exactly rather than approximately.
+var PIPELINE_STATE_DATA_RANGE_COL_ = 9;
+
+/**
+ * Re-opens any of TODAY's windows that a whole-tab rewrite has erased.
+ *
+ * Both archivePastDatesAndTrimLive_ and dailyDataCleanup read every row of
+ * 'Data' into memory, filter it, and write the survivors back over the top. A
+ * Databricks append landing between that read and that write is erased with no
+ * trace of it having existed.
+ *
+ * That used to be survivable. Coverage was inferred from 'Data' itself, so an
+ * erased window simply looked unfetched and the next run refilled it. Since
+ * coverage moved to its own tab, an erased window stays marked as covered and
+ * is never fetched again — a permanent hole, silently, with nothing in the
+ * Failures tab because from Databricks' side the write succeeded.
+ *
+ * The repair is to run this straight after each rewrite, in the same script
+ * that did it. Because the erasure and the repair are in one execution, the
+ * ordering between Apps Script and Databricks stops mattering entirely: no
+ * lock, no waiting, and nothing to do on the days a collision does not happen.
+ *
+ * Two classes of row are deliberately left alone:
+ *
+ *   Windows that do not START today. The archive removes yesterday's rows on
+ *   purpose; their absence from 'Data' is correct, not a loss.
+ *
+ *   Windows with Rows Written <= 1. A window that found no data is recorded
+ *   with a single '(no data this window)' placeholder, and that placeholder
+ *   has a blank date so dailyDataCleanup drops it as "not today" — every time.
+ *   Reopening those would make the pipeline refetch every empty window of the
+ *   day, find nothing, write the placeholder again, and repeat tomorrow. 0
+ *   likewise means a row this file's own backfill wrote, which never had data
+ *   behind it.
+ *
+ * The rare real window holding exactly one row is therefore not repaired. That
+ * is the safe direction to miss in: this only ever DELETES coverage rows, so a
+ * false positive costs a refetch and a duplicate the 04:00 dedupe clears,
+ * while a false negative costs nothing at all.
+ *
+ * @return {number} how many windows were reopened.
+ */
+function reconcilePipelineStateWithData_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var stateSheet = ss.getSheetByName(PIPELINE_STATE_TAB_);
+  var dataSheet = ss.getSheetByName(DATA_SHEET_NAME_);
+  if (!stateSheet || !dataSheet) return 0;
+
+  var stateLastRow = stateSheet.getLastRow();
+  if (stateLastRow < 2) return 0;
+
+  // Which windows still have at least one row on 'Data'.
+  var present = {};
+  var dataLastRow = dataSheet.getLastRow();
+  if (dataLastRow >= 2) {
+    var ranges = dataSheet
+      .getRange(2, PIPELINE_STATE_DATA_RANGE_COL_, dataLastRow - 1, 1)
+      .getDisplayValues();
+    for (var i = 0; i < ranges.length; i++) {
+      var seen = String(ranges[i][0]).trim();
+      if (seen) present[seen] = true;
+    }
+  }
+
+  var todayPrefix = Utilities.formatDate(new Date(), PIPELINE_STATE_TZ_, 'dd/MM/yyyy') + ' ';
+
+  var stateValues = stateSheet
+    .getRange(2, 1, stateLastRow - 1, PIPELINE_STATE_HEADER_.length)
+    .getValues();
+
+  var kept = [];
+  var reopened = [];
+
+  for (var s = 0; s < stateValues.length; s++) {
+    var row = stateValues[s];
+    var dtr = String(row[1] === null || row[1] === undefined ? '' : row[1]).trim();
+    var rowsWritten = Number(row[2]);
+
+    var startsToday = dtr.indexOf(todayPrefix) === 0;
+    var hadRealData = rowsWritten > 1;
+
+    if (startsToday && hadRealData && !present[dtr]) {
+      reopened.push(dtr);
+      continue; // dropped, so the gap-scan sees this window as unfetched again
+    }
+    kept.push(row);
+  }
+
+  if (reopened.length === 0) return 0;
+
+  // Write the survivors first, then clear the tail — never leave the coverage
+  // record empty or half-written between two calls. A Databricks run reading it
+  // in that gap would see no coverage at all and refetch the entire day.
+  if (kept.length > 0) {
+    stateSheet.getRange(2, 1, kept.length, PIPELINE_STATE_HEADER_.length).setValues(kept);
+  }
+  var newLastRow = kept.length + 1;
+  if (stateLastRow > newLastRow) {
+    stateSheet
+      .getRange(newLastRow + 1, 1, stateLastRow - newLastRow, PIPELINE_STATE_HEADER_.length)
+      .clearContent();
+  }
+
+  Logger.log('reconcilePipelineStateWithData_: reopened ' + reopened.length +
+             ' window(s) erased by the rewrite — ' + reopened.join(', '));
+  return reopened.length;
+}
 
 /**
  * Every 15-min window end, in UTC, for the local calendar day fromDateStr..
