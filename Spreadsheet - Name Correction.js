@@ -159,19 +159,13 @@ function correctDataRows_(sheet, startRow, numRows) {
  * for rows that arrived some other way (a manual paste, an import).
  */
 function formatColumnCPeriodically() {
-  // Under the pipeline lock: this rewrites columns C and F for every row, and
-  // a delivery landing mid-pass would be appended into rows this call has
-  // already read past, so it would be left uncorrected until something else
-  // touched it.
-  return withPipelineLock_('formatColumnCPeriodically', function () {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
-    if (!sheet) return;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
+  if (!sheet) return;
 
-    var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
 
-    correctDataRows_(sheet, 2, lastRow - 1);
-  });
+  correctDataRows_(sheet, 2, lastRow - 1);
 }
 
 /**
