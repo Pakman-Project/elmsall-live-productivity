@@ -120,6 +120,16 @@ var allBonusList = [];
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];
+// Bonus number -> how many work areas they registered volume in, for the set of
+// rows the table being drawn is showing. Rebuilt per render by whoever is about
+// to draw; see bonusAreaCountMapPak. Two of them because the Bonus page and an
+// expanded Data Table row cover different periods and must not share an answer.
+var currentBonusAreaCount = {};
+var currentDetailAreaCount = {};
+// Filtering by more than one bonus number at a time. Off by default: a pick
+// replaces the filter and jumps to the top of Overall. Lifted from the "?"
+// dialog, and persisted with the rest of the preferences.
+var allowMultiBonusFilter = false;
 var overviewVolChart = null;
 var trendCharts = [];
 var trendSplitState = { enabled: false, charts: [] };

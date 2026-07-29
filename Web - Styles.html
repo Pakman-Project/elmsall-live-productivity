@@ -1561,6 +1561,22 @@ canvas {
   color: var(--accent);
 }
 
+/* Marks a bonus number that registered volume in more than one work area over
+   the period on screen. Same idea as the marker on the breakdown chips, now
+   carried onto the Bonus page tables and the Data Table's expanded rows.
+   Deliberately quiet: it is a footnote on the name, not a status. .clickable-bonus
+   is a flex row with its own gap, so no margin is needed here. */
+.multi-area-icon {
+  font-size: 8px;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.clickable-bonus:hover .multi-area-icon,
+.clickable-bonus.active .multi-area-icon {
+  opacity: 0.8;
+}
+
 .bonus-tip {
   display: none;
   position: absolute;

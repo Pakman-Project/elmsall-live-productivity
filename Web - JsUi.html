@@ -790,19 +790,10 @@
       bonusProductivity[b] = deployed > 0 ? (info.totalStdHours / deployed) * 100 : 0;
     }
 
-    var bonusAreaCount = {};
-    for (var a = 0; a < BREAKDOWN_AREAS.length; a++) {
-      var areaKey = BREAKDOWN_AREAS[a].key;
-      var seenInArea = {};
-      for (var i = 0; i < rangeData.length; i++) {
-        if (Number(rangeData[i][areaKey]) > 0) seenInArea[rangeData[i].bonus] = true;
-      }
-      var areaBonusKeys = Object.keys(seenInArea);
-      for (var j = 0; j < areaBonusKeys.length; j++) {
-        if (!bonusAreaCount[areaBonusKeys[j]]) bonusAreaCount[areaBonusKeys[j]] = 0;
-        bonusAreaCount[areaBonusKeys[j]]++;
-      }
-    }
+    // The same calculation now drives the marker on the Bonus page and on Data
+    // Table detail rows, so it lives in one place — two copies of "works across
+    // several areas" would eventually come to mean two different things.
+    var bonusAreaCount = bonusAreaCountMapPak(rangeData);
 
     var allBonuses = {};
     for (var i = 0; i < rangeData.length; i++) { allBonuses[rangeData[i].bonus] = true; }

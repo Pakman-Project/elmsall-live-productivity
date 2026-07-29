@@ -242,6 +242,43 @@ function numTdPak(n, d) {
   return '<td class="num' + (isZero ? ' zero' : '') + '">' + numPak(n, d) + '</td>';
 }
 
+// Bonus number -> the number of distinct work areas it registered volume in,
+// across whatever raw entries are passed.
+//
+// Scoped to the caller's data on purpose. "Works across several areas" is a
+// statement about a period, not a permanent property of a person: the Bonus
+// page answers it for its own From/To range, an expanded Data Table row answers
+// it for that row's window, and the breakdown for its own range. Sharing one
+// global answer would make the marker disagree with the numbers beside it.
+function bonusAreaCountMapPak(entries) {
+  var counts = {};
+  if (!entries || !entries.length) return counts;
+
+  for (var a = 0; a < BREAKDOWN_AREAS.length; a++) {
+    var areaKey = BREAKDOWN_AREAS[a].key;
+    // Gathered per area first, so a bonus number appearing in twenty blocks of
+    // the same area still counts as one area.
+    var seen = {};
+    for (var i = 0; i < entries.length; i++) {
+      if (Number(entries[i][areaKey]) > 0) seen[entries[i].bonus] = true;
+    }
+    var bonuses = Object.keys(seen);
+    for (var j = 0; j < bonuses.length; j++) {
+      counts[bonuses[j]] = (counts[bonuses[j]] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+// The marker itself. Returns nothing at all below two areas, so callers can
+// concatenate it unconditionally.
+function multiAreaIconHtmlPak(areaCount) {
+  var n = Number(areaCount) || 0;
+  if (n < 2) return '';
+  return '<i class="fa-solid fa-layer-group multi-area-icon" aria-hidden="true"' +
+         ' title="Works across ' + n + ' work areas in this period"></i>';
+}
+
 function pctPak(n, d) {
   d = d !== undefined ? d : 1;
   if (typeof n === 'string' && n.indexOf('%') !== -1) {

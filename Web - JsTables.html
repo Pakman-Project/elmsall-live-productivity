@@ -292,6 +292,10 @@ function buildMainRowDetail(rowData) {
     return '<div class="main-detail-empty">No individual data found for this period.</div>';
   }
 
+  // Scoped to this row's window: within the 15-60 minutes the row covers, who
+  // moved between areas.
+  currentDetailAreaCount = bonusAreaCountMapPak(slice);
+
   var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryDetailPak);
   return isCardModePak() ? buildMainDetailCardsHtml_(entryRows) : buildMainDetailTableHtml_(entryRows);
 }
@@ -366,6 +370,7 @@ function buildEntryDetailCardHtml_(r) {
     '<div class="entry-card-head">' +
       '<span class="entry-card-time">' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</span>' +
       '<span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
+        multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
         safeTextPak(r.bonus) + ' <i class="fa-solid fa-filter filter-icon"></i>' +
       '</span>' +
       '<span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span>' +
@@ -389,6 +394,7 @@ function buildEntryDetailRowHtml_(r) {
   return '<tr>' +
     '<td>' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</td>' +
     '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
+    multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
     ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
     (isActive ? 'Click to remove filter' : 'Click to filter main view') +
@@ -517,6 +523,7 @@ function buildBonusRowHtml_(r) {
   var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
   return '<tr>' +
     '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="toggleBonusFilter(\'' + escapedBonus + '\')">' +
+    multiAreaIconHtmlPak(currentBonusAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
     ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
     (isActive ? 'Click to remove filter' : 'Click to filter main view') +
@@ -661,6 +668,11 @@ function renderSideTablesPak(rowsLimit) {
   }
 
   var windowData = rawSideData.filter(function (r) { return selectedSet[r.timeRange]; });
+
+  // Drives the multi-area marker in buildBonusRowHtml_. Computed once here over
+  // the whole window rather than per panel: the panels are per work area, so a
+  // panel's own rows can never tell you that someone also worked elsewhere.
+  currentBonusAreaCount = bonusAreaCountMapPak(windowData);
 
   var modeSel = $('bonusViewMode');
   var mode = modeSel ? modeSel.value : 'overall';
