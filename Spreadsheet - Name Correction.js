@@ -24,7 +24,10 @@
  ************************************************************/
 
 var DATA_SHEET_NAME_ = 'Data';
-// Column C (1-based) holds the bonus number / name being corrected.
+var PROC_SHEET_NAME_ = 'Processed Data (15mins)';
+// Column C (1-based) holds the bonus number / name being corrected, on both
+// sheets — Processed Data's own column C is a straight copy of the bonus that
+// produced each pivoted row (see PROC_AREAS in the Databricks notebook).
 var NAME_COLUMN_ = 3;
 // Column F is derived, column G is its source: F = G / 60.
 var HOURS_OUT_COLUMN_ = 6;
@@ -157,15 +160,35 @@ function correctDataRows_(sheet, startRow, numRows) {
  * is no longer needed every 5 minutes — doPost corrects each delivery as it
  * lands — but it remains useful as an occasional safety net, and as the repair
  * for rows that arrived some other way (a manual paste, an import).
+ *
+ * Also corrects Processed Data (15mins)!C2:C. Databricks writes that tab RAW
+ * now, so its column C should already be correct — this is a second safety
+ * net, not a load-bearing step, for the same reason the Data-tab pass below
+ * is one: a name correction here can never be undone by a later write the way
+ * it used to be when the pivot read Data back through USER_ENTERED.
+ *
+ * Hours are NOT recalculated on Processed Data — D:L are the Databricks pivot
+ * output (standard hours per work area), not a G/60 derivation like Data's
+ * column F, so calculateHoursColumn_ does not apply here.
  */
 function formatColumnCPeriodically() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DATA_SHEET_NAME_);
-  if (!sheet) return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
+  var dataSheet = ss.getSheetByName(DATA_SHEET_NAME_);
+  if (dataSheet) {
+    var dataLastRow = dataSheet.getLastRow();
+    if (dataLastRow >= 2) {
+      correctDataRows_(dataSheet, 2, dataLastRow - 1);
+    }
+  }
 
-  correctDataRows_(sheet, 2, lastRow - 1);
+  var procSheet = ss.getSheetByName(PROC_SHEET_NAME_);
+  if (procSheet) {
+    var procLastRow = procSheet.getLastRow();
+    if (procLastRow >= 2) {
+      correctNameColumn_(procSheet, 2, procLastRow - 1);
+    }
+  }
 }
 
 /**
@@ -178,8 +201,9 @@ function confirmFormatDataTab() {
   var response = ui.alert(
     'Correct the Data tab',
     'Re-applies the column C name corrections and recalculates column F across ' +
-    'the whole Data tab.\n\nRows delivered by Databricks are already corrected ' +
-    'as they arrive — this is for rows added another way. Continue?',
+    'the whole Data tab, and re-applies the same column C name correction to ' +
+    'Processed Data (15mins).\n\nBoth are already correct as Databricks writes ' +
+    'them — this is a safety net for rows added another way. Continue?',
     ui.ButtonSet.YES_NO
   );
 
