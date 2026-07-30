@@ -17,6 +17,9 @@
 
 const ARCHIVE_CFG = {
   DATA_SHEET_NAME: 'Data',
+  PROCESSED_SHEET_NAME: 'Processed Data (15mins)',
+  // 'Processed Data (15mins)' is A:C (keys) + D:V (derived) = 22 columns.
+  PROCESSED_SHEET_COLS: 22,
   FRONT_SHEET_NAME: 'Front',
   ARCHIVE_FOLDER_ID: '1eFML5s-EdF0mpImJoAv_2I0yobxpm0vt',
   HEADER_ROWS: 1,
@@ -191,10 +194,97 @@ function createArchivesClearRows_(
 
     applyClearBlocks_(archiveSheet, clearBlocks);
 
+    // The copy is taken of the WHOLE live file, so its Processed Data tab
+    // arrives holding every date the live tab held — including days that have
+    // their own archive, and today's rows, which belong to neither. Trim it to
+    // this archive's date so the file is internally consistent: Data and
+    // Processed Data describing the same day, and nothing else.
+    const procCleared = trimArchiveProcessedData_(archiveSS, dateKey);
+    logDebug_(`Processed Data rows cleared: ${procCleared}`);
+
     setArchiveB2_(archiveSS, dateObj);
 
     log_(`Done: ${archiveName}`);
   }
+}
+
+/************************************************************
+ * TRIM AN ARCHIVE'S 'Processed Data (15mins)' TO ITS OWN DATE
+ *
+ * Column A holds the window, "30/07/2026 00:00 - 30/07/2026 00:15". The day a
+ * window belongs to is the day it STARTS, which is why only the first date in
+ * the string is read: the 23:45 window of one day ends at 00:00 of the next
+ * and would otherwise be filed a day late.
+ *
+ * Only ever called on an archive COPY, never on the live tab. Databricks
+ * rebuilds the live Processed Data in full every fifteen minutes, so anything
+ * cleared there would simply come back — and clearing it would be a second
+ * writer on a tab that deliberately has one.
+ ************************************************************/
+function trimArchiveProcessedData_(archiveSS, dateKey) {
+  const sheet = archiveSS.getSheetByName(ARCHIVE_CFG.PROCESSED_SHEET_NAME);
+  if (!sheet) {
+    log_(`No '${ARCHIVE_CFG.PROCESSED_SHEET_NAME}' tab in the archive; nothing to trim.`);
+    return 0;
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= ARCHIVE_CFG.HEADER_ROWS) return 0;
+
+  const startRow = ARCHIVE_CFG.HEADER_ROWS + 1;
+  const numRows = lastRow - ARCHIVE_CFG.HEADER_ROWS;
+
+  const windows = sheet.getRange(startRow, 1, numRows, 1).getDisplayValues();
+
+  const rowKeys = new Array(numRows);
+  let readable = 0;
+  for (let i = 0; i < numRows; i++) {
+    const key = processedWindowDateKey_(windows[i][0]);
+    rowKeys[i] = key;
+    if (key) readable++;
+  }
+
+  // Guard against a format change quietly emptying the tab. Rows that hold no
+  // readable window at all mean column A has changed shape rather than aged
+  // out, and wiping everything is the wrong response to that. A tab where every
+  // row parses but none matches this date is a different thing entirely and is
+  // allowed through — that is simply a day with no processed rows left.
+  if (readable === 0) {
+    log_(`WARNING: no readable window in column A of '${ARCHIVE_CFG.PROCESSED_SHEET_NAME}' ` +
+         `(checked ${numRows} rows). Format may have changed. Left untouched.`);
+    return 0;
+  }
+
+  const clearBlocks = getClearBlocks_(rowKeys, startRow, new Set([dateKey]));
+
+  let cleared = 0;
+  for (let i = 0; i < clearBlocks.length; i++) cleared += clearBlocks[i][1];
+
+  applyClearBlocks_(sheet, clearBlocks, ARCHIVE_CFG.PROCESSED_SHEET_COLS);
+
+  // Sorted so the kept rows compact to the top and the blanks sink, matching
+  // what the live trim does to Data.
+  if (cleared > 0 && cleared < numRows) {
+    sheet.getRange(startRow, 1, numRows, ARCHIVE_CFG.PROCESSED_SHEET_COLS)
+         .sort({ column: 1, ascending: true });
+  }
+
+  return cleared;
+}
+
+/**
+ * "30/07/2026 00:00 - 30/07/2026 00:15" -> "2026/07/30", matching the keys
+ * parseDateKeyFast_ and dateKey_ produce so they can be compared directly.
+ * Anchored at the start of the string, so it reads the window's start date.
+ */
+function processedWindowDateKey_(display) {
+  const s = String(display === null || display === undefined ? '' : display).trim();
+  if (!s) return null;
+
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+  if (!m) return null;
+
+  return `${m[3]}/${m[2].padStart(2, '0')}/${m[1].padStart(2, '0')}`;
 }
 
 /************************************************************
@@ -255,11 +345,14 @@ function getClearBlocks_(rowKeys, startRow, allowedKeys) {
  * Order doesn't matter here — clearing content never shifts rows,
  * unlike deleteRows() which required bottom-up application.
  ************************************************************/
-function applyClearBlocks_(sheet, blocks) {
+function applyClearBlocks_(sheet, blocks, width) {
+  // Defaults to the Data tab's 11 columns, which is what every existing caller
+  // wants; Processed Data passes its own 22.
+  const cols = width || 11;
   for (let i = 0; i < blocks.length; i++) {
     const [row, count] = blocks[i];
     if (count > 0) {
-      sheet.getRange(row, 1, count, 11).clearContent();
+      sheet.getRange(row, 1, count, cols).clearContent();
     }
   }
 }
