@@ -44,18 +44,18 @@ var TOUR_STEPS = [
   // opened BEFORE the steps that ring them — otherwise those steps point at
   // display:none elements, which measure 0x0 and get no visible ring. The menu
   // is opened here and held open across the two button steps below, then closed.
-  { part: 1, page: 0, target: '#headerMenuBtn', mobileOnly: true,
+  { part: 1, page: 0, target: '#headerMenuBtn', whenCollapsed: true,
     interactive: { sel: '#headerMenuBtn', type: 'click' },
     title: 'Everything else lives here',
-    body: 'On a phone the action buttons fold into this menu — refresh, auto-refresh, rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
+    body: 'When the window is too narrow to show them, the action buttons fold into this menu — refresh, auto-refresh, rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
   { part: 1, page: 0, target: '.refresh-btn',
-    // Idempotent, and only does anything on mobile: this keeps the menu open
-    // when the step is reached forwards OR backwards.
-    action: function () { tourOpenHeaderMenuIfMobile_(); },
+    // Idempotent, and only does anything when the header is collapsed: this
+    // keeps the menu open whether the step is reached forwards or backwards.
+    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     title: 'Refresh any time',
     body: 'The dashboard keeps itself up to date, but tap here whenever you want to pull the very latest figures immediately.' },
   { part: 1, page: 0, target: '#autoRefreshBtn',
-    action: function () { tourOpenHeaderMenuIfMobile_(); },
+    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     cleanup: function () { if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false); },
     title: 'Auto-refresh — and how to pause it',
     body: 'The dashboard checks for new data every minute on its own. Hover this button to see how long until the next check, or click it to pause updating — handy when you are reading a number and don’t want it changing under you. Click again to resume.' },
@@ -73,6 +73,9 @@ var TOUR_STEPS = [
     body: 'Suggestions appear as you type. Arrow keys move through them and Enter picks one — or just click. Watch one being chosen.' },
   { part: 1, page: 0, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
+    // The banner only exists while something is filtered, and the step before
+    // this one is what filtered it. Coming back, that has been undone.
+    action: function () { tourEnsureFilter_(); },
     cleanup: function () { tourClearFilter_(); },
     title: 'The filter follows you everywhere',
     body: 'Every page, chart and table is now showing just that operator, and this banner says so wherever you go. “Clear all” brings everyone back.' },
@@ -152,7 +155,10 @@ var TOUR_STEPS = [
     action: function () { tourOpenAreaGroups_(); },
     title: 'Apply them together',
     body: 'One Apply commits the groups and the charts at the same time — watch the section rebuild.' },
-  { part: 3, page: 0, target: '#areaGroupChartsWrap',
+  // The charts are lifted out of #areaGroupChartsWrap so each can be rearranged
+  // on its own, which leaves the wrapper empty and measuring 0x0. Ringing the
+  // panels themselves, unioned, covers however many the split produced.
+  { part: 3, page: 0, target: '[data-split-owner="areaGroup"]', union: true,
     cleanup: function () { tourRestoreAreaGroups_(); },
     title: 'Titled by what they show',
     body: 'Each chart is named after the groups it draws — “Productivity % - PiE, Top Up vs E3 Packing” — so a split section says what is being compared instead of “Chart A”. Your own groups come back as we move on.' },
@@ -200,6 +206,7 @@ var TOUR_STEPS = [
     body: 'Every bonus number is clickable, and picking one filters the ENTIRE dashboard down to that operator.' },
   { part: 5, page: 2, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
+    action: function () { tourEnsureFilter_(); },
     title: 'Site-wide filter',
     body: 'This banner shows the active filter — every page now reflects only that operator. “Clear all” removes it.' },
 
@@ -225,14 +232,17 @@ var TOUR_STEPS = [
     title: 'Expand a row',
     body: 'A row expands to show the per-operator detail behind that time block — tap its header on mobile.' },
   { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content',
+    action: function () { tourEnsureExpandedRow_(); },
     title: 'Per-operator detail',
     body: 'Each expanded row lists every operator in that block with their volumes and productivity. The bonus numbers in here are clickable too.' },
   { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
     interactive: { sel: '.main-detail-row.open .main-detail-content .clickable-bonus', type: 'click' },
+    action: function () { tourEnsureExpandedRow_(); },
     title: 'Filter from the detail',
     body: 'Just like on the Bonus page, an operator here filters the whole dashboard to them.' },
   { part: 6, page: 3, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
+    action: function () { tourEnsureExpandedRow_(); tourEnsureFilter_(); },
     cleanup: function () { expandedRowKey = null; },
     title: 'Filtered again',
     body: 'Same site-wide filter, reached from the data table. “Clear all” removes it.' },
@@ -259,16 +269,11 @@ var TOUR_STEPS = [
 
   // ===== Part 8 — Arranging the layout =====================================
   { part: 8, page: 0, target: '#reorderBtn',
-    // On a phone this button lives inside the burger menu, so the ring would
-    // have nothing visible to point at. Opening the menu first puts it on
-    // screen for both layouts; the cleanup on the last step closes it again.
-    action: function () {
-      if (window.matchMedia('(max-width: 700px)').matches &&
-          !document.body.classList.contains('header-menu-open') &&
-          typeof toggleHeaderMenu_ === 'function') {
-        toggleHeaderMenu_(true);
-      }
-    },
+    // Whenever the header is collapsed this button is inside the burger menu,
+    // so the ring would have nothing visible to point at. Opening the menu
+    // first puts it on screen at any width; the cleanup on the last step of
+    // this part closes it again.
+    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     title: 'Arrange the layout',
     body: 'Not everyone reads these pages in the same order. The pen button turns on rearrange mode, where you can move the panels around to suit how you work.' },
   { part: 8, page: 0, target: '.reorder-bar',
@@ -277,6 +282,9 @@ var TOUR_STEPS = [
     title: 'Move a panel',
     body: 'Every panel now carries a bar showing its position, with arrows to move it earlier or later — watch one move. No dragging, so it works the same on a phone and never fights with scrolling.' },
   { part: 8, page: 0, target: '.toast',
+    // Rearrange mode is what raises this toast, and the step is ringing it —
+    // so reaching here backwards, after the mode was turned off, needs it back.
+    action: function () { tourEnterReorder_(); },
     interactive: { sel: '.toast-action-primary', type: 'click' },
     title: 'Finish when you are done',
     body: 'This message stays up for as long as rearrange mode is on, so you always know where you are. “Done” finishes, “Reset order” puts everything back. It works the same on the Volume and Bonus pages.',
@@ -380,6 +388,19 @@ function startTourPart_(part) {
 
 function isTourMobile_() {
   return window.matchMedia('(max-width: 700px)').matches;
+}
+
+// Whether the header's action buttons are CURRENTLY behind the burger.
+//
+// Not a width test. The header collapses by measuring whether its title still
+// fits (see updateHeaderFit_), so the collapse happens at whatever width that
+// turns out to be — and on a half-width laptop window it happens far above the
+// 700px the tour used to assume. Steps ringing a header button were then
+// pointing at display:none elements, which measure 0x0 and get no ring: the
+// exact fault the slideshow rewrite was meant to end, reintroduced from the
+// other side.
+function tourHeaderCollapsed_() {
+  return document.body.classList.contains('header-compact');
 }
 
 function resolveInteractive_(step) {
@@ -543,13 +564,17 @@ function runStepCleanup_() {
   }
 }
 
-// A step can declare itself mobileOnly or desktopOnly; anything else runs
-// everywhere.
+// A step can declare itself mobileOnly or desktopOnly — genuinely about the
+// viewport, like pull-to-refresh — or whenCollapsed / whenExpanded, which are
+// about the header's current shape and can both be true at 900px or at 400px.
+// Anything declaring none of them runs everywhere.
 function stepAppliesHere_(step) {
   if (!step) return false;
   var mobile = isTourMobile_();
   if (step.mobileOnly && !mobile) return false;
   if (step.desktopOnly && mobile) return false;
+  if (step.whenCollapsed && !tourHeaderCollapsed_()) return false;
+  if (step.whenExpanded && tourHeaderCollapsed_()) return false;
   return true;
 }
 
@@ -573,13 +598,44 @@ function tourReposition_() {
 // written during a tour either (saveUserPreferences bails while tourActive), so
 // nothing here can outlive the page.
 
-// Mobile only, and safe to call repeatedly. The header actions are inside the
-// burger menu on a phone, so any step ringing one of them has to make sure it
-// is open first — including when the step is reached by stepping backwards.
-function tourOpenHeaderMenuIfMobile_() {
-  if (!window.matchMedia('(max-width: 700px)').matches) return;
+// Safe to call repeatedly. Any step ringing a header action has to make sure
+// the menu holding it is open first — including when the step is reached by
+// stepping backwards, which is why this is idempotent rather than a toggle.
+function tourOpenHeaderMenuIfCollapsed_() {
+  if (!tourHeaderCollapsed_()) return;
   if (typeof toggleHeaderMenu_ !== 'function') return;
   if (!document.body.classList.contains('header-menu-open')) toggleHeaderMenu_(true);
+}
+
+// ---- Making every step reachable backwards ---------------------------------
+// A step that RINGS something only a previous step's demonstration created is
+// fine going forwards and blank coming back. Each of these puts that state back
+// if it is missing, and does nothing if it is already there, so Back lands on a
+// step that looks exactly as it did on the way through.
+
+function tourEnsureFilter_() {
+  if (typeof selectedBonuses === 'undefined') return;
+  if (selectedBonuses.length) return;
+  var pick = (typeof allBonusList !== 'undefined' && allBonusList.length) ? allBonusList[0] : null;
+  if (!pick) return;
+  selectedBonuses = [pick];
+  renderBonusChips();
+  updateClearBtnVisibility();
+  applyLocalFiltersPak();
+}
+
+function tourEnsureExpandedRow_() {
+  if (document.querySelector('.main-detail-row.open')) return;
+  if (typeof currentMainRows === 'undefined' || !currentMainRows.length) return;
+  // Any row will do, but one with detail behind it demonstrates more: the
+  // table can legitimately hold blocks with nothing in them.
+  var row = null;
+  for (var i = 0; i < currentMainRows.length; i++) {
+    if ((currentMainRows[i].stdHours || 0) > 0) { row = currentMainRows[i]; break; }
+  }
+  if (!row) row = currentMainRows[0];
+  expandedRowKey = row.dateTime;
+  if (typeof renderMainTablePak === 'function') renderMainTablePak(currentMainRows);
 }
 
 function tourPrimeSearch_() {
