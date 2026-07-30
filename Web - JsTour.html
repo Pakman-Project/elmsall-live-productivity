@@ -481,6 +481,11 @@ function startTour(isAuto, startIndex) {
   window.addEventListener('scroll', tourReposition_, true);
   document.addEventListener('keydown', tourKeydown_);
 
+  // A fresh tour always plays. showTourStep_ no longer clears this, so without
+  // resetting it here a tour ended while paused would start the next run
+  // frozen on its first slide.
+  _tourPaused = false;
+
   // showTourStep_ switches to the step's page itself; start wherever asked
   // (0 for a full run, or the first step of a chosen part from the "?" menu).
   var start = (typeof startIndex === 'number' && startIndex > 0 && startIndex < TOUR_STEPS.length) ? startIndex : 0;
@@ -1008,7 +1013,11 @@ function showTourStep_(i) {
 
   clearTourTimers_();
   currentInteractiveCfg = null;
-  _tourPaused = false;
+  // Pause is deliberately NOT cleared here. Back and Next both land in this
+  // function, and clearing it made the tour resume playing the moment a paused
+  // viewer stepped anywhere - so pausing to read, then nudging back one slide
+  // to re-read the previous one, silently started the clock again. Pause is the
+  // viewer's state, not the step's; only starting a tour resets it.
   runStepCleanup_();
 
   tourStepIndex = i;
