@@ -438,10 +438,65 @@
     window.addEventListener('resize', refreshScrollEdgesAll_);
   }
 
-  // ── Mobile header menu ─────────────────────────────────────────────────────
-  // Six action buttons fit a desktop header and overrun a phone's, pushing into
-  // the "E3 Live Productivity" title. On mobile they collapse behind one
-  // button; on desktop the CSS leaves them inline and this never runs.
+  // ── Collapsing the header when the title stops fitting ────────────────────
+  // The action buttons used to collapse behind a burger at a fixed 700px. A
+  // breakpoint can only be right for one combination of font, zoom and title
+  // length, and the widths where "E3 Live Productivity" was actually being
+  // clipped sat well above that line — so a half-width laptop window showed
+  // "E3 Live Producti…" with a full row of icons beside it.
+  //
+  // This measures instead. Two stages, applied in order of how much is lost by
+  // giving them up: collapse the icons first, and only if the title STILL does
+  // not fit, drop the "21 min ago" stamp.
+  var HEADER_FIT_SLACK = 1;   // sub-pixel rounding on fractional zoom levels
+
+  function titleIsClipped_() {
+    var title = document.querySelector('.next-header-title');
+    if (!title) return false;
+    return title.scrollWidth > title.clientWidth + HEADER_FIT_SLACK;
+  }
+
+  function updateHeaderFit_() {
+    var body = document.body;
+
+    // Every pass decides from the same starting point rather than from
+    // whatever the last pass left behind. Measuring against the CURRENT state
+    // is the classic way to build an oscillation: collapsing the icons frees
+    // the room that made the title fit, which says "uncollapse", which takes
+    // the room away again. Reading from a known baseline cannot loop.
+    //
+    // Both classes are removed and re-added inside this one synchronous block,
+    // so the browser never paints an intermediate state and nothing flickers.
+    var wasCompact = body.classList.contains('header-compact');
+    body.classList.remove('header-compact', 'header-hide-age');
+
+    // Phones collapse unconditionally: the title is on its own grid row there,
+    // so it may well "fit" while the icons have nowhere to go.
+    var mobile = window.matchMedia('(max-width: 700px)').matches;
+    var compact = mobile || titleIsClipped_();
+
+    if (compact) body.classList.add('header-compact');
+    if (compact && !mobile && titleIsClipped_()) body.classList.add('header-hide-age');
+
+    // An open dropdown belongs to a header that is collapsed. If this pass has
+    // just widened out of that, close it — otherwise the menu stays flagged
+    // open with nothing on screen to close it.
+    if (wasCompact && !compact) toggleHeaderMenu_(false);
+  }
+
+  // Coalesced to one measurement per frame: a drag-resize fires continuously,
+  // and each pass costs two forced layouts.
+  var _headerFitPending = false;
+  function scheduleHeaderFit_() {
+    if (_headerFitPending) return;
+    _headerFitPending = true;
+    requestAnimationFrame(function () {
+      _headerFitPending = false;
+      updateHeaderFit_();
+    });
+  }
+
+  // ── Header menu ────────────────────────────────────────────────────────────
   function toggleHeaderMenu_(force) {
     var open = (typeof force === 'boolean')
       ? force
@@ -528,11 +583,18 @@
       if (btn) { try { btn.focus(); } catch (err) {} }
     });
 
-    // Rotating to a width where the buttons are inline again would otherwise
-    // leave `header-menu-open` set, with nothing on screen to clear it.
-    window.addEventListener('resize', function () {
-      if (!window.matchMedia('(max-width: 700px)').matches) toggleHeaderMenu_(false);
-    });
+    // Re-measure on resize. updateHeaderFit_ also closes an open menu when the
+    // header widens back out, which is what stopped `header-menu-open` being
+    // left set with nothing on screen to clear it.
+    window.addEventListener('resize', scheduleHeaderFit_);
+
+    // Fonts land after first paint and change the title's measured width, so
+    // the first reading can be taken against a fallback face.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(scheduleHeaderFit_).catch(function () {});
+    }
+
+    updateHeaderFit_();
   }
 
   function initPageScrollChrome_() {
