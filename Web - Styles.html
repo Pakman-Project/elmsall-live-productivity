@@ -294,7 +294,11 @@ body {
   color: rgba(255, 255, 255, 0.72);
   white-space: nowrap;
 }
+/* Sits first in the row, ahead of the status. Empty most of the time, and the
+   flex gap would otherwise still reserve space for it, leaving the status
+   pushed off its natural position by a blank element. */
 .next-header-meta .note-text { color: #ff9d5c; font-weight: 600; }
+.next-header-meta .note-text:empty { display: none; }
 /* Retry affordance shown next to a failed-load status message. */
 .status-retry-btn {
   margin-left: 6px;
