@@ -4201,7 +4201,9 @@ body.page-scrolled-far .back-to-top {
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 8px;
-  min-width: 40px;
+  /* Wide enough for "0.5x", the longest label, so cycling through the speeds
+     does not resize the button and shuffle the buttons beside it. */
+  min-width: 48px;
   height: 34px;
   padding: 0 8px;
   cursor: pointer;

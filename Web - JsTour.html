@@ -685,9 +685,14 @@ var TOUR_MS_PER_WORD = 300;
 var TOUR_DEMO_TAIL_MS = 1500;
 
 // Playback speed. Divides every duration, so 2x halves both the step length and
-// the wait before the demonstration.
-var TOUR_SPEEDS = [1, 1.5, 2];
-var _tourSpeedIdx = 0;
+// the wait before the demonstration — and 0.5x doubles them, for a first-time
+// viewer, a second language, or a screen being read across a room.
+//
+// Ordered slowest-first and starting at 1x, so one click from the default goes
+// FASTER. Someone who wants to slow down will hunt for the control; someone
+// speeding through a tour they have seen before is clicking without looking.
+var TOUR_SPEEDS = [0.5, 1, 1.5, 2];
+var _tourSpeedIdx = 1;
 function tourSpeed_() { return TOUR_SPEEDS[_tourSpeedIdx] || 1; }
 
 // Title and body together: the title is read too, and some are long enough to
