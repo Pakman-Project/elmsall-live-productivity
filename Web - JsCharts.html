@@ -443,7 +443,15 @@
       buildAreaGroupDatasets_ = function (groupsForChart) {
         var ds = [];
         groupsForChart.forEach(function (group) {
-          var dataArr = perfSplitAgg.map(function (r) { return r[group.id] || 0; });
+          // null, not 0, where nothing was deployed: Chart.js breaks the line
+          // at a null and draws a dive to the axis for a 0. An area that is
+          // simply not running was being drawn as productivity collapsing to
+          // nothing, which is a different claim entirely - and it dragged the
+          // minimum to 0, which would have pinned the axis below.
+          var dataArr = perfSplitAgg.map(function (r) {
+            var deployed = Number(r[group.id + '_dep']) || 0;
+            return deployed > 0 ? (r[group.id] || 0) : null;
+          });
           if (group.showLine) {
             ds.push({ label: group.label, data: dataArr, borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
           }
@@ -475,6 +483,26 @@
     // about to claim. See clearHoistedSplitPanels_ in JsReorder.
     if (typeof clearHoistedSplitPanels_ === 'function') clearHoistedSplitPanels_();
 
+    // Productivity sits in a narrow band near the top - typically 70-110% - so
+    // an axis pinned to zero spends most of its height on empty space and
+    // flattens the differences that actually matter. The floor drops to just
+    // under the lowest point and the ceiling sits 10% above the highest, both
+    // rounded to a multiple of 10 so the gridlines stay round numbers.
+    //
+    // Computed across EVERY chart in the section rather than per chart.
+    // Splitting exists to compare groups side by side, and two charts drawn to
+    // different scales would make a five-point gap look like a forty-point one.
+    // The trend charts already do the same thing for the same reason.
+    //
+    // Zero is kept when the data genuinely runs low: under 40% the distance to
+    // zero IS the story, and cropping it would overstate how close to normal a
+    // bad spell had been.
+    //
+    // The bar chart above is deliberately NOT treated this way. Bar LENGTH
+    // encodes the value there, so moving its baseline misstates the data rather
+    // than just zooming in on it; a line chart only claims a position.
+    var agY = areaGroupYRange_(areaGroupBuckets, buildAreaGroupDatasets_);
+
     var agWrap = $('areaGroupChartsWrap');
     areaGroupCharts = [];
     if (agWrap) {
@@ -495,7 +523,7 @@
                               '<canvas id="areaGroupChart' + (agIdx === 0 ? '' : '_' + agIdx) + '"></canvas>';
           agWrap.appendChild(panelEl);
 
-          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
+          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
             var others = [perfChart, overviewVolChart].concat(trendCharts);
             for (var oc = 0; oc < areaGroupCharts.length; oc++) { if (oc !== agIdx) others.push(areaGroupCharts[oc]); }
             syncToTargets(areaGroupCharts[agIdx], others, event, elements);
@@ -587,6 +615,52 @@
     if (typeof refreshChartLayoutAfterRender_ === 'function') {
       refreshChartLayoutAfterRender_();
     }
+  }
+
+  // ---- Area-group Y range ---------------------------------------------------
+  // See the call site for why this crops rather than starting at zero.
+  var AREA_GROUP_Y_STEP = 10;         // gridlines stay on round numbers
+  var AREA_GROUP_Y_PAD = 10;          // clearance under the lowest point
+  var AREA_GROUP_Y_ZERO_BELOW = 40;   // below this, show the whole drop to zero
+  var AREA_GROUP_Y_HEAD = 1.10;       // ceiling sits 10% above the highest point
+
+  function areaGroupYRange_(buckets, buildDatasets) {
+    var min = Infinity, max = -Infinity;
+
+    for (var b = 0; b < buckets.length; b++) {
+      var ds = buildDatasets(buckets[b]) || [];
+      for (var d = 0; d < ds.length; d++) {
+        var arr = ds[d].data || [];
+        for (var i = 0; i < arr.length; i++) {
+          var v = Number(arr[i]);
+          // Skips the nulls that mark an idle block, and the nulls a trend line
+          // returns when it has too few points to fit.
+          if (!Number.isFinite(v)) continue;
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      }
+    }
+
+    // Nothing plottable: hand back the old behaviour rather than invent a range.
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= 0) {
+      return { min: 0, max: undefined };
+    }
+
+    var floor = (min < AREA_GROUP_Y_ZERO_BELOW)
+      ? 0
+      : Math.max(0, Math.floor((min - AREA_GROUP_Y_PAD) / AREA_GROUP_Y_STEP) * AREA_GROUP_Y_STEP);
+
+    // Taken literally rather than rounded up to the next gridline. Rounding
+    // pushed a peak of 102 up to an axis of 120 - nearly twenty points of dead
+    // space above the data, which is the problem this was meant to solve.
+    // Chart.js still picks round tick values inside the range, so the gridlines
+    // stay clean; only the very top of the plot area is left unlabelled.
+    var ceil = max * AREA_GROUP_Y_HEAD;
+    // A flat series can land both ends in the same place.
+    if (ceil <= floor) ceil = floor + AREA_GROUP_Y_STEP;
+
+    return { min: floor, max: ceil };
   }
 
   // Volume page (page 1) is rendered separately so it can be deferred until the

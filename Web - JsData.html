@@ -368,6 +368,11 @@ function getAggregatedPerfSplitDataPak(rows, windowMinutes, splitGroups) {
       var std = g[grp.id + '_std'] || 0;
       var dep = g[grp.id + '_dep'] || 0;
       row[grp.id] = dep > 0 ? (std / dep) * 100 : 0;
+      // Carried through so callers can tell the two kinds of zero apart. A
+      // block where nobody was deployed and a block where someone was deployed
+      // and produced nothing both read as 0% here, and they mean opposite
+      // things: one is "not running", the other is "running badly".
+      row[grp.id + '_dep'] = dep;
     });
     result.push(row);
   });
