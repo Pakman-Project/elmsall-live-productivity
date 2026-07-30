@@ -441,7 +441,23 @@ function resetChartOrder_() {
     if (!container) continue;
     var defaults = _reorderDefaults_[zone.zoneKey] || [];
     for (var k = 0; k < defaults.length; k++) {
-      var el = container.querySelector('[data-reorder-key="' + defaults[k] + '"]');
+      var key = defaults[k];
+
+      // '@owner' is a split section: put its charts back in chart order, then
+      // the (empty) wrapper after them, which is where the next render inserts.
+      if (key.charAt(0) === '@') {
+        var owner = key.slice(1);
+        var panels = splitPanelsInChartOrder_(container, owner);
+        for (var q = 0; q < panels.length; q++) container.appendChild(panels[q]);
+        for (var w = 0; w < SPLIT_WRAPPERS_.length; w++) {
+          if (SPLIT_WRAPPERS_[w].owner !== owner) continue;
+          var wrapEl = document.getElementById(SPLIT_WRAPPERS_[w].id);
+          if (wrapEl && wrapEl.parentNode === container) container.appendChild(wrapEl);
+        }
+        continue;
+      }
+
+      var el = container.querySelector('[data-reorder-key="' + key + '"]');
       if (el) container.appendChild(el);
     }
   }
@@ -458,10 +474,58 @@ function resetChartOrder_() {
 // has something true to return to.
 var _reorderDefaults_ = {};
 
+// The Overall zone needs its own capture, because at startup the split
+// sections are still just their wrappers - the charts inside them have not
+// been rendered, so there is nothing tagged to record. Recording only what IS
+// tagged gave a default order of ['overviewVol','perf'], and Reset therefore
+// restored two panels and left the other two wherever the user had dragged
+// them.
+//
+// Waiting until the charts exist is not an option either: by then a saved
+// order has already been applied, so the "default" captured would be the
+// user's own arrangement.
+//
+// So the WRAPPER's authored position is recorded as a placeholder, and
+// expanded at reset time into however many charts the split happens to have
+// produced by then.
+function defaultOrderForOverall_() {
+  var zone = document.getElementById('page1Charts');
+  if (!zone) return [];
+  var out = [];
+  for (var i = 0; i < zone.children.length; i++) {
+    var el = zone.children[i];
+    var placeholder = null;
+    for (var w = 0; w < SPLIT_WRAPPERS_.length; w++) {
+      if (el.id === SPLIT_WRAPPERS_[w].id) { placeholder = '@' + SPLIT_WRAPPERS_[w].owner; break; }
+    }
+    if (placeholder) { out.push(placeholder); continue; }
+    if (el.hasAttribute && el.hasAttribute('data-reorder-key')) {
+      out.push(el.getAttribute('data-reorder-key'));
+    }
+  }
+  return out;
+}
+
+// The hoisted panels of one split section, in chart order rather than in
+// whatever order the user last left them in the DOM.
+function splitPanelsInChartOrder_(container, owner) {
+  var found = container.querySelectorAll('[data-split-owner="' + owner + '"]');
+  var list = Array.prototype.slice.call(found);
+  list.sort(function (a, b) {
+    var ai = parseInt(String(a.getAttribute('data-reorder-key')).slice(owner.length), 10) || 0;
+    var bi = parseInt(String(b.getAttribute('data-reorder-key')).slice(owner.length), 10) || 0;
+    return ai - bi;
+  });
+  return list;
+}
+
 function initChartReorder_() {
   tagReorderItems_();
   for (var z = 0; z < REORDER_ZONES_.length; z++) {
-    _reorderDefaults_[REORDER_ZONES_[z].zoneKey] = defaultOrderFor_(REORDER_ZONES_[z].zoneKey);
+    var zk = REORDER_ZONES_[z].zoneKey;
+    _reorderDefaults_[zk] = (zk === 'overall')
+      ? defaultOrderForOverall_()
+      : defaultOrderFor_(zk);
   }
   applyChartOrder_();
 
