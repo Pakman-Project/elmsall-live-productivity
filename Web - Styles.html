@@ -1968,12 +1968,25 @@ body.header-compact .next-header-actions .header-icon-btn.active {
   color: #fff;
 }
 
-/* Last resort, once collapsing the icons still has not freed enough room:
-   drop the "21 min ago" stamp. It is the least load-bearing thing in the row
-   — the auto-refresh button already says when the next check is due, and the
-   stale warning still appears if data actually goes cold. */
-body.header-hide-age #lastUpdateText {
+/* The "21 min ago" stamp is on demand. It is the least load-bearing thing in
+   the row - the auto-refresh button already says when the next check is due,
+   and the stale warning appears by itself if data really does go cold - but it
+   was permanently occupying the space that pushed the title into an ellipsis.
+   Hovering the meta line reveals it; on a touchscreen a tap does, via
+   .show-age. cursor: help is the affordance, and the container also carries
+   the same text as a title attribute so the information is reachable without
+   discovering the hover at all. */
+#lastUpdateText {
   display: none;
+}
+
+.next-header-meta {
+  cursor: help;
+}
+
+.next-header-meta:hover #lastUpdateText,
+.next-header-meta.show-age #lastUpdateText {
+  display: inline;
 }
 
 @media (max-width: 700px) {

@@ -318,13 +318,22 @@
   function renderLastUpdate_() {
     var el = $('lastUpdateText');
     if (!el) return;
+    // The element itself is hidden until hovered, so the same text is mirrored
+    // onto the container's title. Someone who never discovers the hover still
+    // gets the answer from the native tooltip.
+    var syncTitle = function () {
+      var meta = document.querySelector('.next-header-meta');
+      if (meta) meta.setAttribute('title', 'Data last updated: ' + el.textContent);
+    };
     // Archive snapshots are historical by definition — "3h ago" against a date
     // the user deliberately chose would be noise.
     if (currentArchiveUrl || lastRefreshTimestamp === null) {
       el.textContent = lastUpdateAbsText;
+      syncTitle();
       return;
     }
     el.textContent = lastUpdateAbsText + ' · ' + relativeAgePak(Date.now() - lastRefreshTimestamp);
+    syncTitle();
   }
 
   var STALE_AFTER_MS = 45 * 60 * 1000;
