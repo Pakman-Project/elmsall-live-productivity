@@ -61,10 +61,11 @@ function tagReorderItems_() {
     for (var i = 0; i < overall.children.length; i++) {
       var el = overall.children[i];
       var key = null;
-      if (el.id === 'trendChartsWrap') key = 'trend';
-      else if (el.querySelector && el.querySelector('#overviewVolChart')) key = 'overviewVol';
+      // The two split-chart wrappers are deliberately absent here: their
+      // charts are hoisted out and tagged individually by hoistSplitPanels_,
+      // so each one moves on its own rather than as a locked block.
+      if (el.querySelector && el.querySelector('#overviewVolChart')) key = 'overviewVol';
       else if (el.querySelector && el.querySelector('#perfChart')) key = 'perf';
-      else if (el.id === 'areaGroupChartsWrap') key = 'areaGroup';
       if (key) {
         el.setAttribute('data-reorder-key', key);
         el.setAttribute('data-reorder-label', reorderLabelFor_(el, key));
@@ -83,10 +84,86 @@ function tagReorderItems_() {
 }
 
 function reorderLabelFor_(el, key) {
-  if (key === 'trend') return 'Deployment Trend';
-  if (key === 'areaGroup') return 'Productivity % by Work Area';
   var h2 = el.querySelector('h2');
   return h2 ? h2.textContent.trim() : key;
+}
+
+// ---- Split charts as independent panels -----------------------------------
+// "Productivity % by Work Area" and "Deployment Trend" can each be split into
+// several charts, which the renderer builds inside a display:contents wrapper.
+// That wrapper laid them out as if they were the grid's own children, but the
+// reorder system only ever saw the wrapper - so a split section moved as one
+// locked block and could never be interleaved with the other.
+//
+// The panels are lifted out of their wrapper and made real siblings, which is
+// what makes an A-B-A-B arrangement expressible at all: interleaving is a
+// statement about sibling order, and two panels in different wrappers are not
+// siblings however the boxes are painted.
+//
+// The empty wrapper stays where it is. It is display:contents, so it occupies
+// nothing, and it marks the position new panels are inserted at on the next
+// render.
+var SPLIT_WRAPPERS_ = [
+  { id: 'areaGroupChartsWrap', owner: 'areaGroup', label: 'Productivity %' },
+  { id: 'trendChartsWrap',     owner: 'trend',     label: 'Deployment Trend' }
+];
+
+var SPLIT_CHART_LETTERS_ = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+function splitPanelLabel_(el, base, idx, total) {
+  var h2 = el.querySelector('h2');
+  var own = h2 ? h2.textContent.trim() : '';
+  if (own) return own;
+  if (total <= 1) return base;
+  return base + ' — Chart ' + (SPLIT_CHART_LETTERS_[idx] || (idx + 1));
+}
+
+// Called by the renderer BEFORE it rebuilds, not by the hoist afterwards.
+// The renderer empties the WRAPPER and builds fresh panels into it, which does
+// nothing to panels already lifted out of it - so without this they would
+// accumulate one full set per render. It has to happen before rather than
+// after because a stale panel still holds a canvas carrying the same id the
+// new one is about to use, and anything resolving that id in between would
+// find the corpse.
+function clearHoistedSplitPanels_() {
+  var zone = document.getElementById('page1Charts');
+  if (!zone) return;
+  for (var i = zone.children.length - 1; i >= 0; i--) {
+    var child = zone.children[i];
+    if (child.hasAttribute && child.hasAttribute('data-split-owner')) {
+      zone.removeChild(child);
+    }
+  }
+}
+
+function hoistSplitPanels_() {
+  var zone = document.getElementById('page1Charts');
+  if (!zone) return;
+
+  // Belt and braces: the renderer calls clearHoistedSplitPanels_ before
+  // building, but this is also reached from the tour's restore path.
+  clearHoistedSplitPanels_();
+
+  for (var w = 0; w < SPLIT_WRAPPERS_.length; w++) {
+    var spec = SPLIT_WRAPPERS_[w];
+    var wrap = document.getElementById(spec.id);
+    if (!wrap || wrap.parentNode !== zone) continue;
+
+    var panels = [];
+    for (var c = 0; c < wrap.children.length; c++) {
+      if (wrap.children[c].classList.contains('panel')) panels.push(wrap.children[c]);
+    }
+
+    for (var p = 0; p < panels.length; p++) {
+      var el = panels[p];
+      el.setAttribute('data-split-owner', spec.owner);
+      el.setAttribute('data-reorder-key', spec.owner + p);
+      el.setAttribute('data-reorder-label', splitPanelLabel_(el, spec.label, p, panels.length));
+      // Inserted at the wrapper's own position, so an untouched layout looks
+      // exactly as it did before any of this. A saved order then moves them.
+      zone.insertBefore(el, wrap);
+    }
+  }
 }
 
 // The work-area keys of a zone, in the order the user has arranged its panels.
@@ -220,6 +297,12 @@ function refreshDynamicReorderZone_() {
 // Called by renderChartsPak once it has rebuilt the trend panels, since that
 // replaces the elements the centering was computed against.
 function refreshChartLayoutAfterRender_() {
+  // Order matters: hoist first so the split charts exist as siblings with keys,
+  // then apply the saved order over the whole zone, then centre what ends up
+  // last. Previously the renderer's own output was the final word on order,
+  // which is why a re-render put a moved trend chart back where it started.
+  hoistSplitPanels_();
+  applyChartOrder_();
   refreshOddCentering_();
   if (_reorderMode) refreshReorderBars_();
 }
