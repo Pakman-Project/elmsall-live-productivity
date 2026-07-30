@@ -323,6 +323,12 @@ function moveReorderItem_(key, delta) {
       captureChartOrder_();
       reorderChipsToMatch_('volumeAreaToggles', 'volume');
       reorderChipsToMatch_('bonusAreaToggles', 'bonus');
+      // The Overall grid centres a lone trailing panel, and which panel is
+      // trailing has just changed. Without this the class stayed on whichever
+      // panel held it before the move, so a panel that was no longer last sat
+      // centred on a row of its own until the next data refresh happened to
+      // rebuild the charts and recompute it.
+      refreshOddCentering_();
       refreshReorderBars_();
       // Keep the panel the user is working on in view — it has just jumped a
       // full panel's height, which on a phone is most of the screen.
