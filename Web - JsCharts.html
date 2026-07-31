@@ -186,9 +186,22 @@
   // The chart is updated in place rather than through applyLocalFiltersPak,
   // which would rebuild every chart on the page for what is a one-series
   // change, and would visibly stutter.
+  // Chart.js 4 hands a legend handler a ChartEvent - {type, chart, native, x,
+  // y} - NOT a DOM event. e.stopPropagation is undefined on it, so calling it
+  // threw a TypeError on the first line of this function and nothing after it
+  // ever ran: the legend looked completely dead rather than half-working.
+  //
+  // The real event is on .native. Both forms are handled because the argument
+  // was a DOM event in Chart.js 2, and this is not worth breaking again on the
+  // next major version.
+  function stopChartEventPak_(e) {
+    var src = (e && e.native) ? e.native : e;
+    if (src && typeof src.stopPropagation === 'function') src.stopPropagation();
+    if (src && typeof src.preventDefault === 'function') src.preventDefault();
+  }
+
   function onVolumeLegendClick_(e, legendItem, legend) {
-    e.stopPropagation();
-    e.preventDefault();
+    stopChartEventPak_(e);
     var index = legendItem.datasetIndex;
     var ci = legend.chart;
 
@@ -530,7 +543,7 @@
                               '<canvas id="areaGroupChart' + (agIdx === 0 ? '' : '_' + agIdx) + '"></canvas>';
           agWrap.appendChild(panelEl);
 
-          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { e.stopPropagation(); e.preventDefault(); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
+          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
             var others = [perfChart, overviewVolChart].concat(trendCharts);
             for (var oc = 0; oc < areaGroupCharts.length; oc++) { if (oc !== agIdx) others.push(areaGroupCharts[oc]); }
             syncToTargets(areaGroupCharts[agIdx], others, event, elements);
