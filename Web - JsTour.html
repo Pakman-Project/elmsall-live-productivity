@@ -259,6 +259,9 @@ var TOUR_STEPS = [
 
   // ===== Part 7 — Sharing ==================================================
   { part: 7, page: 0, target: '#shareBtn',
+    // Folded into the burger menu whenever the header is collapsed, where it
+    // measures 0x0 and the ring has nothing to draw around.
+    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     interactive: { sel: '#shareBtn', type: 'click' },
     title: 'Share what you are looking at',
     body: 'Found something worth passing on? The share button gives you a link, or an image of the page.' },
@@ -270,7 +273,10 @@ var TOUR_STEPS = [
       var ov = $('shareOverlay');
       if (ov && !ov.classList.contains('active') && typeof openShareMenu === 'function') openShareMenu();
     },
-    cleanup: function () { if (typeof closeShareMenu === 'function') closeShareMenu(); },
+    cleanup: function () {
+      if (typeof closeShareMenu === 'function') closeShareMenu();
+      if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false);
+    },
     title: 'A link, or a picture',
     body: 'The link reopens this exact view for whoever you send it to — same page, same day, same bonus filter. Or download the page as an image: it captures the WHOLE page, including anything scrolled out of sight, stamped with the time of the data. Click the × to close.' },
 
