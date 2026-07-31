@@ -1291,6 +1291,20 @@ td {
   font-variant-numeric: tabular-nums;
 }
 
+/* A cell holding a bonus number must not clip. The tooltip is absolutely
+   positioned and hangs BELOW its cell, so `overflow: hidden` above cuts off all
+   of it — the element is in the DOM, correctly built, and invisible.
+   .table-wrap was doing the same thing one level up; both had to go, which is
+   why fixing only the wrapper changed nothing.
+   :has() covers any future placement; the two explicit selectors are the ones
+   that actually matter today and work regardless of :has() support. */
+.side-table td:first-child,
+.main-detail-table td:nth-child(2),
+td:has(> .clickable-bonus) {
+  overflow: visible;
+  text-overflow: clip;
+}
+
 /* ── Numeric cells ───────────────────────────────────────────────────────────
    #mainTable centred every cell, which puts 1,234 and 12 at different offsets;
    the eye then has to read each number rather than run down the column. Right
