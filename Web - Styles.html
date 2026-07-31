@@ -1186,6 +1186,21 @@ body.loading-skeleton #mainTableWrapper::after {
   min-height: 0;
 }
 
+/* The bonus-number tooltip is absolutely positioned inside these tables, and an
+   overflow container clips it — which is exactly why it appeared on the header
+   banner's filter chips, which sit in no wrapper, and nowhere else.
+   overflow-y: auto is enough on its own: the moment either axis is not
+   `visible`, the other is forced to clip too.
+
+   Neither table can overflow any more. .side-table is width: 100%, and
+   #mainTable became table-layout: fixed at width: 100% when its columns were
+   made proportional — so scrolling is not what these containers were still
+   doing for us. Clipping the tooltip was. */
+.bonus-two-tables .table-wrap,
+#mainTableWrapper .table-wrap {
+  overflow: visible;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
