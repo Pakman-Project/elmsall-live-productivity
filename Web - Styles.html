@@ -1411,12 +1411,29 @@ tr:hover td {
   gap: 12px;
 }
 
-.volume-charts canvas {
-  height: 280px !important;
+/* Chart.js sizes itself from the canvas's PARENT. Every canvas is wrapped in a
+   .chart-box (see ensureChartBoxesPak_) so that parent is a plain box of
+   exactly the intended height - not the panel, which also holds the title and
+   was making Chart.js compute a size tens of pixels off what the canvas is
+   actually displayed at. That mismatch is what made legend clicks miss. */
+.chart-box {
+  position: relative;
+  width: 100%;
+  min-height: 0;
 }
 
-.volume-charts.combined-mode canvas {
-  height: 500px !important;
+.chart-box > canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.volume-charts .chart-box {
+  height: 280px;
+}
+
+.volume-charts.combined-mode .chart-box {
+  height: 500px;
 }
 
 .chartjs-legend {
@@ -1458,6 +1475,10 @@ tr:hover td {
 canvas {
   width: 100% !important;
   height: 400px !important;
+}
+
+.chart-box {
+  height: 400px;
 }
 
 .mini-table-title {
@@ -2831,10 +2852,13 @@ body.page-scrolled-far .back-to-top {
   position: relative;
 }
 
-.charts canvas {
+.charts .chart-box {
   flex: 1 1 0px;
   min-height: 0;
   max-height: 100%;
+}
+
+.charts canvas {
   width: 100% !important;
 }
 
@@ -3466,18 +3490,18 @@ body.page-scrolled-far .back-to-top {
   .panel {
     padding: 12px 8px;
   }
-  canvas {
-    height: 220px !important;
+  .chart-box {
+    height: 220px;
   }
-  .page:nth-child(1) .charts canvas,
-  .page:nth-child(1) .trend-charts-wrap canvas {
-    height: 320px !important;
+  .page:nth-child(1) .charts .chart-box,
+  .page:nth-child(1) .trend-charts-wrap .chart-box {
+    height: 320px;
   }
-  .volume-charts canvas {
-    height: 220px !important;
+  .volume-charts .chart-box {
+    height: 220px;
   }
-  .volume-charts.combined-mode canvas {
-    height: 400px !important;
+  .volume-charts.combined-mode .chart-box {
+    height: 400px;
   }
   .mini-table-title {
     flex-direction: column;

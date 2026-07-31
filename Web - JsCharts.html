@@ -99,44 +99,47 @@
 
   // afterDatasetsDraw runs before the tooltip is painted, so the line passes
   // under the tooltip rather than across it.
-  // ── Canvas size reconciliation ─────────────────────────────────────────────
-  // The stylesheet fixes every chart canvas's height with !important. Chart.js
-  // measures the canvas's PARENT to decide how big it should be, then writes
-  // that number to canvas.style.height - where the !important rule beats it.
+  // ── Giving Chart.js a container that is the right size ─────────────────────
+  // Legend clicks did nothing, on every chart that has a legend.
   //
-  // The parent is the panel, which also holds the title, so Chart.js always
-  // arrives at a number tens of pixels taller than the box the canvas is
-  // actually displayed in. It draws into a coordinate space that size, the
-  // browser squashes the result into the smaller box, and every coordinate
-  // Chart.js hit-tests against is then wrong by that ratio.
+  // The stylesheet fixes chart canvas heights with !important. Chart.js sizes
+  // itself from the canvas's PARENT, then writes the result to
+  // canvas.style.height - where the !important rule beats it. The parent was
+  // the panel, which also holds the title, so Chart.js consistently arrived at
+  // a number tens of pixels taller than the box the canvas is displayed in. It
+  // drew into a coordinate space that size, the browser squashed the result
+  // into the smaller box, and every coordinate it hit-tests was out by that
+  // ratio: for a 500px canvas under a 40px title, a legend row painted at
+  // y=478 has its hitbox at y=516. A click misses by 38px against a row about
+  // 20px tall, matches no item, and Chart.js returns silently - no error, no
+  // response.
   //
-  // Tooltips survived it: interaction mode is 'index', which keys off x, and
-  // the width is not forced. Legend clicks did not. A legend row's hitbox sat
-  // tens of pixels below where the row was painted, so the click matched no
-  // item and Chart.js silently did nothing - no error, no response. That is
-  // why the legends looked dead, on every chart that has one.
+  // Tooltips were unaffected, which is why nothing else looked wrong:
+  // interaction mode is 'index' so they key off x, and the width is not forced.
   //
-  // Resizing each chart to the canvas's REAL box makes the two agree.
-  function fitChartToBoxPak_(chart) {
-    if (!chart || !chart.canvas) return;
-    var w = chart.canvas.clientWidth;
-    var h = chart.canvas.clientHeight;
-    // A panel inside a display:none parent measures 0. Leave it; it gets
-    // fitted when something shows it and resizeCharts runs.
-    if (w < 1 || h < 1) return;
-    if (Math.abs(chart.width - w) < 1 && Math.abs(chart.height - h) < 1) return;
-    try { chart.resize(w, h); } catch (e) {}
+  // Correcting the size after construction does not hold: Chart.js attaches a
+  // ResizeObserver to the parent, which fires moments later and recomputes from
+  // it again. The fix has to remove the disagreement rather than win it, so
+  // every canvas is wrapped in a box that IS the canvas's size. Chart.js
+  // measures the box, arrives at the same number the stylesheet is enforcing,
+  // and the two stop fighting.
+  function ensureChartBoxesPak_(root) {
+    var scope = root || document;
+    var canvases = scope.querySelectorAll ? scope.querySelectorAll('canvas') : [];
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      var parent = c.parentNode;
+      if (!parent || (parent.classList && parent.classList.contains('chart-box'))) continue;
+      var box = document.createElement('div');
+      box.className = 'chart-box';
+      parent.insertBefore(box, c);
+      box.appendChild(c);
+    }
   }
-
-  var e3FitCanvasPlugin = {
-    id: 'e3FitCanvas',
-    afterInit: function (chart) { fitChartToBoxPak_(chart); }
-  };
 
   if (typeof Chart !== 'undefined') {
     Chart.register(e3CrosshairPlugin);
     Chart.register(e3EmptyStatePlugin);
-    Chart.register(e3FitCanvasPlugin);
   }
 
   // Every render rebuilds all ~13 charts from scratch. Animating that on a
@@ -327,6 +330,7 @@
     var rl = agg.map(function(r) { return r.rangeLabel; });
     var mode = $('volumeChartMode').value;
     var container = $('volumeChartsContainer');
+    ensureChartBoxesPak_(container);
     var primaryTitle = $('volPanel0').querySelector('h2');
     if (mode === 'separate') { container.classList.remove('combined-mode'); primaryTitle.textContent = 'PiE'; }
     else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - E3 Stacked Area Chart' : 'Volume - E3 Combined Line Chart'; }
@@ -432,6 +436,7 @@
   }
 
   function renderChartsPak(rows, trendRowsList, trendTitles, trendAreaKeysList, rawFilteredData, rawTimeList) {
+    ensureChartBoxesPak_(document.getElementById('page1Charts'));
     for (var agd = 0; agd < areaGroupCharts.length; agd++) { if (areaGroupCharts[agd]) areaGroupCharts[agd].destroy(); }
     areaGroupCharts = [];
     areaGroupChart = null;
@@ -574,9 +579,12 @@
             titleHtml += '<div style="display:flex; gap:5px; align-items:center;">' +
               '<button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups &amp; Charts</button></div>';
           }
+          // Wrapped before construction, not after: Chart.js measures the
+          // parent during its own constructor.
           panelEl.innerHTML = '<div class="mini-table-title">' + titleHtml + '</div>' +
                               '<canvas id="areaGroupChart' + (agIdx === 0 ? '' : '_' + agIdx) + '"></canvas>';
           agWrap.appendChild(panelEl);
+          ensureChartBoxesPak_(panelEl);
 
           var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
             var others = [perfChart, overviewVolChart].concat(trendCharts);
@@ -636,6 +644,7 @@
         }
         panelEl.innerHTML = '<div class="mini-table-title">' + titleHtml + '</div><canvas id="trendChart_' + idx + '"></canvas>';
         trendWrap.appendChild(panelEl);
+        ensureChartBoxesPak_(panelEl);
 
         var aggData = trendAggList[idx];
         var areaKeys = trendAreaKeysList[idx] || [];

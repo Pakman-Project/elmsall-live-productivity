@@ -721,21 +721,18 @@
 
   function resizeCharts() {
     setTimeout(function() {
-      // fitChartToBoxPak_, not chart.resize(): a bare resize() recomputes the
-      // size from the parent panel, which is what puts Chart.js's coordinate
-      // space out of step with the canvas's forced CSS height in the first
-      // place. See the comment on fitChartToBoxPak_ in JsCharts.
-      var fit = (typeof fitChartToBoxPak_ === 'function')
-        ? fitChartToBoxPak_
-        : function (c) { if (c) c.resize(); };
-
-      fit(overviewVolChart);
-      fit(perfChart);
-      for (var t = 0; t < trendCharts.length; t++) fit(trendCharts[t]);
-      for (var a = 0; a < areaGroupCharts.length; a++) fit(areaGroupCharts[a]);
-      for (var i = 0; i < volumeCharts.length; i++) fit(volumeCharts[i]);
+      // A plain resize() is correct again now that every canvas sits in a
+      // .chart-box of exactly its own size - Chart.js measures that box and
+      // arrives at the height the stylesheet is already enforcing, instead of
+      // measuring the whole panel and disagreeing with it.
+      if (overviewVolChart) overviewVolChart.resize();
+      if (perfChart) perfChart.resize();
+      for (var t = 0; t < trendCharts.length; t++) { if (trendCharts[t]) trendCharts[t].resize(); }
+      for (var a = 0; a < areaGroupCharts.length; a++) { if (areaGroupCharts[a]) areaGroupCharts[a].resize(); }
+      for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].resize(); }
     }, 310);
   }
+
 
 
   function touchStart() {
