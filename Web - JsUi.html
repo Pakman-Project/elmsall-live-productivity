@@ -887,29 +887,53 @@
     return node.closest(selector);
   }
 
+  // An opened card is moved out of the number and appended to <body>, then
+  // positioned against the number's screen rect.
+  //
+  // Two reasons it has to leave, and neither is optional. Several of the places
+  // a bonus number appears sit inside a scroll container — the expanded row's
+  // card list most of all — and a card positioned inside one of those is
+  // clipped by it. And `position: fixed` is only relative to the viewport if no
+  // ancestor is transformed; #swipeWrapper is translated sideways to move
+  // between pages, so a fixed card left inside it is positioned against that
+  // instead, landing a whole page-width off on any page but the first.
+  var _openTipEl = null;    // the card currently lifted out
+  var _openTipSpan = null;  // the number it belongs to
+  var _openTipHome = null;  // where to put it back
+
   function closeBonusTipsPak_() {
-    var open = document.querySelectorAll('.clickable-bonus.tip-open');
-    for (var i = 0; i < open.length; i++) {
-      open[i].classList.remove('tip-open');
-      var tip = open[i].querySelector('.bonus-tip');
-      if (tip) {
-        tip.classList.remove('tip-floating');
-        tip.style.cssText = '';
+    if (_openTipSpan) _openTipSpan.classList.remove('tip-open');
+
+    if (_openTipEl) {
+      _openTipEl.classList.remove('tip-floating');
+      _openTipEl.style.cssText = '';
+      // The table underneath may have re-rendered while the card was open, in
+      // which case the place it came from is gone and putting it back there
+      // would leave it detached in <body> for good.
+      if (_openTipHome && _openTipHome.parent && document.body.contains(_openTipHome.parent)) {
+        _openTipHome.parent.insertBefore(_openTipEl, _openTipHome.next);
+      } else if (_openTipEl.parentNode) {
+        _openTipEl.parentNode.removeChild(_openTipEl);
       }
     }
+
+    _openTipEl = null;
+    _openTipSpan = null;
+    _openTipHome = null;
   }
 
-  // An opened card is lifted out to fixed positioning against the number's
-  // screen rect. Several of the places a bonus number appears sit inside a
-  // scroll container — the expanded row's card list, the side tables — and an
-  // absolutely positioned card inside one of those is clipped by it. Hovering
-  // never hit this because the surfaces that clip were given `overflow:
-  // visible`; the card list cannot be, its scrolling is the point.
-  function positionOpenBonusTipPak_(span) {
+  function openBonusTipPak_(span) {
     var tip = span.querySelector('.bonus-tip');
     if (!tip) return;
 
+    _openTipEl = tip;
+    _openTipSpan = span;
+    _openTipHome = { parent: tip.parentNode, next: tip.nextSibling };
+
+    span.classList.add('tip-open');
     tip.classList.add('tip-floating');
+    document.body.appendChild(tip);
+
     tip.style.position = 'fixed';
     tip.style.left = '0px';
     tip.style.top = '0px';
@@ -938,11 +962,13 @@
     document.addEventListener('click', function (e) {
       if (!bonusTipTapModePak_()) return;
 
-      var span = closestPak_(e.target, '.clickable-bonus');
-
       // A tap that landed inside an open card is aimed at one of its controls.
-      // Leave it entirely alone, and leave the card open.
-      if (span && closestPak_(e.target, '.bonus-tip')) return;
+      // Checked before anything else: an open card has been moved to <body>, so
+      // it is no longer inside the number and would otherwise read as a tap on
+      // the page, closing the card out from under the button being pressed.
+      if (closestPak_(e.target, '.bonus-tip')) return;
+
+      var span = closestPak_(e.target, '.clickable-bonus');
 
       // Anywhere else, or on a number whose card is already open: put the cards
       // away and let the click carry on to whatever it hit.
@@ -957,8 +983,7 @@
       e.preventDefault();
       e.stopPropagation();
       closeBonusTipsPak_();
-      span.classList.add('tip-open');
-      positionOpenBonusTipPak_(span);
+      openBonusTipPak_(span);
     }, true);
 
     // An open card is pinned to its number's screen rect, so anything that

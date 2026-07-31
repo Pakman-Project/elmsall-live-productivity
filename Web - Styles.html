@@ -1794,9 +1794,15 @@ canvas {
   display: block;
 }
 
-/* Re-anchored to the viewport by positionOpenBonusTipPak_, which may have put
-   it above the number or nudged it sideways to stay on screen — so the arrow
-   no longer points anywhere true, and the hover bridge has no gap to bridge. */
+/* An opened card is moved out to <body> (see openBonusTipPak_), so it is no
+   longer a descendant of the number and the rules above no longer reach it. */
+.bonus-tip.tip-floating {
+  display: block;
+}
+
+/* Re-anchored to the viewport by openBonusTipPak_, which may have put it above
+   the number or nudged it sideways to stay on screen — so the arrow no longer
+   points anywhere true, and the hover bridge has no gap to bridge. */
 .bonus-tip.tip-floating::before,
 .bonus-tip.tip-floating::after {
   display: none;
@@ -1810,7 +1816,13 @@ canvas {
 @media (hover: none) {
   .bonus-tip {
     white-space: normal;
-    overflow-wrap: anywhere;
+    /* NOT `anywhere`. The two look identical once a width is settled, but
+       `anywhere` also lets a word count as one character wide when the browser
+       works out how narrow the box may be — and this box is sized to its
+       contents, so it took that offer and rendered a name one letter per line.
+       `break-word` breaks long words without shrinking the box to fit them. */
+    overflow-wrap: break-word;
+    min-width: 180px;
     max-width: 60vw;
   }
 
