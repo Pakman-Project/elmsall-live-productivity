@@ -622,6 +622,8 @@
   var AREA_GROUP_Y_STEP = 10;         // gridlines stay on round numbers
   var AREA_GROUP_Y_PAD = 10;          // clearance under the lowest point
   var AREA_GROUP_Y_ZERO_BELOW = 40;   // below this, show the whole drop to zero
+  var AREA_GROUP_Y_HEAD = 1.10;       // ceiling clears the peak by 10%
+  var AREA_GROUP_Y_MIN_TOP = 100;     // 100% is always on the chart
 
   function areaGroupYRange_(buckets, buildDatasets) {
     var min = Infinity, max = -Infinity;
@@ -650,13 +652,16 @@
       ? 0
       : Math.max(0, Math.floor((min - AREA_GROUP_Y_PAD) / AREA_GROUP_Y_STEP) * AREA_GROUP_Y_STEP);
 
-    // The next multiple of 10 strictly above the highest point, so both ends of
-    // the axis sit on a round number and the peak always has clear air over it.
-    // Strictly above matters: rounding a peak of exactly 110 to 110 would draw
-    // the line along the top edge of the plot.
-    //
-    //   peak 102 -> 110    peak 95 -> 100    peak 110 -> 120
-    var ceil = Math.floor(max / AREA_GROUP_Y_STEP) * AREA_GROUP_Y_STEP + AREA_GROUP_Y_STEP;
+    // 10% clear of the peak, rounded up to a multiple of 10 so both ends of the
+    // axis sit on a round number:  peak 102 -> 112.2 -> 120.
+    var ceil = Math.ceil((max * AREA_GROUP_Y_HEAD) / AREA_GROUP_Y_STEP) * AREA_GROUP_Y_STEP;
+
+    // Never below 100. 100% is the standard every one of these lines is being
+    // measured against, so it belongs on the chart whether or not anything
+    // reached it - an axis topping out at 70 quietly redraws a bad shift as a
+    // full one, because the eye reads "near the top" as "near target".
+    if (ceil < AREA_GROUP_Y_MIN_TOP) ceil = AREA_GROUP_Y_MIN_TOP;
+
     // A flat series can land both ends on the same gridline.
     if (ceil <= floor) ceil = floor + AREA_GROUP_Y_STEP;
 
