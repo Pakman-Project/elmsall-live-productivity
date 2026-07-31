@@ -159,6 +159,13 @@ var TOUR_STEPS = [
   // on its own, which leaves the wrapper empty and measuring 0x0. Ringing the
   // panels themselves, unioned, covers however many the split produced.
   { part: 3, page: 0, target: '[data-split-owner="areaGroup"]', union: true,
+    // The charts this step rings are on the page BEHIND the Groups & Charts
+    // dialog, so the dialog has to be gone before the ring means anything.
+    // Reached forwards it already is — the step before clicked Apply, which
+    // closes it. Reached backwards it is not: every other step in this part
+    // re-opens it on arrival, and stepping forward from one of those left it
+    // open over the very charts being pointed at.
+    action: function () { if (typeof closeAreaGroups === 'function') closeAreaGroups(); },
     cleanup: function () { tourRestoreAreaGroups_(); },
     title: 'Titled by what they show',
     body: 'Each chart is named after the groups it draws — “Productivity % - PiE, Top Up vs E3 Packing” — so a split section says what is being compared instead of “Chart A”. Your own groups come back as we move on.' },
