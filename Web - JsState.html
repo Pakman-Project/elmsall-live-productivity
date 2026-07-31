@@ -117,6 +117,10 @@ function applyConfigToCSSPak() {
 var timeRanges = [];
 var rawSideData = [];
 var allBonusList = [];
+// Bonus number -> { tm, email }, from the 'TM List' tab. Keyed on the
+// upper-cased code, matching how bonus numbers are canonicalised everywhere
+// else; see readTmDirectory_ in Code.js.
+var tmDirectory = {};
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];

@@ -369,7 +369,8 @@ function buildEntryDetailCardHtml_(r) {
   return '<div class="entry-card">' +
     '<div class="entry-card-head">' +
       '<span class="entry-card-time">' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</span>' +
-      '<span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
+      '<span class="clickable-bonus' + (isActive ? ' active' : '') + '"' + bonusTitleAttrPak_(r.bonus) +
+        ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
         multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
         safeTextPak(r.bonus) + ' <i class="fa-solid fa-filter filter-icon"></i>' +
       '</span>' +
@@ -396,9 +397,9 @@ function buildEntryDetailRowHtml_(r) {
     '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
     multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
-    ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
-    (isActive ? 'Click to remove filter' : 'Click to filter main view') +
-    '</span></span></td>' +
+    ' <i class="fa-solid fa-filter filter-icon"></i>' +
+    bonusTipHtmlPak_(r.bonus, isActive) +
+    '</span></td>' +
     numTdPak(r.hourDeployed, 2) +
     numTdPak(r.stdHours, 2) +
     numTdPak(r.pieVol, 0) +
@@ -525,9 +526,9 @@ function buildBonusRowHtml_(r) {
     '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="toggleBonusFilter(\'' + escapedBonus + '\')">' +
     multiAreaIconHtmlPak(currentBonusAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
-    ' <i class="fa-solid fa-filter filter-icon"></i><span class="bonus-tip"><i class="fa-solid fa-filter" style="margin-right:4px;font-size:10px;"></i>' +
-    (isActive ? 'Click to remove filter' : 'Click to filter main view') +
-    '</span></span></td>' +
+    ' <i class="fa-solid fa-filter filter-icon"></i>' +
+    bonusTipHtmlPak_(r.bonus, isActive) +
+    '</span></td>' +
     '<td class="num">' + numPak(r.standardHour, 1) + '</td>' +
     buildPerfCellHtml_(r.performance) +
     '</tr>';

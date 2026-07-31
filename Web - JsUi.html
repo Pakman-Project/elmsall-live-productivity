@@ -365,7 +365,7 @@
     }
     $('activeFilterCount').textContent = selectedBonuses.length;
     chipsEl.innerHTML = selectedBonuses.map(function(b) {
-      return '<span class="chip">' + b + ' <span class="remove-chip" onclick="removeBonus(\'' + b.replace(/'/g, "\\'") + '\')">&times;</span></span>';
+      return '<span class="chip"' + bonusTitleAttrPak_(b) + '>' + b + ' <span class="remove-chip" onclick="removeBonus(\'' + b.replace(/'/g, "\\'") + '\')">&times;</span></span>';
     }).join('');
     banner.classList.add('active');
   }
@@ -1037,7 +1037,7 @@
         var multiClass = isMulti ? ' multi-area' : '';
         var multiIcon = isMulti ? '<i class="fa-solid fa-layer-group breakdown-multi-icon"></i>' : '';
         var escapedB = escapeAttrPak(bonusName);
-        html += '<span class="breakdown-bonus-chip ' + bClass + multiClass + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + safeTextPak(bonusName) + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span></span>';
+        html += '<span class="breakdown-bonus-chip ' + bClass + multiClass + '"' + bonusTitleAttrPak_(bonusName) + ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + safeTextPak(bonusName) + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span></span>';
       }
       html += '</div>';
       html += '<div class="breakdown-detail-hint">Click a bonus number to filter the main view' + (sumOfAreas > totalUniqueHeads ? ' · <i class="fa-solid fa-layer-group" style="font-size:9px;margin:0 2px;"></i> = works across multiple areas' : '') + '</div>';

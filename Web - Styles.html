@@ -1616,14 +1616,47 @@ canvas {
   top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 8px;
+  padding: 7px 10px;
   background: var(--surface-dropdown);
   border: 1px solid var(--w15);
   border-radius: 6px;
-  font-size: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  /* Each line is its own block, so nowrap keeps a name or an address on one
+     line rather than the whole card on one line. */
   white-space: nowrap;
   z-index: 500;
   pointer-events: none;
+}
+
+.bonus-tip-line {
+  display: block;
+  color: var(--text);
+}
+
+.bonus-tip-line b {
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* The click hint was the whole tooltip before the manager was added to it. It
+   is still worth saying, but it is no longer the reason anyone hovers, so it
+   drops below the details and quietens down. */
+.bonus-tip-hint {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--w8);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.bonus-tip-hint i {
+  margin-right: 4px;
+  font-size: 9px;
 }
 
 .bonus-tip::before {
@@ -3375,9 +3408,14 @@ body.page-scrolled-far .back-to-top {
   padding: 10px 0 12px;
 }
 
+/* No inner scroller any more. The max-height was there to stop a wide
+   aggregation window blowing out the page, but an absolutely positioned
+   tooltip inside a scroll container is clipped by it - the manager card on a
+   bonus number in here would have been cut off at the container's edge, worst
+   on exactly the rows nearest the bottom. The detail table now grows and the
+   page scrolls instead, which costs a longer page and gains a tooltip that is
+   readable wherever it opens. */
 .main-detail-table-wrap {
-  max-height: 340px;
-  overflow-y: auto;
   margin-bottom: 6px;
 }
 

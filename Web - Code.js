@@ -61,8 +61,59 @@ var CONFIG = {
   SOURCE_SHEET_NAME: 'Processed Data (15mins)',
   THRESHOLD_CELL: 'A2',
   DATETIME_CELL: 'B2',
-  LINKS_SHEET_NAME: 'Links'
+  LINKS_SHEET_NAME: 'Links',
+  TM_SHEET_NAME: 'TM List'
 };
+
+// 'TM List' holds one row per operator from row 3 down: B = bonus number,
+// C = their team manager, D = that manager's email.
+var TM_FIRST_ROW_ = 3;
+var TM_FIRST_COL_ = 2;   // column B
+var TM_NUM_COLS_ = 3;    // B:D
+
+/**
+ * Bonus number -> { tm, email }, for the hover tooltip on every bonus number
+ * in the dashboard.
+ *
+ * Keys are upper-cased and trimmed to match how bonus codes are canonicalised
+ * everywhere else in the pipeline (upper(trim(...)) in the notebook's SQL, and
+ * correctNameValue_ on the Data tab). A directory keyed on "mf5" would simply
+ * never match a dashboard showing "MF5".
+ *
+ * Returns {} rather than throwing if the tab is absent - the tooltip is a nice
+ * thing to have, not a reason for the whole dashboard to fail to load.
+ */
+function readTmDirectory_(ss) {
+  try {
+    var sheet = ss.getSheetByName(CONFIG.TM_SHEET_NAME);
+    if (!sheet) return {};
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < TM_FIRST_ROW_) return {};
+
+    var rows = sheet
+      .getRange(TM_FIRST_ROW_, TM_FIRST_COL_, lastRow - TM_FIRST_ROW_ + 1, TM_NUM_COLS_)
+      .getDisplayValues();
+
+    var out = {};
+    for (var i = 0; i < rows.length; i++) {
+      var bonus = String(rows[i][0] === null || rows[i][0] === undefined ? '' : rows[i][0]).trim().toUpperCase();
+      if (!bonus) continue;
+      var tm = String(rows[i][1] === null || rows[i][1] === undefined ? '' : rows[i][1]).trim();
+      var email = String(rows[i][2] === null || rows[i][2] === undefined ? '' : rows[i][2]).trim();
+      if (!tm && !email) continue;
+      // First entry wins. A duplicated bonus number is a data-entry slip, and
+      // silently taking the last one makes which manager is shown depend on row
+      // order, which nobody would think to check.
+      if (out[bonus]) continue;
+      out[bonus] = { tm: tm, email: email };
+    }
+    return out;
+  } catch (err) {
+    Logger.log('readTmDirectory_: ' + err.message);
+    return {};
+  }
+}
 
 // ─────────────────────────────────────────────
 // CacheService helpers.
@@ -516,7 +567,8 @@ function getDashboardData(archiveUrl) {
     rawSideData: rawSideData,
     bonusList: Object.keys(bonusSet).sort(),
     currentTimestamp: (b2Val instanceof Date) ? b2Val.getTime() : null,
-    note: noteVal
+    note: noteVal,
+    tmDirectory: readTmDirectory_(ss)
   };
 }
 

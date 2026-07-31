@@ -121,6 +121,7 @@
   function renderDashboardPayload_(data) {
     timeRanges = data.timeRanges || [];
     rawSideData = data.rawSideData || [];
+    tmDirectory = data.tmDirectory || {};
     allBonusList = data.bonusList || [];
     currentThreshold = parseFloat(data.threshold) || 0;
     if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }

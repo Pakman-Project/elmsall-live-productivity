@@ -287,6 +287,51 @@ function mirrorHiddenAreasPak_(from) {
   else hiddenVolumeAreas = hiddenBonusAreas.slice();
 }
 
+// ---- Who manages this operator ---------------------------------------------
+// Looked up on the upper-cased code: the directory is keyed that way, and the
+// dashboard shows canonicalised codes, so a lookup on the raw string would miss
+// anything whose case differs.
+function tmForBonusPak_(bonus) {
+  var key = String(bonus === null || bonus === undefined ? '' : bonus).trim().toUpperCase();
+  return (key && tmDirectory[key]) ? tmDirectory[key] : null;
+}
+
+// The hover card shown on a bonus number. The manager comes first because it is
+// the reason to hover; the click hint stays last, quieter, as the affordance it
+// always was.
+function bonusTipHtmlPak_(bonus, isActive) {
+  var entry = tmForBonusPak_(bonus);
+  var html = '<span class="bonus-tip">';
+
+  if (entry) {
+    if (entry.tm) {
+      html += '<span class="bonus-tip-line"><b>TM:</b> ' + safeTextPak(entry.tm) + '</span>';
+    }
+    if (entry.email) {
+      html += '<span class="bonus-tip-line"><b>Email:</b> ' + safeTextPak(entry.email) + '</span>';
+    }
+  }
+
+  html += '<span class="bonus-tip-line bonus-tip-hint">' +
+          '<i class="fa-solid fa-filter"></i>' +
+          (isActive ? 'Click to remove filter' : 'Click to filter main view') +
+          '</span></span>';
+  return html;
+}
+
+// Plain-text form, for the surfaces that have no room for the card above - the
+// breakdown chips, the filter chips and the search suggestions. &#10; is a
+// newline inside an attribute, which is what makes a title render on two lines.
+function bonusTitleAttrPak_(bonus) {
+  var entry = tmForBonusPak_(bonus);
+  if (!entry) return '';
+  var parts = [];
+  if (entry.tm) parts.push('TM: ' + entry.tm);
+  if (entry.email) parts.push('Email: ' + entry.email);
+  if (!parts.length) return '';
+  return ' title="' + escapeAttrPak(parts.join('\n')).replace(/\n/g, '&#10;') + '"';
+}
+
 function bonusAreaCountMapPak(entries) {
   var counts = {};
   if (!entries || !entries.length) return counts;
