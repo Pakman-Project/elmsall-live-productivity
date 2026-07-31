@@ -61,8 +61,6 @@
      and expanded-row tints are pre-blended against --panel here rather than
      layered as alpha — otherwise a hovered row would look striped where the
      frozen columns meet the scrolling ones. */
-  --table-freeze-hover: #fafcff;
-  --table-freeze-expanded: #f7fafe;
 
   /* Edge cue for horizontally scrollable tables. */
   --scroll-shadow: rgba(0, 0, 0, 0.28);
@@ -156,8 +154,6 @@
   --tour-mask: rgba(0, 0, 0, 0.62);
   --control-bg: #2c272d;
 
-  --table-freeze-hover: #212328;
-  --table-freeze-expanded: #23262c;
 
   --scroll-shadow: rgba(0, 0, 0, 0.6);
 
@@ -1198,7 +1194,7 @@ table {
 }
 
 #mainTable {
-  min-width: 1300px;
+  min-width: 0;
 }
 
 .side-table {
@@ -1286,13 +1282,16 @@ td {
    alignment is what makes the digits stack — units over units, tens over tens.
    Columns 1-2 (Date Time, Bonus Number) are labels, not quantities, and the
    last column is a centred pill, so both keep their existing alignment. */
-#mainTable td.num,
+/* The Main Table is centred throughout, by request. Right alignment stacks
+   digits - units over units - which is easier to scan down a column, and that
+   is why it was set that way; centring is the trade for a table whose columns
+   are now narrow enough that a right-aligned number sat oddly far from its
+   header. The expanded detail table keeps right alignment. */
 .main-detail-table td.num {
   text-align: right;
   padding-right: 16px;
 }
 
-#mainTable th:nth-child(n+3):nth-child(-n+13),
 .main-detail-table th:nth-child(n+3):nth-child(-n+13) {
   text-align: right;
   padding-right: 16px;
@@ -1312,8 +1311,11 @@ td {
 }
 
 #mainTable th,
-#mainTable td {
+#mainTable td,
+#mainTable td.num {
   text-align: center;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 th {
@@ -1689,6 +1691,25 @@ canvas {
   transition: background 0.2s;
   user-select: none;
   position: relative;
+  /* Headers wrap onto as many lines as they need. The columns are far narrower
+     now that all fourteen share the viewport, and a clipped "Inbound Decant..."
+     is worse than a two-line header - the header is read once to learn the
+     table, then rarely again, so height costs less than meaning. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  vertical-align: bottom;
+}
+
+/* The time range is the one long value in the body: "30/07/2026 20:30 -
+   30/07/2026 20:45" will not fit its share of a narrow window on one line, and
+   ellipsis would hide which block the row is. It wraps instead. Every other
+   cell keeps nowrap from the base `td` rule - a figure broken across two lines
+   is unreadable. */
+#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 
 #mainTable th:hover {
@@ -3150,7 +3171,12 @@ body.page-scrolled-far .back-to-top {
 }
 
 #mainTable {
-  min-width: 1770px;
+  /* No min-width. The table used to be pinned at 1770px against a viewport
+     that is almost always narrower, so it always carried a horizontal
+     scrollbar and the right-hand volume columns were off screen. It now sizes
+     to the space it has and the columns share that space proportionally
+     (widths below), which is what lets all fourteen be visible at once. */
+  width: 100%;
   table-layout: fixed;
 }
 
@@ -3164,162 +3190,104 @@ body.page-scrolled-far .back-to-top {
   gap: 8px;
 }
 
-/* Shared column widths — kept identical between #mainTable and .main-detail-table
-   (same nth-child position) so the expanded per-entry table's columns line up
-   vertically under the Main Table's columns. */
+/* Shared column widths - kept identical between #mainTable and
+   .main-detail-table (same nth-child position) so the expanded per-entry
+   table's columns line up vertically under the Main Table's columns.
+
+   Percentages, not pixels. The two tables used to be pinned at 1770px so every
+   column had room for its widest possible value, which guaranteed a horizontal
+   scrollbar on every screen and put the right-hand volume columns permanently
+   out of view. Sharing the available width instead means all fourteen are
+   visible at once; the ratios are the old pixel widths carried over, so the
+   columns keep their relative importance. */
 #mainTable th:nth-child(1), #mainTable td:nth-child(1),
 .main-detail-table th:nth-child(1), .main-detail-table td:nth-child(1) {
-  width: 260px;
-  text-align: center;
+  width: 14.7%;
 }
 
 #mainTable th:nth-child(2), #mainTable td:nth-child(2),
 .main-detail-table th:nth-child(2), .main-detail-table td:nth-child(2) {
-  width: 170px;
+  width: 9.6%;
 }
 
 #mainTable th:nth-child(3), #mainTable td:nth-child(3),
 .main-detail-table th:nth-child(3), .main-detail-table td:nth-child(3) {
-  width: 130px;
+  width: 7.3%;
 }
 
 #mainTable th:nth-child(4), #mainTable td:nth-child(4),
 .main-detail-table th:nth-child(4), .main-detail-table td:nth-child(4) {
-  width: 120px;
+  width: 6.8%;
 }
 
 #mainTable th:nth-child(5), #mainTable td:nth-child(5),
 .main-detail-table th:nth-child(5), .main-detail-table td:nth-child(5) {
-  width: 90px;
+  width: 5.1%;
 }
 
 #mainTable th:nth-child(6), #mainTable td:nth-child(6),
 .main-detail-table th:nth-child(6), .main-detail-table td:nth-child(6) {
-  width: 90px;
+  width: 5.1%;
 }
 
 #mainTable th:nth-child(7), #mainTable td:nth-child(7),
 .main-detail-table th:nth-child(7), .main-detail-table td:nth-child(7) {
-  width: 100px;
+  width: 5.6%;
 }
 
 #mainTable th:nth-child(8), #mainTable td:nth-child(8),
 .main-detail-table th:nth-child(8), .main-detail-table td:nth-child(8) {
-  width: 100px;
+  width: 5.6%;
 }
 
 #mainTable th:nth-child(9), #mainTable td:nth-child(9),
 .main-detail-table th:nth-child(9), .main-detail-table td:nth-child(9) {
-  width: 110px;
+  width: 6.2%;
 }
 
 #mainTable th:nth-child(10), #mainTable td:nth-child(10),
 .main-detail-table th:nth-child(10), .main-detail-table td:nth-child(10) {
-  width: 120px;
+  width: 6.8%;
 }
 
 #mainTable th:nth-child(11), #mainTable td:nth-child(11),
 .main-detail-table th:nth-child(11), .main-detail-table td:nth-child(11) {
-  width: 120px;
+  width: 6.8%;
 }
 
 #mainTable th:nth-child(12), #mainTable td:nth-child(12),
 .main-detail-table th:nth-child(12), .main-detail-table td:nth-child(12) {
-  width: 120px;
+  width: 6.8%;
 }
 
 #mainTable th:nth-child(13), #mainTable td:nth-child(13),
 .main-detail-table th:nth-child(13), .main-detail-table td:nth-child(13) {
-  width: 120px;
+  width: 6.8%;
 }
 
 #mainTable th:nth-child(14), #mainTable td:nth-child(14),
 .main-detail-table th:nth-child(14), .main-detail-table td:nth-child(14) {
-  width: 120px;
+  width: 6.8%;
 }
 
-/* ── Frozen identity columns on the Data Table ───────────────────────────────
-   #mainTable is 1770px wide against a viewport that is almost always narrower,
-   so Date Time and Bonus Number scrolled out of sight well before the
-   right-hand volume columns arrived. That left the reader looking at a row of
-   numbers with no way to tell which time block or operator they belonged to,
-   and no way to check without scrolling back. Pinning the two identity columns
-   keeps that anchor on screen.
+/* The Data Table's identity columns used to be frozen: #mainTable was 1770px
+   against a narrower viewport, so Date Time and Bonus Number scrolled out of
+   sight before the right-hand volume columns arrived, leaving a row of numbers
+   with nothing to say which block or operator they belonged to.
 
-   Every combinator here is a CHILD combinator, not a descendant one. The
-   expanded per-entry table is a whole <table> nested inside a cell of this one,
-   so its own thead/tbody/tr are all descendants of #mainTable — a descendant
-   selector reaches straight into it and pins its first two columns as well,
-   which is exactly what happened: they turned opaque white and floated over the
-   detail row's recessed background while the rest of it stayed grey.
+   The table now sizes to its container and never scrolls sideways, so there is
+   nothing to hold still and the whole mechanism has gone - along with the
+   `left: 260px` offset it needed, which was tied to a fixed column width that
+   no longer exists and would have misplaced the column the moment either
+   changed.
 
-   The :not(.main-detail-row) guard is still needed for a different reason: that
-   row's single colspan cell is also at :nth-child(1), and pinning it would drag
-   the entire nested table sideways with the horizontal scroll.
-
-   Mobile is untouched — under 700px the table is replaced by .main-card-list. */
-#mainTable > thead > tr > th:nth-child(1),
-#mainTable > thead > tr > th:nth-child(2),
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
-  position: sticky;
-}
-
-/* Table cells are transparent by default and a pinned one must be opaque, or
-   the columns sliding underneath show straight through it. Header and body
-   need DIFFERENT opaque colours though: painting the two frozen header cells
-   with the panel colour left "Date Time" and "Unique Bonus Number" sitting on
-   white while every other header sat on grey, so the header row looked like it
-   simply stopped after the second column. */
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
-  background: var(--panel);
-}
-
-#mainTable > thead > tr > th:nth-child(1),
-#mainTable > thead > tr > th:nth-child(2) {
-  background: var(--surface-dropdown-2);
-}
-
-#mainTable > thead > tr > th:nth-child(1),
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1) {
-  left: 0;
-}
-
-/* 260px is the width given to column 1 in the shared width block above; the two
-   must stay in step or the columns will overlap. The shadow draws the freeze
-   line, so it is obvious which columns are being held still. */
-#mainTable > thead > tr > th:nth-child(2),
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
-  left: 260px;
-  box-shadow: 1px 0 0 var(--border);
-}
-
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(1),
-#mainTable > tbody > tr:not(.main-detail-row) > td:nth-child(2) {
-  z-index: 4;
-}
-
-/* The two header corners are pinned in both directions, so they must sit above
-   both the remaining headers (z-index 10) and the pinned body cells. */
-#mainTable > thead > tr > th:nth-child(1),
-#mainTable > thead > tr > th:nth-child(2) {
-  z-index: 20;
-}
-
-/* Row hover and the expanded highlight are translucent tints, which have no
-   effect over an opaque pinned cell — these are the same tints pre-blended, so
-   a hovered row still reads as one continuous band across the freeze line.
-   !important because the rules they mirror use it too. */
-#mainTable tbody tr.main-expandable-row:hover > td:nth-child(1),
-#mainTable tbody tr.main-expandable-row:hover > td:nth-child(2) {
-  background: var(--table-freeze-hover) !important;
-}
-
-#mainTable tbody tr.main-expandable-row.expanded > td:nth-child(1),
-#mainTable tbody tr.main-expandable-row.expanded > td:nth-child(2) {
-  background: var(--table-freeze-expanded) !important;
-}
+   The pre-blended hover and expanded-row tints for those two cells have gone
+   with it. They existed because a pinned cell had to be opaque, which stopped
+   the translucent row tints showing through it - so the tint was baked into a
+   solid colour instead. Those cells are transparent again now, and leaving the
+   baked colours in would paint the first two columns a flat shade while the
+   rest of the row took the translucent tint: the same seam, drawn by the fix
+   for it. */
 
 .main-expandable-row {
   cursor: pointer;
@@ -3387,7 +3355,10 @@ body.page-scrolled-far .back-to-top {
 }
 
 .main-detail-table {
-  min-width: 1770px;
+  /* Matches #mainTable: no forced width, so its columns keep sitting directly
+     under the Main Table's. */
+  min-width: 0;
+  width: 100%;
 }
 
 .main-detail-table th,
