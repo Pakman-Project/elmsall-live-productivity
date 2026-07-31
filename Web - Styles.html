@@ -1698,7 +1698,18 @@ canvas {
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.25;
-  vertical-align: bottom;
+  /* Middle, not bottom: headers now wrap to one, two or three lines depending
+     on the column, and aligning them to the bottom made a one-line header sit
+     low against a three-line neighbour. Centring keeps the row reading as one
+     band whatever each header's height turns out to be. */
+  vertical-align: middle;
+}
+
+.main-detail-table th {
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 /* The time range is the one long value in the body: "30/07/2026 20:30 -
@@ -1710,6 +1721,10 @@ canvas {
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.3;
+  /* The base td rule clips with an ellipsis. That has to be lifted here or the
+     second line of a wrapped range is cut off. */
+  overflow: visible;
+  text-overflow: clip;
 }
 
 #mainTable th:hover {
@@ -3304,9 +3319,21 @@ body.page-scrolled-far .back-to-top {
 
 .main-row-dt-cell {
   display: flex;
-  align-items: right;
+  /* `align-items: right` was here, which is not a value align-items accepts -
+     it is a justify-content one - so it was being dropped and the chevron sat
+     stretched. */
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 7px;
-  white-space: nowrap;
+  /* This span sits inside the cell and its own nowrap beat the cell's
+     white-space: normal, so the full range could never wrap - it was clipped by
+     the td's ellipsis instead. It breaks at the spaces in
+     "30/07/2026 20:30 - 30/07/2026 20:45", so the whole range is always
+     readable; anywhere is only a fallback for a window narrow enough that one
+     date alone will not fit. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .main-row-chevron {
