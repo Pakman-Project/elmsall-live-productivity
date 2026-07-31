@@ -872,6 +872,106 @@
     });
   }
 
+  // ---- Bonus number cards on a touchscreen ---------------------------------
+  // The TM card opens on hover, which a touchscreen cannot do, so a tap on the
+  // bonus number opens it there instead. The number's own job — filtering the
+  // view — is not lost, it is deferred: the tap after the card is open is the
+  // one that filters. Same two-step every mobile tooltip uses, and the card
+  // says "Click to filter main view" on it, so the second tap is signposted.
+  function bonusTipTapModePak_() {
+    try { return window.matchMedia('(hover: none)').matches; } catch (e) { return false; }
+  }
+
+  function closestPak_(node, selector) {
+    if (!node || !node.closest) return null;
+    return node.closest(selector);
+  }
+
+  function closeBonusTipsPak_() {
+    var open = document.querySelectorAll('.clickable-bonus.tip-open');
+    for (var i = 0; i < open.length; i++) {
+      open[i].classList.remove('tip-open');
+      var tip = open[i].querySelector('.bonus-tip');
+      if (tip) {
+        tip.classList.remove('tip-floating');
+        tip.style.cssText = '';
+      }
+    }
+  }
+
+  // An opened card is lifted out to fixed positioning against the number's
+  // screen rect. Several of the places a bonus number appears sit inside a
+  // scroll container — the expanded row's card list, the side tables — and an
+  // absolutely positioned card inside one of those is clipped by it. Hovering
+  // never hit this because the surfaces that clip were given `overflow:
+  // visible`; the card list cannot be, its scrolling is the point.
+  function positionOpenBonusTipPak_(span) {
+    var tip = span.querySelector('.bonus-tip');
+    if (!tip) return;
+
+    tip.classList.add('tip-floating');
+    tip.style.position = 'fixed';
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    tip.style.transform = 'none';
+    tip.style.maxWidth = Math.min(window.innerWidth - 16, 300) + 'px';
+
+    var host = span.getBoundingClientRect();
+    var box = tip.getBoundingClientRect();
+
+    var left = host.left + (host.width / 2) - (box.width / 2);
+    left = Math.max(8, Math.min(left, window.innerWidth - box.width - 8));
+
+    // Below the number by default, above it when there is no room below.
+    var top = host.bottom + 6;
+    if (top + box.height > window.innerHeight - 8) {
+      top = Math.max(8, host.top - box.height - 6);
+    }
+
+    tip.style.left = Math.round(left) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+  }
+
+  function initBonusTipTaps_() {
+    // Capture phase, so this runs before the inline onclick on the number and
+    // can decide whether that click is a "show me" or a "filter by this".
+    document.addEventListener('click', function (e) {
+      if (!bonusTipTapModePak_()) return;
+
+      var span = closestPak_(e.target, '.clickable-bonus');
+
+      // A tap that landed inside an open card is aimed at one of its controls.
+      // Leave it entirely alone, and leave the card open.
+      if (span && closestPak_(e.target, '.bonus-tip')) return;
+
+      // Anywhere else, or on a number whose card is already open: put the cards
+      // away and let the click carry on to whatever it hit.
+      if (!span || span.classList.contains('tip-open')) {
+        closeBonusTipsPak_();
+        return;
+      }
+
+      // Nothing to show for this number — behave as though this code is absent.
+      if (!span.querySelector('.bonus-tip')) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      closeBonusTipsPak_();
+      span.classList.add('tip-open');
+      positionOpenBonusTipPak_(span);
+    }, true);
+
+    // An open card is pinned to its number's screen rect, so anything that
+    // moves that rect leaves it pointing at nothing. Capture phase catches
+    // scrolling in any container, not just the page — the number may well be
+    // inside a scrolling table or card list.
+    document.addEventListener('scroll', closeBonusTipsPak_, true);
+    window.addEventListener('resize', closeBonusTipsPak_);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeBonusTipsPak_();
+    });
+  }
+
   function showHeadBreakdown() {
     if (!rawSideData || rawSideData.length === 0) return;
     document.getElementById('breakdownOverlay').classList.add('active');

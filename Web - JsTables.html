@@ -369,10 +369,14 @@ function buildEntryDetailCardHtml_(r) {
   return '<div class="entry-card">' +
     '<div class="entry-card-head">' +
       '<span class="entry-card-time">' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</span>' +
-      '<span class="clickable-bonus' + (isActive ? ' active' : '') + '"' + bonusTitleAttrPak_(r.bonus) +
+      // The card mode is the touchscreen layout, where a title attribute never
+      // renders at all — so this carries the real tooltip card, the one a tap
+      // can open.
+      '<span class="clickable-bonus' + (isActive ? ' active' : '') + '"' +
         ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
         multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
         safeTextPak(r.bonus) + ' <i class="fa-solid fa-filter filter-icon"></i>' +
+        bonusTipHtmlPak_(r.bonus, isActive) +
       '</span>' +
       '<span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span>' +
     '</div>' +

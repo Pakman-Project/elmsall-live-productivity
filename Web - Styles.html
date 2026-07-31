@@ -1658,7 +1658,22 @@ canvas {
      line rather than the whole card on one line. */
   white-space: nowrap;
   z-index: 500;
-  pointer-events: none;
+  /* The card holds controls now, so the pointer has to be able to reach it.
+     It is only in the layout while it is shown, so nothing beneath it is
+     blocked the rest of the time. */
+  pointer-events: auto;
+}
+
+/* A transparent bridge across the 6px gap between the number and its card.
+   Without it, moving the mouse down towards a copy button leaves the number,
+   the :hover rule stops matching, and the card disappears mid-reach. */
+.bonus-tip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 8px;
 }
 
 .bonus-tip-line {
@@ -1698,8 +1713,35 @@ canvas {
   border-bottom-color: var(--surface-dropdown);
 }
 
-.clickable-bonus:hover .bonus-tip {
+.clickable-bonus:hover .bonus-tip,
+.clickable-bonus.tip-open .bonus-tip {
   display: block;
+}
+
+/* Re-anchored to the viewport by positionOpenBonusTipPak_, which may have put
+   it above the number or nudged it sideways to stay on screen — so the arrow
+   no longer points anywhere true, and the hover bridge has no gap to bridge. */
+.bonus-tip.tip-floating::before,
+.bonus-tip.tip-floating::after {
+  display: none;
+}
+
+/* Touchscreens have no hover, so the card is opened by a tap instead (see
+   initBonusTipTaps_). Two things change once it is opened that way: it has to
+   stay inside a narrow screen, so an email address wraps rather than running
+   off the edge, and it is dismissed by a tap rather than by moving away, so it
+   is worth making it read as something deliberately open. */
+@media (hover: none) {
+  .bonus-tip {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    max-width: 60vw;
+  }
+
+  .clickable-bonus.tip-open {
+    background: var(--accent-14);
+    border-color: var(--accent);
+  }
 }
 
 .side-table th {
