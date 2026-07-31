@@ -651,13 +651,13 @@
       ? 0
       : Math.max(0, Math.floor((min - AREA_GROUP_Y_PAD) / AREA_GROUP_Y_STEP) * AREA_GROUP_Y_STEP);
 
-    // Taken literally rather than rounded up to the next gridline. Rounding
-    // pushed a peak of 102 up to an axis of 120 - nearly twenty points of dead
-    // space above the data, which is the problem this was meant to solve.
-    // Chart.js still picks round tick values inside the range, so the gridlines
-    // stay clean; only the very top of the plot area is left unlabelled.
-    var ceil = max * AREA_GROUP_Y_HEAD;
-    // A flat series can land both ends in the same place.
+    // Rounded up to the next multiple of 10, so both ends of the axis sit on a
+    // round number and the topmost gridline is labelled rather than floating
+    // just under an unlabelled ceiling. Costs some headroom - a peak of 102
+    // gives an axis of 120 - which is the deliberate trade for a scale that
+    // reads cleanly at a glance on a wall screen.
+    var ceil = Math.ceil((max * AREA_GROUP_Y_HEAD) / AREA_GROUP_Y_STEP) * AREA_GROUP_Y_STEP;
+    // A flat series can land both ends on the same gridline.
     if (ceil <= floor) ceil = floor + AREA_GROUP_Y_STEP;
 
     return { min: floor, max: ceil };
