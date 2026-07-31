@@ -313,6 +313,40 @@
     setMultiBonusFilter_(el.checked);
   }
 
+  // ── Settings dialog ────────────────────────────────────────────────────────
+  // Everything here used to live at the bottom of the "?" dialog, behind a
+  // question-mark icon that promises help rather than configuration. Nobody
+  // looks for "reset my settings" under a help button.
+  function openSettings() {
+    var multiCb = $('multiBonusToggle');
+    if (multiCb) multiCb.checked = allowMultiBonusFilter;
+    var syncCb = $('syncAreaChipsToggle');
+    if (syncCb) syncCb.checked = syncAreaChips;
+
+    var ov = $('settingsOverlay');
+    if (ov) ov.classList.add('active');
+  }
+
+  function closeSettings() {
+    var ov = $('settingsOverlay');
+    if (ov) ov.classList.remove('active');
+  }
+
+  // Turning sync ON has to reconcile two selections that may already differ.
+  // Volume's wins: it is the first page with chips and the one whose hidden
+  // areas also drive the combined-chart legend, so adopting the other
+  // direction could silently re-show a series someone had switched off there.
+  function onSyncAreaChipsToggle_(el) {
+    syncAreaChips = !!el.checked;
+
+    if (syncAreaChips) {
+      mirrorHiddenAreasPak_('volume');
+      if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
+    } else {
+      saveUserPreferences();
+    }
+  }
+
   function toggleBonusFilter(bonus) {
     if (selectedBonuses.indexOf(bonus) !== -1) {
       removeBonus(bonus);

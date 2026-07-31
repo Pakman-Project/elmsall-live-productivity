@@ -138,10 +138,11 @@
   }
 
   function toggleVolumeArea(key) {
-    var idx = hiddenVolumeAreas.indexOf(key);
-    if (idx === -1) { hiddenVolumeAreas.push(key); }
-    else { hiddenVolumeAreas.splice(idx, 1); }
+    toggleAreaKeyPak_(hiddenVolumeAreas, key);
+    mirrorHiddenAreasPak_('volume');
     saveUserPreferences();
+    // Rebuilds every page, which is what carries the change across to Bonus
+    // when the two are synced.
     applyLocalFiltersPak();
   }
 
@@ -202,6 +203,12 @@
     var at = hiddenVolumeAreas.indexOf(key);
     if (nowHidden && at === -1) { hiddenVolumeAreas.push(key); }
     else if (!nowHidden && at !== -1) { hiddenVolumeAreas.splice(at, 1); }
+    // The legend writes to the same state the chips do, so it syncs the same
+    // way. The Bonus page is not on screen here, and applyLocalFiltersPak is
+    // deliberately not called - see above for why this updates in place - so
+    // the pages are marked dirty instead and rebuild when next shown.
+    mirrorHiddenAreasPak_('volume');
+    if (syncAreaChips && typeof markAllPagesDirty_ === 'function') markAllPagesDirty_();
     saveUserPreferences();
   }
 

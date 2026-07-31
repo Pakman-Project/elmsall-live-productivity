@@ -417,6 +417,68 @@
       </div>
     </div>
 
+    <div id="settingsOverlay" class="breakdown-overlay" onclick="closeSettings()">
+      <div class="breakdown-modal settings-modal" onclick="event.stopPropagation()">
+        <div class="breakdown-header">
+          <div>
+            <h2>Settings</h2>
+            <p class="breakdown-subtitle">How the dashboard behaves for you. Saved in this browser only — nobody else is affected.</p>
+          </div>
+          <button class="breakdown-close" onclick="closeSettings()" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="breakdown-body">
+          <div class="settings-group">
+            <h3 class="tour-menu-sub">Filtering</h3>
+            <label class="setting-row" for="multiBonusToggle">
+              <input type="checkbox" id="multiBonusToggle" onchange="onMultiBonusToggle_(this)">
+              <span class="setting-text">
+                <span class="setting-label">Filter by several bonus numbers at once</span>
+                <span class="setting-hint">Normally picking a bonus number replaces whatever
+                  was filtered before, and takes you to the top of Overall so you can see what
+                  changed. Turn this on to build up a set of people instead, and stay on the
+                  page you are already on.</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="tour-menu-sub">Work areas</h3>
+            <label class="setting-row" for="syncAreaChipsToggle">
+              <input type="checkbox" id="syncAreaChipsToggle" onchange="onSyncAreaChipsToggle_(this)">
+              <span class="setting-text">
+                <span class="setting-label">Keep the work-area chips the same on Volume and Bonus</span>
+                <span class="setting-hint">On by default: hiding a work area on one page hides it
+                  on the other, so both pages are answering the same question. Turn this off to
+                  keep two separate selections — useful if you watch one area's volume while
+                  ranking operators in another.</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="settings-group settings-shortcuts">
+            <h3 class="tour-menu-sub">Keyboard shortcuts</h3>
+            <dl class="shortcut-list">
+              <dt><kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt><dd>Move between the four pages</dd>
+              <dt><kbd>/</kbd></dt><dd>Jump to the bonus-number search</dd>
+              <dt><kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd></dt><dd>Move through search suggestions and pick one</dd>
+              <dt><kbd>Esc</kbd></dt><dd>Close a dialog, the search list, or the tour</dd>
+              <dt><kbd>Tab</kbd></dt><dd>Move through controls — stays inside an open dialog</dd>
+              <dt><kbd>Space</kbd></dt><dd>Pause or resume the tour, while it is running</dd>
+            </dl>
+          </div>
+
+          <div class="settings-group settings-reset">
+            <button class="btn" onclick="resetAllSettingsPak()">
+              <i class="fa-solid fa-rotate-left"></i> Reset all my settings
+            </button>
+            <p class="tour-menu-reset-hint">Puts the theme, chart order, groups, hidden work areas and display modes back to how they arrive out of the box. Only affects this browser.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="tourMenuOverlay" class="breakdown-overlay" onclick="closeTourMenu()">
       <div class="breakdown-modal tour-menu-modal" onclick="event.stopPropagation()">
         <div class="breakdown-header">
@@ -434,38 +496,6 @@
           </button>
           <div class="tour-menu-list" id="tourMenuList"></div>
 
-          <div class="tour-menu-settings">
-            <h3 class="tour-menu-sub">Filtering</h3>
-            <label class="setting-row" for="multiBonusToggle">
-              <input type="checkbox" id="multiBonusToggle" onchange="onMultiBonusToggle_(this)">
-              <span class="setting-text">
-                <span class="setting-label">Filter by several bonus numbers at once</span>
-                <span class="setting-hint">Normally picking a bonus number replaces whatever
-                  was filtered before, and takes you to the top of Overall so you can see what
-                  changed. Turn this on to build up a set of people instead, and stay on the
-                  page you are already on.</span>
-              </span>
-            </label>
-          </div>
-
-          <div class="tour-menu-shortcuts">
-            <h3 class="tour-menu-sub">Keyboard shortcuts</h3>
-            <dl class="shortcut-list">
-              <dt><kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt><dd>Move between the four pages</dd>
-              <dt><kbd>/</kbd></dt><dd>Jump to the bonus-number search</dd>
-              <dt><kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd></dt><dd>Move through search suggestions and pick one</dd>
-              <dt><kbd>Esc</kbd></dt><dd>Close a dialog, the search list, or the tour</dd>
-              <dt><kbd>Tab</kbd></dt><dd>Move through controls — stays inside an open dialog</dd>
-              <dt><kbd>Space</kbd></dt><dd>Pause or resume the tour, while it is running</dd>
-            </dl>
-          </div>
-
-          <div class="tour-menu-reset">
-            <button class="btn" onclick="resetAllSettingsPak()">
-              <i class="fa-solid fa-rotate-left"></i> Reset all my settings
-            </button>
-            <p class="tour-menu-reset-hint">Puts the theme, chart order, groups, hidden work areas and display modes back to how they arrive out of the box. Only affects this browser.</p>
-          </div>
         </div>
       </div>
     </div>

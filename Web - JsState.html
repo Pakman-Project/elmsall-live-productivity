@@ -156,6 +156,12 @@ var lastRealPayload = null;
 var sideSortMetric = 'performance';
 var hiddenBonusAreas = [];
 var hiddenVolumeAreas = [];
+// Whether those two are one setting or two. On by default: hiding a work area
+// is nearly always a statement about what the user is interested in right now
+// rather than about one page, and keeping two independent copies of it meant
+// the Bonus page quietly disagreeing with the Volume page about which areas
+// were in play.
+var syncAreaChips = true;
 // Deferred per-page rendering: inputs from the last applyLocalFiltersPak() pass,
 // plus which pages still need building. Pages are rendered on first view.
 var pageRenderCtx = null;

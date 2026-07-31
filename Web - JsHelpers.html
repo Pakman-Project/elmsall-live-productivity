@@ -50,6 +50,7 @@ function saveUserPreferences() {
       areaGroupSplit: areaGroupSplitState,
       chartOrder: chartOrderState,
       allowMultiBonus: allowMultiBonusFilter,
+      syncAreaChips: syncAreaChips,
       theme: currentTheme
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
@@ -87,6 +88,12 @@ function loadUserPreferences() {
     allowMultiBonusFilter = prefs.allowMultiBonus === true;
     var multiCb = $('multiBonusToggle');
     if (multiCb) multiCb.checked = allowMultiBonusFilter;
+
+    // Strictly !== false, the mirror of the test above: this one defaults ON,
+    // so only a deliberate opt-out turns it off.
+    syncAreaChips = prefs.syncAreaChips !== false;
+    var syncCb = $('syncAreaChipsToggle');
+    if (syncCb) syncCb.checked = syncAreaChips;
     if (prefs.bonusViewMode && $('bonusViewMode')) $('bonusViewMode').value = prefs.bonusViewMode;
 
     if (Array.isArray(prefs.hiddenBonusAreas)) {
@@ -100,6 +107,11 @@ function loadUserPreferences() {
       for (var hv = 0; hv < VOLUME_TYPES.length; hv++) { validVolAreaKeys[VOLUME_TYPES[hv].key] = true; }
       hiddenVolumeAreas = prefs.hiddenVolumeAreas.filter(function(k) { return validVolAreaKeys[k]; });
     }
+
+    // Both lists are restored independently above, and a blob saved before the
+    // sync setting existed can hold two different selections. Reconcile now
+    // rather than letting the pages open disagreeing with each other.
+    mirrorHiddenAreasPak_('volume');
 
     var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
     for (var i = 0; i < syncedHours.length; i++) {
@@ -192,7 +204,7 @@ function loadUserPreferences() {
 // a dozen module-level variables holding preference state, and re-deriving them
 // all correctly is far more likely to go wrong than simply starting again.
 function resetAllSettingsPak() {
-  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes, row counts and the filtering setting all go back to their defaults. Your data is untouched, and other people are unaffected.')) return;
+  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes, row counts and the settings in the gear dialog all go back to their defaults. Your data is untouched, and other people are unaffected.')) return;
   try {
     localStorage.removeItem('e3_dashboard_prefs_v1');
     localStorage.removeItem('e3_dashboard_payload_v1');
@@ -257,6 +269,24 @@ function numTdPak(n, d) {
 // page answers it for its own From/To range, an expanded Data Table row answers
 // it for that row's window, and the breakdown for its own range. Sharing one
 // global answer would make the marker disagree with the numbers beside it.
+// Adds or removes a work-area key in place. Used by both pages' chips so the
+// two cannot drift apart in how they read a click.
+function toggleAreaKeyPak_(list, key) {
+  var i = list.indexOf(key);
+  if (i === -1) list.push(key);
+  else list.splice(i, 1);
+}
+
+// Copies one page's hidden-area list onto the other, when the two are synced.
+// Assigning a COPY rather than the same array: sharing one array would make
+// the de-sync setting meaningless, since turning it off would leave both
+// pages still pointing at the same object.
+function mirrorHiddenAreasPak_(from) {
+  if (!syncAreaChips) return;
+  if (from === 'volume') hiddenBonusAreas = hiddenVolumeAreas.slice();
+  else hiddenVolumeAreas = hiddenBonusAreas.slice();
+}
+
 function bonusAreaCountMapPak(entries) {
   var counts = {};
   if (!entries || !entries.length) return counts;

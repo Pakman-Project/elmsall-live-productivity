@@ -621,9 +621,17 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
 }
 
 function toggleBonusArea(key) {
-  var idx = hiddenBonusAreas.indexOf(key);
-  if (idx === -1) { hiddenBonusAreas.push(key); }
-  else { hiddenBonusAreas.splice(idx, 1); }
+  toggleAreaKeyPak_(hiddenBonusAreas, key);
+
+  if (syncAreaChips) {
+    mirrorHiddenAreasPak_('bonus');
+    // Volume has to change too, and it is not the page in front of the user.
+    // applyLocalFiltersPak marks every page dirty, so Volume is rebuilt when
+    // they get to it, and saves preferences on the way out.
+    applyLocalFiltersPak();
+    return;
+  }
+
   refreshBonusTables();
 }
 

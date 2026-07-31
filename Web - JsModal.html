@@ -19,7 +19,7 @@
 
 var MODAL_OVERLAY_IDS_ = [
   'breakdownOverlay', 'trendSplitOverlay', 'areaGroupOverlay',
-  'shareOverlay', 'tourMenuOverlay'
+  'shareOverlay', 'tourMenuOverlay', 'settingsOverlay'
 ];
 
 // Each overlay's own close function, so Escape takes exactly the same path as
@@ -29,7 +29,8 @@ var MODAL_CLOSERS_ = {
   trendSplitOverlay: function () { closeTrendSplit(); },
   areaGroupOverlay:  function () { closeAreaGroups(); },
   shareOverlay:      function () { closeShareMenu(); },
-  tourMenuOverlay:   function () { closeTourMenu(); }
+  tourMenuOverlay:   function () { closeTourMenu(); },
+  settingsOverlay:   function () { closeSettings(); }
 };
 
 var MODAL_FOCUSABLE_SEL_ = 'a[href], button:not([disabled]), input:not([disabled]),' +

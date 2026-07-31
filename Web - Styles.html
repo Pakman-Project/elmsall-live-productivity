@@ -4337,10 +4337,20 @@ body.page-scrolled-far .back-to-top {
 .tour-menu-item:active {
   transform: scale(0.99);
 }
-.tour-menu-shortcuts {
+/* Every section of the Settings dialog is separated the same way, so the rules
+   that used to be written three times - once per section - are one rule now.
+   :first-child drops the leading divider, which otherwise sat immediately under
+   the dialog's own header rule and read as a double line. */
+.settings-group {
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+.settings-group:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .tour-menu-sub {
@@ -4390,15 +4400,9 @@ kbd {
 /* Nothing here applies to a touchscreen, and listing keys nobody can press
    just pushes the reset button further off the bottom of a phone screen. */
 @media (max-width: 700px) {
-  .tour-menu-shortcuts {
+  .settings-group.settings-shortcuts {
     display: none;
   }
-}
-
-.tour-menu-settings {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
 }
 
 /* The checkbox sits on its own line against the label text rather than being
@@ -4439,12 +4443,6 @@ kbd {
   font-size: 12px;
   color: var(--muted);
   line-height: 1.45;
-}
-
-.tour-menu-reset {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
 }
 
 .tour-menu-reset-hint {
