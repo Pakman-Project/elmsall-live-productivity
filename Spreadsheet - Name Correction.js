@@ -79,12 +79,29 @@ var NAME_TIME_MAP_ = {
 };
 
 /**
+ * Bonus codes made only of zeros lose their width on the way in: Sheets stores
+ * "000" as the number 0 and reads it back as "0". Same damage as the "3E3"
+ * case, different shape, so it gets the same treatment — an exact lookup back
+ * to the intended code.
+ *
+ * Only one width can be recovered, because every all-zero code arrives as the
+ * same "0". If genuine "00" or "0000" codes ever appear, fix it at the source
+ * (write the cell as text) rather than here.
+ */
+var NAME_ZERO_MAP_ = {
+  '0': '000'
+};
+
+/**
  * One displayed column C cell -> its corrected value.
  */
 function correctNameValue_(display) {
   // Trim whitespace AND convert to ALL CAPS.
   var v = String(display === null || display === undefined ? '' : display).trim().toUpperCase();
   if (!v) return '';
+
+  // Restore all-zero codes collapsed to "0" by Sheets.
+  if (NAME_ZERO_MAP_[v]) return NAME_ZERO_MAP_[v];
 
   // Fix scientific notation (e.g. 3.00E+03 -> 3E3). Sheets renders a bonus
   // number that looks like a number in whatever notation it prefers, and the
@@ -107,7 +124,8 @@ function correctNameValue_(display) {
  *
  * The number format is forced to plain text AFTER the write. Without it Sheets
  * re-reads "3E3" as a number and renders it straight back as 3.00E+03, undoing
- * the correction on the way in.
+ * the correction on the way in. The same applies to "000", which would
+ * otherwise collapse straight back to 0.
  */
 function correctNameColumn_(sheet, startRow, numRows) {
   if (numRows < 1) return;
