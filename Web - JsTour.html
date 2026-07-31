@@ -207,9 +207,14 @@ var TOUR_STEPS = [
     interactive: { sel: '.side-table th[onclick^="setSideTableSort"]', type: 'click' },
     title: 'Sort the tables',
     body: 'A column header — Standard Hours or Productivity % — re-sorts every table by it.' },
-  { part: 5, page: 2, target: '.side-table td:first-child',
+  // Ringed as a union of the number and its card, so the highlight covers the
+  // thing being described rather than the number it hangs off. Both selectors
+  // only match once the action below has opened one.
+  { part: 5, page: 2, target: '.clickable-bonus.tip-open, .bonus-tip.tour-tip-shown', union: true,
+    action: function () { tourShowBonusTip_(); },
+    cleanup: function () { tourHideBonusTip_(); },
     title: 'Who is behind a number',
-    body: 'A bonus number on its own doesn’t tell you who to speak to. Hover one — tap it on a phone — and a card names their Team Manager and gives their email address, each with its own button to copy it.' },
+    body: 'A bonus number on its own doesn’t tell you who to speak to. Hover one — tap it on a phone — and this card names their Team Manager and gives their email address, each with its own button to copy it.' },
   { part: 5, page: 2, target: '.clickable-bonus',
     interactive: { sel: '.clickable-bonus', type: 'click' },
     title: 'Filter by an operator',
@@ -653,6 +658,29 @@ function tourOpenHeaderMenuIfCollapsed_() {
 // fine going forwards and blank coming back. Each of these puts that state back
 // if it is missing, and does nothing if it is already there, so Back lands on a
 // step that looks exactly as it did on the way through.
+
+// The TM card is a hover card, and the tour cannot hover. It is opened here by
+// hand instead, IN PLACE rather than through openBonusTipPak_: that one lifts
+// the card out to the viewport to escape a scroll container, which would also
+// lift it clear of the tour's spotlight and leave it sitting over the dimming
+// mask. Left where it is, the ring can be drawn around the number and the card
+// together and the whole thing reads as one highlighted object.
+function tourShowBonusTip_() {
+  tourHideBonusTip_();
+  var span = document.querySelector('#bonusTablesContainer .clickable-bonus');
+  if (!span) return;
+  var tip = span.querySelector('.bonus-tip');
+  if (!tip) return;
+  span.classList.add('tip-open');
+  tip.classList.add('tour-tip-shown');
+}
+
+function tourHideBonusTip_() {
+  var spans = document.querySelectorAll('.clickable-bonus.tip-open');
+  for (var i = 0; i < spans.length; i++) spans[i].classList.remove('tip-open');
+  var tips = document.querySelectorAll('.bonus-tip.tour-tip-shown');
+  for (var j = 0; j < tips.length; j++) tips[j].classList.remove('tour-tip-shown');
+}
 
 function tourEnsureFilter_() {
   if (typeof selectedBonuses === 'undefined') return;
