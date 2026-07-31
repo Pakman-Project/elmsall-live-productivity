@@ -973,7 +973,13 @@ body.loading-skeleton #mainTableWrapper::after {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px;
+  /* Doubled from 10px. This is the only gap between the panels and the two
+     pieces of chrome they sit against — the black header above and the rail to
+     the left — and at 10px the cards read as crammed against both rather than
+     sitting inside a page. The mobile override below is deliberately left
+     alone: horizontal room is the scarce thing on a phone, and spending it on
+     margin would cost chart width. */
+  padding: 20px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   overscroll-behavior: contain;
