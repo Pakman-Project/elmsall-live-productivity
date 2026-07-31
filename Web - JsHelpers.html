@@ -304,12 +304,8 @@ function bonusTipHtmlPak_(bonus, isActive) {
   var html = '<span class="bonus-tip">';
 
   if (entry) {
-    if (entry.tm) {
-      html += '<span class="bonus-tip-line"><b>TM:</b> ' + safeTextPak(entry.tm) + '</span>';
-    }
-    if (entry.email) {
-      html += '<span class="bonus-tip-line"><b>Email:</b> ' + safeTextPak(entry.email) + '</span>';
-    }
+    if (entry.tm) html += bonusTipCopyRowPak_('TM:', entry.tm, 'name');
+    if (entry.email) html += bonusTipCopyRowPak_('Email:', entry.email, 'email address');
   }
 
   html += '<span class="bonus-tip-line bonus-tip-hint">' +
@@ -317,6 +313,84 @@ function bonusTipHtmlPak_(bonus, isActive) {
           (isActive ? 'Click to remove filter' : 'Click to filter main view') +
           '</span></span>';
   return html;
+}
+
+// One detail line with its own copy button. Separate buttons per line because
+// the two values are wanted for different things — the name to type into a
+// message, the address to paste into a mail client — and a single "copy all"
+// would mean deleting half of what was pasted every time.
+function bonusTipCopyRowPak_(label, value, what) {
+  return '<span class="bonus-tip-line bonus-tip-row">' +
+    '<b>' + label + '</b>' +
+    '<span class="bonus-tip-val">' + safeTextPak(value) + '</span>' +
+    '<button type="button" class="bonus-tip-copy" data-copy="' + escapeAttrPak(value) + '"' +
+    ' title="Copy ' + what + '" aria-label="Copy ' + what + '"' +
+    ' onclick="copyBonusTipValuePak_(event, this)">' +
+    '<i class="fa-solid fa-copy"></i></button>' +
+    '</span>';
+}
+
+// The button sits inside the bonus number, whose own click filters the view, so
+// the event has to stop here or copying an address would also change what is on
+// screen behind the card.
+function copyBonusTipValuePak_(e, btn) {
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  var value = btn.getAttribute('data-copy') || '';
+  if (!value) return;
+
+  // navigator.clipboard is not always granted inside an embedded frame, which
+  // is exactly where this dashboard runs, so the old execCommand path stays as
+  // the fallback. Same two-step already used for the share link.
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = value;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    // iOS ignores select() on its own; the explicit range is what makes the
+    // selection stick there.
+    try { ta.setSelectionRange(0, value.length); } catch (err) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
+    document.body.removeChild(ta);
+    flashCopyButtonPak_(btn, ok);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(value)
+      .then(function () { flashCopyButtonPak_(btn, true); })
+      .catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+// The card has no room for a message, and there is no other visible change to
+// confirm a copy, so the button itself answers: a tick, or a cross if the
+// browser refused.
+function flashCopyButtonPak_(btn, ok) {
+  var icon = btn.querySelector('i');
+  if (!icon) return;
+
+  if (btn._copyTimer) clearTimeout(btn._copyTimer);
+  else btn._copyIconClass = icon.className;
+
+  icon.className = ok ? 'fa-solid fa-check' : 'fa-solid fa-xmark';
+  btn.classList.remove('copied', 'copy-failed');
+  btn.classList.add(ok ? 'copied' : 'copy-failed');
+
+  btn._copyTimer = setTimeout(function () {
+    icon.className = btn._copyIconClass;
+    btn.classList.remove('copied', 'copy-failed');
+    btn._copyTimer = null;
+  }, 1200);
 }
 
 // Plain-text form, for the surfaces that have no room for the card above - the

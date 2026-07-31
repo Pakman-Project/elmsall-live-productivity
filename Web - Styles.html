@@ -1687,6 +1687,54 @@ canvas {
   margin-right: 4px;
 }
 
+/* A detail line with a copy button on the end: label, value, button, with the
+   value taking whatever is left so the buttons line up under each other. */
+.bonus-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bonus-tip-row b {
+  /* The flex gap already spaces the label. */
+  margin-right: 0;
+}
+
+.bonus-tip-val {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bonus-tip-copy {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 3px 6px;
+  background: transparent;
+  border: 1px solid var(--w15);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.bonus-tip-copy:hover {
+  color: var(--text);
+  background: var(--w10);
+  border-color: var(--w25);
+}
+
+.bonus-tip-copy.copied {
+  color: var(--color-good);
+  border-color: var(--color-good);
+}
+
+.bonus-tip-copy.copy-failed {
+  color: var(--color-bad);
+  border-color: var(--color-bad);
+}
+
 /* The click hint was the whole tooltip before the manager was added to it. It
    is still worth saying, but it is no longer the reason anyone hovers, so it
    drops below the details and quietens down. */
@@ -1741,6 +1789,12 @@ canvas {
   .clickable-bonus.tip-open {
     background: var(--accent-14);
     border-color: var(--accent);
+  }
+
+  /* A 10px icon is not a finger-sized target. */
+  .bonus-tip-copy {
+    padding: 7px 9px;
+    font-size: 12px;
   }
 }
 
