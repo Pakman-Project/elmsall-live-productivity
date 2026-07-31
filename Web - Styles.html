@@ -1201,6 +1201,34 @@ body.loading-skeleton #mainTableWrapper::after {
   overflow: visible;
 }
 
+/* Losing `overflow` above also lost what was rounding the table's corners. The
+   wrapper's border still curves, but a header cell's background is a plain
+   rectangle and now paints straight over that curve and out through it. Only
+   clipping was ever hiding that, so the corner cells have to carry the radius
+   themselves. 11px, not 12: the wrapper's 1px border sits outside its own
+   radius, so matching it exactly leaves a hairline of background showing. */
+.bonus-two-tables .table-wrap thead tr:first-child th:first-child,
+#mainTableWrapper .table-wrap thead tr:first-child th:first-child {
+  border-top-left-radius: 11px;
+}
+
+.bonus-two-tables .table-wrap thead tr:first-child th:last-child,
+#mainTableWrapper .table-wrap thead tr:first-child th:last-child {
+  border-top-right-radius: 11px;
+}
+
+/* The bottom pair matters as soon as a row is striped, hovered or expanded —
+   the same square background against the same curve. */
+.bonus-two-tables .table-wrap tbody tr:last-child td:first-child,
+#mainTableWrapper .table-wrap tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 11px;
+}
+
+.bonus-two-tables .table-wrap tbody tr:last-child td:last-child,
+#mainTableWrapper .table-wrap tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 11px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
