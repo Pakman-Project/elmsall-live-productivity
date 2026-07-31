@@ -511,6 +511,9 @@ function startTour(isAuto, startIndex) {
   tourReturnScroll = getActivePageScrollTop_();
 
   document.querySelectorAll('.kpi-tooltip.open').forEach(function(t) { t.classList.remove('open'); });
+  // A TM card left open from before is anchored to a number the tour is about
+  // to scroll away from, and would sit over the tour's own ring.
+  if (typeof closeBonusTipsPak_ === 'function') closeBonusTipsPak_();
 
   // Must happen BEFORE the demo render so the demo data is drawn with the
   // tour's expected control values.

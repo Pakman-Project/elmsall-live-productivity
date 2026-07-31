@@ -962,6 +962,12 @@
     document.addEventListener('click', function (e) {
       if (!bonusTipTapModePak_()) return;
 
+      // The tour clicks bonus numbers itself, through real event dispatch, so
+      // it arrives here like any other tap. What it is demonstrating at those
+      // steps is the filter, and swallowing the first click to show a card
+      // instead would leave the step demonstrating nothing.
+      if (typeof tourActive !== 'undefined' && tourActive) return;
+
       // A tap that landed inside an open card is aimed at one of its controls.
       // Checked before anything else: an open card has been moved to <body>, so
       // it is no longer inside the number and would otherwise read as a tap on
