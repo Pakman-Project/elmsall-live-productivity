@@ -665,12 +665,35 @@ function tourOpenHeaderMenuIfCollapsed_() {
 // lift it clear of the tour's spotlight and leave it sitting over the dimming
 // mask. Left where it is, the ring can be drawn around the number and the card
 // together and the whole thing reads as one highlighted object.
+// Stand-ins for the step above. The tour runs on invented bonus numbers, which
+// are in nobody's TM list, so the card it opens has nothing in it but the click
+// hint — an empty card, ringed, under a caption describing what it contains.
+var TOUR_DEMO_TM_NAME_ = 'John Doe';
+var TOUR_DEMO_TM_EMAIL_ = 'john.doe@next.co.uk';
+
 function tourShowBonusTip_() {
   tourHideBonusTip_();
   var span = document.querySelector('#bonusTablesContainer .clickable-bonus');
   if (!span) return;
   var tip = span.querySelector('.bonus-tip');
   if (!tip) return;
+
+  // Only when the card is genuinely empty. If a tour ever runs against real
+  // data, the real manager is the better thing to be pointing at.
+  if (!tip.querySelector('.bonus-tip-row') && typeof bonusTipCopyRowPak_ === 'function') {
+    var holder = document.createElement('span');
+    holder.innerHTML = bonusTipCopyRowPak_('TM:', TOUR_DEMO_TM_NAME_, 'name') +
+                       bonusTipCopyRowPak_('Email:', TOUR_DEMO_TM_EMAIL_, 'email address');
+    // Each inserted before the same reference node, so they land in order and
+    // above the click hint that is already there.
+    var before = tip.firstChild;
+    var rows = Array.prototype.slice.call(holder.childNodes);
+    for (var r = 0; r < rows.length; r++) {
+      rows[r].classList.add('tour-demo-line');
+      tip.insertBefore(rows[r], before);
+    }
+  }
+
   span.classList.add('tip-open');
   tip.classList.add('tour-tip-shown');
 }
@@ -680,6 +703,10 @@ function tourHideBonusTip_() {
   for (var i = 0; i < spans.length; i++) spans[i].classList.remove('tip-open');
   var tips = document.querySelectorAll('.bonus-tip.tour-tip-shown');
   for (var j = 0; j < tips.length; j++) tips[j].classList.remove('tour-tip-shown');
+  // The stand-in manager goes with it, so a card opened for real afterwards
+  // never claims John Doe manages anybody.
+  var demo = document.querySelectorAll('.bonus-tip .tour-demo-line');
+  for (var k = 0; k < demo.length; k++) demo[k].parentNode.removeChild(demo[k]);
 }
 
 function tourEnsureFilter_() {
