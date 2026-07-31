@@ -99,9 +99,44 @@
 
   // afterDatasetsDraw runs before the tooltip is painted, so the line passes
   // under the tooltip rather than across it.
+  // ── Canvas size reconciliation ─────────────────────────────────────────────
+  // The stylesheet fixes every chart canvas's height with !important. Chart.js
+  // measures the canvas's PARENT to decide how big it should be, then writes
+  // that number to canvas.style.height - where the !important rule beats it.
+  //
+  // The parent is the panel, which also holds the title, so Chart.js always
+  // arrives at a number tens of pixels taller than the box the canvas is
+  // actually displayed in. It draws into a coordinate space that size, the
+  // browser squashes the result into the smaller box, and every coordinate
+  // Chart.js hit-tests against is then wrong by that ratio.
+  //
+  // Tooltips survived it: interaction mode is 'index', which keys off x, and
+  // the width is not forced. Legend clicks did not. A legend row's hitbox sat
+  // tens of pixels below where the row was painted, so the click matched no
+  // item and Chart.js silently did nothing - no error, no response. That is
+  // why the legends looked dead, on every chart that has one.
+  //
+  // Resizing each chart to the canvas's REAL box makes the two agree.
+  function fitChartToBoxPak_(chart) {
+    if (!chart || !chart.canvas) return;
+    var w = chart.canvas.clientWidth;
+    var h = chart.canvas.clientHeight;
+    // A panel inside a display:none parent measures 0. Leave it; it gets
+    // fitted when something shows it and resizeCharts runs.
+    if (w < 1 || h < 1) return;
+    if (Math.abs(chart.width - w) < 1 && Math.abs(chart.height - h) < 1) return;
+    try { chart.resize(w, h); } catch (e) {}
+  }
+
+  var e3FitCanvasPlugin = {
+    id: 'e3FitCanvas',
+    afterInit: function (chart) { fitChartToBoxPak_(chart); }
+  };
+
   if (typeof Chart !== 'undefined') {
     Chart.register(e3CrosshairPlugin);
     Chart.register(e3EmptyStatePlugin);
+    Chart.register(e3FitCanvasPlugin);
   }
 
   // Every render rebuilds all ~13 charts from scratch. Animating that on a

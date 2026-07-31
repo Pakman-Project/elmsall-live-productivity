@@ -721,16 +721,22 @@
 
   function resizeCharts() {
     setTimeout(function() {
-      if (overviewVolChart) overviewVolChart.resize();
-      for (var t = 0; t < trendCharts.length; t++) {
-        if (trendCharts[t]) trendCharts[t].resize();
-      }
-      if (perfChart) perfChart.resize();
-      for (var i = 0; i < volumeCharts.length; i++) {
-        if (volumeCharts[i]) volumeCharts[i].resize();
-      }
+      // fitChartToBoxPak_, not chart.resize(): a bare resize() recomputes the
+      // size from the parent panel, which is what puts Chart.js's coordinate
+      // space out of step with the canvas's forced CSS height in the first
+      // place. See the comment on fitChartToBoxPak_ in JsCharts.
+      var fit = (typeof fitChartToBoxPak_ === 'function')
+        ? fitChartToBoxPak_
+        : function (c) { if (c) c.resize(); };
+
+      fit(overviewVolChart);
+      fit(perfChart);
+      for (var t = 0; t < trendCharts.length; t++) fit(trendCharts[t]);
+      for (var a = 0; a < areaGroupCharts.length; a++) fit(areaGroupCharts[a]);
+      for (var i = 0; i < volumeCharts.length; i++) fit(volumeCharts[i]);
     }, 310);
   }
+
 
   function touchStart() {
     return function(event) {
