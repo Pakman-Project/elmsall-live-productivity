@@ -304,7 +304,29 @@ var TOUR_STEPS = [
   { part: 9, page: 0, target: null,
     title: 'What else is saved',
     body: 'Also remembered: the Volume and Bonus display modes, which work areas you’ve hidden with the chips, your Area Groups and split charts, the panel order you arranged, and how many rows the bonus tables show. Your bonus-number filter is NOT saved — every visit starts showing everyone.' },
+  { part: 9, page: 0, target: '#settingsBtn',
+    // Like every other header button, this one folds into the burger menu on a
+    // narrow window, where it would measure 0x0 and get no visible ring.
+    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
+    interactive: { sel: '#settingsBtn', type: 'click' },
+    title: 'Where you change all this',
+    body: 'The gear button opens Settings — the handful of things you can change about how the dashboard behaves for you. Here it goes.' },
+  { part: 9, page: 0, target: '#settingsOverlay .breakdown-close', modal: true,
+    interactive: { sel: '#settingsOverlay .breakdown-close', type: 'click' },
+    // Reached forwards the dialog is already open; reached BACKWARDS (from the
+    // theme step) it is not, and the step would have had nothing to point at.
+    action: function () {
+      var ov = $('settingsOverlay');
+      if (ov && !ov.classList.contains('active') && typeof openSettings === 'function') openSettings();
+    },
+    cleanup: function () { if (typeof closeSettings === 'function') closeSettings(); },
+    title: 'What you can change',
+    body: 'Filtering: normally picking a bonus number replaces the last one — turn this on to build up a set of people instead. Work areas: hiding an area on Volume hides it on Bonus too, unless you turn that off. Below them, every keyboard shortcut, and a reset that puts the whole dashboard back to how it arrives out of the box. All of it saved in this browser only. Click the × to close.' },
   { part: 9, page: 0, target: '#themeToggleBtn',
+    // Also inside the burger menu when the header is collapsed. The menu is
+    // held open for this last step of the part, then closed.
+    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
+    cleanup: function () { if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false); },
     title: 'Light or dark',
     body: 'This button switches between light and dark mode — that’s remembered too, so the dashboard always opens the way you like it.' },
 
