@@ -1003,6 +1003,60 @@
     });
   }
 
+  // ---- Bonus number cards on hover (desktop) --------------------------------
+  // The card used to just show in place via a plain CSS :hover rule. That is
+  // fine until the number sits near the left edge of a page: `.swipe-container`
+  // clips anything crossing its own edge to make the paging swipe work, and a
+  // card centred under a number close to that edge is wider than the gap to
+  // it, so its left side was clipped away (and the rail behind showed through
+  // where it had been). Routing hover through the same floating,
+  // viewport-clamped positioning already built for the touchscreen tap fixes
+  // it here too, since a `position: fixed` card on <body> is outside that
+  // clipping box entirely.
+  var _tipHoverTimer = null;
+
+  function initBonusTipHover_() {
+    document.addEventListener('mouseover', function (e) {
+      if (bonusTipTapModePak_()) return;
+      if (typeof tourActive !== 'undefined' && tourActive) return;
+
+      var span = closestPak_(e.target, '.clickable-bonus');
+      var onOpenTip = _openTipEl && closestPak_(e.target, '.bonus-tip') === _openTipEl;
+
+      // Already open, or the pointer is on the card that belongs to it —
+      // just cancel any close that was scheduled while crossing the gap.
+      if (span === _openTipSpan || onOpenTip) {
+        if (_tipHoverTimer) { clearTimeout(_tipHoverTimer); _tipHoverTimer = null; }
+        return;
+      }
+      if (!span || !span.querySelector('.bonus-tip')) return;
+
+      if (_tipHoverTimer) { clearTimeout(_tipHoverTimer); _tipHoverTimer = null; }
+      closeBonusTipsPak_();
+      openBonusTipPak_(span);
+    }, true);
+
+    document.addEventListener('mouseout', function (e) {
+      if (bonusTipTapModePak_()) return;
+      if (!_openTipSpan) return;
+
+      var leavingOwner = closestPak_(e.target, '.clickable-bonus') === _openTipSpan ||
+        (_openTipEl && closestPak_(e.target, '.bonus-tip') === _openTipEl);
+      if (!leavingOwner) return;
+
+      var to = e.relatedTarget;
+      var stillInside = to && (closestPak_(to, '.clickable-bonus') === _openTipSpan ||
+        (_openTipEl && closestPak_(to, '.bonus-tip') === _openTipEl));
+      if (stillInside) return;
+
+      // Short grace period, not an instant close: the pointer crosses a real
+      // gap between the number and its floating card to get from one to the
+      // other, and a mouseout fires for that whole trip, not just a true exit.
+      if (_tipHoverTimer) clearTimeout(_tipHoverTimer);
+      _tipHoverTimer = setTimeout(closeBonusTipsPak_, 120);
+    }, true);
+  }
+
   function showHeadBreakdown() {
     if (!rawSideData || rawSideData.length === 0) return;
     document.getElementById('breakdownOverlay').classList.add('active');

@@ -1805,7 +1805,10 @@ canvas {
   border-bottom-color: var(--surface-dropdown);
 }
 
-.clickable-bonus:hover .bonus-tip,
+/* Display is driven by JS (initBonusTipHover_ / openBonusTipPak_) adding
+   .tip-open, not by :hover directly — a plain :hover rule showed the card in
+   place, unclamped, and let .swipe-container's edge-clipping (needed for the
+   paging swipe) cut off a card centred near a page's left edge. */
 .clickable-bonus.tip-open .bonus-tip {
   display: block;
 }
