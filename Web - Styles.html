@@ -1629,6 +1629,14 @@ canvas {
   background: var(--accent-10);
 }
 
+/* The number itself has to rise with its card. It is positioned but has no
+   z-index of its own, so it paints in DOM order against everything else that
+   is positioned — and a card is only ever above what its host is above. */
+.clickable-bonus:hover,
+.clickable-bonus.tip-open {
+  z-index: 2500;
+}
+
 .clickable-bonus .filter-icon {
   font-size: 9px;
   opacity: 0;
@@ -1685,7 +1693,11 @@ canvas {
   /* Each line is its own block, so nowrap keeps a name or an address on one
      line rather than the whole card on one line. */
   white-space: nowrap;
-  z-index: 500;
+  /* Above the panels and toolbars the card overhangs — 500 still lost to the
+     search dropdown and the group panel (both 2000), so a card opening near
+     one had its left-hand side painted over by that panel's surface. Kept
+     below the overlays (10000+) so a modal still covers it. */
+  z-index: 2500;
   /* The card holds controls now, so the pointer has to be able to reach it.
      It is only in the layout while it is shown, so nothing beneath it is
      blocked the rest of the time. */
