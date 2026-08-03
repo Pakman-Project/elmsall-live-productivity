@@ -1738,6 +1738,10 @@ canvas {
 .bonus-tip-row b {
   /* The flex gap already spaces the label. */
   margin-right: 0;
+  /* "1st Line Manager:" is long enough that flex would otherwise shrink it and
+     wrap it mid-phrase before touching the value beside it. */
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .bonus-tip-val {

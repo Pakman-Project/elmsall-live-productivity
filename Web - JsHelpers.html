@@ -304,7 +304,7 @@ function bonusTipHtmlPak_(bonus, isActive) {
   var html = '<span class="bonus-tip">';
 
   if (entry) {
-    if (entry.tm) html += bonusTipCopyRowPak_('TM:', entry.tm, 'name');
+    if (entry.tm) html += bonusTipCopyRowPak_('1st Line Manager:', entry.tm, 'name');
     if (entry.email) html += bonusTipCopyRowPak_('Email:', entry.email, 'email address');
   }
 
@@ -400,7 +400,7 @@ function bonusTitleAttrPak_(bonus) {
   var entry = tmForBonusPak_(bonus);
   if (!entry) return '';
   var parts = [];
-  if (entry.tm) parts.push('TM: ' + entry.tm);
+  if (entry.tm) parts.push('1st Line Manager: ' + entry.tm);
   if (entry.email) parts.push('Email: ' + entry.email);
   if (!parts.length) return '';
   return ' title="' + escapeAttrPak(parts.join('\n')).replace(/\n/g, '&#10;') + '"';

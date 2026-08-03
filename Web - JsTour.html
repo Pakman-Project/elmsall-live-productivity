@@ -214,7 +214,7 @@ var TOUR_STEPS = [
     action: function () { tourShowBonusTip_(); },
     cleanup: function () { tourHideBonusTip_(); },
     title: 'Who is behind a number',
-    body: 'A bonus number on its own doesn’t tell you who to speak to. Hover one — tap it on a phone — and this card names their Team Manager and gives their email address, each with its own button to copy it.' },
+    body: 'A bonus number on its own doesn’t tell you who to speak to. Hover one — tap it on a phone — and this card names their 1st Line Manager and gives their email address, each with its own button to copy it.' },
   { part: 5, page: 2, target: '.clickable-bonus',
     interactive: { sel: '.clickable-bonus', type: 'click' },
     title: 'Filter by an operator',
@@ -682,7 +682,7 @@ function tourShowBonusTip_() {
   // data, the real manager is the better thing to be pointing at.
   if (!tip.querySelector('.bonus-tip-row') && typeof bonusTipCopyRowPak_ === 'function') {
     var holder = document.createElement('span');
-    holder.innerHTML = bonusTipCopyRowPak_('TM:', TOUR_DEMO_TM_NAME_, 'name') +
+    holder.innerHTML = bonusTipCopyRowPak_('1st Line Manager:', TOUR_DEMO_TM_NAME_, 'name') +
                        bonusTipCopyRowPak_('Email:', TOUR_DEMO_TM_EMAIL_, 'email address');
     // Each inserted before the same reference node, so they land in order and
     // above the click hint that is already there.
