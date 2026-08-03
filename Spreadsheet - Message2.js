@@ -108,7 +108,7 @@ function sendGoogleChatMessage2() {
                   buttonList: {
                     buttons: [
                       {
-                        text: 'OPEN INTERFACE',
+                        text: 'OPEN DASHBOARD',
                         onClick: {
                           openLink: {
                             url: webAppUrl
