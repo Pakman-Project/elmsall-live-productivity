@@ -203,6 +203,28 @@ function compareEntryRowsPak(a, b) {
   return safeTextPak(a.bonus).localeCompare(safeTextPak(b.bonus));
 }
 
+// A window wider than 15 minutes is built out of several 15-minute blocks, and
+// the newest one is still filling. At 06:20 the feed holds 06:00-06:15 and
+// nothing else, so a 30-minute row labelled 06:00-06:30 carried a quarter of an
+// hour's work under a half-hour heading — which does not read as "not finished
+// yet", it reads as a collapse in productivity.
+//
+// So a group short of its full complement of blocks is dropped. Only at the
+// ENDS of the series: a group missing a block in the middle of the day is a gap
+// in the data, and quietly removing that row would hide the gap rather than
+// show it. The leading edge matters too — an Hours Range slice can begin
+// mid-window (3 hours back from 06:15 starts at 03:15, half-way through the
+// 03:00-03:30 window), which is partial for exactly the same reason.
+function dropPartialEdgeGroupKeys_(sortedKeys, groups, windowMinutes) {
+  var expected = Math.max(1, Math.round(windowMinutes / 15));
+  if (expected < 2) return sortedKeys;
+  var start = 0;
+  var end = sortedKeys.length;
+  while (start < end && (groups[sortedKeys[start]].blockCount || 0) < expected) start++;
+  while (end > start && (groups[sortedKeys[end - 1]].blockCount || 0) < expected) end--;
+  return sortedKeys.slice(start, end);
+}
+
 function getAggregatedDataPak(rows, windowMinutes) {
   var groups = {};
   rows.forEach(function(r) {
@@ -214,13 +236,15 @@ function getAggregatedDataPak(rows, windowMinutes) {
     else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
     else { groupDate.setSeconds(0, 0); }
     var k = groupDate.getTime();
-    if (!groups[k]) { groups[k] = { startTime: groupDate, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bcrInductingVol: 0, e1e2InductingVol: 0, bonusSet: {} }; }
+    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bcrInductingVol: 0, e1e2InductingVol: 0, bonusSet: {} }; }
     var g = groups[k];
+    g.blockCount++;
     g.hourDeployed += (Number(r.hourDeployed) || 0); g.stdHours += (Number(r.stdHours) || 0); g.pieVol += (Number(r.pieVol) || 0); g.topUpVol += (Number(r.topUpVol) || 0); g.e3PackingVol += (Number(r.e3PackingVol) || 0); g.parcelSortationVol += (Number(r.parcelSortationVol) || 0); g.parcelInductVol += (Number(r.parcelInductVol) || 0); g.inboundDecantingVol += (Number(r.inboundDecantingVol) || 0); g.osrDecantingVol += (Number(r.osrDecantingVol) || 0); g.bcrInductingVol += (Number(r.bcrInductingVol) || 0); g.e1e2InductingVol += (Number(r.e1e2InductingVol) || 0);
     if (r.rawBonusSet) { for (var bKey in r.rawBonusSet) { if (r.rawBonusSet.hasOwnProperty(bKey)) { g.bonusSet[bKey] = true; } } }
   });
   var result = [];
   var sortedKeys = Object.keys(groups).map(Number).sort(function(a, b) { return a - b; });
+  sortedKeys = dropPartialEdgeGroupKeys_(sortedKeys, groups, windowMinutes);
   var isFiltered = selectedBonuses.length > 0;
   sortedKeys.forEach(function(k) {
     var g = groups[k]; var start = g.startTime; var end = new Date(start.getTime() + (windowMinutes * 60000));
@@ -240,8 +264,9 @@ function aggregateTrendRows(rows, windowMinutes) {
     if (windowMinutes === 30) { var m = groupDate.getMinutes(); groupDate.setMinutes(m >= 30 ? 30 : 0, 0, 0); }
     else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
     var k = groupDate.getTime();
-    if (!groups[k]) { groups[k] = { startTime: groupDate, hourDeployed: 0, stdHours: 0, stdBreakdown: {} }; }
+    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, stdBreakdown: {} }; }
     var g = groups[k];
+    g.blockCount++;
     g.hourDeployed += (Number(r.hourDeployed) || 0);
     g.stdHours += (Number(r.stdHours) || 0); 
     if (r.stdBreakdown) {
@@ -254,6 +279,7 @@ function aggregateTrendRows(rows, windowMinutes) {
   });
   var result = [];
   var sortedKeys = Object.keys(groups).map(Number).sort(function(a, b) { return a - b; });
+  sortedKeys = dropPartialEdgeGroupKeys_(sortedKeys, groups, windowMinutes);
   sortedKeys.forEach(function(k) {
     var g = groups[k];
     var start = g.startTime;
