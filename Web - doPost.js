@@ -1,8 +1,16 @@
 /************************************************************
- * DATABRICKS DELIVERY ENDPOINT
+ * BONUS HUB REPORT RUNNER DELIVERY ENDPOINT
  *
- * Databricks POSTs a CSV/TSV body here every 15 minutes and the rows are
- * appended to the 'Data' tab.
+ * The Tampermonkey userscript "[PAK] PSD - Bonus Hub Report Runner" POSTs a
+ * report's rows here as CSV/TSV and they are appended to the 'Data' tab. It is
+ * the only caller. The scheduled Databricks notebooks do NOT come through here
+ * — they authenticate as a service account and write to the Sheet directly
+ * with gspread.
+ *
+ * The userscript posts to a *versioned* deployment (@89 - Public_V89), not
+ * @HEAD, so edits to this file do not reach it on `clasp push` alone: a new
+ * version has to be deployed and its URL put into REPORT_POST_URLS_BACKFILL
+ * in the userscript.
  *
  * Two things happen here that used to happen elsewhere, or not at all:
  *
@@ -66,10 +74,10 @@ function doPost(e) {
       SpreadsheetApp.flush();
 
       // Never let a correction failure fail the delivery. The rows are already
-      // safely on the tab; answering with an error would invite Databricks to
-      // retry and append the same batch twice, which is a worse problem than
-      // a batch that is briefly uncorrected. formatColumnCPeriodically (or the
-      // Scripts menu) repairs it.
+      // safely on the tab; answering with an error would show the report as
+      // failed in the userscript and invite a re-run that appends the same
+      // batch twice, which is a worse problem than a batch that is briefly
+      // uncorrected. formatColumnCPeriodically (or the Scripts menu) repairs it.
       try {
         correctDataRows_(sheet, startRow, rows.length);
       } catch (fmtErr) {
