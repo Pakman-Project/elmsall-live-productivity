@@ -1,8 +1,15 @@
 /************************************************************
- * DATABRICKS DELIVERY ENDPOINT
+ * REPORT DELIVERY ENDPOINT
  *
- * Databricks POSTs a CSV/TSV body here every 15 minutes and the rows are
- * appended to the 'Data' tab.
+ * The 'PSD - Bonus Hub Report Runner' userscript POSTs a CSV/TSV body here and
+ * the rows are appended to the 'Data' tab.
+ *
+ * This is NOT the Databricks feed, despite what this header used to say.
+ * Databricks never comes through here: it holds a service account and writes to
+ * the spreadsheet directly with the Sheets API, appending to 'Data' and
+ * rebuilding 'Processed Data (15mins)' itself. This endpoint exists for the
+ * browser-side report runner, which has no credentials of its own and so has to
+ * hand its rows to the web app instead.
  *
  * Two things happen here that used to happen elsewhere, or not at all:
  *
@@ -66,10 +73,10 @@ function doPost(e) {
       SpreadsheetApp.flush();
 
       // Never let a correction failure fail the delivery. The rows are already
-      // safely on the tab; answering with an error would invite Databricks to
-      // retry and append the same batch twice, which is a worse problem than
-      // a batch that is briefly uncorrected. formatColumnCPeriodically (or the
-      // Scripts menu) repairs it.
+      // safely on the tab; answering with an error would invite the report
+      // runner to retry and append the same batch twice, which is a worse
+      // problem than a batch briefly uncorrected. formatColumnCPeriodically
+      // (or the Scripts menu) repairs it.
       try {
         correctDataRows_(sheet, startRow, rows.length);
       } catch (fmtErr) {
