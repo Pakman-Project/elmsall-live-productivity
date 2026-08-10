@@ -14,7 +14,8 @@ var VOLUME_TYPES = [
   { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'Inbound Decanting', color: '#48dbfb' },
   { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', color: '#feca57' },
   { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', color: '#f368e0' },
-  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', color: '#38ada9' }
+  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', color: '#38ada9' },
+  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', color: '#a3cb38' }
 ];
 
 // Ordered to match #mainTable's column order (and the CSV export header order) —
@@ -28,7 +29,8 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'inboundDecantingVol', label: 'Inbound Decanting' },
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
-  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' }
+  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' }
 ];
 
 // Mirrors the #mainTable <th data-key> list, used to populate the mobile sort <select>.
@@ -46,6 +48,7 @@ var mainTableSortableColumns = [
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
   { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
   { key: 'performance', label: 'Productivity %' }
 ];
 
@@ -80,7 +83,8 @@ var BREAKDOWN_AREAS = [
   { key: 'inboundDecanting', label: 'Inbound Decanting', color: '#48dbfb' },
   { key: 'osrDecanting', label: 'OSR Decanting', color: '#feca57' },
   { key: 'bcrInducting', label: 'BCR Inducting', color: '#f368e0' },
-  { key: 'e1e2Inducting', label: 'E1/E2 Inducting', color: '#38ada9' }
+  { key: 'e1e2Inducting', label: 'E1/E2 Inducting', color: '#38ada9' },
+  { key: 'sorter6Packing', label: 'Sorter 6 Packing', color: '#a3cb38' }
 ];
 
 // APP_CONFIG.colors is the CHART palette — saturated colours chosen to read as

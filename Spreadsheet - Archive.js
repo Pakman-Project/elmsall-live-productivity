@@ -18,8 +18,13 @@
 const ARCHIVE_CFG = {
   DATA_SHEET_NAME: 'Data',
   PROCESSED_SHEET_NAME: 'Processed Data (15mins)',
-  // 'Processed Data (15mins)' is A:C (keys) + D:V (derived) = 22 columns.
-  PROCESSED_SHEET_COLS: 22,
+  // Width of 'Processed Data (15mins)' is NOT fixed here: it is A:C (keys) plus
+  // two blocks that grow by one column each time a work area is added — 22
+  // columns for 9 areas, 24 for 10. A constant that lags the tab silently
+  // excludes the newest area's columns from the clear and, worse, from the sort,
+  // which would shear those two columns away from the rows they belong to.
+  // Read from the tab instead; see processedSheetCols_.
+  PROCESSED_SHEET_COLS_FALLBACK: 22,
   FRONT_SHEET_NAME: 'Front',
   ARCHIVE_FOLDER_ID: '1eFML5s-EdF0mpImJoAv_2I0yobxpm0vt',
   HEADER_ROWS: 1,
@@ -260,16 +265,33 @@ function trimArchiveProcessedData_(archiveSS, dateKey) {
   let cleared = 0;
   for (let i = 0; i < clearBlocks.length; i++) cleared += clearBlocks[i][1];
 
-  applyClearBlocks_(sheet, clearBlocks, ARCHIVE_CFG.PROCESSED_SHEET_COLS);
+  const procCols = processedSheetCols_(sheet);
+
+  applyClearBlocks_(sheet, clearBlocks, procCols);
 
   // Sorted so the kept rows compact to the top and the blanks sink, matching
   // what the live trim does to Data.
   if (cleared > 0 && cleared < numRows) {
-    sheet.getRange(startRow, 1, numRows, ARCHIVE_CFG.PROCESSED_SHEET_COLS)
+    sheet.getRange(startRow, 1, numRows, procCols)
          .sort({ column: 1, ascending: true });
   }
 
   return cleared;
+}
+
+/**
+ * How wide 'Processed Data (15mins)' actually is on THIS file.
+ *
+ * Archives are frozen copies, so an old one is genuinely narrower than today's
+ * live tab and must be trimmed and sorted at its own width — a hard-coded
+ * number is wrong for every file that is not the current layout.
+ *
+ * getLastColumn() is the tab's own answer. The fallback only covers a tab so
+ * empty that it reports nothing, where the width is academic anyway.
+ */
+function processedSheetCols_(sheet) {
+  const cols = sheet.getLastColumn();
+  return cols > 0 ? cols : ARCHIVE_CFG.PROCESSED_SHEET_COLS_FALLBACK;
 }
 
 /**

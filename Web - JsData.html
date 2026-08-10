@@ -154,6 +154,7 @@ function generateMainRows_(data, timeList, opts) {
     var osrDecantingTotal = blockData.reduce(function(sum, r) { return sum + (r.osrDecanting || 0); }, 0);
     var bcrInductingTotal = blockData.reduce(function(sum, r) { return sum + (r.bcrInducting || 0); }, 0);
     var e1e2InductingTotal = blockData.reduce(function(sum, r) { return sum + (r.e1e2Inducting || 0); }, 0);
+    var sorter6PackingTotal = blockData.reduce(function(sum, r) { return sum + (r.sorter6Packing || 0); }, 0);
     var bonuses = {};
     for (var j = 0; j < qualifiedData.length; j++) { bonuses[qualifiedData[j].bonus] = true; }
     var bonusNumber = calculateBonusDisplay(bonuses, selectedBonuses.length > 0);
@@ -167,7 +168,7 @@ function generateMainRows_(data, timeList, opts) {
       hourDeployed = uniqueCount / 4;
     }
     var performance = hourDeployed !== 0 ? (stdHours / hourDeployed) * 100 : 0;
-    rows.push({ dateTime: tr, bonusNumber: bonusNumber, hourDeployed: hourDeployed, stdHours: stdHours, pieVol: pieTotal, topUpVol: topUpTotal, e3PackingVol: e3PackingTotal, parcelSortationVol: parcelSortationTotal, parcelInductVol: parcelInductTotal, inboundDecantingVol: inboundDecantingTotal, osrDecantingVol: osrDecantingTotal, bcrInductingVol: bcrInductingTotal, e1e2InductingVol: e1e2InductingTotal, performance: performance, rawBonusSet: bonuses });
+    rows.push({ dateTime: tr, bonusNumber: bonusNumber, hourDeployed: hourDeployed, stdHours: stdHours, pieVol: pieTotal, topUpVol: topUpTotal, e3PackingVol: e3PackingTotal, parcelSortationVol: parcelSortationTotal, parcelInductVol: parcelInductTotal, inboundDecantingVol: inboundDecantingTotal, osrDecantingVol: osrDecantingTotal, bcrInductingVol: bcrInductingTotal, e1e2InductingVol: e1e2InductingTotal, sorter6PackingVol: sorter6PackingTotal, performance: performance, rawBonusSet: bonuses });
   });
   return rows;
 }
@@ -189,6 +190,7 @@ function buildIndividualEntryRows_(entries) {
       osrDecantingVol: Number(r.osrDecanting) || 0,
       bcrInductingVol: Number(r.bcrInducting) || 0,
       e1e2InductingVol: Number(r.e1e2Inducting) || 0,
+      sorter6PackingVol: Number(r.sorter6Packing) || 0,
       performance: stdHours / 0.25 * 100
     };
   });
@@ -236,10 +238,10 @@ function getAggregatedDataPak(rows, windowMinutes) {
     else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
     else { groupDate.setSeconds(0, 0); }
     var k = groupDate.getTime();
-    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bcrInductingVol: 0, e1e2InductingVol: 0, bonusSet: {} }; }
+    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bcrInductingVol: 0, e1e2InductingVol: 0, sorter6PackingVol: 0, bonusSet: {} }; }
     var g = groups[k];
     g.blockCount++;
-    g.hourDeployed += (Number(r.hourDeployed) || 0); g.stdHours += (Number(r.stdHours) || 0); g.pieVol += (Number(r.pieVol) || 0); g.topUpVol += (Number(r.topUpVol) || 0); g.e3PackingVol += (Number(r.e3PackingVol) || 0); g.parcelSortationVol += (Number(r.parcelSortationVol) || 0); g.parcelInductVol += (Number(r.parcelInductVol) || 0); g.inboundDecantingVol += (Number(r.inboundDecantingVol) || 0); g.osrDecantingVol += (Number(r.osrDecantingVol) || 0); g.bcrInductingVol += (Number(r.bcrInductingVol) || 0); g.e1e2InductingVol += (Number(r.e1e2InductingVol) || 0);
+    g.hourDeployed += (Number(r.hourDeployed) || 0); g.stdHours += (Number(r.stdHours) || 0); g.pieVol += (Number(r.pieVol) || 0); g.topUpVol += (Number(r.topUpVol) || 0); g.e3PackingVol += (Number(r.e3PackingVol) || 0); g.parcelSortationVol += (Number(r.parcelSortationVol) || 0); g.parcelInductVol += (Number(r.parcelInductVol) || 0); g.inboundDecantingVol += (Number(r.inboundDecantingVol) || 0); g.osrDecantingVol += (Number(r.osrDecantingVol) || 0); g.bcrInductingVol += (Number(r.bcrInductingVol) || 0); g.e1e2InductingVol += (Number(r.e1e2InductingVol) || 0); g.sorter6PackingVol += (Number(r.sorter6PackingVol) || 0);
     if (r.rawBonusSet) { for (var bKey in r.rawBonusSet) { if (r.rawBonusSet.hasOwnProperty(bKey)) { g.bonusSet[bKey] = true; } } }
   });
   var result = [];
@@ -249,7 +251,7 @@ function getAggregatedDataPak(rows, windowMinutes) {
   sortedKeys.forEach(function(k) {
     var g = groups[k]; var start = g.startTime; var end = new Date(start.getTime() + (windowMinutes * 60000));
     var label = formatDatePak(start) + ' - ' + formatDatePak(end);
-    result.push({ dateTime: label, rangeLabel: label, hourDeployed: g.hourDeployed, stdHours: g.stdHours, pieVol: g.pieVol, topUpVol: g.topUpVol, e3PackingVol: g.e3PackingVol, parcelSortationVol: g.parcelSortationVol, parcelInductVol: g.parcelInductVol, inboundDecantingVol: g.inboundDecantingVol, osrDecantingVol: g.osrDecantingVol, bcrInductingVol: g.bcrInductingVol, e1e2InductingVol: g.e1e2InductingVol, performance: g.hourDeployed > 0 ? (g.stdHours / g.hourDeployed) * 100 : 0, bonusNumber: calculateBonusDisplay(g.bonusSet, isFiltered) });
+    result.push({ dateTime: label, rangeLabel: label, hourDeployed: g.hourDeployed, stdHours: g.stdHours, pieVol: g.pieVol, topUpVol: g.topUpVol, e3PackingVol: g.e3PackingVol, parcelSortationVol: g.parcelSortationVol, parcelInductVol: g.parcelInductVol, inboundDecantingVol: g.inboundDecantingVol, osrDecantingVol: g.osrDecantingVol, bcrInductingVol: g.bcrInductingVol, e1e2InductingVol: g.e1e2InductingVol, sorter6PackingVol: g.sorter6PackingVol, performance: g.hourDeployed > 0 ? (g.stdHours / g.hourDeployed) * 100 : 0, bonusNumber: calculateBonusDisplay(g.bonusSet, isFiltered) });
   });
   return result;
 }

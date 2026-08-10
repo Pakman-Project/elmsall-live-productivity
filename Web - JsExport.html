@@ -11,7 +11,7 @@ var RAW_DATA_CSV_HEADERS_ = [
   'Time Block', 'Bonus Number', 'Est. Hours Deployed', 'Standard Hours',
   'PiE', 'Top Up', 'E3 Packing', 'Parcel Induct',
   'Parcel Sortation', 'Inbound Decanting', 'OSR Decanting',
-  'BCR Inducting', 'E1/E2 Inducting',
+  'BCR Inducting', 'E1/E2 Inducting', 'Sorter 6 Packing',
   'Productivity %'
 ];
 
@@ -30,6 +30,7 @@ function entryRowToCsvLinePak_(r) {
     Math.round(Number(r.osrDecantingVol) || 0),
     Math.round(Number(r.bcrInductingVol) || 0),
     Math.round(Number(r.e1e2InductingVol) || 0),
+    Math.round(Number(r.sorter6PackingVol) || 0),
     (Number(r.performance) || 0).toFixed(1)
   ].map(csvEscapePak).join(',');
 }

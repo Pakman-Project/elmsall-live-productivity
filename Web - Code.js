@@ -51,7 +51,7 @@ function doGet(e) {
   t.webAppUrl = url;
 
   return t.evaluate()
-    .setTitle('E3 Live Productivity')
+    .setTitle('Elmsall Dashboard')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -241,75 +241,128 @@ function getArchiveLinks() {
 }
 
 // ─────────────────────────────────────────────
-// Helpers: read Processed Data (15mins) rows, handling both layouts.
-// v2 (current): std D:L (idx 3-11), total M (idx 12), volumes N:V (idx 13-21).
-// v1 (legacy archives, pre BCR/E1-E2): std D:J (3-9), total K (10), volumes L:R (11-17).
-// Detected via L1: in v2 it is the last "D.Analysis - ..." header.
+// Processed Data (15mins) column mapping.
+//
+// The tab has grown twice — 7 work areas, then 9, now 10 — and every archive is
+// a frozen copy of whichever layout was current the day it was cut. Offsets
+// were previously hard-coded per version and chosen by sniffing L1, which meant
+// each new area needed a third set of magic numbers and left the sniff test
+// increasingly arbitrary.
+//
+// The header row is the sheet's own description of its layout, so it is read
+// and each area located by name instead. A file holding any subset of these
+// columns, in any order, is then read correctly, and the next new area needs
+// one line here rather than a new layout version.
+//
+// stdHeader is the report name the notebook writes into the standard-hours
+// block; volHeader is that area's volume column. An area whose columns are
+// absent from a file reads as 0 — which is what a pre-BCR archive should show.
 // ─────────────────────────────────────────────
+var PROC_TOTAL_HEADER_ = 'Sum of Std hrs';
+
+var PROC_AREA_COLUMNS_ = [
+  { key: 'pie',              stdHeader: 'D.Analysis - OSR PiE',            volHeader: 'Volume - PiE' },
+  { key: 'topUp',            stdHeader: 'D.Analysis - OSR Topup',          volHeader: 'Volume - Top Up' },
+  { key: 'e3Packing',        stdHeader: 'D.Analysis - E3 Packing',         volHeader: 'Volume - E3 Packing' },
+  { key: 'parcelSortation',  stdHeader: 'D.Analysis - Parcel Sortation',   volHeader: 'Volume - Parcel Sortation' },
+  { key: 'parcelInduct',     stdHeader: 'D.Analysis - Parcel Induct',      volHeader: 'Volume - Parcel Induct' },
+  { key: 'inboundDecanting', stdHeader: 'D.Analysis - Inbound Decanting',  volHeader: 'Volume - Inbound Decanting' },
+  { key: 'osrDecanting',     stdHeader: 'D.Analysis - OSR Decanting',      volHeader: 'Volume - OSR Decanting' },
+  { key: 'bcrInducting',     stdHeader: 'D.Analysis - BCR Inducting',      volHeader: 'Volume - BCR Inducting' },
+  { key: 'e1e2Inducting',    stdHeader: 'D.Analysis - E1/E2 Inducting',    volHeader: 'Volume - E1/E2 Inducting' },
+  { key: 'sorter6Packing',   stdHeader: 'D.Analysis - Sorter 6 Packing',   volHeader: 'Volume - Sorter 6 Packing' }
+];
+
+// Headers are typed and re-typed by hand on ten-odd archive files, so they are
+// matched on a normalised form rather than exactly: stray double spaces and
+// casing differences should not silently zero a column.
+function normaliseProcHeader_(v) {
+  return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function buildProcColumnMap_(headerRow) {
+  var idx = {};
+  for (var c = 0; c < headerRow.length; c++) {
+    var name = normaliseProcHeader_(headerRow[c]);
+    // First occurrence wins: a duplicated header is far more likely to be a
+    // stray copy off to the right than the real column.
+    if (name && !idx.hasOwnProperty(name)) idx[name] = c;
+  }
+
+  var totalIdx = idx[normaliseProcHeader_(PROC_TOTAL_HEADER_)];
+  var map = { total: (totalIdx === undefined) ? -1 : totalIdx, areas: [] };
+
+  for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
+    var a = PROC_AREA_COLUMNS_[i];
+    var s = idx[normaliseProcHeader_(a.stdHeader)];
+    var v = idx[normaliseProcHeader_(a.volHeader)];
+    map.areas.push({
+      key: a.key,
+      std: (s === undefined) ? -1 : s,
+      vol: (v === undefined) ? -1 : v
+    });
+  }
+  return map;
+}
+
+// Fallback for a file whose header row is missing or has been renamed past
+// recognition. Reproduces exactly what the old positional reader did, so such a
+// file keeps rendering as it did before rather than coming back empty.
+// v2: std D:L (3-11), total M (12), volumes N:V (13-21).
+// v1: std D:J (3-9),  total K (10), volumes L:R (11-17).
+function legacyProcColumnMap_(isV2) {
+  var positional = ['pie', 'topUp', 'e3Packing', 'parcelSortation', 'parcelInduct',
+                    'inboundDecanting', 'osrDecanting', 'bcrInducting', 'e1e2Inducting'];
+  var n = isV2 ? 9 : 7;
+  var total = 3 + n;
+  var map = { total: total, areas: [] };
+
+  for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
+    var key = PROC_AREA_COLUMNS_[i].key;
+    var pos = positional.indexOf(key);
+    var present = pos !== -1 && pos < n;
+    map.areas.push({
+      key: key,
+      std: present ? (3 + pos) : -1,
+      vol: present ? (total + 1 + pos) : -1
+    });
+  }
+  return map;
+}
+
 function readProcRows_(sheet, lastRow) {
-  var l1 = String(sheet.getRange('L1').getDisplayValue() || '');
-  var isV2 = l1.indexOf('D.Analysis') === 0;
-  var cols = isV2 ? 22 : 18;
+  var lastCol = sheet.getLastColumn();
+  var header = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0] : [];
+  var map = buildProcColumnMap_(header);
+
+  if (map.total < 0) {
+    // No recognisable total column: fall back to the old L1 sniff.
+    map = legacyProcColumnMap_(String(header[11] || '').indexOf('D.Analysis') === 0);
+  }
+
   return {
-    vals: sheet.getRange(2, 1, lastRow - 1, cols).getValues(),
+    vals: sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, map.total + 1)).getValues(),
     // Only columns A:C are ever needed as display values — buildSideEntry_ reads
     // dispsRow[0] (time range) and dispsRow[2] (bonus) and takes every other
-    // field from vals, in BOTH the v1 and v2 layouts. Reading 3 columns instead
-    // of the full 18/22 removes most of a second full-sheet read per call.
+    // field from vals. Reading 3 columns instead of the full width removes most
+    // of a second full-sheet read per call.
     disps: sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues(),
-    isV2: isV2
+    map: map
   };
 }
 
-function buildSideEntry_(valsRow, dispsRow, isV2) {
-  if (isV2) {
-    return {
-      timeRange: String(dispsRow[0]).trim(),
-      bonus: String(dispsRow[2]).trim(),
-      value: toNumber_(valsRow[12]),
-      pieStd: toNumber_(valsRow[3]),
-      topUpStd: toNumber_(valsRow[4]),
-      e3PackingStd: toNumber_(valsRow[5]),
-      parcelSortationStd: toNumber_(valsRow[6]),
-      parcelInductStd: toNumber_(valsRow[7]),
-      inboundDecantingStd: toNumber_(valsRow[8]),
-      osrDecantingStd: toNumber_(valsRow[9]),
-      bcrInductingStd: toNumber_(valsRow[10]),
-      e1e2InductingStd: toNumber_(valsRow[11]),
-      pie: toNumber_(valsRow[13]),
-      topUp: toNumber_(valsRow[14]),
-      e3Packing: toNumber_(valsRow[15]),
-      parcelSortation: toNumber_(valsRow[16]),
-      parcelInduct: toNumber_(valsRow[17]),
-      inboundDecanting: toNumber_(valsRow[18]),
-      osrDecanting: toNumber_(valsRow[19]),
-      bcrInducting: toNumber_(valsRow[20]),
-      e1e2Inducting: toNumber_(valsRow[21])
-    };
-  }
-  return {
+function buildSideEntry_(valsRow, dispsRow, map) {
+  var entry = {
     timeRange: String(dispsRow[0]).trim(),
     bonus: String(dispsRow[2]).trim(),
-    value: toNumber_(valsRow[10]),
-    pieStd: toNumber_(valsRow[3]),
-    topUpStd: toNumber_(valsRow[4]),
-    e3PackingStd: toNumber_(valsRow[5]),
-    parcelSortationStd: toNumber_(valsRow[6]),
-    parcelInductStd: toNumber_(valsRow[7]),
-    inboundDecantingStd: toNumber_(valsRow[8]),
-    osrDecantingStd: toNumber_(valsRow[9]),
-    bcrInductingStd: 0,
-    e1e2InductingStd: 0,
-    pie: toNumber_(valsRow[11]),
-    topUp: toNumber_(valsRow[12]),
-    e3Packing: toNumber_(valsRow[13]),
-    parcelSortation: toNumber_(valsRow[14]),
-    parcelInduct: toNumber_(valsRow[15]),
-    inboundDecanting: toNumber_(valsRow[16]),
-    osrDecanting: toNumber_(valsRow[17]),
-    bcrInducting: 0,
-    e1e2Inducting: 0
+    value: map.total >= 0 ? toNumber_(valsRow[map.total]) : 0
   };
+  for (var i = 0; i < map.areas.length; i++) {
+    var a = map.areas[i];
+    entry[a.key + 'Std'] = a.std >= 0 ? toNumber_(valsRow[a.std]) : 0;
+    entry[a.key] = a.vol >= 0 ? toNumber_(valsRow[a.vol]) : 0;
+  }
+  return entry;
 }
 
 // ─────────────────────────────────────────────
@@ -437,7 +490,10 @@ function getDashboardData(archiveUrl) {
 
       if (yKeys.length) {
         yKeys.sort();
-        yCacheKey = 'ydayArch_v1_' + yesterdayStr + '_' + yKeys.length +
+        // v2 in the key, not v1: entries cached by the previous build carry no
+        // sorter6Packing field, and yesterday's rows would read as blank for
+        // that area until the old entries expired.
+        yCacheKey = 'ydayArch_v2_' + yesterdayStr + '_' + yKeys.length +
                     '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {
@@ -456,7 +512,7 @@ function getDashboardData(archiveUrl) {
             var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
 
             for (var i = 0; i < aRead.vals.length; i++) {
-              var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.isV2);
+              var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
               if (!yesterdayTRSet[aEntry.timeRange]) continue;
               if (!aEntry.bonus || aEntry.value <= 0) continue;
               yEntries.push(aEntry);
@@ -480,7 +536,7 @@ function getDashboardData(archiveUrl) {
       var lRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
 
       for (var i = 0; i < lRead.vals.length; i++) {
-        var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.isV2);
+        var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.map);
         if (!lEntry.bonus || lEntry.value <= 0) continue;
 
         var lKey = lEntry.timeRange + '||' + lEntry.bonus;
@@ -519,7 +575,7 @@ function getDashboardData(archiveUrl) {
       }
 
       for (var i = 0; i < sRead.vals.length; i++) {
-        var entry = buildSideEntry_(sRead.vals[i], sRead.disps[i], sRead.isV2);
+        var entry = buildSideEntry_(sRead.vals[i], sRead.disps[i], sRead.map);
         if (timeSet[entry.timeRange] && entry.bonus && entry.value > 0) {
           rawSideData.push(entry);
           bonusSet[entry.bonus] = true;

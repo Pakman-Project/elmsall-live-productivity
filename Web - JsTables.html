@@ -167,6 +167,7 @@ function renderMainTablePak(sourceRows) {
         numTdPak(r.osrDecantingVol, 0) +
         numTdPak(r.bcrInductingVol, 0) +
         numTdPak(r.e1e2InductingVol, 0) +
+        numTdPak(r.sorter6PackingVol, 0) +
         '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
 
       (function (rowEl, rowData) {
@@ -316,6 +317,7 @@ var DETAIL_TABLE_COLUMNS = [
   { key: 'osrDecantingVol',     label: 'OSR Decanting',       type: 'num' },
   { key: 'bcrInductingVol',     label: 'BCR Inducting',       type: 'num' },
   { key: 'e1e2InductingVol',    label: 'E1/E2 Inducting',     type: 'num' },
+  { key: 'sorter6PackingVol',   label: 'Sorter 6 Packing',    type: 'num' },
   { key: 'performance',         label: 'Productivity %',      type: 'num' }
 ];
 
@@ -415,6 +417,7 @@ function buildEntryDetailRowHtml_(r) {
     numTdPak(r.osrDecantingVol, 0) +
     numTdPak(r.bcrInductingVol, 0) +
     numTdPak(r.e1e2InductingVol, 0) +
+    numTdPak(r.sorter6PackingVol, 0) +
     '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>' +
     '</tr>';
 }
