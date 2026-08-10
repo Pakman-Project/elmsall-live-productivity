@@ -51,7 +51,7 @@ function doGet(e) {
   t.webAppUrl = url;
 
   return t.evaluate()
-    .setTitle('Elmsall Dashboard')
+    .setTitle('Elmsall Live Productivity')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

@@ -39,17 +39,17 @@ function showDashboardPreview_(width, height, title, forceTour) {
 }
 
 function previewDashboard() {
-  showDashboardPreview_(1400, 850, 'Elmsall Dashboard — Dev Preview', '');
+  showDashboardPreview_(1400, 850, 'Elmsall Live Productivity — Dev Preview', '');
 }
 
 function previewDashboardMobile() {
-  showDashboardPreview_(680, 1300, 'Elmsall Dashboard — Mobile Preview', '');
+  showDashboardPreview_(680, 1300, 'Elmsall Live Productivity — Mobile Preview', '');
 }
 
 // Reproduces what a brand-new user sees: clears the "tour seen" flag so the
 // tour auto-starts exactly as it does on a genuine first visit.
 function previewDashboardFirstTime() {
-  showDashboardPreview_(1400, 850, 'Elmsall Dashboard — First-time (Tour)', 'reset');
+  showDashboardPreview_(1400, 850, 'Elmsall Live Productivity — First-time (Tour)', 'reset');
 }
 
 function confirmRunDailyAutomation() {
