@@ -1,5 +1,5 @@
 /************************************************************
- * 'Data' TAB CORRECTION — column C names, column F hours
+ * 'Data' TAB CORRECTION — column C names, column G hours
  *
  * A SAFETY NET, not a step in the live pipeline. Read that first, because it
  * used to be the opposite and the difference matters.
@@ -34,7 +34,7 @@
  *
  * NOTE: this deliberately does NOT touch 'Processed Data (15mins)'. Databricks
  * is the sole writer of that tab, and it rebuilds it in full every 15 minutes.
- * A second writer editing its column C while the notebook is writing A2:V can
+ * A second writer editing its column C while the notebook is writing that tab can
  * pair one row's bonus code with another row's figures — and since the pivot
  * key now folds case itself, there is nothing there to gain in exchange.
  ************************************************************/
@@ -42,9 +42,10 @@
 var DATA_SHEET_NAME_ = 'Data';
 // Column C (1-based) holds the bonus number / name being corrected.
 var NAME_COLUMN_ = 3;
-// Column F is derived, column G is its source: F = G / 60.
-var HOURS_OUT_COLUMN_ = 6;
-var HOURS_IN_COLUMN_ = 7;
+// Standard Hours is derived, SMV is its source: StandardHours = SMV / 60.
+// Columns G and H since Attribute was inserted after Event Type; F and G before.
+var HOURS_OUT_COLUMN_ = 7;
+var HOURS_IN_COLUMN_ = 8;
 
 /**
  * Written-out clock times that should be stored as the short shift codes the
@@ -141,24 +142,24 @@ function correctNameColumn_(sheet, startRow, numRows) {
 }
 
 /**
- * Recomputes column F (= G / 60, to 4 significant figures) for a block of rows.
+ * Recomputes column G (= H / 60, to 4 significant figures) for a block of rows.
  */
 function calculateHoursColumn_(sheet, startRow, numRows) {
   if (numRows < 1) return;
-  var gValues = sheet.getRange(startRow, HOURS_IN_COLUMN_, numRows, 1).getValues();
+  var smvValues = sheet.getRange(startRow, HOURS_IN_COLUMN_, numRows, 1).getValues();
 
-  var fValues = gValues.map(function (row) {
-    var g = row[0];
-    if (g === '' || g === null || g === undefined) return [''];
+  var hourValues = smvValues.map(function (row) {
+    var smv = row[0];
+    if (smv === '' || smv === null || smv === undefined) return [''];
 
-    var num = Number(g);
+    var num = Number(smv);
     if (isNaN(num)) return [''];
 
     return [Number((num / 60).toPrecision(4))];
   });
 
   var outRange = sheet.getRange(startRow, HOURS_OUT_COLUMN_, numRows, 1);
-  outRange.setValues(fValues);
+  outRange.setValues(hourValues);
   // Up to 4 decimal places, without trailing zeros.
   outRange.setNumberFormat('0.####');
 }
@@ -210,7 +211,7 @@ function confirmFormatDataTab() {
   var ui = SpreadsheetApp.getUi();
   var response = ui.alert(
     'Correct the Data tab',
-    'Re-applies the column C name corrections and recalculates column F across ' +
+    'Re-applies the column C name corrections and recalculates column G across ' +
     'the whole Data tab.\n\nRows delivered by Databricks are already correct as ' +
     'they arrive — this is a safety net for rows added another way, such as a ' +
     'manual paste. Processed Data is not touched; Databricks rebuilds it.\n\n' +

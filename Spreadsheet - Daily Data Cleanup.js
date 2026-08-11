@@ -3,8 +3,8 @@
  *
  * Intended for a time-driven trigger at 04:00. In order:
  *   1. Drop every row in A2:A whose date is not today (dd/mm/yyyy).
- *   2. Drop duplicate rows - identical across A:J.
- *   3. Sort what remains by column I.
+ *   2. Drop duplicate rows - identical across A:K.
+ *   3. Sort what remains by column J.
  *
  * 'Processed Data (15mins)' is deliberately NOT touched. The Databricks
  * notebook rebuilds it from the whole 'Data' tab at the end of every delivery,
@@ -29,12 +29,15 @@
  * batch. Those accumulate, and this clears them out as a side effect.
  ************************************************************/
 
-// Columns A:J - what to dedupe on, and what the pipeline reads.
-var CLEANUP_KEY_COLUMNS_ = 10;
-// Column I (1-based), the time-block key everything downstream orders by.
-var CLEANUP_SORT_COLUMN_ = 9;
+// Columns A:K - what to dedupe on, and what the pipeline reads. Eleven since
+// the Attribute column was inserted after Event Type; ten before that.
+var CLEANUP_KEY_COLUMNS_ = 11;
+// Column J (1-based), the time-block key everything downstream orders by. It
+// moved from I when Attribute was inserted ahead of it.
+var CLEANUP_SORT_COLUMN_ = 10;
 /**
- * Identity of a row for duplicate detection: its first ten displayed cells.
+ * Identity of a row for duplicate detection: its first CLEANUP_KEY_COLUMNS_
+ * displayed cells.
  *
  * JSON.stringify rather than join(separator). Joining on any printable
  * character lets two different rows collide - ['a|b','c'] and ['a','b|c']
@@ -82,10 +85,10 @@ function dailyDataCleanup() {
     return;
   }
 
-  // Read the full used width, not just A:J. If anything ever lands in K or
-  // beyond, rewriting only the first ten columns would leave it attached to
+  // Read the full used width, not just A:K. If anything ever lands beyond the
+  // key columns, rewriting only those would leave it attached to
   // whichever row ended up in its place - silent corruption. The duplicate key
-  // and the sort still only look at A:J.
+  // and the sort still only look at A:K.
   var width = Math.max(CLEANUP_KEY_COLUMNS_, sheet.getLastColumn());
   var range = sheet.getRange(2, 1, lastRow - 1, width);
   var values = range.getValues();
@@ -132,8 +135,8 @@ function dailyDataCleanup() {
   sheet.getRange(2, 1, lastRow - 1, width).clearContent();
   if (kept.length > 0) {
     sheet.getRange(2, 1, kept.length, width).setValues(kept);
-    // Sorted after writing, by column I, exactly as the sheet's own sort would.
-    // This is a value sort: if column I holds TEXT rather than real datetimes,
+    // Sorted after writing, by column J, exactly as the sheet's own sort would.
+    // This is a value sort: if column J holds TEXT rather than real datetimes,
     // the order is lexicographic, which for dd/mm/yyyy strings is not
     // chronological. That is already how the Databricks rebuild orders these
     // (it sorts on the parsed window start, then bonus), so it is left
@@ -164,7 +167,7 @@ function confirmDailyDataCleanup() {
   var resp = ui.alert(
     'Clean up Data tab',
     'This deletes every row in Data that is not dated today, removes duplicate ' +
-    'rows and sorts by column I.\n\nProcessed Data is rebuilt by Databricks ' +
+    'rows and sorts by column J.\n\nProcessed Data is rebuilt by Databricks ' +
     'within fifteen minutes and is not touched here.\n\nContinue?',
     ui.ButtonSet.YES_NO);
   if (resp !== ui.Button.YES) return;

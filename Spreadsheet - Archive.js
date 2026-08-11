@@ -5,13 +5,13 @@
  *   runDailyAutomation()
  *
  * Strategy:
- * 1. Sort Data!A2:K by Column I
+ * 1. Sort Data!A2:<used width> by Column J (Date Time Range)
  * 2. Read only Data!A:A to get row date keys
  * 3. For each past date:
  *    - make archive copy
  *    - clear every row that is not that date
  *    - set Front!B2
- * 4. Live file keeps ONLY today by clear all other rows, Sort Data!A2:K by Column I again
+ * 4. Live file keeps ONLY today by clear all other rows, sort Data again by Column J
  * 5. Refresh the Links sheet with current archive files
  ************************************************************/
 
@@ -26,6 +26,10 @@ const ARCHIVE_CFG = {
   // Read from the tab instead; see processedSheetCols_.
   PROCESSED_SHEET_COLS_FALLBACK: 22,
   FRONT_SHEET_NAME: 'Front',
+  // 'Date Time Range' on the Data tab, the time-block key everything downstream
+  // orders by. Column J since the Attribute column was inserted after Event
+  // Type; it was I before.
+  DATA_SORT_COLUMN: 10,
   ARCHIVE_FOLDER_ID: '1eFML5s-EdF0mpImJoAv_2I0yobxpm0vt',
   HEADER_ROWS: 1,
   FILE_DATE_FORMAT: 'dd/MM/yyyy',
@@ -78,13 +82,18 @@ function archivePastDatesAndTrimLive_() {
   }
 
   /* ---------------------------------------------------------
-   * SORT Data!A2:K by Column I before reading/processing
+   * SORT the Data rows by Column J before reading/processing
    * --------------------------------------------------------- */
   const dataStartRow = ARCHIVE_CFG.HEADER_ROWS + 1;
   const numDataRows = lastRow - ARCHIVE_CFG.HEADER_ROWS;
-  log_(`Sorting Data range (A${dataStartRow}:K${lastRow}) by Column I...`);
-  // Column I is the 9th column. Change ascending to false if you need Descending.
-  liveSheet.getRange(dataStartRow, 1, numDataRows, 11).sort({ column: 9, ascending: true });
+  // Sort the full USED width rather than a fixed count. The tab was ten columns
+  // wide, then eleven once Attribute was inserted, and a sort narrower than the
+  // data shears the columns it misses away from the rows they belong to —
+  // silently, and only for the rows that actually moved.
+  const dataCols = Math.max(liveSheet.getLastColumn(), ARCHIVE_CFG.DATA_SORT_COLUMN);
+  log_(`Sorting Data rows ${dataStartRow}-${lastRow} (${dataCols} cols) by Column J...`);
+  liveSheet.getRange(dataStartRow, 1, numDataRows, dataCols)
+           .sort({ column: ARCHIVE_CFG.DATA_SORT_COLUMN, ascending: true });
   log_('Sort complete.');
   /* --------------------------------------------------------- */
 
@@ -331,9 +340,12 @@ function trimLiveByClearingRows_(sheet, rowKeys, startRow, allowedKeys) {
 
   applyClearBlocks_(sheet, clearBlocks);
 
-  // Re-sort by Column I so today's kept rows compact to the top and the
-  // now-blank cleared rows sink to the bottom.
-  sheet.getRange(startRow, 1, rowKeys.length, 11).sort({ column: 9, ascending: true });
+  // Re-sort by Column J so today's kept rows compact to the top and the
+  // now-blank cleared rows sink to the bottom. Full used width, for the same
+  // reason as the sort in archivePastDatesAndTrimLive_.
+  const trimCols = Math.max(sheet.getLastColumn(), ARCHIVE_CFG.DATA_SORT_COLUMN);
+  sheet.getRange(startRow, 1, rowKeys.length, trimCols)
+       .sort({ column: ARCHIVE_CFG.DATA_SORT_COLUMN, ascending: true });
 }
 
 /************************************************************
