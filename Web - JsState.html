@@ -9,17 +9,22 @@ var VOLUME_TYPES = [
   { key: 'pieVol', stdKey: 'pieStd', label: 'PiE', color: '#69a7ff' },
   { key: 'topUpVol', stdKey: 'topUpStd', label: 'Top Up', color: '#32d583' },
   { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', color: '#ff9f43' },
-  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', color: '#a55eea' },
   { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', color: '#ff6b6b' },
+  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', color: '#a55eea' },
   { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'Inbound Decanting', color: '#48dbfb' },
   { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', color: '#feca57' },
   { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', color: '#f368e0' },
   { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', color: '#38ada9' },
-  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', color: '#a3cb38' }
+  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', color: '#a3cb38' },
+  { key: 'onlinePickingDriveVol', stdKey: 'onlinePickingDriveStd', label: 'Online Picking - Drive', color: '#6c5ce7' },
+  { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Online Picking - Way', color: '#b33771' },
+  { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'Online Picking - E3', color: '#e58e26' }
 ];
 
-// Ordered to match #mainTable's column order (and the CSV export header order) —
-// intentionally NOT the same order as VOLUME_TYPES (which swaps Parcel Induct/Sortation).
+// Same order as VOLUME_TYPES, #mainTable's columns and the CSV export header.
+// Parcel Induct used to sit after Parcel Sortation here and before it
+// everywhere else, so the Volume page listed the two the opposite way round to
+// the rest of the dashboard; Induct comes first in both now.
 var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'pieVol', label: 'PiE' },
   { key: 'topUpVol', label: 'Top Up' },
@@ -30,7 +35,10 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
   { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
-  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' }
+  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
+  { key: 'onlinePickingDriveVol', label: 'Online Picking - Drive' },
+  { key: 'onlinePickingWayVol', label: 'Online Picking - Way' },
+  { key: 'onlinePickingE3Vol', label: 'Online Picking - E3' }
 ];
 
 // Mirrors the #mainTable <th data-key> list, used to populate the mobile sort <select>.
@@ -49,6 +57,9 @@ var mainTableSortableColumns = [
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
   { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
   { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
+  { key: 'onlinePickingDriveVol', label: 'Online Picking - Drive' },
+  { key: 'onlinePickingWayVol', label: 'Online Picking - Way' },
+  { key: 'onlinePickingE3Vol', label: 'Online Picking - E3' },
   { key: 'performance', label: 'Productivity %' }
 ];
 
@@ -84,7 +95,10 @@ var BREAKDOWN_AREAS = [
   { key: 'osrDecanting', label: 'OSR Decanting', color: '#feca57' },
   { key: 'bcrInducting', label: 'BCR Inducting', color: '#f368e0' },
   { key: 'e1e2Inducting', label: 'E1/E2 Inducting', color: '#38ada9' },
-  { key: 'sorter6Packing', label: 'Sorter 6 Packing', color: '#a3cb38' }
+  { key: 'sorter6Packing', label: 'Sorter 6 Packing', color: '#a3cb38' },
+  { key: 'onlinePickingDrive', label: 'Online Picking - Drive', color: '#6c5ce7' },
+  { key: 'onlinePickingWay', label: 'Online Picking - Way', color: '#b33771' },
+  { key: 'onlinePickingE3', label: 'Online Picking - E3', color: '#e58e26' }
 ];
 
 // APP_CONFIG.colors is the CHART palette — saturated colours chosen to read as
