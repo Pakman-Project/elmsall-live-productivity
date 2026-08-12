@@ -1909,7 +1909,7 @@ canvas {
   user-select: none;
   position: relative;
   /* Headers wrap onto as many lines as they need. The columns are far narrower
-     now that all fourteen share the viewport, and a clipped "Inbound Decant..."
+     now that all of them share the viewport, and a clipped "Inbound Decant..."
      is worse than a two-line header - the header is read once to learn the
      table, then rarely again, so height costs less than meaning. */
   white-space: normal;
@@ -3407,7 +3407,7 @@ body.page-scrolled-far .back-to-top {
      that is almost always narrower, so it always carried a horizontal
      scrollbar and the right-hand volume columns were off screen. It now sizes
      to the space it has and the columns share that space proportionally
-     (widths below), which is what lets all fourteen be visible at once. */
+     (widths below), which is what lets every column be visible at once. */
   width: 100%;
   table-layout: fixed;
 }
@@ -3426,80 +3426,48 @@ body.page-scrolled-far .back-to-top {
    .main-detail-table (same nth-child position) so the expanded per-entry
    table's columns line up vertically under the Main Table's columns.
 
-   Percentages, not pixels. The two tables used to be pinned at 1770px so every
-   column had room for its widest possible value, which guaranteed a horizontal
-   scrollbar on every screen and put the right-hand volume columns permanently
-   out of view. Sharing the available width instead means all fourteen are
-   visible at once; the ratios are the old pixel widths carried over, so the
-   columns keep their relative importance. */
+   Percentages, not pixels, so every column shares the viewport and all of
+   them are visible at once - see #mainTable above.
+
+   Structured as a BASE width carried by every cell - one area column's share
+   - with overrides for the four identity columns and for Productivity via
+   :last-child. This exists because the previous version enumerated columns
+   1-14 summing to exactly 100%: every column added after that (Sorter 6, the
+   three Online Picking areas) fell outside the list, was starved to a sliver
+   a couple of characters wide, and its header wrapped into the towering
+   header row that made the whole table look broken. Under this scheme a new
+   area column arrives already carrying the base share, and fixed layout just
+   dilutes every column proportionally - no starvation, no CSS edit.
+
+   Current ledger at 18 columns: 12.6 + 8.0 + 6.0 + 5.6 + 13x4.6 + 8.0 = 100. */
+#mainTable th, #mainTable td,
+.main-detail-table th, .main-detail-table td {
+  width: 4.6%;
+}
+
 #mainTable th:nth-child(1), #mainTable td:nth-child(1),
 .main-detail-table th:nth-child(1), .main-detail-table td:nth-child(1) {
-  width: 14.7%;
+  width: 12.6%;
 }
 
 #mainTable th:nth-child(2), #mainTable td:nth-child(2),
 .main-detail-table th:nth-child(2), .main-detail-table td:nth-child(2) {
-  width: 9.6%;
+  width: 8%;
 }
 
 #mainTable th:nth-child(3), #mainTable td:nth-child(3),
 .main-detail-table th:nth-child(3), .main-detail-table td:nth-child(3) {
-  width: 7.3%;
+  width: 6%;
 }
 
 #mainTable th:nth-child(4), #mainTable td:nth-child(4),
 .main-detail-table th:nth-child(4), .main-detail-table td:nth-child(4) {
-  width: 6.8%;
-}
-
-#mainTable th:nth-child(5), #mainTable td:nth-child(5),
-.main-detail-table th:nth-child(5), .main-detail-table td:nth-child(5) {
-  width: 5.1%;
-}
-
-#mainTable th:nth-child(6), #mainTable td:nth-child(6),
-.main-detail-table th:nth-child(6), .main-detail-table td:nth-child(6) {
-  width: 5.1%;
-}
-
-#mainTable th:nth-child(7), #mainTable td:nth-child(7),
-.main-detail-table th:nth-child(7), .main-detail-table td:nth-child(7) {
   width: 5.6%;
 }
 
-#mainTable th:nth-child(8), #mainTable td:nth-child(8),
-.main-detail-table th:nth-child(8), .main-detail-table td:nth-child(8) {
-  width: 5.6%;
-}
-
-#mainTable th:nth-child(9), #mainTable td:nth-child(9),
-.main-detail-table th:nth-child(9), .main-detail-table td:nth-child(9) {
-  width: 6.2%;
-}
-
-#mainTable th:nth-child(10), #mainTable td:nth-child(10),
-.main-detail-table th:nth-child(10), .main-detail-table td:nth-child(10) {
-  width: 6.8%;
-}
-
-#mainTable th:nth-child(11), #mainTable td:nth-child(11),
-.main-detail-table th:nth-child(11), .main-detail-table td:nth-child(11) {
-  width: 6.8%;
-}
-
-#mainTable th:nth-child(12), #mainTable td:nth-child(12),
-.main-detail-table th:nth-child(12), .main-detail-table td:nth-child(12) {
-  width: 6.8%;
-}
-
-#mainTable th:nth-child(13), #mainTable td:nth-child(13),
-.main-detail-table th:nth-child(13), .main-detail-table td:nth-child(13) {
-  width: 6.8%;
-}
-
-#mainTable th:nth-child(14), #mainTable td:nth-child(14),
-.main-detail-table th:nth-child(14), .main-detail-table td:nth-child(14) {
-  width: 6.8%;
+#mainTable th:last-child, #mainTable td:last-child,
+.main-detail-table th:last-child, .main-detail-table td:last-child {
+  width: 8%;
 }
 
 /* The Data Table's identity columns used to be frozen: #mainTable was 1770px

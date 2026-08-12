@@ -333,7 +333,9 @@
     ensureChartBoxesPak_(container);
     var primaryTitle = $('volPanel0').querySelector('h2');
     if (mode === 'separate') { container.classList.remove('combined-mode'); primaryTitle.textContent = 'PiE'; }
-    else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - E3 Stacked Area Chart' : 'Volume - E3 Combined Line Chart'; }
+    // No "E3" in the combined titles: the chart carries every work area on the
+    // dashboard, and the site outgrew E3 when the Elmsall-wide areas arrived.
+    else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - Stacked Area Chart' : 'Volume - Combined Line Chart'; }
     for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
     volumeCharts = [];
     // Drop any builders left over from the previous render before queueing new
@@ -399,9 +401,22 @@
         // hidden instead, which the legend shows struck through.
         datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(isStacked ? 0.6 : 0.1)), tension: 0.35, pointRadius: 2, fill: isStacked,
           hidden: hiddenVolumeAreas.indexOf(volType.key) !== -1,
-          __areaKey: volType.key });
+          __areaKey: volType.key,
+          // Whether this area saw ANY volume in the current window under the
+          // current bonus filter - computed once per render, read by the
+          // tooltip filter below.
+          __hasAnyData: dataArr.some(function(v) { return (Number(v) || 0) > 0; }) });
       }
-      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: CHART_TEXT(), usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: onVolumeLegendClick_ }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis } } });
+      // With a bonus filter active, an index-mode tooltip lists all thirteen
+      // areas for one or two people, and the zeros bury the lines that matter.
+      // So under a filter the tooltip drops areas the selected people never
+      // touched in this window. Series with a zero AT THIS POINT but volume
+      // elsewhere stay - a gap in a shift is information; a row of zeros for
+      // an area someone never worked is noise. Unfiltered view is unchanged,
+      // and the legend still shows every area either way.
+      var combinedTooltip = { callbacks: commonTooltip.callbacks,
+        filter: function(item) { return selectedBonuses.length === 0 || item.dataset.__hasAnyData; } };
+      var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: CHART_TEXT(), usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: onVolumeLegendClick_ }, tooltip: combinedTooltip }, scales: { x: xOpt, y: volYAxis } } });
       volumeCharts.push(chart);
     }
   }
