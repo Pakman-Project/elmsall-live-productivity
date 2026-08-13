@@ -43,11 +43,37 @@ var PIPELINE_STATE_TAB_ = 'Pipeline State';
 var PIPELINE_STATE_HEADER_ = ['Window End (UTC)', 'Date Time Range', 'Rows Written', 'Recorded At (UTC)'];
 var PIPELINE_STATE_TZ_ = 'Europe/London';
 var PIPELINE_STATE_WINDOW_MS_ = 15 * 60 * 1000;
-// Column I of 'Data' holds the Date Time Range — the join key between a row
-// and the window it belongs to, and the same string 'Pipeline State' records
-// in its column B. Both are written from one value in the notebook, so they
-// match exactly rather than approximately.
-var PIPELINE_STATE_DATA_RANGE_COL_ = 9;
+// The Date Time Range is the join key between a row on 'Data' and the window it
+// belongs to — the same string 'Pipeline State' records in its column B. Both
+// are written from one value in the notebook, so they match exactly rather than
+// approximately.
+//
+// Located by HEADER NAME, never by position. It sat at a hard-coded column I,
+// and inserting 'Attribute' at column E moved it to J: the lookup then read
+// Week, matched nothing, and reconcile concluded that every window of the day
+// was missing from 'Data' and deleted its coverage. Databricks refetched them
+// eight at a time and appended duplicates, every morning, silently. A name
+// survives an insert; a number does not.
+var PIPELINE_STATE_DATA_RANGE_HEADER_ = 'Date Time Range';
+
+function normalisePipelineHeader_(v) {
+  return String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/**
+ * 1-based index of the Date Time Range column on 'Data', or 0 if its header is
+ * not there to be found.
+ */
+function dataDateTimeRangeColumn_(dataSheet) {
+  var lastCol = dataSheet.getLastColumn();
+  if (lastCol < 1) return 0;
+  var header = dataSheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  var want = normalisePipelineHeader_(PIPELINE_STATE_DATA_RANGE_HEADER_);
+  for (var c = 0; c < header.length; c++) {
+    if (normalisePipelineHeader_(header[c]) === want) return c + 1;
+  }
+  return 0;
+}
 
 /**
  * Re-opens any of TODAY's windows that a whole-tab rewrite has erased.
@@ -82,9 +108,17 @@ var PIPELINE_STATE_DATA_RANGE_COL_ = 9;
  *   behind it.
  *
  * The rare real window holding exactly one row is therefore not repaired. That
- * is the safe direction to miss in: this only ever DELETES coverage rows, so a
- * false positive costs a refetch and a duplicate the 04:00 dedupe clears,
- * while a false negative costs nothing at all.
+ * is the safe direction to miss in: a false NEGATIVE leaves one window to be
+ * noticed by hand, while a false positive costs a refetch and duplicate rows.
+ *
+ * Those duplicates were once written off as "the 04:00 dedupe clears them".
+ * That was too generous, and a mis-read join column proved it: reconcile
+ * decided every window of the day was missing, Databricks refetched them eight
+ * per run, and the pivot summed the duplicates into the dashboard for the rest
+ * of the day. The dedupe does clear them — at 04:00 the NEXT morning, having
+ * shown inflated hours and volumes in between, and only in time for reconcile
+ * to do it again. Hence the guards below: this function would rather do
+ * nothing and say so than delete coverage it cannot justify.
  *
  * @return {number} how many windows were reopened.
  */
@@ -97,16 +131,27 @@ function reconcilePipelineStateWithData_() {
   var stateLastRow = stateSheet.getLastRow();
   if (stateLastRow < 2) return 0;
 
+  var rangeCol = dataDateTimeRangeColumn_(dataSheet);
+  if (!rangeCol) {
+    // Refuse rather than guess. Every decision below turns on this one column,
+    // and reading the wrong one makes every window look absent — which deletes
+    // the whole day's coverage and duplicates the whole day's rows.
+    Logger.log('reconcilePipelineStateWithData_: no "' + PIPELINE_STATE_DATA_RANGE_HEADER_ +
+               '" header on ' + DATA_SHEET_NAME_ + '; made no changes.');
+    return 0;
+  }
+
   // Which windows still have at least one row on 'Data'.
   var present = {};
+  var presentCount = 0;
   var dataLastRow = dataSheet.getLastRow();
   if (dataLastRow >= 2) {
     var ranges = dataSheet
-      .getRange(2, PIPELINE_STATE_DATA_RANGE_COL_, dataLastRow - 1, 1)
+      .getRange(2, rangeCol, dataLastRow - 1, 1)
       .getDisplayValues();
     for (var i = 0; i < ranges.length; i++) {
       var seen = String(ranges[i][0]).trim();
-      if (seen) present[seen] = true;
+      if (seen && !present[seen]) { present[seen] = true; presentCount++; }
     }
   }
 
@@ -118,6 +163,8 @@ function reconcilePipelineStateWithData_() {
 
   var kept = [];
   var reopened = [];
+  var todayConsidered = 0;
+  var todayMatched = 0;
 
   for (var s = 0; s < stateValues.length; s++) {
     var row = stateValues[s];
@@ -127,6 +174,11 @@ function reconcilePipelineStateWithData_() {
     var startsToday = dtr.indexOf(todayPrefix) === 0;
     var hadRealData = rowsWritten > 1;
 
+    if (startsToday && hadRealData) {
+      todayConsidered++;
+      if (present[dtr]) todayMatched++;
+    }
+
     if (startsToday && hadRealData && !present[dtr]) {
       reopened.push(dtr);
       continue; // dropped, so the gap-scan sees this window as unfetched again
@@ -135,6 +187,20 @@ function reconcilePipelineStateWithData_() {
   }
 
   if (reopened.length === 0) return 0;
+
+  // A rewrite collision erases the rows one append landed between a read and a
+  // write — a window or two, against a day's worth that are still there. If NOT
+  // ONE of today's recorded windows can be found on 'Data' while 'Data' plainly
+  // holds rows, the two sides are not being compared on the same thing, and
+  // deleting the whole day's coverage on that basis is how this function turned
+  // a mis-read column into a morning of duplicate rows. Refuse and say so.
+  if (todayConsidered > 1 && todayMatched === 0 && presentCount > 0) {
+    Logger.log('reconcilePipelineStateWithData_: REFUSED — none of ' + todayConsidered +
+               " of today's recorded windows matched any of " + presentCount +
+               ' range(s) on ' + DATA_SHEET_NAME_ + ' (column ' + rangeCol + '). ' +
+               'That is a join-key mismatch, not an erasure. Made no changes.');
+    return 0;
+  }
 
   // Write the survivors first, then clear the tail — never leave the coverage
   // record empty or half-written between two calls. A Databricks run reading it
