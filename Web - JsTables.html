@@ -185,7 +185,12 @@ function renderMainTablePak(sourceRows) {
       detailTr.className = 'main-detail-row' + (isExpanded ? ' open' : '');
 
       var detailTd = document.createElement('td');
-      detailTd.colSpan = 14;
+      // Spans exactly the row it belongs to, counted from that row rather than
+      // stated as a number. It was pinned at 14, and every column added since -
+      // Sorter 6, then the three Online Picking areas - fell outside the span,
+      // so the nested detail table was laid out across 14/18ths of the width
+      // and its columns stopped sitting under the Main Table's.
+      detailTd.colSpan = tr.cells.length;
       detailTd.className = 'main-detail-td';
       detailTd.innerHTML = '<div class="main-detail-content">' + (isExpanded ? buildMainRowDetail(r) : '') + '</div>';
 

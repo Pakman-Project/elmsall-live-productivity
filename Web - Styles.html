@@ -1349,12 +1349,24 @@ td:has(> .clickable-bonus) {
   padding-right: 16px;
 }
 
-.main-detail-table th:nth-child(n+3):nth-child(-n+13) {
+/* Every numeric header: column 3 to the last-but-one, the last being the
+   Productivity % pill. Written as "from 3, but not the last" rather than an
+   explicit 3-13, which stopped covering the newer areas the moment any were
+   added.
+
+   CURRENTLY INERT, and so is `.main-detail-table td.num` above it. The detail
+   table is rendered INSIDE a cell of #mainTable, so `#mainTable th, #mainTable
+   td` reaches it too — and an id beats any number of classes, whatever the
+   order. The whole detail table is therefore centred along with the Main
+   Table, not right-aligned as the comment above claims. Left as-is rather than
+   quietly changed: it is a deliberate-looking alignment nobody has complained
+   about. To make it bite, scope this and the .num rule under #mainTable. */
+.main-detail-table th:nth-child(n+3):not(:last-child) {
   text-align: right;
   padding-right: 16px;
 }
 
-/* Eleven of the fourteen columns are volumes, and for any given operator all
+/* Most of the columns are volumes, and for any given operator all
    but one or two are 0. At full contrast those zeros carry the same visual
    weight as the figures that matter, so the table reads as a wall. Fading them
    leaves the real numbers standing out on their own.
