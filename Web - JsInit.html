@@ -128,12 +128,7 @@
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
     allBonusList = data.bonusList || [];
-    if (siteFilter !== 'all') {
-      var inSite_ = {};
-      for (var si = 0; si < rawSideData.length; si++) { inSite_[rawSideData[si].bonus] = true; }
-      allBonusList = allBonusList.filter(function (b) { return inSite_[b]; });
-      selectedBonuses = selectedBonuses.filter(function (b) { return inSite_[b]; });
-    }
+    if (siteFilter !== 'all') refreshBonusListForScope_();
     if (typeof syncSiteUi_ === 'function') syncSiteUi_();
     currentThreshold = parseFloat(data.threshold) || 0;
     if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }

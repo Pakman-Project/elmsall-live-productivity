@@ -563,8 +563,12 @@
   function renderSiteMenu_() {
     var menu = $('siteMenu');
     if (!menu) return;
+    var overridden = siteFilterOverridden_();
     menu.innerHTML = SITES.map(function (s) {
-      var on = s.key === siteFilter;
+      // Ticks the user's CHOICE, not what a bonus filter has temporarily
+      // forced - otherwise picking E3, filtering to someone, and opening the
+      // menu would show Elmsall ticked and look like the choice was lost.
+      var on = s.key === siteFilterPreferred;
       var n = siteAreaCount_(s.key);
       return '<button type="button" class="site-menu-item" role="option" ' +
              'aria-selected="' + (on ? 'true' : 'false') + '" ' +
@@ -596,7 +600,17 @@
     var btn = $('sitePickerBtn');
     if (btn) {
       btn.classList.toggle('filtered', siteFilter !== 'all');
-      btn.setAttribute('aria-label', 'Building: ' + cfg.short + '. Change building.');
+      // While a bonus filter has forced the whole site, say so rather than
+      // letting the title look like the building choice was forgotten.
+      var overridden = siteFilterOverridden_();
+      btn.classList.toggle('site-overridden', overridden);
+      btn.title = overridden
+        ? 'Showing all buildings while a bonus filter is active. Clear the filter to return to '
+          + siteConfig_(siteFilterPreferred).short + '.'
+        : 'Show one building';
+      btn.setAttribute('aria-label', overridden
+        ? 'Building: all of Elmsall, because a bonus filter is active. Change building.'
+        : 'Building: ' + cfg.short + '. Change building.');
     }
     try { document.title = cfg.title; } catch (e) {}
   }
@@ -606,22 +620,22 @@
     for (var i = 0; i < SITES.length; i++) { if (SITES[i].key === key) known = true; }
     if (!known) key = 'all';
 
-    var changed = key !== siteFilter;
-    siteFilter = key;
+    var changed = key !== siteFilterPreferred;
+    siteFilterPreferred = key;
     toggleSiteMenu_(false);
-    syncSiteUi_();
 
-    // Re-scope the payload. Everything downstream reads rawSideData, so this is
-    // the only place that has to know a filter happened.
-    rawSideData = scopeRowsToSite_(allSideData);
+    // Sets siteFilter from the preference and the bonus filter, and re-scopes
+    // the payload if that moved it. A bonus filter in force means the choice is
+    // recorded now and takes effect when the filter is cleared.
+    syncSiteScope_();
+    syncSiteUi_();
 
     // The operator list follows the building: someone who never worked in E3
     // has nothing to show on an E3 dashboard, so offering them in the search
-    // would only ever produce an empty view.
-    var present = {};
-    for (var r = 0; r < rawSideData.length; r++) { present[rawSideData[r].bonus] = true; }
-    allBonusList = Object.keys(present).sort();
-    selectedBonuses = selectedBonuses.filter(function (b) { return present[b]; });
+    // would only ever produce an empty view. syncSiteScope_ has already done
+    // this when the scope moved; this covers the case where it did not - the
+    // preference changed while a bonus filter held the view at whole-site.
+    refreshBonusListForScope_();
 
     if (typeof renderBonusChips === 'function') renderBonusChips();
     if (typeof updateClearBtnVisibility === 'function') updateClearBtnVisibility();

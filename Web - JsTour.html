@@ -485,14 +485,14 @@ function applyTourDefaults_() {
     sideSortMetric: sideSortMetric,
     expandedRowKey: expandedRowKey,
     sortState: { key: sortState.key, dir: sortState.dir },
-    siteFilter: (typeof siteFilter !== 'undefined') ? siteFilter : 'all'
+    siteFilter: (typeof siteFilterPreferred !== 'undefined') ? siteFilterPreferred : 'all'
   };
 
   // The tour shows the whole site. Its demo data covers every work area, and
   // renderDashboardPayload_ scopes whatever it is given - so a viewer who had
   // filtered to E1/E2 would have watched a tour of four areas, with the Volume
   // page eleven panels short of what the narration describes.
-  if (typeof siteFilter !== 'undefined') siteFilter = 'all';
+  if (typeof siteFilterPreferred !== 'undefined') { siteFilterPreferred = 'all'; siteFilter = 'all'; }
 
   if ($('bonusViewMode')) $('bonusViewMode').value = 'area';
   if ($('volumeChartMode')) $('volumeChartMode').value = 'separate';
@@ -521,7 +521,10 @@ function restoreTourState_() {
   sortState.dir = st.sortState.dir;
   // Restored BEFORE the caller re-renders the real payload, so the user's own
   // building comes back with their own data rather than a frame of everything.
-  if (typeof siteFilter !== 'undefined' && st.siteFilter) siteFilter = st.siteFilter;
+  if (typeof siteFilterPreferred !== 'undefined' && st.siteFilter) {
+    siteFilterPreferred = st.siteFilter;
+    siteFilter = (typeof effectiveSiteFilter_ === 'function') ? effectiveSiteFilter_() : st.siteFilter;
+  }
   if (typeof syncSiteUi_ === 'function') syncSiteUi_();
 }
 

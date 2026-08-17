@@ -60,6 +60,11 @@ function buildFullDayTimeList_() {
 }
 
 function applyLocalFiltersPak() {
+  // Before anything reads rawSideData: a bonus filter overrides the building
+  // filter, and this is the one place every path that changes either of them
+  // passes through.
+  if (typeof syncSiteScope_ === 'function') syncSiteScope_();
+
   var hoursRange = parseInt($('hoursRange').value, 10) || 3;
   var windowMinutes = parseInt($('timeWindow').value, 10);
   var rowsLimit = parseInt($('sharedRowsLimit').value, 10) || 10;

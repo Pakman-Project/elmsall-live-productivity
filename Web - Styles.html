@@ -558,6 +558,11 @@ body.loading-skeleton #mainTableWrapper::after {
 /* A filtered view is not the default, so the title carries a marker rather
    than relying on the reader noticing which of three similar names it says. */
 .site-picker-btn.filtered .next-header-title { font-weight: 400; }
+/* A bonus filter has forced the whole site: the marker dot would otherwise
+   say "filtered to a building" while the title says Elmsall. */
+.site-picker-btn.site-overridden .site-picker-caret { opacity: 0.35; }
+.site-picker-btn.site-overridden::after { display: none; }
+
 .site-picker-btn.filtered::after {
   content: '';
   width: 6px;

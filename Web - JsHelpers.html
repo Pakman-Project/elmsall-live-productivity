@@ -51,7 +51,7 @@ function saveUserPreferences() {
       chartOrder: chartOrderState,
       allowMultiBonus: allowMultiBonusFilter,
       syncAreaChips: syncAreaChips,
-      siteFilter: siteFilter,
+      siteFilter: siteFilterPreferred,
       theme: currentTheme
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
@@ -71,7 +71,7 @@ function loadUserPreferences() {
 
     // Restored before the payload arrives, so the first render is already
     // scoped rather than showing the whole site and then narrowing.
-    if (prefs.siteFilter) siteFilter = prefs.siteFilter;
+    if (prefs.siteFilter) { siteFilterPreferred = prefs.siteFilter; siteFilter = prefs.siteFilter; }
 
     if (prefs.hoursRange) $('hoursRange').value = prefs.hoursRange;
     if (prefs.timeWindow) $('timeWindow').value = prefs.timeWindow;

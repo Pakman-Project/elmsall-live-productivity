@@ -45,7 +45,61 @@ var SITES = [
   { key: 'e1e2', title: 'E1/E2 Live Productivity',   short: 'E1/E2' }
 ];
 
+// siteFilterPreferred is what the user chose; siteFilter is what is actually
+// in force. They differ while a bonus filter is active - see
+// effectiveSiteFilter_ below - and only the preference is ever saved.
+var siteFilterPreferred = 'all';
 var siteFilter = 'all';
+
+/**
+ * The building actually in force.
+ *
+ * Filtering to a bonus number is a question about a PERSON, and a person is not
+ * confined to one building: an operator can pick in Drive before lunch and pack
+ * in E3 after it. Answering "how did they do" with only one building's half of
+ * their shift is worse than not answering - so a bonus filter overrides the
+ * building filter and shows the whole site. Clearing it hands the building
+ * back.
+ */
+function effectiveSiteFilter_() {
+  var filtering = (typeof selectedBonuses !== 'undefined') && selectedBonuses.length > 0;
+  return filtering ? 'all' : siteFilterPreferred;
+}
+
+/** True when a bonus filter is currently overriding a chosen building. */
+function siteFilterOverridden_() {
+  return siteFilterPreferred !== 'all' && effectiveSiteFilter_() === 'all';
+}
+
+/**
+ * Brings siteFilter into line with the preference and the bonus filter, and
+ * re-scopes the payload if it moved. Called at the top of applyLocalFiltersPak,
+ * which every path that touches the bonus selection already ends in - so the
+ * eight places that add, remove, replace or clear a bonus need no changes.
+ */
+function syncSiteScope_() {
+  var want = effectiveSiteFilter_();
+  if (want === siteFilter) return false;
+  siteFilter = want;
+  rawSideData = scopeRowsToSite_(allSideData);
+  refreshBonusListForScope_();
+  if (typeof syncSiteUi_ === 'function') syncSiteUi_();
+  return true;
+}
+
+/**
+ * The operator list, rebuilt from whatever is currently in scope.
+ *
+ * Derived rather than filtered in place, because the scope widens as well as
+ * narrows: picking E3 and then filtering to someone flips the view back to the
+ * whole site, and a list left narrowed to E3 would offer a smaller set of
+ * people than the dashboard is showing.
+ */
+function refreshBonusListForScope_() {
+  var present = {};
+  for (var r = 0; r < rawSideData.length; r++) { present[rawSideData[r].bonus] = true; }
+  allBonusList = Object.keys(present).sort();
+}
 
 // The unscoped payload. rawSideData holds the SCOPED view, so every existing
 // reader of it - KPIs, charts, tables, export, breakdown - narrows to the
