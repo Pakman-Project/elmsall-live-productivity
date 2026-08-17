@@ -479,17 +479,21 @@ function renderAreaToggleChips_(opts) {
   // order the user has arranged those panels into. Falls back to the authored
   // VOLUME_TYPES order when the caller has no arrangement to offer, and appends
   // anything the arrangement does not mention so no area can go missing.
+  // Only the chosen building's areas: a chip for an area that cannot appear in
+  // the panels below it is a control with nothing to control. Both the Volume
+  // page's strip and the Bonus page's come through here.
+  var inScope = volumeTypesActive_();
   var ordered = [];
   var byAreaKey = {};
-  for (var bk = 0; bk < VOLUME_TYPES.length; bk++) { byAreaKey[VOLUME_TYPES[bk].key] = VOLUME_TYPES[bk]; }
+  for (var bk = 0; bk < inScope.length; bk++) { byAreaKey[inScope[bk].key] = inScope[bk]; }
   if (opts.orderKeys && opts.orderKeys.length) {
     for (var o = 0; o < opts.orderKeys.length; o++) {
       var got = byAreaKey[opts.orderKeys[o]];
       if (got && ordered.indexOf(got) === -1) ordered.push(got);
     }
   }
-  for (var d = 0; d < VOLUME_TYPES.length; d++) {
-    if (ordered.indexOf(VOLUME_TYPES[d]) === -1) ordered.push(VOLUME_TYPES[d]);
+  for (var d = 0; d < inScope.length; d++) {
+    if (ordered.indexOf(inScope[d]) === -1) ordered.push(inScope[d]);
   }
 
   var html = '';

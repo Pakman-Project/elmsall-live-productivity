@@ -612,6 +612,13 @@
         ? 'Building: all of Elmsall, because a bonus filter is active. Change building.'
         : 'Building: ' + cfg.short + '. Change building.');
     }
+    // "All E3 Areas" was accurate when E3 was the whole dashboard. It names
+    // the building in view now.
+    var scopeTag = $('perfChartScopeTag');
+    if (scopeTag) {
+      scopeTag.textContent = (siteFilter === 'all') ? 'All Areas' : 'All ' + cfg.short + ' Areas';
+    }
+
     try { document.title = cfg.title; } catch (e) {}
   }
 

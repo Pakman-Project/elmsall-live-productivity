@@ -226,11 +226,39 @@ var mainTableSortableColumns = [
 var lastMainTableCardMode = null;
 
 var AREA_GROUP_COLORS = ['#69a7ff', '#ff9f43', '#48dbfb', '#a55eea', '#32d583', '#ff6b6b', '#feca57'];
+// The Overall page leads on two picking areas and contrasts them with a packing
+// area. Which ones depends on the building: PiE and Top Up do not exist in
+// E1/E2, so an E1/E2 view built on them is three flat lines at zero.
+var SITE_HEADLINE = {
+  all:  { pick: ['pieVol', 'topUpVol'], pack: ['e3PackingVol'] },
+  e3:   { pick: ['pieVol', 'topUpVol'], pack: ['e3PackingVol'] },
+  e1e2: { pick: ['onlinePickingDriveVol', 'onlinePickingWayVol'], pack: ['sorter6PackingVol'] }
+};
+
+function siteHeadline_() {
+  return SITE_HEADLINE[siteFilter] || SITE_HEADLINE.all;
+}
+
+/** VOLUME_TYPES entries for this building's headline picking areas. */
+function headlinePickTypes_() {
+  var want = siteHeadline_().pick, out = [];
+  for (var i = 0; i < VOLUME_TYPES.length; i++) {
+    if (want.indexOf(VOLUME_TYPES[i].key) !== -1) out.push(VOLUME_TYPES[i]);
+  }
+  return out;
+}
+
+/** The default work-area groups for the building in view. */
+function defaultAreaGroupsForSite_() {
+  var h = siteHeadline_();
+  return [h.pick.slice(), h.pack.slice()];
+}
+
 var DEFAULT_AREA_GROUPS = [['pieVol', 'topUpVol'], ['e3PackingVol']];
 var MAX_AREA_GROUPS = 7;
 
 function defaultAreaGroupState_() {
-  return DEFAULT_AREA_GROUPS.map(function(g) {
+  return defaultAreaGroupsForSite_().map(function(g) {
     return { keys: g.slice(), showLine: true, showTrend: true };
   });
 }

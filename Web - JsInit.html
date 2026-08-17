@@ -118,6 +118,86 @@
   // Renders a full dashboard payload (real OR demo/tour data) into the UI: KPI
   // cards, notes, and all charts/tables via applyLocalFiltersPak(). Kept separate
   // from loadDataPak so the tour can re-apply the real payload when it finishes.
+  // The three KPI cards, recomputed from whatever is currently in scope.
+  //
+  // Lifted out of renderDashboardPayload_ so it can run on a building change
+  // too: the cards were computed once per payload, so switching to E1/E2
+  // re-rendered every chart and table while Head Deployed, Head Above and
+  // Productivity % kept the whole-site figures from the last load.
+  function renderKpiCards_() {
+    if (!timeRanges.length) return;
+  // KPI figures for one hour-sized window (4 x 15-min blocks). Computing this
+  // for the last hour AND the hour before it gives the trend indicators
+  // something to compare against.
+  function computeHourKpis_(blockSlice) {
+    var times = {};
+    for (var i = 0; i < blockSlice.length; i++) { times[blockSlice[i]] = true; }
+    var rows = rawSideData.filter(function(r) { return times[r.timeRange]; });
+
+    var headSet = {};
+    for (var i = 0; i < rows.length; i++) { headSet[rows[i].bonus] = true; }
+
+    var headHours = {};
+    for (var i = 0; i < rows.length; i++) {
+      var b = rows[i].bonus;
+      if (!headHours[b]) headHours[b] = 0;
+      headHours[b] += (rows[i].value || 0);
+    }
+    var target = currentThreshold * 4;
+    var above = 0;
+    var hk = Object.keys(headHours);
+    for (var i = 0; i < hk.length; i++) { if (headHours[hk[i]] >= target) above++; }
+
+    // Productivity counts only rows that clear the threshold — i.e. an
+    // operator whose total standard hours for a 15-min block is at or below
+    // the threshold is treated as not really working that block, and is
+    // excluded from BOTH the standard hours and the head count so the ratio
+    // stays consistent. This matches generateMainRows_, which the Data
+    // Table's Productivity % column uses; previously the KPI summed every row
+    // and so disagreed with the table.
+    var qualified = rows.filter(function(r) { return (r.value || 0) > currentThreshold; });
+
+    var tS = 0;
+    for (var i = 0; i < qualified.length; i++) { tS += (qualified[i].value || 0); }
+    var blockGroup = {};
+    for (var i = 0; i < qualified.length; i++) {
+      var tr = qualified[i].timeRange;
+      if (!blockGroup[tr]) blockGroup[tr] = {};
+      blockGroup[tr][qualified[i].bonus] = true;
+    }
+    // A block with a single qualifying operator counts normally. Previously it
+    // contributed 0 to the head count while that operator's hours still
+    // counted in the numerator, which inflated the productivity figure.
+    var totalDisplayCount = 0;
+    var bgKeys = Object.keys(blockGroup);
+    for (var i = 0; i < bgKeys.length; i++) {
+      totalDisplayCount += Object.keys(blockGroup[bgKeys[i]]).length;
+    }
+    var tD = totalDisplayCount / 4;
+
+    return {
+      heads: Object.keys(headSet).length,
+      above: above,
+      perf: tD > 0 ? (tS / tD) * 100 : 0,
+      hasData: rows.length > 0
+    };
+  }
+
+  var thisHour = computeHourKpis_(timeRanges.slice(-4));
+  // Blocks -8..-5: the hour immediately before the one being displayed.
+  var prevHour = computeHourKpis_(timeRanges.slice(-8, -4));
+
+  $('headDeployed').textContent = thisHour.heads;
+  $('headAbove20').textContent = thisHour.above;
+  $('avgPerf').textContent = thisHour.perf > 0 ? thisHour.perf.toFixed(0) + '%' : '0%';
+
+  // Only show a trend when there is a real previous hour to compare with,
+  // otherwise the first hour of the day would read as a huge "increase".
+  setKpiTrend_('headDeployedTrend', thisHour.heads, prevHour.heads, prevHour.hasData, '');
+  setKpiTrend_('headAbove20Trend', thisHour.above, prevHour.above, prevHour.hasData, '');
+  setKpiTrend_('avgPerfTrend', thisHour.perf, prevHour.perf, prevHour.hasData, 'pp');
+  }
+
   function renderDashboardPayload_(data) {
     timeRanges = data.timeRanges || [];
     // The payload is kept whole in allSideData; rawSideData is the view of it
@@ -139,77 +219,6 @@
     $('thresholdDisplay').textContent = currentThreshold || '-';
     lastUpdateAbsText = 'Last Update: ' + (data.lastRefresh || '-');
     renderLastUpdate_();
-
-    // KPI figures for one hour-sized window (4 x 15-min blocks). Computing this
-    // for the last hour AND the hour before it gives the trend indicators
-    // something to compare against.
-    function computeHourKpis_(blockSlice) {
-      var times = {};
-      for (var i = 0; i < blockSlice.length; i++) { times[blockSlice[i]] = true; }
-      var rows = rawSideData.filter(function(r) { return times[r.timeRange]; });
-
-      var headSet = {};
-      for (var i = 0; i < rows.length; i++) { headSet[rows[i].bonus] = true; }
-
-      var headHours = {};
-      for (var i = 0; i < rows.length; i++) {
-        var b = rows[i].bonus;
-        if (!headHours[b]) headHours[b] = 0;
-        headHours[b] += (rows[i].value || 0);
-      }
-      var target = currentThreshold * 4;
-      var above = 0;
-      var hk = Object.keys(headHours);
-      for (var i = 0; i < hk.length; i++) { if (headHours[hk[i]] >= target) above++; }
-
-      // Productivity counts only rows that clear the threshold — i.e. an
-      // operator whose total standard hours for a 15-min block is at or below
-      // the threshold is treated as not really working that block, and is
-      // excluded from BOTH the standard hours and the head count so the ratio
-      // stays consistent. This matches generateMainRows_, which the Data
-      // Table's Productivity % column uses; previously the KPI summed every row
-      // and so disagreed with the table.
-      var qualified = rows.filter(function(r) { return (r.value || 0) > currentThreshold; });
-
-      var tS = 0;
-      for (var i = 0; i < qualified.length; i++) { tS += (qualified[i].value || 0); }
-      var blockGroup = {};
-      for (var i = 0; i < qualified.length; i++) {
-        var tr = qualified[i].timeRange;
-        if (!blockGroup[tr]) blockGroup[tr] = {};
-        blockGroup[tr][qualified[i].bonus] = true;
-      }
-      // A block with a single qualifying operator counts normally. Previously it
-      // contributed 0 to the head count while that operator's hours still
-      // counted in the numerator, which inflated the productivity figure.
-      var totalDisplayCount = 0;
-      var bgKeys = Object.keys(blockGroup);
-      for (var i = 0; i < bgKeys.length; i++) {
-        totalDisplayCount += Object.keys(blockGroup[bgKeys[i]]).length;
-      }
-      var tD = totalDisplayCount / 4;
-
-      return {
-        heads: Object.keys(headSet).length,
-        above: above,
-        perf: tD > 0 ? (tS / tD) * 100 : 0,
-        hasData: rows.length > 0
-      };
-    }
-
-    var thisHour = computeHourKpis_(timeRanges.slice(-4));
-    // Blocks -8..-5: the hour immediately before the one being displayed.
-    var prevHour = computeHourKpis_(timeRanges.slice(-8, -4));
-
-    $('headDeployed').textContent = thisHour.heads;
-    $('headAbove20').textContent = thisHour.above;
-    $('avgPerf').textContent = thisHour.perf > 0 ? thisHour.perf.toFixed(0) + '%' : '0%';
-
-    // Only show a trend when there is a real previous hour to compare with,
-    // otherwise the first hour of the day would read as a huge "increase".
-    setKpiTrend_('headDeployedTrend', thisHour.heads, prevHour.heads, prevHour.hasData, '');
-    setKpiTrend_('headAbove20Trend', thisHour.above, prevHour.above, prevHour.hasData, '');
-    setKpiTrend_('avgPerfTrend', thisHour.perf, prevHour.perf, prevHour.hasData, 'pp');
 
     applyLocalFiltersPak();
 

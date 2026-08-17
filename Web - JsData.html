@@ -1,9 +1,23 @@
 <script>
 
 function getPerfSplitGroups_() {
+  // Saved groups are kept exactly as the user built them, but a group made
+  // entirely of the other building's areas draws nothing. When NONE of them has
+  // an area in view - which is what switching building does to an untouched
+  // setup - fall back to this building's defaults rather than render an empty
+  // chart. The saved state is not overwritten, so switching back restores it.
+  var source = areaGroupState;
+  var anyInScope = false;
+  for (var s = 0; s < source.length; s++) {
+    var sk = (source[s] || {}).keys || [];
+    for (var t = 0; t < sk.length; t++) { if (areaInSite_(sk[t])) { anyInScope = true; break; } }
+    if (anyInScope) break;
+  }
+  if (!anyInScope) source = defaultAreaGroupState_();
+
   var groups = [];
-  for (var i = 0; i < areaGroupState.length; i++) {
-    var entry = areaGroupState[i] || {};
+  for (var i = 0; i < source.length; i++) {
+    var entry = source[i] || {};
     var keys = entry.keys || [];
     var labels = [];
     for (var k = 0; k < keys.length; k++) {
@@ -64,6 +78,10 @@ function applyLocalFiltersPak() {
   // filter, and this is the one place every path that changes either of them
   // passes through.
   if (typeof syncSiteScope_ === 'function') syncSiteScope_();
+
+  // The KPI cards read the same scoped payload, so they are rendered here
+  // rather than once per data load - a building change has to move them too.
+  if (typeof renderKpiCards_ === 'function') renderKpiCards_();
 
   var hoursRange = parseInt($('hoursRange').value, 10) || 3;
   var windowMinutes = parseInt($('timeWindow').value, 10);

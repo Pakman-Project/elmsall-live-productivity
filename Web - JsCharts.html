@@ -482,11 +482,18 @@
         overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
       }
     } else {
-      overviewTitleEl.textContent = 'Volume - PiE & Top Up';
-      overviewDatasets = [
-        { label: 'Volume PiE', data: pieData, borderWidth: 2, borderColor: APP_CONFIG.colors.accent, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.accent, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true },
-        { label: 'Volume Top Up', data: topUpData, borderWidth: 2, borderColor: APP_CONFIG.colors.good, backgroundColor: hexToRgbaPak(APP_CONFIG.colors.good, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true }
-      ];
+      // The two headline picking areas for the building in view. Hard-coding
+      // PiE and Top Up drew three flat lines at zero on an E1/E2 dashboard,
+      // where neither area exists - see SITE_HEADLINE in JsState.
+      var headline = headlinePickTypes_();
+      overviewTitleEl.textContent = 'Volume - ' +
+        headline.map(function (t) { return t.label; }).join(' & ');
+      overviewDatasets = headline.map(function (t) {
+        return { label: 'Volume ' + t.label, data: agg.map(function (r) { return r[t.key]; }),
+                 borderWidth: 2, borderColor: t.color,
+                 backgroundColor: hexToRgbaPak(t.color, CHART_FILL_A(0.6)),
+                 tension: 0.35, pointRadius: 2, fill: true };
+      });
     }
     overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
