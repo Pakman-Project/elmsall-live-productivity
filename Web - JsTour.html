@@ -44,6 +44,9 @@ var TOUR_STEPS = [
   // opened BEFORE the steps that ring them — otherwise those steps point at
   // display:none elements, which measure 0x0 and get no visible ring. The menu
   // is opened here and held open across the two button steps below, then closed.
+  { part: 1, page: 0, target: '#sitePickerBtn',
+    title: 'One site, or all of it',
+    body: 'Elmsall is three buildings. The title is also a filter — pick E3 or E1/E2 and the whole dashboard narrows to it: every figure, chart and column, not just a change of heading. The name you see is always the data you are looking at, and your choice is remembered.' },
   { part: 1, page: 0, target: '#headerMenuBtn', whenCollapsed: true,
     interactive: { sel: '#headerMenuBtn', type: 'click' },
     title: 'Everything else lives here',
@@ -481,8 +484,15 @@ function applyTourDefaults_() {
     selectedBonuses: selectedBonuses.slice(),
     sideSortMetric: sideSortMetric,
     expandedRowKey: expandedRowKey,
-    sortState: { key: sortState.key, dir: sortState.dir }
+    sortState: { key: sortState.key, dir: sortState.dir },
+    siteFilter: (typeof siteFilter !== 'undefined') ? siteFilter : 'all'
   };
+
+  // The tour shows the whole site. Its demo data covers every work area, and
+  // renderDashboardPayload_ scopes whatever it is given - so a viewer who had
+  // filtered to E1/E2 would have watched a tour of four areas, with the Volume
+  // page eleven panels short of what the narration describes.
+  if (typeof siteFilter !== 'undefined') siteFilter = 'all';
 
   if ($('bonusViewMode')) $('bonusViewMode').value = 'area';
   if ($('volumeChartMode')) $('volumeChartMode').value = 'separate';
@@ -509,6 +519,10 @@ function restoreTourState_() {
   expandedRowKey = st.expandedRowKey;
   sortState.key = st.sortState.key;
   sortState.dir = st.sortState.dir;
+  // Restored BEFORE the caller re-renders the real payload, so the user's own
+  // building comes back with their own data rather than a frame of everything.
+  if (typeof siteFilter !== 'undefined' && st.siteFilter) siteFilter = st.siteFilter;
+  if (typeof syncSiteUi_ === 'function') syncSiteUi_();
 }
 
 function startTour(isAuto, startIndex) {
