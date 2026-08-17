@@ -53,7 +53,7 @@ function wireSortingPak() {
 
   var sortSelect = $('mainSortSelect');
   if (sortSelect) {
-    sortSelect.innerHTML = mainTableSortableColumns.map(function (c) {
+    sortSelect.innerHTML = sortableColumnsActive_().map(function (c) {
       return '<option value="' + c.key + '">' + c.label + '</option>';
     }).join('');
     sortSelect.value = sortState.key;
@@ -79,6 +79,13 @@ function wireSortingPak() {
 }
 
 function renderMainTablePak(sourceRows) {
+  // Column headers follow the building filter. The cells are built from the
+  // same list (mainMetricColumnsActive_), so the two cannot fall out of step.
+  var siteHeaders = document.querySelectorAll('#mainTable th[data-site]');
+  for (var sh = 0; sh < siteHeaders.length; sh++) {
+    siteHeaders[sh].style.display = areaInSite_(siteHeaders[sh].dataset.key) ? '' : 'none';
+  }
+
   var headers = document.querySelectorAll('#mainTable th');
   for (var h = 0; h < headers.length; h++) {
     headers[h].classList.remove('active-sort', 'asc', 'desc');
@@ -158,21 +165,10 @@ function renderMainTablePak(sourceRows) {
         '<td>' + safeTextPak(r.bonusNumber) + '</td>' +
         numTdPak(r.hourDeployed, 2) +
         numTdPak(r.stdHours, 2) +
-        numTdPak(r.pieVol, 0) +
-        numTdPak(r.topUpVol, 0) +
-        numTdPak(r.e3PackingVol, 0) +
-        numTdPak(r.parcelInductVol, 0) +
-        numTdPak(r.parcelSortationVol, 0) +
-        numTdPak(r.inboundDecantingVol, 0) +
-        numTdPak(r.osrDecantingVol, 0) +
-        numTdPak(r.bcrInductingVol, 0) +
-        numTdPak(r.e1e2InductingVol, 0) +
-        numTdPak(r.sorter6PackingVol, 0) +
-        numTdPak(r.onlinePickingDriveVol, 0) +
-        numTdPak(r.onlinePickingWayVol, 0) +
-        numTdPak(r.onlinePickingE3Vol, 0) +
-        numTdPak(r.e3BppVol, 0) +
-        numTdPak(r.e1e2BppVol, 0) +
+        // Built from the active column list rather than one call per area: the
+        // building filter drops columns, and a hand-written run of calls had to
+        // be edited in step with four other lists every time an area arrived.
+        mainMetricColumnsActive_().map(function (m) { return numTdPak(r[m.key], 0); }).join('') +
         '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
 
       (function (rowEl, rowData) {
@@ -206,7 +202,7 @@ function renderMainTablePak(sourceRows) {
 
 function buildMainCardHtml_(r) {
   var isExpanded = expandedRowKey !== null && r.dateTime === expandedRowKey;
-  var metricsHtml = MAIN_TABLE_METRIC_COLUMNS.map(function (m) {
+  var metricsHtml = mainMetricColumnsActive_().map(function (m) {
     return '<div class="main-card-metric"><span class="main-card-metric-label">' + m.label + '</span>' +
            '<span class="main-card-metric-value' + (Number(r[m.key]) ? '' : ' zero') + '">' +
            numPak(r[m.key], 0) + '</span></div>';
@@ -379,7 +375,7 @@ function setDetailSort(key) {
 function buildEntryDetailCardHtml_(r) {
   var escapedBonus = escapeAttrPak(r.bonus);
   var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
-  var metricsHtml = MAIN_TABLE_METRIC_COLUMNS.map(function (m) {
+  var metricsHtml = mainMetricColumnsActive_().map(function (m) {
     return '<div class="entry-card-metric"><span>' + m.label + '</span><b>' + numPak(r[m.key], 0) + '</b></div>';
   }).join('');
 
@@ -423,21 +419,7 @@ function buildEntryDetailRowHtml_(r) {
     '</span></td>' +
     numTdPak(r.hourDeployed, 2) +
     numTdPak(r.stdHours, 2) +
-    numTdPak(r.pieVol, 0) +
-    numTdPak(r.topUpVol, 0) +
-    numTdPak(r.e3PackingVol, 0) +
-    numTdPak(r.parcelInductVol, 0) +
-    numTdPak(r.parcelSortationVol, 0) +
-    numTdPak(r.inboundDecantingVol, 0) +
-    numTdPak(r.osrDecantingVol, 0) +
-    numTdPak(r.bcrInductingVol, 0) +
-    numTdPak(r.e1e2InductingVol, 0) +
-    numTdPak(r.sorter6PackingVol, 0) +
-    numTdPak(r.onlinePickingDriveVol, 0) +
-    numTdPak(r.onlinePickingWayVol, 0) +
-    numTdPak(r.onlinePickingE3Vol, 0) +
-    numTdPak(r.e3BppVol, 0) +
-    numTdPak(r.e1e2BppVol, 0) +
+    mainMetricColumnsActive_().map(function (m) { return numTdPak(r[m.key], 0); }).join('') +
     '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>' +
     '</tr>';
 }
@@ -445,8 +427,9 @@ function buildEntryDetailRowHtml_(r) {
 function buildMainDetailTableHtml_(entryRows) {
   var html = '<div class="table-wrap main-detail-table-wrap">';
   html += '<table class="main-detail-table"><thead><tr>';
-  for (var c = 0; c < DETAIL_TABLE_COLUMNS.length; c++) {
-    var col = DETAIL_TABLE_COLUMNS[c];
+  var detailCols = filterAreaList_(DETAIL_TABLE_COLUMNS);
+  for (var c = 0; c < detailCols.length; c++) {
+    var col = detailCols[c];
     var cls = 'detail-sortable';
     if (detailSortState.key === col.key) cls += ' active-sort ' + detailSortState.dir;
     // stopPropagation: the header sits inside the expandable row, and without it

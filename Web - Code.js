@@ -11,6 +11,8 @@ var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'data'];
 // link cannot request a setting the UI does not offer.
 var DEEP_LINK_HOURS_ = ['3', '6', '9', '12', '24'];
 var DEEP_LINK_WINDOWS_ = ['15', '30', '60'];
+// Mirrors SITES in JsState. A link can only ask for a building that exists.
+var DEEP_LINK_SITES_ = ['all', 'e3', 'e1e2'];
 
 function sanitizeParam_(e, name) {
   return (e && e.parameter && e.parameter[name]) ? String(e.parameter[name]) : '';
@@ -43,6 +45,10 @@ function doGet(e) {
 
   var win = sanitizeParam_(e, 'window');
   t.deepWindow = (DEEP_LINK_WINDOWS_.indexOf(win) !== -1) ? win : '';
+
+  // ?site=all|e3|e1e2 — which building the dashboard is scoped to.
+  var site = sanitizeParam_(e, 'site').toLowerCase();
+  t.deepSite = (DEEP_LINK_SITES_.indexOf(site) !== -1) ? site : '';
 
   // The page lives in a sandboxed iframe and cannot see the address bar, so the
   // "Copy link" button needs the real web-app URL handed to it.

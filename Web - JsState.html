@@ -23,6 +23,105 @@ var VOLUME_TYPES = [
   { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', color: '#8d6e63' }
 ];
 
+// ── The site filter ────────────────────────────────────────────────────────
+// Elmsall is three buildings, and most people only run one of them. The header
+// title doubles as the picker, so what the dashboard says it is showing and
+// what it IS showing cannot drift apart.
+//
+// E1/E2 Inducting is E3 work despite the name: the operator stands in E3
+// inducting totes that arrived from E1/E2. The building is where the hours are
+// earned, not where the stock came from.
+var AREA_SITE = {
+  pie: 'e3', topUp: 'e3', e3Packing: 'e3', parcelInduct: 'e3',
+  parcelSortation: 'e3', inboundDecanting: 'e3', osrDecanting: 'e3',
+  bcrInducting: 'e3', e1e2Inducting: 'e3', onlinePickingE3: 'e3', e3Bpp: 'e3',
+  sorter6Packing: 'e1e2', onlinePickingDrive: 'e1e2', onlinePickingWay: 'e1e2',
+  e1e2Bpp: 'e1e2'
+};
+
+var SITES = [
+  { key: 'all',  title: 'Elmsall Live Productivity', short: 'Elmsall' },
+  { key: 'e3',   title: 'E3 Live Productivity',      short: 'E3' },
+  { key: 'e1e2', title: 'E1/E2 Live Productivity',   short: 'E1/E2' }
+];
+
+var siteFilter = 'all';
+
+// The unscoped payload. rawSideData holds the SCOPED view, so every existing
+// reader of it - KPIs, charts, tables, export, breakdown - narrows to the
+// chosen building without knowing the filter exists.
+var allSideData = [];
+
+// 'pieVol' and 'pieStd' both describe the area 'pie'.
+function areaBaseKey_(key) {
+  return String(key || '').replace(/(Vol|Std)$/, '');
+}
+
+// True for anything that is not a work area at all (Date Time, Productivity %,
+// and so on), so a column list can be filtered without losing its scaffolding.
+function areaInSite_(key) {
+  var base = areaBaseKey_(key);
+  if (!AREA_SITE.hasOwnProperty(base)) return true;
+  return siteFilter === 'all' || AREA_SITE[base] === siteFilter;
+}
+
+function filterAreaList_(list) {
+  if (siteFilter === 'all') return list;
+  return list.filter(function (x) { return areaInSite_(x.key); });
+}
+
+// Rendering reads these; validation deliberately does NOT. A saved area group
+// or hidden-area choice naming the other building stays valid and comes back
+// intact when the filter is cleared, rather than being pruned on sight.
+function volumeTypesActive_()      { return filterAreaList_(VOLUME_TYPES); }
+function breakdownAreasActive_()   { return filterAreaList_(BREAKDOWN_AREAS); }
+function mainMetricColumnsActive_(){ return filterAreaList_(MAIN_TABLE_METRIC_COLUMNS); }
+function sortableColumnsActive_()  { return filterAreaList_(mainTableSortableColumns); }
+
+function siteConfig_(key) {
+  for (var i = 0; i < SITES.length; i++) { if (SITES[i].key === key) return SITES[i]; }
+  return SITES[0];
+}
+
+/**
+ * The payload, narrowed to the chosen building.
+ *
+ * `value` is the row's total standard hours across every area, and the whole
+ * dashboard is built on it - KPIs, the productivity ratio, the threshold test.
+ * Rewriting it to the chosen building's hours is what turns this from "hide
+ * some charts" into an actual E3 or E1/E2 dashboard, and it means none of
+ * those consumers need to know about the filter.
+ *
+ * A row with no hours AND no volume in this building is dropped rather than
+ * kept at zero, so head counts describe who worked in the building rather than
+ * who was on site. An operator who worked in both is counted in both, which is
+ * the honest answer when their hours genuinely split across two buildings.
+ */
+function scopeRowsToSite_(rows) {
+  if (siteFilter === 'all') return rows.slice();
+
+  var stdKeys = [], volKeys = [];
+  for (var i = 0; i < VOLUME_TYPES.length; i++) {
+    if (!areaInSite_(VOLUME_TYPES[i].key)) continue;
+    stdKeys.push(VOLUME_TYPES[i].stdKey);
+    volKeys.push(areaBaseKey_(VOLUME_TYPES[i].key));
+  }
+
+  var out = [];
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r], std = 0, vol = 0;
+    for (var s = 0; s < stdKeys.length; s++) { std += Number(row[stdKeys[s]]) || 0; }
+    for (var v = 0; v < volKeys.length; v++) { vol += Number(row[volKeys[v]]) || 0; }
+    if (std <= 0 && vol <= 0) continue;
+
+    var copy = {};
+    for (var k in row) { if (row.hasOwnProperty(k)) copy[k] = row[k]; }
+    copy.value = std;
+    out.push(copy);
+  }
+  return out;
+}
+
 // Same order as VOLUME_TYPES, #mainTable's columns and the CSV export header.
 // Parcel Induct used to sit after Parcel Sortation here and before it
 // everywhere else, so the Volume page listed the two the opposite way round to

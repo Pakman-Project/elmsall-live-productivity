@@ -7,7 +7,21 @@
         </svg>
       </a>
       <span class="next-header-divider" aria-hidden="true"></span>
-      <h1 class="next-header-title">Elmsall Live Productivity</h1>
+      <!-- The title IS the building picker. A separate control would compete
+           for header width that is already tight enough to collapse the action
+           buttons behind a burger, and would let the heading disagree with what
+           is actually on screen. The h1 wraps the button rather than the other
+           way round: a button may not contain a heading. -->
+      <h1 class="next-header-h1">
+        <button type="button" class="site-picker-btn" id="sitePickerBtn"
+                onclick="toggleSiteMenu_()" aria-haspopup="listbox"
+                aria-expanded="false" aria-controls="siteMenu"
+                title="Show one building" aria-label="Building: Elmsall. Change building.">
+          <span class="next-header-title" id="siteTitle">Elmsall Live Productivity</span>
+          <i class="fa-solid fa-chevron-down site-picker-caret" aria-hidden="true"></i>
+        </button>
+      </h1>
+      <div class="site-menu" id="siteMenu" role="listbox" aria-label="Building"></div>
     </div>
     <!-- Note first: it carries whatever someone has deliberately written for
          the floor to read, so it outranks the machine-generated status beside

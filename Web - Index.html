@@ -33,6 +33,7 @@
       var DEEP_DATE  = '<?= deepDate ?>';
       var DEEP_HOURS = '<?= deepHours ?>';
       var DEEP_WINDOW = '<?= deepWindow ?>';
+      var DEEP_SITE  = '<?= deepSite ?>';
       // The page cannot read the address bar from inside its iframe, so the
       // web-app URL is handed in for "Copy link" to build on.
       var WEB_APP_URL = '<?= webAppUrl ?>';
@@ -336,21 +337,21 @@
                         <th data-key="bonusNumber">Unique Bonus Number</th>
                         <th data-key="hourDeployed">Est. Hours Deployed</th>
                         <th data-key="stdHours">Standard Hours</th>
-                        <th data-key="pieVol">PiE</th>
-                        <th data-key="topUpVol">Top Up</th>
-                        <th data-key="e3PackingVol">E3 Packing</th>
-                        <th data-key="parcelInductVol">Parcel Induct</th>
-                        <th data-key="parcelSortationVol">Parcel Sortation</th>
-                        <th data-key="inboundDecantingVol">Inbound Decanting</th>
-                        <th data-key="osrDecantingVol">OSR Decanting</th>
-                        <th data-key="bcrInductingVol">BCR Inducting</th>
-                        <th data-key="e1e2InductingVol">E1/E2 Inducting</th>
-                        <th data-key="sorter6PackingVol">Sorter 6 Packing</th>
-                        <th data-key="onlinePickingDriveVol">Drive - Online Picking</th>
-                        <th data-key="onlinePickingWayVol">Way - Online Picking</th>
-                        <th data-key="onlinePickingE3Vol">E3 - Online Picking</th>
-                        <th data-key="e3BppVol">E3 BPP</th>
-                        <th data-key="e1e2BppVol">E1/E2 BPP</th>
+                        <th data-key="pieVol" data-site="e3">PiE</th>
+                        <th data-key="topUpVol" data-site="e3">Top Up</th>
+                        <th data-key="e3PackingVol" data-site="e3">E3 Packing</th>
+                        <th data-key="parcelInductVol" data-site="e3">Parcel Induct</th>
+                        <th data-key="parcelSortationVol" data-site="e3">Parcel Sortation</th>
+                        <th data-key="inboundDecantingVol" data-site="e3">Inbound Decanting</th>
+                        <th data-key="osrDecantingVol" data-site="e3">OSR Decanting</th>
+                        <th data-key="bcrInductingVol" data-site="e3">BCR Inducting</th>
+                        <th data-key="e1e2InductingVol" data-site="e3">E1/E2 Inducting</th>
+                        <th data-key="sorter6PackingVol" data-site="e1e2">Sorter 6 Packing</th>
+                        <th data-key="onlinePickingDriveVol" data-site="e1e2">Drive - Online Picking</th>
+                        <th data-key="onlinePickingWayVol" data-site="e1e2">Way - Online Picking</th>
+                        <th data-key="onlinePickingE3Vol" data-site="e3">E3 - Online Picking</th>
+                        <th data-key="e3BppVol" data-site="e3">E3 BPP</th>
+                        <th data-key="e1e2BppVol" data-site="e1e2">E1/E2 BPP</th>
                         <th data-key="performance">Productivity %</th>
                       </tr>
                     </thead>

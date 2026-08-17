@@ -39,6 +39,12 @@ function buildShareUrlPak() {
   if (hoursEl && hoursEl.value) params.push('hours=' + encodeURIComponent(hoursEl.value));
   if (windowEl && windowEl.value) params.push('window=' + encodeURIComponent(windowEl.value));
 
+  // The building travels with the link, so "look at this" reproduces the
+  // scope the sender was actually reading, not the recipient's saved one.
+  if (typeof siteFilter !== 'undefined' && siteFilter && siteFilter !== 'all') {
+    params.push('site=' + encodeURIComponent(siteFilter));
+  }
+
   // Only pin a date when viewing a history snapshot; Live is the default and
   // should stay live for whoever opens the link.
   if (currentArchiveUrl) {

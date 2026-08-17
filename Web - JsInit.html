@@ -120,9 +120,21 @@
   // from loadDataPak so the tour can re-apply the real payload when it finishes.
   function renderDashboardPayload_(data) {
     timeRanges = data.timeRanges || [];
-    rawSideData = data.rawSideData || [];
+    // The payload is kept whole in allSideData; rawSideData is the view of it
+    // narrowed to the chosen building. Everything downstream reads rawSideData,
+    // so with no filter set the two are the same and nothing behaves
+    // differently from before.
+    allSideData = data.rawSideData || [];
+    rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
     allBonusList = data.bonusList || [];
+    if (siteFilter !== 'all') {
+      var inSite_ = {};
+      for (var si = 0; si < rawSideData.length; si++) { inSite_[rawSideData[si].bonus] = true; }
+      allBonusList = allBonusList.filter(function (b) { return inSite_[b]; });
+      selectedBonuses = selectedBonuses.filter(function (b) { return inSite_[b]; });
+    }
+    if (typeof syncSiteUi_ === 'function') syncSiteUi_();
     currentThreshold = parseFloat(data.threshold) || 0;
     if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }
 
@@ -499,6 +511,12 @@
       var dlWins = document.querySelectorAll('[data-sync="timeWindow"]');
       for (var dw = 0; dw < dlWins.length; dw++) { dlWins[dw].value = DEEP_WINDOW; }
     }
+
+    // A link naming a building beats the saved preference: the sender chose
+    // what to show, and the recipient's own filter would otherwise silently
+    // reframe it.
+    if (typeof DEEP_SITE !== 'undefined' && DEEP_SITE) { siteFilter = DEEP_SITE; }
+    if (typeof syncSiteUi_ === 'function') syncSiteUi_();
 
     // ALWAYS start on Live so a stale archive is never auto-loaded — unless the
     // link explicitly asked for a dated snapshot (handled once the archive list

@@ -546,6 +546,106 @@
     }
   }
 
+  // ── Building picker ──────────────────────────────────────────────────────
+  // The header title opens this. Choosing a building re-scopes the payload and
+  // re-renders everything; see scopeRowsToSite_ in JsState for what "scope"
+  // means to the numbers.
+
+  function siteAreaCount_(key) {
+    if (key === 'all') return VOLUME_TYPES.length;
+    var n = 0;
+    for (var i = 0; i < VOLUME_TYPES.length; i++) {
+      if (AREA_SITE[areaBaseKey_(VOLUME_TYPES[i].key)] === key) n++;
+    }
+    return n;
+  }
+
+  function renderSiteMenu_() {
+    var menu = $('siteMenu');
+    if (!menu) return;
+    menu.innerHTML = SITES.map(function (s) {
+      var on = s.key === siteFilter;
+      var n = siteAreaCount_(s.key);
+      return '<button type="button" class="site-menu-item" role="option" ' +
+             'aria-selected="' + (on ? 'true' : 'false') + '" ' +
+             'onclick="setSiteFilter_(\'' + s.key + '\')">' +
+             '<i class="fa-solid fa-check site-menu-check" aria-hidden="true"></i>' +
+             '<span>' + safeTextPak(s.title) +
+             '<span class="site-menu-sub">' + n + ' work area' + (n === 1 ? '' : 's') + '</span>' +
+             '</span></button>';
+    }).join('');
+  }
+
+  function toggleSiteMenu_(force) {
+    var menu = $('siteMenu');
+    var btn = $('sitePickerBtn');
+    if (!menu || !btn) return;
+    var open = (typeof force === 'boolean') ? force : !menu.classList.contains('open');
+    if (open) renderSiteMenu_();
+    menu.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  // Reflects the current building in the title, the tab title and the marker
+  // dot. Called on load and on every change, so there is one place that decides
+  // what "you are looking at E3" looks like.
+  function syncSiteUi_() {
+    var cfg = siteConfig_(siteFilter);
+    var title = $('siteTitle');
+    if (title) title.textContent = cfg.title;
+    var btn = $('sitePickerBtn');
+    if (btn) {
+      btn.classList.toggle('filtered', siteFilter !== 'all');
+      btn.setAttribute('aria-label', 'Building: ' + cfg.short + '. Change building.');
+    }
+    try { document.title = cfg.title; } catch (e) {}
+  }
+
+  function setSiteFilter_(key, opts) {
+    var known = false;
+    for (var i = 0; i < SITES.length; i++) { if (SITES[i].key === key) known = true; }
+    if (!known) key = 'all';
+
+    var changed = key !== siteFilter;
+    siteFilter = key;
+    toggleSiteMenu_(false);
+    syncSiteUi_();
+
+    // Re-scope the payload. Everything downstream reads rawSideData, so this is
+    // the only place that has to know a filter happened.
+    rawSideData = scopeRowsToSite_(allSideData);
+
+    // The operator list follows the building: someone who never worked in E3
+    // has nothing to show on an E3 dashboard, so offering them in the search
+    // would only ever produce an empty view.
+    var present = {};
+    for (var r = 0; r < rawSideData.length; r++) { present[rawSideData[r].bonus] = true; }
+    allBonusList = Object.keys(present).sort();
+    selectedBonuses = selectedBonuses.filter(function (b) { return present[b]; });
+
+    if (typeof renderBonusChips === 'function') renderBonusChips();
+    if (typeof updateClearBtnVisibility === 'function') updateClearBtnVisibility();
+
+    // Area groups and hidden-area choices can name areas from the other
+    // building; those simply stop matching rather than being rewritten, so
+    // switching back restores exactly what was there before.
+    if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
+    if (changed && typeof saveUserPreferences === 'function') saveUserPreferences();
+  }
+
+  document.addEventListener('click', function (e) {
+    var menu = $('siteMenu');
+    if (!menu || !menu.classList.contains('open')) return;
+    if (e.target.closest && (e.target.closest('#siteMenu') || e.target.closest('#sitePickerBtn'))) return;
+    toggleSiteMenu_(false);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var menu = $('siteMenu');
+    if (menu && menu.classList.contains('open')) toggleSiteMenu_(false);
+  });
+
   // "/" focuses the search, the convention on more or less every site with a
   // search box. Guarded so it does not fire while the user is already typing
   // somewhere, or while a dialog or the tour has the screen.
@@ -1175,8 +1275,11 @@
 
     var breakdown = [];
     var maxCount = 0;
-    for (var a = 0; a < BREAKDOWN_AREAS.length; a++) {
-      var area = BREAKDOWN_AREAS[a];
+    // Only the chosen building's areas: on an E3 dashboard a row of E1/E2
+    // areas sitting at zero is noise, not information.
+    var breakdownAreas_ = breakdownAreasActive_();
+    for (var a = 0; a < breakdownAreas_.length; a++) {
+      var area = breakdownAreas_[a];
       var areaBonuses = {};
       for (var i = 0; i < rangeData.length; i++) {
         if (Number(rangeData[i][area.key]) > 0) areaBonuses[rangeData[i].bonus] = true;
@@ -1294,8 +1397,9 @@
       }
       html += '</div>';
       html += '<div class="area-group-areas">';
-      for (var v = 0; v < VOLUME_TYPES.length; v++) {
-        var t = VOLUME_TYPES[v];
+      var _areaOpts = volumeTypesActive_();
+      for (var v = 0; v < _areaOpts.length; v++) {
+        var t = _areaOpts[v];
         var checked = _trendSplitDraft[i].indexOf(t.key) !== -1 ? 'checked' : '';
         html += '<label class="trend-split-cb"><input type="checkbox" data-chart="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onTrendSplitCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
       }
@@ -1478,8 +1582,9 @@
       html += '</div>';
       html += '</div>';
       html += '<div class="area-group-areas">';
-      for (var v = 0; v < VOLUME_TYPES.length; v++) {
-        var t = VOLUME_TYPES[v];
+      var _areaOpts = volumeTypesActive_();
+      for (var v = 0; v < _areaOpts.length; v++) {
+        var t = _areaOpts[v];
         var checked = g.keys.indexOf(t.key) !== -1 ? 'checked' : '';
         html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onAreaGroupCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
       }

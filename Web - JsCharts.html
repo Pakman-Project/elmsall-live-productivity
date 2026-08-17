@@ -352,7 +352,11 @@
       if (!panelEl) continue;
       panelEl.classList.remove('vol-span-full');
       if (mode === 'separate') {
-        var isHidden = hiddenVolumeAreas.indexOf(VOLUME_TYPES[vp].key) !== -1;
+        // Out-of-building panels are hidden exactly like a de-selected
+        // area, so the odd-count full-width rule below still counts what is
+        // actually on screen.
+        var isHidden = hiddenVolumeAreas.indexOf(VOLUME_TYPES[vp].key) !== -1 ||
+                       !areaInSite_(VOLUME_TYPES[vp].key);
         panelEl.style.display = isHidden ? 'none' : '';
         if (!isHidden) visibleIndices.push(vp);
       } else {
@@ -380,6 +384,7 @@
     if (mode === 'separate') {
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
         if (hiddenVolumeAreas.indexOf(VOLUME_TYPES[i].key) !== -1) continue;
+        if (!areaInSite_(VOLUME_TYPES[i].key)) continue;
         // The series data is mapped now — it is cheap, and doing it here keeps
         // `agg` out of the closure. Only the Chart.js construction, which is
         // the expensive half, is deferred to observeVolumePanels_ below.
@@ -394,6 +399,7 @@
     } else {
       var datasets = [];
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
+        if (!areaInSite_(VOLUME_TYPES[i].key)) continue;
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
         // Hidden areas stay in the dataset list rather than being filtered
         // out. Chart.js builds its legend from the datasets, so removing one

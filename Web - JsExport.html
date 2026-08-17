@@ -7,45 +7,35 @@ function csvEscapePak(value) {
   return s;
 }
 
-var RAW_DATA_CSV_HEADERS_ = [
-  'Time Block', 'Bonus Number', 'Est. Hours Deployed', 'Standard Hours',
-  'PiE', 'Top Up', 'E3 Packing', 'Parcel Induct',
-  'Parcel Sortation', 'Inbound Decanting', 'OSR Decanting',
-  'BCR Inducting', 'E1/E2 Inducting', 'Sorter 6 Packing',
-  'Drive - Online Picking', 'Way - Online Picking', 'E3 - Online Picking',
-  'E3 BPP', 'E1/E2 BPP',
-  'Productivity %'
-];
+// Header and row are one list, so a column cannot appear in the header without
+// a value under it. The area columns come from the same active list the table
+// uses, so the export narrows with the building filter and a new work area
+// needs no edit here at all - which the two hand-maintained lists this replaces
+// did, every time, in step with each other.
+function rawDataCsvColumns_() {
+  var cols = [
+    { label: 'Time Block',          get: function (r) { return r.timeRange; } },
+    { label: 'Bonus Number',        get: function (r) { return r.bonus; } },
+    { label: 'Est. Hours Deployed', get: function (r) { return (Number(r.hourDeployed) || 0).toFixed(2); } },
+    { label: 'Standard Hours',      get: function (r) { return (Number(r.stdHours) || 0).toFixed(2); } }
+  ];
+  mainMetricColumnsActive_().forEach(function (m) {
+    cols.push({ label: m.label, get: function (r) { return Math.round(Number(r[m.key]) || 0); } });
+  });
+  cols.push({ label: 'Productivity %', get: function (r) { return (Number(r.performance) || 0).toFixed(1); } });
+  return cols;
+}
 
-function entryRowToCsvLinePak_(r) {
-  return [
-    r.timeRange,
-    r.bonus,
-    (Number(r.hourDeployed) || 0).toFixed(2),
-    (Number(r.stdHours) || 0).toFixed(2),
-    Math.round(Number(r.pieVol) || 0),
-    Math.round(Number(r.topUpVol) || 0),
-    Math.round(Number(r.e3PackingVol) || 0),
-    Math.round(Number(r.parcelInductVol) || 0),
-    Math.round(Number(r.parcelSortationVol) || 0),
-    Math.round(Number(r.inboundDecantingVol) || 0),
-    Math.round(Number(r.osrDecantingVol) || 0),
-    Math.round(Number(r.bcrInductingVol) || 0),
-    Math.round(Number(r.e1e2InductingVol) || 0),
-    Math.round(Number(r.sorter6PackingVol) || 0),
-    Math.round(Number(r.onlinePickingDriveVol) || 0),
-    Math.round(Number(r.onlinePickingWayVol) || 0),
-    Math.round(Number(r.onlinePickingE3Vol) || 0),
-    Math.round(Number(r.e3BppVol) || 0),
-    Math.round(Number(r.e1e2BppVol) || 0),
-    (Number(r.performance) || 0).toFixed(1)
-  ].map(csvEscapePak).join(',');
+function entryRowToCsvLinePak_(r, cols) {
+  cols = cols || rawDataCsvColumns_();
+  return cols.map(function (c) { return c.get(r); }).map(csvEscapePak).join(',');
 }
 
 function buildRawDataCsvPak_(entryRows) {
-  var lines = [RAW_DATA_CSV_HEADERS_.map(csvEscapePak).join(',')];
+  var cols = rawDataCsvColumns_();
+  var lines = [cols.map(function (c) { return c.label; }).map(csvEscapePak).join(',')];
   for (var i = 0; i < entryRows.length; i++) {
-    lines.push(entryRowToCsvLinePak_(entryRows[i]));
+    lines.push(entryRowToCsvLinePak_(entryRows[i], cols));
   }
   return lines.join('\r\n');
 }

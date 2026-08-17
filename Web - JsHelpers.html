@@ -51,6 +51,7 @@ function saveUserPreferences() {
       chartOrder: chartOrderState,
       allowMultiBonus: allowMultiBonusFilter,
       syncAreaChips: syncAreaChips,
+      siteFilter: siteFilter,
       theme: currentTheme
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
@@ -67,6 +68,10 @@ function loadUserPreferences() {
     var prefs = JSON.parse(raw);
 
     applyTheme_(prefs.theme === 'dark' ? 'dark' : 'light');
+
+    // Restored before the payload arrives, so the first render is already
+    // scoped rather than showing the whole site and then narrowing.
+    if (prefs.siteFilter) siteFilter = prefs.siteFilter;
 
     if (prefs.hoursRange) $('hoursRange').value = prefs.hoursRange;
     if (prefs.timeWindow) $('timeWindow').value = prefs.timeWindow;
@@ -410,8 +415,9 @@ function bonusAreaCountMapPak(entries) {
   var counts = {};
   if (!entries || !entries.length) return counts;
 
-  for (var a = 0; a < BREAKDOWN_AREAS.length; a++) {
-    var areaKey = BREAKDOWN_AREAS[a].key;
+  var areas_ = breakdownAreasActive_();
+  for (var a = 0; a < areas_.length; a++) {
+    var areaKey = areas_[a].key;
     // Gathered per area first, so a bonus number appearing in twenty blocks of
     // the same area still counts as one area.
     var seen = {};
