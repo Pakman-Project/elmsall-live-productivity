@@ -274,7 +274,9 @@ var PROC_AREA_COLUMNS_ = [
   // Three zones of one Online Picking source; separate areas on the dashboard.
   { key: 'onlinePickingDrive', stdHeader: 'D.Analysis - Online Picking - Drive', volHeader: 'Volume - Online Picking - Drive' },
   { key: 'onlinePickingWay',   stdHeader: 'D.Analysis - Online Picking - Way',   volHeader: 'Volume - Online Picking - Way' },
-  { key: 'onlinePickingE3',    stdHeader: 'D.Analysis - Online Picking - E3',    volHeader: 'Volume - Online Picking - E3' }
+  { key: 'onlinePickingE3',    stdHeader: 'D.Analysis - Online Picking - E3',    volHeader: 'Volume - Online Picking - E3' },
+  { key: 'e3Bpp',              stdHeader: 'D.Analysis - E3 BPP',                 volHeader: 'Volume - E3 BPP' },
+  { key: 'e1e2Bpp',            stdHeader: 'D.Analysis - E1/E2 BPP',              volHeader: 'Volume - E1/E2 BPP' }
 ];
 
 // Headers are typed and re-typed by hand on ten-odd archive files, so they are

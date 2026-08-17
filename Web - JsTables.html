@@ -171,6 +171,8 @@ function renderMainTablePak(sourceRows) {
         numTdPak(r.onlinePickingDriveVol, 0) +
         numTdPak(r.onlinePickingWayVol, 0) +
         numTdPak(r.onlinePickingE3Vol, 0) +
+        numTdPak(r.e3BppVol, 0) +
+        numTdPak(r.e1e2BppVol, 0) +
         '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>';
 
       (function (rowEl, rowData) {
@@ -329,6 +331,8 @@ var DETAIL_TABLE_COLUMNS = [
   { key: 'onlinePickingDriveVol', label: 'Online Picking - Drive', type: 'num' },
   { key: 'onlinePickingWayVol',   label: 'Online Picking - Way',   type: 'num' },
   { key: 'onlinePickingE3Vol',    label: 'Online Picking - E3',    type: 'num' },
+  { key: 'e3BppVol',              label: 'E3 BPP',                 type: 'num' },
+  { key: 'e1e2BppVol',            label: 'E1/E2 BPP',              type: 'num' },
   { key: 'performance',         label: 'Productivity %',      type: 'num' }
 ];
 
@@ -432,6 +436,8 @@ function buildEntryDetailRowHtml_(r) {
     numTdPak(r.onlinePickingDriveVol, 0) +
     numTdPak(r.onlinePickingWayVol, 0) +
     numTdPak(r.onlinePickingE3Vol, 0) +
+    numTdPak(r.e3BppVol, 0) +
+    numTdPak(r.e1e2BppVol, 0) +
     '<td><span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span></td>' +
     '</tr>';
 }

@@ -13,6 +13,7 @@ var RAW_DATA_CSV_HEADERS_ = [
   'Parcel Sortation', 'Inbound Decanting', 'OSR Decanting',
   'BCR Inducting', 'E1/E2 Inducting', 'Sorter 6 Packing',
   'Online Picking - Drive', 'Online Picking - Way', 'Online Picking - E3',
+  'E3 BPP', 'E1/E2 BPP',
   'Productivity %'
 ];
 
@@ -35,6 +36,8 @@ function entryRowToCsvLinePak_(r) {
     Math.round(Number(r.onlinePickingDriveVol) || 0),
     Math.round(Number(r.onlinePickingWayVol) || 0),
     Math.round(Number(r.onlinePickingE3Vol) || 0),
+    Math.round(Number(r.e3BppVol) || 0),
+    Math.round(Number(r.e1e2BppVol) || 0),
     (Number(r.performance) || 0).toFixed(1)
   ].map(csvEscapePak).join(',');
 }
