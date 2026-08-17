@@ -272,9 +272,16 @@ var PROC_AREA_COLUMNS_ = [
   { key: 'e1e2Inducting',    stdHeader: 'D.Analysis - E1/E2 Inducting',    volHeader: 'Volume - E1/E2 Inducting' },
   { key: 'sorter6Packing',   stdHeader: 'D.Analysis - Sorter 6 Packing',   volHeader: 'Volume - Sorter 6 Packing' },
   // Three zones of one Online Picking source; separate areas on the dashboard.
-  { key: 'onlinePickingDrive', stdHeader: 'D.Analysis - Online Picking - Drive', volHeader: 'Volume - Online Picking - Drive' },
-  { key: 'onlinePickingWay',   stdHeader: 'D.Analysis - Online Picking - Way',   volHeader: 'Volume - Online Picking - Way' },
-  { key: 'onlinePickingE3',    stdHeader: 'D.Analysis - Online Picking - E3',    volHeader: 'Volume - Online Picking - E3' },
+  // volHeaderWas: the volume header follows the display label, and these three
+  // were renamed "Online Picking - X" -> "X - Online Picking". Archives are
+  // frozen copies carrying the old header, so the old spelling is still
+  // accepted — without it every archived day would show these areas as zero.
+  { key: 'onlinePickingDrive', stdHeader: 'D.Analysis - Online Picking - Drive', volHeader: 'Volume - Drive - Online Picking',
+    volHeaderWas: ['Volume - Online Picking - Drive'] },
+  { key: 'onlinePickingWay',   stdHeader: 'D.Analysis - Online Picking - Way',   volHeader: 'Volume - Way - Online Picking',
+    volHeaderWas: ['Volume - Online Picking - Way'] },
+  { key: 'onlinePickingE3',    stdHeader: 'D.Analysis - Online Picking - E3',    volHeader: 'Volume - E3 - Online Picking',
+    volHeaderWas: ['Volume - Online Picking - E3'] },
   { key: 'e3Bpp',              stdHeader: 'D.Analysis - E3 BPP',                 volHeader: 'Volume - E3 BPP' },
   { key: 'e1e2Bpp',            stdHeader: 'D.Analysis - E1/E2 BPP',              volHeader: 'Volume - E1/E2 BPP' }
 ];
@@ -298,14 +305,24 @@ function buildProcColumnMap_(headerRow) {
   var totalIdx = idx[normaliseProcHeader_(PROC_TOTAL_HEADER_)];
   var map = { total: (totalIdx === undefined) ? -1 : totalIdx, areas: [] };
 
+  // The current name first, then any it used to go by — so renaming an area
+  // does not blank it out on every archive cut before the rename.
+  function locate(primary, formerly) {
+    var hit = idx[normaliseProcHeader_(primary)];
+    if (hit !== undefined) return hit;
+    for (var f = 0; formerly && f < formerly.length; f++) {
+      hit = idx[normaliseProcHeader_(formerly[f])];
+      if (hit !== undefined) return hit;
+    }
+    return -1;
+  }
+
   for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
     var a = PROC_AREA_COLUMNS_[i];
-    var s = idx[normaliseProcHeader_(a.stdHeader)];
-    var v = idx[normaliseProcHeader_(a.volHeader)];
     map.areas.push({
       key: a.key,
-      std: (s === undefined) ? -1 : s,
-      vol: (v === undefined) ? -1 : v
+      std: locate(a.stdHeader, a.stdHeaderWas),
+      vol: locate(a.volHeader, a.volHeaderWas)
     });
   }
   return map;
