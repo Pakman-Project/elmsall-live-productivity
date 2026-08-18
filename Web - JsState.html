@@ -42,9 +42,9 @@ var VOLUME_TYPES = [
   { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', family: 'BPP', color: '#7b5100', colorDark: '#8b5b00' },
   { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', family: 'BPP', color: '#cb8903', colorDark: '#bc7d09' },
   { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', family: 'Top Up', color: '#cb4b0b', colorDark: '#c94a11' },
-  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', family: 'Returns Pick', color: '#ab0b1d', colorDark: '#af343a' },
+  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', family: 'Automation Pick', color: '#ab0b1d', colorDark: '#af343a' },
   { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Top Up', color: '#f97542', colorDark: '#e36230' },
-  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', family: 'Returns Pick', color: '#f85d59', colorDark: '#dc5e5e' }
+  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', family: 'Automation Pick', color: '#f85d59', colorDark: '#dc5e5e' }
 ];
 
 // The eight family hues. Their ORDER is a safety property, not a taste one -
@@ -59,7 +59,7 @@ var AREA_FAMILIES = [
   { name: 'Parcel',       color: '#e87ba4', colorDark: '#d55181' },
   { name: 'Decanting',    color: '#008300', colorDark: '#008300' },
   { name: 'Inducting',    color: '#4a3aa7', colorDark: '#9085e9' },
-  { name: 'Returns Pick', color: '#e34948', colorDark: '#e66767' }
+  { name: 'Automation Pick', color: '#e34948', colorDark: '#e66767' }
 ];
 
 /**
@@ -93,6 +93,15 @@ function volumeFamiliesActive_() {
   }
   return out.filter(function(f) { return f.types.length > 0; });
 }
+
+// The Volume page's Combined and Stacked modes each come in two forms: folded
+// to families (the default) and every area drawn separately. Both are listed
+// in the Display Mode select, so there is one control and one saved
+// preference rather than a mode plus a hidden switch.
+var VOLUME_MODES_ALL_AREAS = ['combinedAll', 'stackedAll'];
+var VOLUME_MODES_STACKED = ['stacked', 'stackedAll'];
+function volumeModeIsStacked_(mode) { return VOLUME_MODES_STACKED.indexOf(mode) !== -1; }
+function volumeModeIsByFamily_(mode) { return VOLUME_MODES_ALL_AREAS.indexOf(mode) === -1; }
 
 // ── The site filter ────────────────────────────────────────────────────────
 // Elmsall is three buildings, and most people only run one of them. The header

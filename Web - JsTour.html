@@ -180,11 +180,11 @@ var TOUR_STEPS = [
   { part: 4, page: 1, target: '#volumeChartMode',
     interactive: { sel: '#volumeChartMode', type: 'change', changeValue: 'stacked' },
     title: 'Change the display mode',
-    body: 'This dropdown switches between separate charts, one combined line, and a stacked area. Here it moves to “Stacked Area”.' },
+    body: 'This dropdown switches between separate charts per area, one combined line, and a stacked area. The combined views come in two forms: grouped into work families, or every area drawn on its own. Here it moves to “Stacked Area - Families”.' },
   { part: 4, page: 1, target: '.volume-charts',
     cleanup: function () { var s = $('volumeChartMode'); if (s) { s.value = 'separate'; applyLocalFiltersPak(); } },
     title: 'Stacked view',
-    body: 'All areas now stack into a single chart, so you see the total shape and each area’s share at once.' },
+    body: 'Everything now stacks into one chart, so you see the total shape and each share at once. Areas are grouped into families here — nineteen colours at once are hard to tell apart. Pick “All Areas” if you want every one of them.' },
 
   // ===== Part 5 — Bonus Numbers page =======================================
   { part: 5, page: 2, target: '.bonus-page-controls',
