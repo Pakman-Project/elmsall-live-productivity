@@ -1309,7 +1309,7 @@
       bonusList.sort(function(a, b) { return (bonusProductivity[b] || 0) - (bonusProductivity[a] || 0); });
       var count = bonusList.length;
       if (count > 0) {
-        breakdown.push({ label: area.label, count: count, color: area.color, bonuses: bonusList });
+        breakdown.push({ label: area.label, count: count, color: areaColor_(area), bonuses: bonusList });
         if (count > maxCount) maxCount = count;
       }
     }
@@ -1422,7 +1422,7 @@
       for (var v = 0; v < _areaOpts.length; v++) {
         var t = _areaOpts[v];
         var checked = _trendSplitDraft[i].indexOf(t.key) !== -1 ? 'checked' : '';
-        html += '<label class="trend-split-cb"><input type="checkbox" data-chart="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onTrendSplitCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
+        html += '<label class="trend-split-cb"><input type="checkbox" data-chart="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onTrendSplitCbChange(this)"><span class="trend-split-dot" style="background:' + areaColor_(t) + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
       }
       html += '</div></div>';
     }
@@ -1493,7 +1493,7 @@
     }
     return {
       label: labels.length ? labels.join(', ') : 'Group ' + (i + 1) + ' (empty)',
-      color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length],
+      color: groupColor_(i),
       empty: labels.length === 0
     };
   }
@@ -1607,7 +1607,7 @@
       for (var v = 0; v < _areaOpts.length; v++) {
         var t = _areaOpts[v];
         var checked = g.keys.indexOf(t.key) !== -1 ? 'checked' : '';
-        html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onAreaGroupCbChange(this)"><span class="trend-split-dot" style="background:' + t.color + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
+        html += '<label class="trend-split-cb"><input type="checkbox" data-group="' + i + '" data-key="' + t.key + '" ' + checked + ' onchange="onAreaGroupCbChange(this)"><span class="trend-split-dot" style="background:' + areaColor_(t) + '"></span><span class="area-cb-text">' + t.label + '</span></label>';
       }
       html += '</div></div>';
     }

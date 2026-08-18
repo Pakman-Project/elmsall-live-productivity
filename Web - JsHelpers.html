@@ -501,7 +501,7 @@ function renderAreaToggleChips_(opts) {
     var t = ordered[v];
     var off = hidden.indexOf(t.key) !== -1;
     html += '<button class="bonus-area-chip' + (off ? ' off' : '') + '" data-area-key="' + escapeAttrPak(t.key) + '" onclick="' + opts.onToggle + '(\'' + t.key + '\')" title="' + (off ? 'Show ' : 'Hide ') + escapeAttrPak(t.label) + '">' +
-            '<span class="breakdown-dot" style="background:' + t.color + '"></span>' + t.label +
+            '<span class="breakdown-dot" style="background:' + areaColor_(t) + '"></span>' + t.label +
             '<i class="fa-solid ' + (off ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>';
   }
   togglesEl.innerHTML = html;

@@ -5,27 +5,94 @@ var APP_CONFIG = {
   classes: { good: 'good', warn: 'warn', bad: 'bad' }
 };
 
+// ── Work-area colour ──────────────────────────────────────────────────
+// Colour carries two things at once: hue says which FAMILY of work an area
+// belongs to, lightness says which area within it. So the three Online
+// Pickings are three blues, the three Top Ups three oranges, and both BPPs
+// are yellows - the grouping reads off a chart without anyone consulting a
+// legend.
+//
+// Both columns are generated in OKLCH from the eight fixed hues below and
+// measured, not eyeballed: every colour sits inside its mode's lightness
+// band, clears the chroma floor under which a hue starts reading as grey, and
+// every family ramp is monotone with a real lightness step between
+// neighbours. The dark column is its own set of steps chosen for the dark
+// surface, not the light column lightened.
+//
+// What colour cannot do: nineteen shades are not all tellable apart at once,
+// and no palette fixes that - it is a limit of the eye, not of the hexes. So
+// charts where series touch draw the eight FAMILIES instead (the Volume
+// page's Combined and Stacked modes), and these per-area shades are used
+// where areas do not sit edge to edge: separate panels, chips, dots,
+// breakdown bars.
 var VOLUME_TYPES = [
-  { key: 'pieVol', stdKey: 'pieStd', label: 'PiE', color: '#69a7ff' },
-  { key: 'topUpVol', stdKey: 'topUpStd', label: 'Top Up', color: '#32d583' },
-  { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', color: '#ff9f43' },
-  { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', color: '#ff6b6b' },
-  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', color: '#a55eea' },
-  { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'Inbound Decanting', color: '#48dbfb' },
-  { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', color: '#feca57' },
-  { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', color: '#f368e0' },
-  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', color: '#38ada9' },
-  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', color: '#a3cb38' },
-  { key: 'onlinePickingDriveVol', stdKey: 'onlinePickingDriveStd', label: 'Drive - Online Picking', color: '#6c5ce7' },
-  { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Way - Online Picking', color: '#b33771' },
-  { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'E3 - Online Picking', color: '#e58e26' },
-  { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', color: '#0fb9b1' },
-  { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', color: '#8d6e63' },
-  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', color: '#7f8fa6' },
-  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', color: '#c44569' },
-  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', color: '#218c74' },
-  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', color: '#9c88ff' }
+  { key: 'pieVol', stdKey: 'pieStd', label: 'PiE', family: 'Picking', color: '#0453a5', colorDark: '#035cb3' },
+  { key: 'topUpVol', stdKey: 'topUpStd', label: 'Top Up', family: 'Top Up', color: '#913203', colorDark: '#a73a07' },
+  { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', family: 'Packing', color: '#076c49', colorDark: '#0c7954' },
+  { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', family: 'Parcel', color: '#95305b', colorDark: '#ae2b60' },
+  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', family: 'Parcel', color: '#db7099', colorDark: '#db5786' },
+  { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'Inbound Decanting', family: 'Decanting', color: '#016f01', colorDark: '#0a7c08' },
+  { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', family: 'Decanting', color: '#49b343', colorDark: '#3aa635' },
+  { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#5345b3', colorDark: '#6355b4' },
+  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', family: 'Inducting', color: '#8d86fa', colorDark: '#877cdf' },
+  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', family: 'Packing', color: '#22b37d', colorDark: '#24a476' },
+  { key: 'onlinePickingDriveVol', stdKey: 'onlinePickingDriveStd', label: 'Drive - Online Picking', family: 'Picking', color: '#1d6dca', colorDark: '#1d6eca' },
+  { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Way - Online Picking', family: 'Picking', color: '#3c89e9', colorDark: '#3482e0' },
+  { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'E3 - Online Picking', family: 'Picking', color: '#64a6fd', colorDark: '#4996f5' },
+  { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', family: 'BPP', color: '#7b5100', colorDark: '#8b5b00' },
+  { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', family: 'BPP', color: '#cb8903', colorDark: '#bc7d09' },
+  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', family: 'Top Up', color: '#cb4b0b', colorDark: '#c94a11' },
+  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', family: 'Returns Pick', color: '#ab0b1d', colorDark: '#af343a' },
+  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Top Up', color: '#f97542', colorDark: '#e36230' },
+  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', family: 'Returns Pick', color: '#f85d59', colorDark: '#dc5e5e' }
 ];
+
+// The eight family hues. Their ORDER is a safety property, not a taste one -
+// it is what keeps neighbouring families apart under red-green colour
+// blindness - so it does not get re-ordered to look nicer. These are what a
+// folded chart draws; a family hue is never handed to an individual area.
+var AREA_FAMILIES = [
+  { name: 'Picking',      color: '#2a78d6', colorDark: '#3987e5' },
+  { name: 'Top Up',       color: '#eb6834', colorDark: '#d95926' },
+  { name: 'Packing',      color: '#1baf7a', colorDark: '#199e70' },
+  { name: 'BPP',          color: '#eda100', colorDark: '#c98500' },
+  { name: 'Parcel',       color: '#e87ba4', colorDark: '#d55181' },
+  { name: 'Decanting',    color: '#008300', colorDark: '#008300' },
+  { name: 'Inducting',    color: '#4a3aa7', colorDark: '#9085e9' },
+  { name: 'Returns Pick', color: '#e34948', colorDark: '#e66767' }
+];
+
+/**
+ * The colour to draw `t` in right now, for anything carrying a color /
+ * colorDark pair - a work area or a family. Resolving here rather than at
+ * each call site is what makes the theme toggle one rebuild instead of a
+ * conditional at every place a colour is used.
+ */
+function areaColor_(t) {
+  if (!t) return '#888888';
+  return (currentTheme === 'dark' && t.colorDark) ? t.colorDark : t.color;
+}
+
+/**
+ * The families that actually have work areas in the building currently in
+ * force, each carrying its member VOLUME_TYPES entries. Empty families are
+ * dropped, so an E1/E2 dashboard draws five families rather than eight with
+ * three of them flat at zero.
+ */
+function volumeFamiliesActive_() {
+  var byName = {}, out = [];
+  for (var i = 0; i < AREA_FAMILIES.length; i++) {
+    var f = AREA_FAMILIES[i];
+    byName[f.name] = { name: f.name, color: f.color, colorDark: f.colorDark, types: [] };
+    out.push(byName[f.name]);
+  }
+  for (var v = 0; v < VOLUME_TYPES.length; v++) {
+    var t = VOLUME_TYPES[v];
+    if (!areaInSite_(t.key)) continue;
+    if (byName[t.family]) byName[t.family].types.push(t);
+  }
+  return out.filter(function(f) { return f.types.length > 0; });
+}
 
 // ── The site filter ────────────────────────────────────────────────────────
 // Elmsall is three buildings, and most people only run one of them. The header
@@ -162,7 +229,7 @@ function joinAreaLabels_(labels, sep) {
     var prefix = cut === -1 ? label : label.slice(0, cut);
     // A label with no " - " is its own family, keyed on itself so two
     // different plain labels never merge.
-    var key = suffix === null ? ' ' + label + i : suffix;
+    var key = suffix === null ? '\u0000' + label + i : suffix;
     if (!bySuffix[key]) { bySuffix[key] = { suffix: suffix, parts: [] }; order.push(key); }
     bySuffix[key].parts.push(prefix);
   }
@@ -281,7 +348,18 @@ var mainTableSortableColumns = [
 // Caches the last-known table/card mode so the resize handler only re-renders on an actual flip.
 var lastMainTableCardMode = null;
 
-var AREA_GROUP_COLORS = ['#69a7ff', '#ff9f43', '#48dbfb', '#a55eea', '#32d583', '#ff6b6b', '#feca57'];
+// Colours for user-composed area GROUPS. A group is any set of areas someone
+// chose to combine, so it has no family - it just takes the next of the eight
+// hues in their fixed order, which is the case those hues were selected and
+// checked for.
+var AREA_GROUP_COLORS = AREA_FAMILIES.map(function(f) { return f.color; });
+var AREA_GROUP_COLORS_DARK = AREA_FAMILIES.map(function(f) { return f.colorDark; });
+
+/** The nth group's colour in the current theme, wrapping past the eighth. */
+function groupColor_(i) {
+  var list = (currentTheme === 'dark') ? AREA_GROUP_COLORS_DARK : AREA_GROUP_COLORS;
+  return list[((i % list.length) + list.length) % list.length];
+}
 // The Overall page leads on two picking areas and contrasts them with a packing
 // area. Which ones depends on the building: PiE and Top Up do not exist in
 // E1/E2, so an E1/E2 view built on them is three flat lines at zero.
@@ -328,27 +406,19 @@ function defaultAreaGroupSplitState_() {
   return { enabled: false, charts: [] };
 }
 
-var BREAKDOWN_AREAS = [
-  { key: 'pie', label: 'PiE', color: '#69a7ff' },
-  { key: 'topUp', label: 'Top Up', color: '#32d583' },
-  { key: 'e3Packing', label: 'E3 Packing', color: '#ff9f43' },
-  { key: 'parcelInduct', label: 'Parcel Induct', color: '#ff6b6b' },
-  { key: 'parcelSortation', label: 'Parcel Sortation', color: '#a55eea' },
-  { key: 'inboundDecanting', label: 'Inbound Decanting', color: '#48dbfb' },
-  { key: 'osrDecanting', label: 'OSR Decanting', color: '#feca57' },
-  { key: 'bcrInducting', label: 'BCR Inducting', color: '#f368e0' },
-  { key: 'e1e2Inducting', label: 'E1/E2 Inducting', color: '#38ada9' },
-  { key: 'sorter6Packing', label: 'Sorter 6 Packing', color: '#a3cb38' },
-  { key: 'onlinePickingDrive', label: 'Drive - Online Picking', color: '#6c5ce7' },
-  { key: 'onlinePickingWay', label: 'Way - Online Picking', color: '#b33771' },
-  { key: 'onlinePickingE3', label: 'E3 - Online Picking', color: '#e58e26' },
-  { key: 'e3Bpp', label: 'E3 BPP', color: '#0fb9b1' },
-  { key: 'e1e2Bpp', label: 'E1/E2 BPP', color: '#8d6e63' },
-  { key: 'rspsTopUp', label: 'RSPS Top Up', color: '#7f8fa6' },
-  { key: 'rspsPick', label: 'RSPS Pick', color: '#c44569' },
-  { key: 'ispsTopUp', label: 'ISPS Top Up', color: '#218c74' },
-  { key: 'ispsPick', label: 'ISPS Pick', color: '#9c88ff' }
-];
+// The Bonus page's breakdown bars, over the same nineteen areas as
+// VOLUME_TYPES - so they are DERIVED from it rather than restated. The hand
+// written copy that used to live here had to be edited in lockstep every time
+// an area was added or a colour changed, which is the same second-source-of-
+// truth that has caused trouble elsewhere in this pipeline.
+//
+// The keys differ by one suffix and that is the only reason this list exists:
+// breakdown reads the raw side data, whose volume field is the bare area name
+// ('pie'), while VOLUME_TYPES is keyed for the shaped rows ('pieVol').
+var BREAKDOWN_AREAS = VOLUME_TYPES.map(function(t) {
+  return { key: areaBaseKey_(t.key), label: t.label, family: t.family,
+           color: t.color, colorDark: t.colorDark };
+});
 
 // APP_CONFIG.colors is the CHART palette — saturated colours chosen to read as
 // distinct series against a plot background. It used to be pushed into

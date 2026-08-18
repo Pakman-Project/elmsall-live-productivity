@@ -30,7 +30,7 @@ function getPerfSplitGroups_() {
       id: 'g' + i,
       label: joinAreaLabels_(labels),
       keys: keys,
-      color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length],
+      color: groupColor_(i),
       showLine: entry.showLine !== false,
       showTrend: entry.showTrend === true
     });

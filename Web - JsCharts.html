@@ -246,14 +246,19 @@
     if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; }
     else { ci.show(index); legendItem.hidden = false; }
 
+    // A legend entry stands for a FAMILY now, so one click writes through to
+    // every work area inside it - which is what keeps the folded chart and the
+    // per-area chips saying the same thing about what is shown.
     var ds = ci.data.datasets[index];
-    var key = ds && ds.__areaKey;
-    if (!key) return;
+    var keys = (ds && ds.__areaKeys) || (ds && ds.__areaKey ? [ds.__areaKey] : null);
+    if (!keys || !keys.length) return;
 
     var nowHidden = !ci.isDatasetVisible(index);
-    var at = hiddenVolumeAreas.indexOf(key);
-    if (nowHidden && at === -1) { hiddenVolumeAreas.push(key); }
-    else if (!nowHidden && at !== -1) { hiddenVolumeAreas.splice(at, 1); }
+    for (var hk = 0; hk < keys.length; hk++) {
+      var at = hiddenVolumeAreas.indexOf(keys[hk]);
+      if (nowHidden && at === -1) { hiddenVolumeAreas.push(keys[hk]); }
+      else if (!nowHidden && at !== -1) { hiddenVolumeAreas.splice(at, 1); }
+    }
     // The legend writes to the same state the chips do, so it syncs the same
     // way. The Bonus page is not on screen here, and applyLocalFiltersPak is
     // deliberately not called - see above for why this updates in place - so
@@ -391,24 +396,49 @@
         var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
         (function (idx, vType, series) {
           _volPendingBuilders[idx] = function () {
-            volumeCharts.push(new Chart($('volChart' + idx), { type: 'line', data: { labels: labels, datasets: [{ label: vType.label, data: series, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } }));
+            volumeCharts.push(new Chart($('volChart' + idx), { type: 'line', data: { labels: labels, datasets: [{ label: vType.label, data: series, borderWidth: 2, borderColor: areaColor_(vType), backgroundColor: hexToRgbaPak(areaColor_(vType), CHART_FILL_A(0.1)), tension: 0.35, pointRadius: 2, fill: true }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: commonTooltip }, scales: { x: xOpt, y: volYAxis }, onHover: function(event, elements) { syncVolumeCharts(event, elements); } } }));
           };
         })(i, volType, dataArr);
       }
       observeVolumePanels_();
     } else {
+      // Combined and Stacked put every series on one plot, where neighbours
+      // sit edge to edge and have to be told apart on sight. Nineteen cannot
+      // be — that is a limit of the eye, so no choice of colours would rescue
+      // it — and this chart therefore draws the eight work FAMILIES, each the
+      // sum of its areas. The per-area detail is a mode away in Separate
+      // Charts, where each area has a panel to itself and adjacency never
+      // arises.
       var datasets = [];
-      for (var i = 0; i < VOLUME_TYPES.length; i++) {
-        if (!areaInSite_(VOLUME_TYPES[i].key)) continue;
-        var volType = VOLUME_TYPES[i]; var dataArr = agg.map(function(r) { return r[volType.key]; });
-        // Hidden areas stay in the dataset list rather than being filtered
-        // out. Chart.js builds its legend from the datasets, so removing one
-        // would remove the only control for bringing it back — it is marked
-        // hidden instead, which the legend shows struck through.
-        datasets.push({ label: volType.label, data: dataArr, borderWidth: 2, borderColor: volType.color, backgroundColor: hexToRgbaPak(volType.color, CHART_FILL_A(isStacked ? 0.6 : 0.1)), tension: 0.35, pointRadius: 2, fill: isStacked,
-          hidden: hiddenVolumeAreas.indexOf(volType.key) !== -1,
-          __areaKey: volType.key,
-          // Whether this area saw ANY volume in the current window under the
+      var famList = volumeFamiliesActive_();
+      for (var i = 0; i < famList.length; i++) {
+        var fam = famList[i];
+        var famKeys = fam.types.map(function(t) { return t.key; });
+        // Hiding an area takes it out of its family's total too, so the chips
+        // and this chart agree on what is being counted rather than only on
+        // what is drawn.
+        var shownKeys = famKeys.filter(function(k) { return hiddenVolumeAreas.indexOf(k) === -1; });
+        var famHidden = shownKeys.length === 0;
+        var sumKeys = famHidden ? famKeys : shownKeys;
+        var dataArr = agg.map(function(r) {
+          var sum = 0;
+          for (var sk = 0; sk < sumKeys.length; sk++) sum += Number(r[sumKeys[sk]]) || 0;
+          return sum;
+        });
+        // A family holding one area in this building is named for the area —
+        // "E3 Packing" says more than "Packing" when it is the only packing
+        // there is. The colour stays the family's either way, because that is
+        // what carries the separation guarantee.
+        var famLabel = fam.types.length === 1 ? fam.types[0].label : fam.name;
+        var famColor = areaColor_(fam);
+        // A fully hidden family stays in the dataset list rather than being
+        // filtered out. Chart.js builds its legend from the datasets, so
+        // removing one would remove the only control for bringing it back — it
+        // is marked hidden instead, which the legend shows struck through.
+        datasets.push({ label: famLabel, data: dataArr, borderWidth: 2, borderColor: famColor, backgroundColor: hexToRgbaPak(famColor, CHART_FILL_A(isStacked ? 0.6 : 0.1)), tension: 0.35, pointRadius: 2, fill: isStacked,
+          hidden: famHidden,
+          __areaKeys: famKeys,
+          // Whether this family saw ANY volume in the current window under the
           // current bonus filter - computed once per render, read by the
           // tooltip filter below.
           __hasAnyData: dataArr.some(function(v) { return (Number(v) || 0) > 0; }) });
@@ -493,7 +523,7 @@
           if ((Number(vData[vd]) || 0) > 0) { vHasVolume = true; break; }
         }
         if (!vHasVolume) continue;
-        overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
+        overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: areaColor_(vType), backgroundColor: hexToRgbaPak(areaColor_(vType), CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
       }
     } else {
       // The two headline picking areas for the building in view. Hard-coding
@@ -507,8 +537,8 @@
         joinAreaLabels_(headline.map(function (t) { return t.label; }), ' & ');
       overviewDatasets = headline.map(function (t) {
         return { label: 'Volume ' + t.label, data: agg.map(function (r) { return r[t.key]; }),
-                 borderWidth: 2, borderColor: t.color,
-                 backgroundColor: hexToRgbaPak(t.color, CHART_FILL_A(0.6)),
+                 borderWidth: 2, borderColor: areaColor_(t),
+                 backgroundColor: hexToRgbaPak(areaColor_(t), CHART_FILL_A(0.6)),
                  tension: 0.35, pointRadius: 2, fill: true };
       });
     }
@@ -533,7 +563,7 @@
             if ((Number(rawFilteredData[pd][pgType.stdKey]) || 0) > 0) { pgHasActivity = true; break; }
           }
           if (pgHasActivity) {
-            perfGroups.push({ id: 'g' + pg, label: pgType.label, keys: [pgType.key], color: pgType.color, showLine: true, showTrend: true });
+            perfGroups.push({ id: 'g' + pg, label: pgType.label, keys: [pgType.key], color: areaColor_(pgType), showLine: true, showTrend: true });
           }
         }
       } else {
@@ -647,7 +677,7 @@
     // --- 4. TREND (1 to MAX_TREND_CHARTS charts) ---
     function buildTrendDatasets(aggData, areaKeys) {
       var ds = [{ label: 'Hour Deployed', data: aggData.map(function(r) { return r.hourDeployed; }), borderWidth: 2.5, borderColor: APP_CONFIG.colors.accent, backgroundColor: 'transparent', tension: 0.35, pointRadius: 2, fill: false, stack: 'deployed-line', order: 1 }];
-      for (var a = 0; a < areaKeys.length; a++) { var key = areaKeys[a]; var type = VOLUME_TYPES.filter(function(v){ return v.key === key; })[0]; ds.push({ label: type.label + ' Std Hrs', data: aggData.map(function(r) { return (r.stdBreakdown && r.stdBreakdown[key]) || 0; }), borderWidth: 1, borderColor: type.color, backgroundColor: hexToRgbaPak(type.color, CHART_FILL_A(0.35)), tension: 0.35, pointRadius: 0, fill: true, stack: 'std-hours-stack', order: 2 }); }
+      for (var a = 0; a < areaKeys.length; a++) { var key = areaKeys[a]; var type = VOLUME_TYPES.filter(function(v){ return v.key === key; })[0]; ds.push({ label: type.label + ' Std Hrs', data: aggData.map(function(r) { return (r.stdBreakdown && r.stdBreakdown[key]) || 0; }), borderWidth: 1, borderColor: areaColor_(type), backgroundColor: hexToRgbaPak(areaColor_(type), CHART_FILL_A(0.35)), tension: 0.35, pointRadius: 0, fill: true, stack: 'std-hours-stack', order: 2 }); }
       return ds;
     }
 
