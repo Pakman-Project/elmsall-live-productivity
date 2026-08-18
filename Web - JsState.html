@@ -20,11 +20,10 @@ var APP_CONFIG = {
 // surface, not the light column lightened.
 //
 // What colour cannot do: nineteen shades are not all tellable apart at once,
-// and no palette fixes that - it is a limit of the eye, not of the hexes. So
-// charts where series touch draw the eight FAMILIES instead (the Volume
-// page's Combined and Stacked modes), and these per-area shades are used
-// where areas do not sit edge to edge: separate panels, chips, dots,
-// breakdown bars.
+// and no palette fixes that - it is a limit of the eye, not of the hexes. On
+// the charts that put every area on one plot, the legend and the hover
+// tooltip are what identify a series; colour groups them and narrows the
+// search, but it is not asked to carry the identification alone.
 var VOLUME_TYPES = [
   { key: 'pieVol', stdKey: 'pieStd', label: 'PiE', family: 'Picking', color: '#0453a5', colorDark: '#035cb3' },
   { key: 'topUpVol', stdKey: 'topUpStd', label: 'Top Up', family: 'Top Up', color: '#913203', colorDark: '#a73a07' },
@@ -47,10 +46,12 @@ var VOLUME_TYPES = [
   { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', family: 'Automation Pick', color: '#f85d59', colorDark: '#dc5e5e' }
 ];
 
-// The eight family hues. Their ORDER is a safety property, not a taste one -
-// it is what keeps neighbouring families apart under red-green colour
-// blindness - so it does not get re-ordered to look nicer. These are what a
-// folded chart draws; a family hue is never handed to an individual area.
+// The eight family hues every work-area shade is derived from. Their ORDER is
+// a safety property, not a taste one - it is what keeps neighbouring hues
+// apart under red-green colour blindness - so it does not get re-ordered to
+// look nicer. A family hue is never handed to an individual area; the areas
+// wear lightness steps of it, and the hues themselves are what area GROUPS
+// take (see AREA_GROUP_COLORS).
 var AREA_FAMILIES = [
   { name: 'Picking',      color: '#2a78d6', colorDark: '#3987e5' },
   { name: 'Top Up',       color: '#eb6834', colorDark: '#d95926' },
@@ -73,35 +74,6 @@ function areaColor_(t) {
   return (currentTheme === 'dark' && t.colorDark) ? t.colorDark : t.color;
 }
 
-/**
- * The families that actually have work areas in the building currently in
- * force, each carrying its member VOLUME_TYPES entries. Empty families are
- * dropped, so an E1/E2 dashboard draws five families rather than eight with
- * three of them flat at zero.
- */
-function volumeFamiliesActive_() {
-  var byName = {}, out = [];
-  for (var i = 0; i < AREA_FAMILIES.length; i++) {
-    var f = AREA_FAMILIES[i];
-    byName[f.name] = { name: f.name, color: f.color, colorDark: f.colorDark, types: [] };
-    out.push(byName[f.name]);
-  }
-  for (var v = 0; v < VOLUME_TYPES.length; v++) {
-    var t = VOLUME_TYPES[v];
-    if (!areaInSite_(t.key)) continue;
-    if (byName[t.family]) byName[t.family].types.push(t);
-  }
-  return out.filter(function(f) { return f.types.length > 0; });
-}
-
-// The Volume page's Combined and Stacked modes each come in two forms: folded
-// to families (the default) and every area drawn separately. Both are listed
-// in the Display Mode select, so there is one control and one saved
-// preference rather than a mode plus a hidden switch.
-var VOLUME_MODES_ALL_AREAS = ['combinedAll', 'stackedAll'];
-var VOLUME_MODES_STACKED = ['stacked', 'stackedAll'];
-function volumeModeIsStacked_(mode) { return VOLUME_MODES_STACKED.indexOf(mode) !== -1; }
-function volumeModeIsByFamily_(mode) { return VOLUME_MODES_ALL_AREAS.indexOf(mode) === -1; }
 
 // ── The site filter ────────────────────────────────────────────────────────
 // Elmsall is three buildings, and most people only run one of them. The header

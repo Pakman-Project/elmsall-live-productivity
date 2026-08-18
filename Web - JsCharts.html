@@ -246,10 +246,9 @@
     if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; }
     else { ci.show(index); legendItem.hidden = false; }
 
-    // A legend entry stands for one or more work areas - a family in the
-    // folded modes, a single area in the All Areas ones - so a click writes
-    // through to every area behind it. That is what keeps this chart and the
-    // per-area chips saying the same thing about what is shown.
+    // A legend entry stands for a work area, and the click writes through to
+    // hiddenVolumeAreas - which is what keeps this chart and the Separate-mode
+    // chips saying the same thing about what is shown.
     var ds = ci.data.datasets[index];
     var keys = (ds && ds.__areaKeys) || (ds && ds.__areaKey ? [ds.__areaKey] : null);
     if (!keys || !keys.length) return;
@@ -341,7 +340,7 @@
     if (mode === 'separate') { container.classList.remove('combined-mode'); primaryTitle.textContent = 'PiE'; }
     // No "E3" in the combined titles: the chart carries every work area on the
     // dashboard, and the site outgrew E3 when the Elmsall-wide areas arrived.
-    else { container.classList.add('combined-mode'); primaryTitle.textContent = volumeModeIsStacked_(mode) ? 'Volume - Stacked Area Chart' : 'Volume - Combined Line Chart'; }
+    else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - Stacked Area Chart' : 'Volume - Combined Line Chart'; }
     for (var i = 0; i < volumeCharts.length; i++) { if (volumeCharts[i]) volumeCharts[i].destroy(); }
     volumeCharts = [];
     // Drop any builders left over from the previous render before queueing new
@@ -385,7 +384,7 @@
     }
 
     var commonTooltip = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } };
-    var isStacked = volumeModeIsStacked_(mode);
+    var isStacked = mode === 'stacked';
     var volYAxis = { beginAtZero: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } }, stacked: isStacked };
     if (mode === 'separate') {
       for (var i = 0; i < VOLUME_TYPES.length; i++) {
@@ -403,39 +402,17 @@
       }
       observeVolumePanels_();
     } else {
-      // Combined and Stacked put every series on one plot, where neighbours sit
-      // edge to edge and have to be told apart on sight.
-      //
-      // The Families form folds the areas into their eight work families, each
-      // the sum of its areas — because nineteen shades genuinely cannot all be
-      // told apart at once, and no choice of colours would rescue that.
-      //
-      // The All Areas form draws all nineteen anyway, for when the detail is
-      // what is wanted and the legend and tooltip will carry the identification
-      // that colour alone cannot. Both forms are built from the same list of
-      // series below; only what goes into that list differs.
-      var byFamily = volumeModeIsByFamily_(mode);
+      // Combined and Stacked put every in-scope area on one plot: nineteen
+      // series on Elmsall, eleven on E3, eight on E1/E2. Colour groups them -
+      // the pickings are blues, the top ups oranges - which narrows where to
+      // look, but with this many series touching, the legend and the hover
+      // tooltip are what actually identify a line. Colour is not asked to
+      // carry that alone.
       var series = [];
-      if (byFamily) {
-        var famList = volumeFamiliesActive_();
-        for (var fi = 0; fi < famList.length; fi++) {
-          var fam = famList[fi];
-          series.push({
-            // A family holding one area in this building is named for the area
-            // — "E3 Packing" says more than "Packing" when it is the only
-            // packing there is. The colour stays the family's either way,
-            // because that is what carries the separation guarantee.
-            label: fam.types.length === 1 ? fam.types[0].label : fam.name,
-            color: areaColor_(fam),
-            keys: fam.types.map(function(t) { return t.key; })
-          });
-        }
-      } else {
-        for (var ai = 0; ai < VOLUME_TYPES.length; ai++) {
-          var aType = VOLUME_TYPES[ai];
-          if (!areaInSite_(aType.key)) continue;
-          series.push({ label: aType.label, color: areaColor_(aType), keys: [aType.key] });
-        }
+      for (var ai = 0; ai < VOLUME_TYPES.length; ai++) {
+        var aType = VOLUME_TYPES[ai];
+        if (!areaInSite_(aType.key)) continue;
+        series.push({ label: aType.label, color: areaColor_(aType), keys: [aType.key] });
       }
 
       var datasets = [];
