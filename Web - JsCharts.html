@@ -500,8 +500,11 @@
       // PiE and Top Up drew three flat lines at zero on an E1/E2 dashboard,
       // where neither area exists - see SITE_HEADLINE in JsState.
       var headline = headlinePickTypes_();
+      // Folded, and joined with " & " rather than a comma so the E3 title stays
+      // "PiE & Top Up". E1/E2's pair shares a suffix and collapses to
+      // "Drive & Way - Online Picking" instead of naming Online Picking twice.
       overviewTitleEl.textContent = 'Volume - ' +
-        headline.map(function (t) { return t.label; }).join(' & ');
+        joinAreaLabels_(headline.map(function (t) { return t.label; }), ' & ');
       overviewDatasets = headline.map(function (t) {
         return { label: 'Volume ' + t.label, data: agg.map(function (r) { return r[t.key]; }),
                  borderWidth: 2, borderColor: t.color,

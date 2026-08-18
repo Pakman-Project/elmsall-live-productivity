@@ -146,11 +146,14 @@ function sortableColumnsActive_()  { return filterAreaList_(mainTableSortableCol
  * panel. Areas named "<where> - <what>" that share the same <what> collapse to
  * "Drive, Way & E3 - Online Picking".
  *
+ * `sep` joins the pieces that remain: ", " by default, " & " where the
+ * caller wants the two-item reading ("PiE & Top Up").
+ *
  * Folding is per family and order-preserving, so a mixed group still reads
  * correctly: Drive, Way and Sorter 6 Packing gives
  * "Drive & Way - Online Picking, Sorter 6 Packing" rather than all-or-nothing.
  */
-function joinAreaLabels_(labels) {
+function joinAreaLabels_(labels, sep) {
   var order = [], bySuffix = {};
   for (var i = 0; i < labels.length; i++) {
     var label = String(labels[i]);
@@ -174,7 +177,7 @@ function joinAreaLabels_(labels) {
     var head = fam.parts.slice(0, -1).join(', ');
     out.push(head + ' & ' + fam.parts[fam.parts.length - 1] + ' - ' + fam.suffix);
   }
-  return out.join(', ');
+  return out.join(sep || ', ');
 }
 
 function siteConfig_(key) {
