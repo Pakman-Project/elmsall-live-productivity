@@ -476,9 +476,23 @@
     var overviewTitleEl = $('overviewVolChart').closest('.card.panel').querySelector('h2');
     var overviewDatasets = [];
     if (selectedBonuses.length > 0) {
-      overviewTitleEl.textContent = 'Volume - E3 Stacked Area Chart';
+      // No "E3": the chart carries every area on the dashboard.
+      overviewTitleEl.textContent = 'Volume - Stacked Area Chart';
+      // Only the areas this person actually worked. Stacking all nineteen for
+      // one operator put a legend of flat zero lines under a chart drawn from
+      // two of them, and the two that matter were no easier to find for it.
+      // Judged on the plotted values, because "flat zero" is a statement about
+      // what is drawn - an area worked with no volume events has nothing to
+      // show on a volume chart either.
       for (var v = 0; v < VOLUME_TYPES.length; v++) {
-        var vType = VOLUME_TYPES[v]; var vData = agg.map(function(r) { return r[vType.key]; });
+        var vType = VOLUME_TYPES[v];
+        if (!areaInSite_(vType.key)) continue;
+        var vData = agg.map(function(r) { return r[vType.key]; });
+        var vHasVolume = false;
+        for (var vd = 0; vd < vData.length; vd++) {
+          if ((Number(vData[vd]) || 0) > 0) { vHasVolume = true; break; }
+        }
+        if (!vHasVolume) continue;
         overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: vType.color, backgroundColor: hexToRgbaPak(vType.color, CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
       }
     } else {
