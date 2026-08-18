@@ -644,15 +644,14 @@ body.loading-skeleton #mainTableWrapper::after {
 }
 /* Inputs sitting on the black bar: translucent light fields. */
 .next-header .input,
-.next-header #archiveSelect {
+.next-header #datePickerBtn {
   background: rgba(255, 255, 255, 0.12) !important;
   color: #fff !important;
   border: 1px solid rgba(255, 255, 255, 0.22);
   height: 36px;
 }
 .next-header .input::placeholder { color: rgba(255, 255, 255, 0.7); }
-.next-header #archiveSelect { min-width: 150px; max-width: 200px; }
-.next-header #archiveSelect option { background: var(--surface-dropdown) !important; color: var(--text) !important; }
+.next-header #datePickerBtn { min-width: 150px; max-width: 200px; }
 .next-header .input:focus { border-color: rgba(255, 255, 255, 0.55); }
 .next-header .search-input-wrap .fa-search { color: rgba(255, 255, 255, 0.7); }
 
@@ -779,7 +778,7 @@ body.loading-skeleton #mainTableWrapper::after {
   .next-header-title { font-size: 17px; }
   /* Scaled with the title so the two keep their relative weight on a phone. */
   .next-logo svg { height: 15px; }
-  .next-header-controls #archiveSelect { flex: 0 0 auto; min-width: 110px; max-width: 150px; }
+  .next-header-controls #datePickerBtn { flex: 0 0 auto; min-width: 110px; max-width: 150px; }
   .next-header-controls .bonus-search-container { flex: 1 1 auto; width: auto; }
 
   /* Rail becomes a horizontal strip under the header. */
@@ -798,21 +797,159 @@ body.loading-skeleton #mainTableWrapper::after {
   .next-rail .rail-item .rail-icon { width: 46px; height: 28px; font-size: 20px; }
 }
 
-#archiveSelect {
-  min-width: 180px;
-  max-width: 220px;
-  cursor: pointer;
-  background: var(--w5) !important;
-  color: var(--text) !important;
-  background-image: none;
-  padding: 6px 10px;
-  z-index: 1;
-  margin-right: 8px;
+/* The native control the picker writes through to. Kept in the DOM (it is
+   what every other module reads) but never shown. Not display:none - a hidden
+   field that still needs a value is more robustly parked off-screen. */
+.date-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-#archiveSelect option {
-  background: var(--bg) !important;
-  color: var(--text) !important;
+.date-picker { position: relative; margin-right: 8px; }
+
+#datePickerBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.date-picker-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.date-picker-icon { flex: 0 0 auto; font-size: 12px; opacity: 0.85; }
+.date-picker-caret {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+#datePickerBtn[aria-expanded="true"] .date-picker-caret { transform: rotate(180deg); }
+/* Viewing an archived day is a state worth seeing without reading the label -
+   it is the difference between "these numbers are still moving" and "this day
+   is finished". */
+#datePickerBtn.is-history {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.date-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 120;
+  display: none;
+  width: 264px;
+  padding: 6px;
+  border: 1px solid var(--w12, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  background: var(--surface-dropdown, #1b2230);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.date-menu.open { display: block; }
+
+.date-menu-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border: 1px solid var(--w12, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  color: var(--muted, rgba(233, 237, 245, 0.6));
+}
+.date-menu-search:focus-within { border-color: var(--accent, #69a7ff); }
+.date-menu-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text, #e9edf5);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+/* A year of archives is a long list, so it scrolls inside the menu rather than
+   running off the bottom of the page. */
+.date-menu-list { max-height: 320px; overflow-y: auto; }
+
+.date-menu-month {
+  position: sticky;
+  top: 0;
+  padding: 8px 10px 4px;
+  background: var(--surface-dropdown, #1b2230);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, rgba(233, 237, 245, 0.6));
+}
+
+.date-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text, #e9edf5);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.date-menu-item:hover,
+.date-menu-item:focus-visible { background: var(--w8, rgba(255, 255, 255, 0.08)); }
+.date-menu-check {
+  width: 14px;
+  flex: 0 0 auto;
+  opacity: 0;
+  font-size: 12px;
+  color: var(--accent, #69a7ff);
+}
+.date-menu-item[aria-selected="true"] .date-menu-check { opacity: 1; }
+.date-menu-item[aria-selected="true"] { font-weight: 600; }
+.date-menu-text { min-width: 0; }
+.date-menu-sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted, rgba(233, 237, 245, 0.6));
+}
+.date-menu-empty {
+  padding: 12px 10px;
+  font-size: 12px;
+  color: var(--muted, rgba(233, 237, 245, 0.6));
+}
+
+/* On a phone the menu spans the header rather than hanging off a button that
+   is itself only a third of the screen wide. */
+@media (max-width: 768px) {
+  .date-picker { position: static; }
+  .date-menu { left: 12px; right: 12px; width: auto; }
+  .date-menu-item { padding: 12px 10px; font-size: 14px; }
+  .date-menu-list { max-height: 60vh; }
+  /* 16px keeps iOS from zooming the page when the field takes focus. */
+  .date-menu-input { font-size: 16px; }
 }
 
 .bonus-search-container {
@@ -3841,12 +3978,12 @@ body.page-scrolled-far .back-to-top {
     padding: 5px 10px;
   }
   .bonus-search-container,
-  #archiveSelect {
+  #datePickerBtn {
     width: 100%;
     max-width: 100%;
     min-width: 0;
   }
-  #archiveSelect {
+  #datePickerBtn {
     min-width: 0;
     max-width: 100%;
     width: 100%;
@@ -5021,8 +5158,8 @@ kbd {
      is the same kind of control, so it matches that input rather than the
      smaller size used by the in-page dropdowns. 16px also avoids iOS zooming
      the page when the control is focused. */
-  .next-header #archiveSelect,
-  #archiveSelect {
+  .next-header #datePickerBtn,
+  #datePickerBtn {
     font-size: 16px;
   }
 
@@ -5179,7 +5316,7 @@ kbd {
   /* #bonusSearch is targeted by id, not by class: the base mobile rule uses an
      id selector (and !important padding), which outranks any class-based
      override no matter how many classes it chains. */
-  body.page-scrolled .next-header-controls #archiveSelect,
+  body.page-scrolled .next-header-controls #datePickerBtn,
   body.page-scrolled .next-header-controls #bonusSearch {
     height: 30px;
     min-height: 30px !important;
@@ -5187,13 +5324,14 @@ kbd {
     padding-top: 4px !important;
     padding-bottom: 4px !important;
   }
-  body.page-scrolled .next-header-controls #archiveSelect {
+  body.page-scrolled .next-header-controls #datePickerBtn {
     min-width: 90px;
     max-width: 120px;
   }
   /* iOS zooms the page when a field under 16px is focused. Restoring 16px on
-     focus keeps the shrunken look without triggering that zoom. */
-  body.page-scrolled .next-header-controls #archiveSelect:focus,
+     focus keeps the shrunken look without triggering that zoom. The date
+     control is a button now and cannot zoom; its menu's search field carries
+     its own 16px at this width. */
   body.page-scrolled .next-header-controls #bonusSearch:focus {
     font-size: 16px;
   }

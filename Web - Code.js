@@ -175,20 +175,14 @@ function cacheGetLarge_(key) {
 
 function getArchiveLinks() {
 
-  // Called twice per dashboard load (once by the client for the History
-  // dropdown, once internally by getDashboardData to find yesterday's archive),
-  // and the Links sheet changes at most once a day — so a short cache removes
-  // the duplicate read entirely. Payload is small (≤14 links), no chunking.
-  var _linksCache = null;
-  try { _linksCache = CacheService.getScriptCache(); } catch (e) {}
-  if (_linksCache) {
-    var _hit = _linksCache.get('archiveLinks_v1');
-    if (_hit) {
-      try {
-        var _parsed = JSON.parse(_hit);
-        return _parsed;
-      } catch (e) {}
-    }
+  // Called twice per dashboard load (once by the client for the date picker,
+  // once internally by getDashboardData to find yesterday's archive), and the
+  // Links sheet changes at most once a day — so a short cache removes the
+  // duplicate read entirely. The payload grows by one entry per archived day
+  // and has no ceiling, hence the chunked cache helpers.
+  var _hit = cacheGetLarge_('archiveLinks_v2');
+  if (_hit) {
+    try { return JSON.parse(_hit); } catch (e) {}
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -203,9 +197,6 @@ function getArchiveLinks() {
 
   var uniqueLinks = [];
   var seenNames = {};
-
-  var now = new Date();
-  var cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
 
   for (var i = 0; i < kValues.length; i++) {
     var rawName = kValues[i];
@@ -225,11 +216,12 @@ function getArchiveLinks() {
       }
     }
 
-    if (dateObj && dateObj >= cutoffDate) {
-      if (formattedName && url && !seenNames[formattedName]) {
-        uniqueLinks.push({ name: formattedName, url: url, date: dateObj });
-        seenNames[formattedName] = true;
-      }
+    // Every dated link the sheet holds, however old. This used to stop at 14
+    // days, which quietly put a fortnight's ceiling on how far back anyone
+    // could look even when the archive itself went back further.
+    if (dateObj && formattedName && url && !seenNames[formattedName]) {
+      uniqueLinks.push({ name: formattedName, url: url, date: dateObj });
+      seenNames[formattedName] = true;
     }
   }
 
@@ -240,9 +232,7 @@ function getArchiveLinks() {
   var _out = uniqueLinks.map(function(l) {
     return { name: l.name, url: l.url };
   });
-  if (_linksCache) {
-    try { _linksCache.put('archiveLinks_v1', JSON.stringify(_out), 300); } catch (e) {}
-  }
+  cachePutLarge_('archiveLinks_v2', JSON.stringify(_out), 300);
   return _out;
 }
 

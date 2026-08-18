@@ -654,6 +654,191 @@
     if (changed && typeof saveUserPreferences === 'function') saveUserPreferences();
   }
 
+
+  // ── The date picker ────────────────────────────────────────────────────────
+  // The header's Live/history control used to be a bare <select> of the last
+  // fortnight. With that cap lifted the list runs to hundreds of days, which a
+  // native select handles badly: no way to search it, and on a phone it becomes
+  // a wheel you scroll blind looking for one day in nine months.
+  //
+  // The <select> is still there and is still the single source of truth - the
+  // change listener that loads data, the share link, and the ?date= deep link
+  // all read it. This draws a searchable menu over it and writes back through
+  // it, so nothing downstream needed to know the control changed.
+
+  var DATE_MONTHS_ = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  var DATE_DAYS_ = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // "12/08/2026" -> the pieces the list and the search both need, or null for
+  // anything that is not a dd/MM/yyyy archive name. Null is how the Live option
+  // stays out of the dated part of the list without being special-cased twice.
+  function dateOptionParts_(name) {
+    var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(name || '').trim());
+    if (!m) return null;
+    var day = Number(m[1]), mon = Number(m[2]) - 1, yr = Number(m[3]);
+    var d = new Date(yr, mon, day);
+    // Date rolls impossible values over rather than rejecting them - "99/99"
+    // becomes a real date in 2029 - so the only way to reject one is to check
+    // the pieces survived the trip.
+    if (d.getDate() !== day || d.getMonth() !== mon || d.getFullYear() !== yr) return null;
+    var month = DATE_MONTHS_[d.getMonth()];
+    return {
+      name: String(name).trim(),
+      month: month + ' ' + d.getFullYear(),
+      short: DATE_DAYS_[d.getDay()].slice(0, 3) + ' ' + m[1] + ' ' + month.slice(0, 3),
+      long: DATE_DAYS_[d.getDay()] + ' ' + Number(m[1]) + ' ' + month + ' ' + d.getFullYear()
+    };
+  }
+
+  // One entry per option on the hidden select, in its order (newest first).
+  function dateMenuEntries_() {
+    var sel = $('archiveSelect');
+    if (!sel) return [];
+    var out = [];
+    for (var i = 0; i < sel.options.length; i++) {
+      var o = sel.options[i];
+      var parts = dateOptionParts_(o.textContent);
+      out.push({
+        value: o.value,
+        label: parts ? parts.short : o.textContent,
+        sub: parts ? parts.name : '',
+        month: parts ? parts.month : '',
+        // Long form and numeric form both go in the haystack, so "aug",
+        // "tuesday", "12/08" and "2026" all find the same day.
+        hay: (parts ? parts.long + ' ' + parts.name : 'live today now').toLowerCase()
+      });
+    }
+    return out;
+  }
+
+  function renderDateMenu_() {
+    var list = $('dateMenuList');
+    if (!list) return;
+    var box = $('dateMenuSearch');
+    var q = box ? box.value.trim().toLowerCase() : '';
+    var terms = q ? q.split(/\s+/) : [];
+    var sel = $('archiveSelect');
+    var current = sel ? sel.value : '';
+
+    var entries = dateMenuEntries_().filter(function (e) {
+      // Live is never filtered out. It is the way back to today, and hiding it
+      // behind a half-typed search is a trap rather than a tidier list.
+      if (!e.value) return true;
+      return terms.every(function (t) { return e.hay.indexOf(t) !== -1; });
+    });
+
+    var html = '', lastMonth = null, dated = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e.value) dated++;
+      if (e.month && e.month !== lastMonth) {
+        lastMonth = e.month;
+        html += '<div class="date-menu-month">' + safeTextPak(e.month) + '</div>';
+      }
+      html += '<button type="button" class="date-menu-item" role="option" ' +
+              'aria-selected="' + (e.value === current ? 'true' : 'false') + '" ' +
+              'data-value="' + escapeAttrPak(e.value) + '">' +
+              '<i class="fa-solid fa-check date-menu-check" aria-hidden="true"></i>' +
+              '<span class="date-menu-text">' + safeTextPak(e.label) +
+              (e.sub ? '<span class="date-menu-sub">' + safeTextPak(e.sub) + '</span>' : '') +
+              '</span></button>';
+    }
+    if (!dated) {
+      html += '<div class="date-menu-empty">' +
+              (terms.length ? 'No archived day matches that.'
+                            : 'No archived days yet \u2014 only Live.') + '</div>';
+    }
+    list.innerHTML = html;
+  }
+
+  function toggleDateMenu_(force) {
+    var menu = $('dateMenu'), btn = $('datePickerBtn');
+    if (!menu || !btn) return;
+    var open = (typeof force === 'boolean') ? force : !menu.classList.contains('open');
+    if (open) {
+      var box = $('dateMenuSearch');
+      if (box) box.value = '';
+      renderDateMenu_();
+    }
+    menu.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) return;
+    var box2 = $('dateMenuSearch');
+    // Focus the field with a pointer, but not on a phone: the keyboard would
+    // slide up over the list the user just opened.
+    var narrow = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    if (box2 && !narrow) box2.focus();
+    var cur = menu.querySelector('.date-menu-item[aria-selected="true"]');
+    if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
+  }
+
+  function pickDate_(value) {
+    var sel = $('archiveSelect');
+    if (!sel) return;
+    toggleDateMenu_(false);
+    // Re-picking the day already on screen is a no-op, not a reload: the
+    // archive read is the most expensive thing this dashboard does.
+    if (sel.value === String(value || '')) return;
+    sel.value = String(value || '');
+    syncDateUi_();
+    // Setting .value in script does not fire a change event, and the change
+    // event is what actually loads the day.
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Reflects the selected day on the button. Called after every pick and after
+  // the list arrives from the server, so there is one place that decides what
+  // "you are looking at the 12th" looks like.
+  function syncDateUi_() {
+    var sel = $('archiveSelect'), btn = $('datePickerBtn'), label = $('datePickerLabel');
+    if (!sel || !btn || !label) return;
+    var opt = sel.options[sel.selectedIndex];
+    var name = opt ? opt.textContent : 'Live';
+    var parts = dateOptionParts_(name);
+    label.textContent = parts ? parts.short : name;
+    btn.classList.toggle('is-history', !!sel.value);
+    btn.title = sel.value ? 'Viewing ' + name + '. Change date.' : 'Live, or an earlier day';
+    btn.setAttribute('aria-label', 'Showing: ' + (parts ? parts.long : name) + '. Change date.');
+  }
+
+  function initDatePicker_() {
+    var list = $('dateMenuList');
+    if (list) {
+      // Delegated: the list is rebuilt on every keystroke, so per-item
+      // listeners would be re-bound hundreds of times a search.
+      list.addEventListener('click', function (e) {
+        var item = e.target.closest ? e.target.closest('.date-menu-item') : null;
+        if (item) pickDate_(item.getAttribute('data-value') || '');
+      });
+    }
+    var box = $('dateMenuSearch');
+    if (box) {
+      box.addEventListener('input', renderDateMenu_);
+      box.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || !box.value.trim()) return;
+        // Enter takes the first DATED match, never Live - Live is always in the
+        // list, so taking "the first item" would jump to today on every search.
+        var first = $('dateMenuList').querySelector('.date-menu-item[aria-selected]:not([data-value=""])');
+        if (first) { e.preventDefault(); pickDate_(first.getAttribute('data-value') || ''); }
+      });
+    }
+    syncDateUi_();
+  }
+
+  document.addEventListener('click', function (e) {
+    var menu = $('dateMenu');
+    if (!menu || !menu.classList.contains('open')) return;
+    if (e.target.closest && (e.target.closest('#dateMenu') || e.target.closest('#datePickerBtn'))) return;
+    toggleDateMenu_(false);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var menu = $('dateMenu');
+    if (menu && menu.classList.contains('open')) toggleDateMenu_(false);
+  });
+
   document.addEventListener('click', function (e) {
     var menu = $('siteMenu');
     if (!menu || !menu.classList.contains('open')) return;

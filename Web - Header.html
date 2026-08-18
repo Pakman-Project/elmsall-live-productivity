@@ -36,9 +36,35 @@
 
   <div class="next-header-right">
     <div class="next-header-controls">
-      <select id="archiveSelect" class="input header-input">
-        <option value="" selected>Loading History...</option>
+      <!-- The <select> is still the single source of truth for which day is
+           on screen - loadDataPak, the share link and the ?date= deep link all
+           read it - but it is no longer what anyone clicks. With the fortnight
+           cap lifted the list runs to hundreds of days, which a native select
+           handles badly: no search, and on a phone it becomes a wheel you
+           scroll blind. The button below opens a searchable menu over it. -->
+      <select id="archiveSelect" class="date-native" tabindex="-1" aria-hidden="true">
+        <option value="" selected>Live</option>
       </select>
+
+      <div class="date-picker">
+        <button type="button" class="date-picker-btn" id="datePickerBtn"
+                onclick="toggleDateMenu_()" aria-haspopup="listbox"
+                aria-expanded="false" aria-controls="dateMenu"
+                title="Live, or an earlier day" aria-label="Showing: Live. Change date.">
+          <i class="fa-solid fa-calendar-day date-picker-icon" aria-hidden="true"></i>
+          <span class="date-picker-label" id="datePickerLabel">Live</span>
+          <i class="fa-solid fa-chevron-down date-picker-caret" aria-hidden="true"></i>
+        </button>
+        <div class="date-menu" id="dateMenu" role="dialog" aria-label="Choose a date">
+          <div class="date-menu-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="text" id="dateMenuSearch" class="date-menu-input"
+                   placeholder="Jump to a date..." autocomplete="off"
+                   aria-label="Filter dates" aria-controls="dateMenuList">
+          </div>
+          <div class="date-menu-list" id="dateMenuList" role="listbox" aria-label="Available dates"></div>
+        </div>
+      </div>
 
       <div class="bonus-search-container">
         <div class="search-row">

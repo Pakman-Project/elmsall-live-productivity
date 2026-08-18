@@ -18,6 +18,9 @@
         sel.appendChild(opt);
       }
       if (previous) sel.value = previous;
+      // The picker reads its options off this select, so it re-renders once
+      // they exist - and again below if a deep link moved the selection.
+      if (typeof syncDateUi_ === 'function') syncDateUi_();
 
       // ?date=YYYY-MM-DD — match it against the snapshot list and switch to it.
       // Has to happen here because the list is what maps a date to its URL.
@@ -28,6 +31,7 @@
           if (links[d].name === wanted) {
             sel.value = links[d].url;
             currentArchiveUrl = links[d].url;
+            if (typeof syncDateUi_ === 'function') syncDateUi_();
             loadDataPak(currentArchiveUrl);
             break;
           }
@@ -544,6 +548,7 @@
     // Fire BOTH server round-trips in parallel — they don't depend on each
     // other, so waiting for the archive list before requesting data was
     // doubling time-to-first-data.
+    if (typeof initDatePicker_ === 'function') initDatePicker_();
     populateArchiveDropdown();
     // silent=true when we already painted cached data: refresh in the
     // background rather than covering the populated dashboard with a spinner.
