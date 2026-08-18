@@ -28,7 +28,7 @@ function getPerfSplitGroups_() {
     if (labels.length === 0) continue;
     groups.push({
       id: 'g' + i,
-      label: labels.join(', '),
+      label: joinAreaLabels_(labels),
       keys: keys,
       color: AREA_GROUP_COLORS[i % AREA_GROUP_COLORS.length],
       showLine: entry.showLine !== false,
@@ -183,6 +183,10 @@ function generateMainRows_(data, timeList, opts) {
     var onlinePickingE3Total = blockData.reduce(function(sum, r) { return sum + (r.onlinePickingE3 || 0); }, 0);
     var e3BppTotal = blockData.reduce(function(sum, r) { return sum + (r.e3Bpp || 0); }, 0);
     var e1e2BppTotal = blockData.reduce(function(sum, r) { return sum + (r.e1e2Bpp || 0); }, 0);
+    var rspsTopUpTotal = blockData.reduce(function(sum, r) { return sum + (r.rspsTopUp || 0); }, 0);
+    var rspsPickTotal = blockData.reduce(function(sum, r) { return sum + (r.rspsPick || 0); }, 0);
+    var ispsTopUpTotal = blockData.reduce(function(sum, r) { return sum + (r.ispsTopUp || 0); }, 0);
+    var ispsPickTotal = blockData.reduce(function(sum, r) { return sum + (r.ispsPick || 0); }, 0);
     var bonuses = {};
     for (var j = 0; j < qualifiedData.length; j++) { bonuses[qualifiedData[j].bonus] = true; }
     var bonusNumber = calculateBonusDisplay(bonuses, selectedBonuses.length > 0);
@@ -196,7 +200,7 @@ function generateMainRows_(data, timeList, opts) {
       hourDeployed = uniqueCount / 4;
     }
     var performance = hourDeployed !== 0 ? (stdHours / hourDeployed) * 100 : 0;
-    rows.push({ dateTime: tr, bonusNumber: bonusNumber, hourDeployed: hourDeployed, stdHours: stdHours, pieVol: pieTotal, topUpVol: topUpTotal, e3PackingVol: e3PackingTotal, parcelSortationVol: parcelSortationTotal, parcelInductVol: parcelInductTotal, inboundDecantingVol: inboundDecantingTotal, osrDecantingVol: osrDecantingTotal, bcrInductingVol: bcrInductingTotal, e1e2InductingVol: e1e2InductingTotal, sorter6PackingVol: sorter6PackingTotal, onlinePickingDriveVol: onlinePickingDriveTotal, onlinePickingWayVol: onlinePickingWayTotal, onlinePickingE3Vol: onlinePickingE3Total, e3BppVol: e3BppTotal, e1e2BppVol: e1e2BppTotal, performance: performance, rawBonusSet: bonuses });
+    rows.push({ dateTime: tr, bonusNumber: bonusNumber, hourDeployed: hourDeployed, stdHours: stdHours, pieVol: pieTotal, topUpVol: topUpTotal, e3PackingVol: e3PackingTotal, parcelSortationVol: parcelSortationTotal, parcelInductVol: parcelInductTotal, inboundDecantingVol: inboundDecantingTotal, osrDecantingVol: osrDecantingTotal, bcrInductingVol: bcrInductingTotal, e1e2InductingVol: e1e2InductingTotal, sorter6PackingVol: sorter6PackingTotal, onlinePickingDriveVol: onlinePickingDriveTotal, onlinePickingWayVol: onlinePickingWayTotal, onlinePickingE3Vol: onlinePickingE3Total, e3BppVol: e3BppTotal, e1e2BppVol: e1e2BppTotal, rspsTopUpVol: rspsTopUpTotal, rspsPickVol: rspsPickTotal, ispsTopUpVol: ispsTopUpTotal, ispsPickVol: ispsPickTotal, performance: performance, rawBonusSet: bonuses });
   });
   return rows;
 }
@@ -224,6 +228,10 @@ function buildIndividualEntryRows_(entries) {
       onlinePickingE3Vol: Number(r.onlinePickingE3) || 0,
       e3BppVol: Number(r.e3Bpp) || 0,
       e1e2BppVol: Number(r.e1e2Bpp) || 0,
+      rspsTopUpVol: Number(r.rspsTopUp) || 0,
+      rspsPickVol: Number(r.rspsPick) || 0,
+      ispsTopUpVol: Number(r.ispsTopUp) || 0,
+      ispsPickVol: Number(r.ispsPick) || 0,
       performance: stdHours / 0.25 * 100
     };
   });
@@ -271,10 +279,10 @@ function getAggregatedDataPak(rows, windowMinutes) {
     else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
     else { groupDate.setSeconds(0, 0); }
     var k = groupDate.getTime();
-    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bcrInductingVol: 0, e1e2InductingVol: 0, sorter6PackingVol: 0, onlinePickingDriveVol: 0, onlinePickingWayVol: 0, onlinePickingE3Vol: 0, e3BppVol: 0, e1e2BppVol: 0, bonusSet: {} }; }
+    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, pieVol: 0, topUpVol: 0, e3PackingVol: 0, parcelSortationVol: 0, parcelInductVol: 0, inboundDecantingVol: 0, osrDecantingVol: 0, bcrInductingVol: 0, e1e2InductingVol: 0, sorter6PackingVol: 0, onlinePickingDriveVol: 0, onlinePickingWayVol: 0, onlinePickingE3Vol: 0, e3BppVol: 0, e1e2BppVol: 0, rspsTopUpVol: 0, rspsPickVol: 0, ispsTopUpVol: 0, ispsPickVol: 0, bonusSet: {} }; }
     var g = groups[k];
     g.blockCount++;
-    g.hourDeployed += (Number(r.hourDeployed) || 0); g.stdHours += (Number(r.stdHours) || 0); g.pieVol += (Number(r.pieVol) || 0); g.topUpVol += (Number(r.topUpVol) || 0); g.e3PackingVol += (Number(r.e3PackingVol) || 0); g.parcelSortationVol += (Number(r.parcelSortationVol) || 0); g.parcelInductVol += (Number(r.parcelInductVol) || 0); g.inboundDecantingVol += (Number(r.inboundDecantingVol) || 0); g.osrDecantingVol += (Number(r.osrDecantingVol) || 0); g.bcrInductingVol += (Number(r.bcrInductingVol) || 0); g.e1e2InductingVol += (Number(r.e1e2InductingVol) || 0); g.sorter6PackingVol += (Number(r.sorter6PackingVol) || 0); g.onlinePickingDriveVol += (Number(r.onlinePickingDriveVol) || 0); g.onlinePickingWayVol += (Number(r.onlinePickingWayVol) || 0); g.onlinePickingE3Vol += (Number(r.onlinePickingE3Vol) || 0); g.e3BppVol += (Number(r.e3BppVol) || 0); g.e1e2BppVol += (Number(r.e1e2BppVol) || 0);
+    g.hourDeployed += (Number(r.hourDeployed) || 0); g.stdHours += (Number(r.stdHours) || 0); g.pieVol += (Number(r.pieVol) || 0); g.topUpVol += (Number(r.topUpVol) || 0); g.e3PackingVol += (Number(r.e3PackingVol) || 0); g.parcelSortationVol += (Number(r.parcelSortationVol) || 0); g.parcelInductVol += (Number(r.parcelInductVol) || 0); g.inboundDecantingVol += (Number(r.inboundDecantingVol) || 0); g.osrDecantingVol += (Number(r.osrDecantingVol) || 0); g.bcrInductingVol += (Number(r.bcrInductingVol) || 0); g.e1e2InductingVol += (Number(r.e1e2InductingVol) || 0); g.sorter6PackingVol += (Number(r.sorter6PackingVol) || 0); g.onlinePickingDriveVol += (Number(r.onlinePickingDriveVol) || 0); g.onlinePickingWayVol += (Number(r.onlinePickingWayVol) || 0); g.onlinePickingE3Vol += (Number(r.onlinePickingE3Vol) || 0); g.e3BppVol += (Number(r.e3BppVol) || 0); g.e1e2BppVol += (Number(r.e1e2BppVol) || 0); g.rspsTopUpVol += (Number(r.rspsTopUpVol) || 0); g.rspsPickVol += (Number(r.rspsPickVol) || 0); g.ispsTopUpVol += (Number(r.ispsTopUpVol) || 0); g.ispsPickVol += (Number(r.ispsPickVol) || 0);
     if (r.rawBonusSet) { for (var bKey in r.rawBonusSet) { if (r.rawBonusSet.hasOwnProperty(bKey)) { g.bonusSet[bKey] = true; } } }
   });
   var result = [];
@@ -284,7 +292,7 @@ function getAggregatedDataPak(rows, windowMinutes) {
   sortedKeys.forEach(function(k) {
     var g = groups[k]; var start = g.startTime; var end = new Date(start.getTime() + (windowMinutes * 60000));
     var label = formatDatePak(start) + ' - ' + formatDatePak(end);
-    result.push({ dateTime: label, rangeLabel: label, hourDeployed: g.hourDeployed, stdHours: g.stdHours, pieVol: g.pieVol, topUpVol: g.topUpVol, e3PackingVol: g.e3PackingVol, parcelSortationVol: g.parcelSortationVol, parcelInductVol: g.parcelInductVol, inboundDecantingVol: g.inboundDecantingVol, osrDecantingVol: g.osrDecantingVol, bcrInductingVol: g.bcrInductingVol, e1e2InductingVol: g.e1e2InductingVol, sorter6PackingVol: g.sorter6PackingVol, onlinePickingDriveVol: g.onlinePickingDriveVol, onlinePickingWayVol: g.onlinePickingWayVol, onlinePickingE3Vol: g.onlinePickingE3Vol, e3BppVol: g.e3BppVol, e1e2BppVol: g.e1e2BppVol, performance: g.hourDeployed > 0 ? (g.stdHours / g.hourDeployed) * 100 : 0, bonusNumber: calculateBonusDisplay(g.bonusSet, isFiltered) });
+    result.push({ dateTime: label, rangeLabel: label, hourDeployed: g.hourDeployed, stdHours: g.stdHours, pieVol: g.pieVol, topUpVol: g.topUpVol, e3PackingVol: g.e3PackingVol, parcelSortationVol: g.parcelSortationVol, parcelInductVol: g.parcelInductVol, inboundDecantingVol: g.inboundDecantingVol, osrDecantingVol: g.osrDecantingVol, bcrInductingVol: g.bcrInductingVol, e1e2InductingVol: g.e1e2InductingVol, sorter6PackingVol: g.sorter6PackingVol, onlinePickingDriveVol: g.onlinePickingDriveVol, onlinePickingWayVol: g.onlinePickingWayVol, onlinePickingE3Vol: g.onlinePickingE3Vol, e3BppVol: g.e3BppVol, e1e2BppVol: g.e1e2BppVol, rspsTopUpVol: g.rspsTopUpVol, rspsPickVol: g.rspsPickVol, ispsTopUpVol: g.ispsTopUpVol, ispsPickVol: g.ispsPickVol, performance: g.hourDeployed > 0 ? (g.stdHours / g.hourDeployed) * 100 : 0, bonusNumber: calculateBonusDisplay(g.bonusSet, isFiltered) });
   });
   return result;
 }
@@ -363,7 +371,7 @@ function getTrendTitle(areaKeys) {
       }
     }
   }
-  return 'Deployment Trend - ' + labels.join(', ');
+  return 'Deployment Trend - ' + joinAreaLabels_(labels);
 }
 
 function generatePerfSplitRows_(data, timeList, groups) {

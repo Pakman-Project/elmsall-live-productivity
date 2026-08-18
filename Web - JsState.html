@@ -20,7 +20,11 @@ var VOLUME_TYPES = [
   { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Way - Online Picking', color: '#b33771' },
   { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'E3 - Online Picking', color: '#e58e26' },
   { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', color: '#0fb9b1' },
-  { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', color: '#8d6e63' }
+  { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', color: '#8d6e63' },
+  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', color: '#7f8fa6' },
+  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', color: '#c44569' },
+  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', color: '#218c74' },
+  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', color: '#9c88ff' }
 ];
 
 // ── The site filter ────────────────────────────────────────────────────────
@@ -36,7 +40,9 @@ var AREA_SITE = {
   parcelSortation: 'e3', inboundDecanting: 'e3', osrDecanting: 'e3',
   bcrInducting: 'e3', e1e2Inducting: 'e3', onlinePickingE3: 'e3', e3Bpp: 'e3',
   sorter6Packing: 'e1e2', onlinePickingDrive: 'e1e2', onlinePickingWay: 'e1e2',
-  e1e2Bpp: 'e1e2'
+  e1e2Bpp: 'e1e2',
+  // Returns processing, all four in E1/E2.
+  rspsTopUp: 'e1e2', rspsPick: 'e1e2', ispsTopUp: 'e1e2', ispsPick: 'e1e2'
 };
 
 var SITES = [
@@ -132,6 +138,45 @@ function breakdownAreasActive_()   { return filterAreaList_(BREAKDOWN_AREAS); }
 function mainMetricColumnsActive_(){ return filterAreaList_(MAIN_TABLE_METRIC_COLUMNS); }
 function sortableColumnsActive_()  { return filterAreaList_(mainTableSortableColumns); }
 
+/**
+ * Joins work-area labels for a chart title, folding a shared suffix.
+ *
+ * "Drive - Online Picking, Way - Online Picking, E3 - Online Picking" says
+ * "Online Picking" three times and pushes the useful part off the end of the
+ * panel. Areas named "<where> - <what>" that share the same <what> collapse to
+ * "Drive, Way & E3 - Online Picking".
+ *
+ * Folding is per family and order-preserving, so a mixed group still reads
+ * correctly: Drive, Way and Sorter 6 Packing gives
+ * "Drive & Way - Online Picking, Sorter 6 Packing" rather than all-or-nothing.
+ */
+function joinAreaLabels_(labels) {
+  var order = [], bySuffix = {};
+  for (var i = 0; i < labels.length; i++) {
+    var label = String(labels[i]);
+    var cut = label.indexOf(' - ');
+    var suffix = cut === -1 ? null : label.slice(cut + 3);
+    var prefix = cut === -1 ? label : label.slice(0, cut);
+    // A label with no " - " is its own family, keyed on itself so two
+    // different plain labels never merge.
+    var key = suffix === null ? ' ' + label + i : suffix;
+    if (!bySuffix[key]) { bySuffix[key] = { suffix: suffix, parts: [] }; order.push(key); }
+    bySuffix[key].parts.push(prefix);
+  }
+
+  var out = [];
+  for (var o = 0; o < order.length; o++) {
+    var fam = bySuffix[order[o]];
+    if (fam.suffix === null || fam.parts.length === 1) {
+      out.push(fam.suffix === null ? fam.parts[0] : fam.parts[0] + ' - ' + fam.suffix);
+      continue;
+    }
+    var head = fam.parts.slice(0, -1).join(', ');
+    out.push(head + ' & ' + fam.parts[fam.parts.length - 1] + ' - ' + fam.suffix);
+  }
+  return out.join(', ');
+}
+
 function siteConfig_(key) {
   for (var i = 0; i < SITES.length; i++) { if (SITES[i].key === key) return SITES[i]; }
   return SITES[0];
@@ -195,7 +240,11 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'onlinePickingWayVol', label: 'Way - Online Picking' },
   { key: 'onlinePickingE3Vol', label: 'E3 - Online Picking' },
   { key: 'e3BppVol', label: 'E3 BPP' },
-  { key: 'e1e2BppVol', label: 'E1/E2 BPP' }
+  { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
+  { key: 'rspsTopUpVol', label: 'RSPS Top Up' },
+  { key: 'rspsPickVol', label: 'RSPS Pick' },
+  { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
+  { key: 'ispsPickVol', label: 'ISPS Pick' }
 ];
 
 // Mirrors the #mainTable <th data-key> list, used to populate the mobile sort <select>.
@@ -219,6 +268,10 @@ var mainTableSortableColumns = [
   { key: 'onlinePickingE3Vol', label: 'E3 - Online Picking' },
   { key: 'e3BppVol', label: 'E3 BPP' },
   { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
+  { key: 'rspsTopUpVol', label: 'RSPS Top Up' },
+  { key: 'rspsPickVol', label: 'RSPS Pick' },
+  { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
+  { key: 'ispsPickVol', label: 'ISPS Pick' },
   { key: 'performance', label: 'Productivity %' }
 ];
 
@@ -287,7 +340,11 @@ var BREAKDOWN_AREAS = [
   { key: 'onlinePickingWay', label: 'Way - Online Picking', color: '#b33771' },
   { key: 'onlinePickingE3', label: 'E3 - Online Picking', color: '#e58e26' },
   { key: 'e3Bpp', label: 'E3 BPP', color: '#0fb9b1' },
-  { key: 'e1e2Bpp', label: 'E1/E2 BPP', color: '#8d6e63' }
+  { key: 'e1e2Bpp', label: 'E1/E2 BPP', color: '#8d6e63' },
+  { key: 'rspsTopUp', label: 'RSPS Top Up', color: '#7f8fa6' },
+  { key: 'rspsPick', label: 'RSPS Pick', color: '#c44569' },
+  { key: 'ispsTopUp', label: 'ISPS Top Up', color: '#218c74' },
+  { key: 'ispsPick', label: 'ISPS Pick', color: '#9c88ff' }
 ];
 
 // APP_CONFIG.colors is the CHART palette — saturated colours chosen to read as
