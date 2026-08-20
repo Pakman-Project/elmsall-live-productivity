@@ -1,0 +1,7 @@
+# clasp pushes every .js/.html under rootDir, which is this folder. Without
+# this, tools/ would be uploaded into the Apps Script project - files that
+# `require('fs')` and would fail the moment anything ran.
+tools/**
+**/node_modules/**
+.git/**
+*.md

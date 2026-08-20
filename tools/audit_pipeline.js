@@ -1,0 +1,259 @@
+// Cross-checks every place the pipeline enumerates work areas or assumes a
+// column position, across the Apps Script client and the Databricks notebooks.
+// Run after adding a work area, adding a Data-tab column, or renaming an area.
+const fs = require('fs'), vm = require('vm');
+// Paths are resolved from this file, not hardcoded, so the checks run from any
+// clone. The Databricks and Tampermonkey repos are expected as SIBLINGS of this
+// one - that is how they sit on the machine this pipeline is maintained from.
+const path = require('path');
+const REPOS = path.resolve(__dirname, '..', '..');
+
+const APPS = path.resolve(__dirname, '..') + path.sep;
+const DBX = path.join(REPOS, 'Databricks-Live-Productivity-Output') + path.sep;
+const TM = path.join(REPOS, 'Tampermonkey Scripts') + path.sep;
+const R = f => fs.readFileSync(APPS + f, 'utf8');
+const n = (s, re) => (s.match(re) || []).length;
+
+let fail = 0;
+const head = t => console.log('\n' + t);
+const check = (label, ok, detail) => {
+  if (!ok) fail++;
+  console.log('  ' + (ok ? 'ok  ' : 'FAIL') + '  ' + label + (detail ? '   ' + detail : ''));
+};
+
+const idx = R('Web - Index.html'), state = R('Web - JsState.html'),
+      tables = R('Web - JsTables.html'), exp = R('Web - JsExport.html'),
+      data = R('Web - JsData.html'), tour = R('Web - JsTourData.html'),
+      code = R('Web - Code.js'), charts = R('Web - JsCharts.html'),
+      ui = R('Web - JsUi.html'), helpers = R('Web - JsHelpers.html');
+
+// Slice a `var NAME = [ ... ];` block without regex-escaping games.
+// Ends at the first `];` rather than a line-start one: the tour's AREAS list is
+// indented, and anchoring to "\n];" ran past it into the next list.
+function grab(src, name) {
+  const start = src.indexOf('var ' + name + ' = [');
+  if (start === -1) throw new Error('list not found: ' + name);
+  const end = src.indexOf('];', start);
+  if (end === -1) throw new Error('unterminated list: ' + name);
+  return src.slice(start, end);
+}
+
+// JsState evaluated for real, so lists that are DERIVED (rather than written
+// out) still get counted, and the palette can be checked as data.
+const stateCtx = { console };
+vm.createContext(stateCtx);
+vm.runInContext(
+  state.replace(/<\/?script>/g, '').split('function applyConfigToCSSPak')[0],
+  stateCtx);
+const ev = expr => vm.runInContext(expr, stateCtx);
+
+const AREAS = 19;
+const COLS = AREAS + 5;   // 4 identity columns + areas + Productivity %
+
+head('[1] work-area enumerations (expect ' + AREAS + ')');
+const counts = {
+  VOLUME_TYPES: n(grab(state, 'VOLUME_TYPES'), /\{ key:/g),
+  MAIN_TABLE_METRIC_COLUMNS: n(grab(state, 'MAIN_TABLE_METRIC_COLUMNS'), /\{ key:/g),
+  BREAKDOWN_AREAS: ev('BREAKDOWN_AREAS.length'),
+  'volume panels': n(idx, /id="volPanel/g),
+  'volume canvases': n(idx, /id="volChart/g),
+  'tour AREAS': n(grab(tour, 'AREAS'), /'/g) / 2,
+  PROC_AREA_COLUMNS_: n(grab(code, 'PROC_AREA_COLUMNS_'), /\{ key:/g),
+  AREA_SITE: n(state.slice(state.indexOf('var AREA_SITE = {'),
+                           state.indexOf('};', state.indexOf('var AREA_SITE = {'))),
+              /: '(e3|e1e2)'/g),
+};
+Object.keys(counts).forEach(k => check(k, counts[k] === AREAS, '= ' + counts[k]));
+
+head('[1b] palette');
+{
+  const fams = ev('AREA_FAMILIES.map(f => f.name)');
+  const vt = ev('VOLUME_TYPES.map(t => ({key:t.key, label:t.label, family:t.family, color:t.color, dark:t.colorDark}))');
+  check('every area has a family', vt.every(t => t.family), '');
+  check('every family is declared',
+        vt.every(t => fams.indexOf(t.family) !== -1),
+        vt.filter(t => fams.indexOf(t.family) === -1).map(t => t.key).join(',') || 'all found');
+  check('every area has both themes',
+        vt.every(t => /^#[0-9a-f]{6}$/.test(t.color) && /^#[0-9a-f]{6}$/.test(t.dark)), '');
+  for (const mode of ['color', 'dark']) {
+    const seen = {}, dup = [];
+    vt.forEach(t => { if (seen[t[mode]]) dup.push(seen[t[mode]] + '/' + t.key + ' ' + t[mode]); seen[t[mode]] = t.key; });
+    check('no two areas share a ' + (mode === 'dark' ? 'dark' : 'light') + ' hex', dup.length === 0, dup.join('; '));
+  }
+  check('AREA_FAMILIES has 8 slots', fams.length === 8, '= ' + fams.length);
+  // Folding is what makes the combined chart legible; if a family ever held
+  // every area it would fold to one series and say nothing.
+  const sizes = {};
+  vt.forEach(t => { sizes[t.family] = (sizes[t.family] || 0) + 1; });
+  check('no family holds more than half the areas',
+        Math.max(...Object.values(sizes)) <= Math.ceil(AREAS / 2),
+        Object.keys(sizes).map(k => k + ':' + sizes[k]).join(' '));
+  // BREAKDOWN_AREAS is derived - assert it actually tracks VOLUME_TYPES.
+  const bd = ev('BREAKDOWN_AREAS.map(a => a.key + "|" + a.label + "|" + a.color)');
+  const want = ev('VOLUME_TYPES.map(t => areaBaseKey_(t.key) + "|" + t.label + "|" + t.color)');
+  check('BREAKDOWN_AREAS tracks VOLUME_TYPES', bd.join() === want.join(), '');
+  // Nothing may reach a raw .color on a work area: the theme has to be
+  // resolved, or dark mode silently draws the light hexes.
+  const rawColor = [];
+  [['Web - JsCharts.html', charts], ['Web - JsUi.html', ui],
+   ['Web - JsHelpers.html', helpers]].forEach(([name, src]) => {
+    (src.match(/\b(?:vType|volType|t|type|area|pgType)\.color\b/g) || [])
+      .forEach(m => rawColor.push(name + ' ' + m));
+  });
+  check('no unresolved .color on a work area', rawColor.length === 0, rawColor.join('; '));
+}
+
+head('[2] column lists (expect ' + COLS + ')');
+check('#mainTable <th>', n(idx, /<th data-key="/g) === COLS, '= ' + n(idx, /<th data-key="/g));
+const sortable = grab(state, 'mainTableSortableColumns');
+check('mainTableSortableColumns', n(sortable, /\{ key:/g) === COLS, '= ' + n(sortable, /\{ key:/g));
+const detail = grab(tables, 'DETAIL_TABLE_COLUMNS');
+check('DETAIL_TABLE_COLUMNS', n(detail, /\{ key:/g) === COLS, '= ' + n(detail, /\{ key:/g));
+
+head('[3] per-area cells are GENERATED, not hand-listed');
+// The recurring bug was a hand-written run of numTdPak calls drifting out of
+// step with the column lists. Rows must be built from the active list instead.
+check('main + detail rows derive their cells',
+  n(tables, /mainMetricColumnsActive_\(\)\.map/g) >= 2,
+  n(tables, /mainMetricColumnsActive_\(\)\.map/g) + ' uses');
+check('CSV header and row share one list', exp.indexOf('function rawDataCsvColumns_') !== -1);
+check('no stale hardcoded CSV header', exp.indexOf('RAW_DATA_CSV_HEADERS_ =') === -1);
+check('mobile sort select filters by building', tables.indexOf('sortableColumnsActive_()') !== -1);
+check('table headers hide by building', tables.indexOf('th[data-site]') !== -1);
+
+head('[4] every area key reaches the paths still keyed by name');
+const keys = [];
+{
+  const re = /key: '([a-zA-Z0-9]+)Vol'/g, block = grab(state, 'VOLUME_TYPES');
+  let m;
+  while ((m = re.exec(block))) keys.push(m[1]);
+}
+keys.forEach(k => {
+  const missing = [
+    ['JsData block total', data.indexOf('r.' + k + ' || 0') !== -1],
+    ['JsData row field', data.indexOf(k + 'Vol:') !== -1],
+    ['JsData group init', data.indexOf(k + 'Vol: 0') !== -1],
+    ['JsData group accum', data.indexOf('g.' + k + 'Vol +=') !== -1],
+    ['Index th', idx.indexOf('data-key="' + k + 'Vol"') !== -1],
+    ['Index th data-site', idx.indexOf('data-key="' + k + 'Vol" data-site="') !== -1],
+    ['Code.js header map', code.indexOf("key: '" + k + "'") !== -1],
+    ['AREA_SITE', new RegExp('\\b' + k + ": '(e3|e1e2)'").test(state)],
+  ].filter(p => !p[1]).map(p => p[0]);
+  check(k, missing.length === 0, missing.length ? 'MISSING: ' + missing.join(', ') : '');
+});
+
+head('[5] area names agree: notebook PROC_AREAS <-> Code.js headers');
+const nb = JSON.parse(fs.readFileSync(DBX + 'Elmsall Live Productivity.ipynb', 'utf8'));
+const nbSrc = nb.cells.map(c => c.source.join('')).join('\n');
+const pStart = nbSrc.indexOf('PROC_AREAS = [');
+const procBlock = nbSrc.slice(pStart, nbSrc.indexOf('\n]', pStart));
+const nbAreas = [];
+{
+  const re = /"report": "([^"]+)",\s*"label": "([^"]+)"/g;
+  let m;
+  while ((m = re.exec(procBlock))) nbAreas.push({ report: m[1], label: m[2] });
+}
+check('notebook PROC_AREAS count', nbAreas.length === AREAS, '= ' + nbAreas.length);
+const codeMap = [];
+{
+  const re = /stdHeader: '([^']+)',\s*volHeader: '([^']+)'/g, block = grab(code, 'PROC_AREA_COLUMNS_');
+  let m;
+  while ((m = re.exec(block))) codeMap.push({ std: m[1], vol: m[2] });
+}
+check('Code.js header pairs', codeMap.length === AREAS, '= ' + codeMap.length);
+nbAreas.forEach((a, i) => {
+  const c = codeMap[i] || {};
+  const ok = c.std === a.report && c.vol === 'Volume - ' + a.label;
+  check('  ' + a.report, ok, ok ? '' : 'std=' + c.std + '  vol=' + c.vol);
+});
+
+head('[6] Data tab positional assumptions (layout A..K)');
+const DATA = ['Date', 'Hour', 'PAYLOAD_BONUSCODE', 'PAYLOAD_EVENTTYPE', 'Attribute',
+              'Total_Quantity', 'Total_StandardHours', 'Total_SMV', 'Week',
+              'Date Time Range', 'Report Name'];
+const at = name => DATA.indexOf(name) + 1;
+const archive = R('Spreadsheet - Archive.js'), cleanup = R('Spreadsheet - Daily Data Cleanup.js'),
+      namec = R('Spreadsheet - Name Correction.js'), pstate = R('Spreadsheet - Pipeline State.js');
+const num = (s, re) => { const m = s.match(re); return m ? Number(m[1]) : null; };
+[['Archive DATA_SORT_COLUMN', num(archive, /DATA_SORT_COLUMN: (\d+)/), at('Date Time Range')],
+ ['Cleanup CLEANUP_KEY_COLUMNS_', num(cleanup, /CLEANUP_KEY_COLUMNS_ = (\d+)/), DATA.length],
+ ['Cleanup CLEANUP_SORT_COLUMN_', num(cleanup, /CLEANUP_SORT_COLUMN_ = (\d+)/), at('Date Time Range')],
+ ['NameCorrection NAME_COLUMN_', num(namec, /NAME_COLUMN_ = (\d+)/), at('PAYLOAD_BONUSCODE')],
+ ['NameCorrection HOURS_OUT_COLUMN_', num(namec, /HOURS_OUT_COLUMN_ = (\d+)/), at('Total_StandardHours')],
+ ['NameCorrection HOURS_IN_COLUMN_', num(namec, /HOURS_IN_COLUMN_ = (\d+)/), at('Total_SMV')],
+].forEach(p => check(p[0], p[1] === p[2], p[1] + ' vs ' + p[2]));
+check('PipelineState locates its column by header',
+  pstate.indexOf('PIPELINE_STATE_DATA_RANGE_HEADER_') !== -1 &&
+  pstate.indexOf('PIPELINE_STATE_DATA_RANGE_COL_') === -1);
+
+head('[7] notebook internals');
+['Elmsall Live Productivity.ipynb', 'Elmsall Live Productivity - Backfill Mode.ipynb'].forEach(f => {
+  const src = JSON.parse(fs.readFileSync(DBX + f, 'utf8')).cells.map(c => c.source.join('')).join('\n');
+  const p = src.indexOf('PROC_AREAS = [');
+  const areas = src.slice(p, src.indexOf('\n]', p));
+  const tag = f.replace('Elmsall Live Productivity', 'nb').replace('.ipynb', '') + ': ';
+  check(tag + AREAS + ' areas', n(areas, /"report":/g) === AREAS, '= ' + n(areas, /"report":/g));
+  check(tag + 'header derived from PROC_AREAS', src.indexOf('PROC_HEADER = (["Date", "Hour", "BONUS"]') !== -1);
+  check(tag + 'clear range derived', src.indexOf('PROC_LAST_COL') !== -1);
+  check(tag + 'grid widened before write', src.indexOf('proc_ws.resize(cols=len(PROC_HEADER))') !== -1);
+  check(tag + 'divisors aligned to PROC_AREAS', src.indexOf('PROC_DIVISORS[i]') !== -1);
+  const cs = src.indexOf('COLUMNS = [');
+  const colsBlock = src.slice(cs, src.indexOf(']', cs));
+  check(tag + 'Data COLUMNS = ' + DATA.length, n(colsBlock, /'/g) / 2 === DATA.length, '= ' + n(colsBlock, /'/g) / 2);
+  check(tag + 'pivot Report Name r[10]', src.indexOf('area_index.get(r[10].strip())') !== -1);
+  check(tag + 'pivot Date Time Range r[9]', src.indexOf('key = (r[9].strip()') !== -1);
+  check(tag + 'pivot StdHours r[6]', src.indexOf('_f(r[6])') !== -1);
+  check(tag + 'pivot Quantity r[5]', src.indexOf('_f(r[5])') !== -1);
+});
+
+head('[7b] userscript backfill map <-> notebook reports');
+{
+  // The third leg of the pipeline, and the one with no loud failure mode: a
+  // report missing from REPORT_POST_URLS_BACKFILL still RUNS in WHDS and still
+  // saves locally, it just never gets posted. That looks identical to the
+  // report working, so it went unnoticed for twelve work areas until this
+  // check existed. Nothing here can catch it except comparing the two lists.
+  const us = fs.readFileSync(TM + '[PAK] PSD - Bonus Hub Report Runner.user.js', 'utf8');
+  const nbBack = fs.readFileSync(DBX + 'Elmsall Live Productivity - Backfill Mode.ipynb', 'utf8');
+
+  const wanted = (JSON.parse(nbBack).cells || [])
+    .map(c => (c.source || []).join(''))
+    .join('\n')
+    .match(/\{"name":\s*"(D\.Analysis - [^"]+)"/g) || [];
+  const want = wanted.map(m => m.replace(/^\{"name":\s*"/, '').replace(/"$/, ''));
+
+  const from = us.indexOf('const REPORT_POST_URLS_BACKFILL');
+  const got = from === -1 ? [] :
+    (us.slice(from, us.indexOf(']))', from)).match(/'(D\.Analysis - [^']+)'/g) || [])
+      .map(m => m.slice(1, -1));
+
+  check('notebook backfill reports = ' + AREAS, want.length === AREAS, '= ' + want.length);
+  check('userscript backfill entries = ' + AREAS, got.length === AREAS, '= ' + got.length);
+  const missing = want.filter(n => got.indexOf(n) === -1);
+  const extra = got.filter(n => want.indexOf(n) === -1);
+  check('every notebook report is postable', missing.length === 0, missing.join(', ') || 'none missing');
+  check('no orphan entries in the userscript', extra.length === 0, extra.join(', ') || 'none orphaned');
+  check('same order as the notebook', JSON.stringify(want) === JSON.stringify(got), '');
+  // One endpoint, declared once - nineteen copies of a URL is nineteen chances
+  // to repoint one of them by accident.
+  const urlCount = (us.slice(from, us.indexOf(']))', from)).match(/https:\/\/script\.google\.com/g) || []).length;
+  check('the URL is not repeated per entry', urlCount === 0,
+        urlCount ? urlCount + ' inline URLs inside the map' : 'declared once above the list');
+}
+
+head('[8] syntax');
+[['Web - Code.js', 0], ['Spreadsheet - Archive.js', 0],
+ ['Spreadsheet - Daily Data Cleanup.js', 0], ['Spreadsheet - Name Correction.js', 0],
+ ['Spreadsheet - Pipeline State.js', 0], ['Web - doPost.js', 0],
+ ['Web - JsState.html', 1], ['Web - JsData.html', 1], ['Web - JsTables.html', 1],
+ ['Web - JsExport.html', 1], ['Web - JsTourData.html', 1], ['Web - JsCharts.html', 1],
+ ['Web - JsUi.html', 1], ['Web - JsHelpers.html', 1], ['Web - JsInit.html', 1],
+ ['Web - JsShare.html', 1], ['Web - JsTour.html', 1]].forEach(pair => {
+  let body = R(pair[0]);
+  if (pair[1]) body = body.replace(/^\s*<script>/, '').replace(/<\/script>\s*$/, '');
+  try { new vm.Script(body, { filename: pair[0] }); check(pair[0], true); }
+  catch (e) { check(pair[0], false, e.message); }
+});
+
+console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
+process.exit(fail ? 1 : 0);
