@@ -31,3 +31,19 @@ and Tampermonkey repos are expected as **siblings** of this one.
 validator, which lives in a temporary directory. When it is absent that section
 prints a notice and the structural checks still run - point `DATAVIZ_VALIDATOR`
 at the script to re-enable it.
+
+## Previewing the dashboard
+
+    node tools/preview.js                       # writes tools/preview.html
+    node tools/preview.js --page=volume --site=e3
+    node tools/preview.js --tour=1
+
+Assembles the real markup, styles and client code into one standalone page,
+resolving the HtmlService includes and standing in for google.script.run with
+the tour's demo payload. Layout, theming, charts, the building filter and the
+date picker all behave as deployed; the numbers are fake and nothing in
+Code.js runs, so this cannot catch a server-side bug.
+
+Open it with VS Code's **Live Preview**, not by double-clicking - the page
+uses localStorage, which browsers restrict on file:// URLs. The output is
+gitignored, and .claspignore keeps all of tools/ out of the Apps Script push.
