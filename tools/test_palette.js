@@ -25,13 +25,46 @@ vm.runInContext(
   ctx);
 const ev = e => vm.runInContext(e, ctx);
 
+// Just enough sRGB -> OKLCH to check a ramp's direction and hue. The validator
+// measures separation but exports no conversion, and these two properties are
+// about the ramp's RELATIONSHIP to VOLUME_TYPES order and to its family hue,
+// which is something only this file knows to ask.
+function oklch_(hex) {
+  const int = parseInt(/^#?([0-9a-f]{6})$/i.exec(hex)[1], 16);
+  const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const r = lin((int >> 16) & 255), g = lin((int >> 8) & 255), b = lin(int & 255);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+  const B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+  return { L: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+           h: ((Math.atan2(B, A) * 180 / Math.PI) + 360) % 360 };
+}
+const oklchL_ = hex => oklch_(hex).L;
+const oklchH_ = hex => oklch_(hex).h;
+
 // ── structure ────────────────────────────────────────────────────────────────
 head('[1] every area belongs to a declared family');
 {
   const fams = ev('AREA_FAMILIES.map(f => f.name)');
   const vt = ev('VOLUME_TYPES.map(t => ({key:t.key, family:t.family, color:t.color, dark:t.colorDark}))');
   check('19 areas', vt.length === 19, '= ' + vt.length);
-  check('8 family hues', fams.length === 8, '= ' + fams.length);
+  // Six since BPP folded into Packing and Automation Pick into Picking. The
+  // eight-slot requirement moved to AREA_GROUP_COLORS, which is what actually
+  // needed it - see the group-palette checks below.
+  check('6 family hues', fams.length === 6, '= ' + fams.length);
+  const grp = ev('AREA_GROUP_COLORS'), grpD = ev('AREA_GROUP_COLORS_DARK');
+  check('8 group hues', grp.length === 8 && grpD.length === 8,
+        grp.length + ' / ' + grpD.length);
+  check('group palette outlasts MAX_AREA_GROUPS',
+        grp.length >= ev('MAX_AREA_GROUPS'),
+        grp.length + ' hues for ' + ev('MAX_AREA_GROUPS') + ' groups');
+  // Deriving it from AREA_FAMILIES is what made the group palette shrink with
+  // the family count; groupColor_ wraps, so seven groups over six hues gives
+  // two of them the same colour.
+  check('group palette is written out, not derived',
+        R('Web - JsState.html').indexOf('AREA_GROUP_COLORS = AREA_FAMILIES.map(') === -1, '');
   check('every area names a family', vt.every(t => t.family), '');
   check('every named family exists', vt.every(t => fams.indexOf(t.family) !== -1),
         vt.filter(t => fams.indexOf(t.family) === -1).map(t => t.key).join(',') || 'all found');
@@ -103,11 +136,19 @@ const st_ = v => String(v === true ? 'pass' : v === false ? 'fail' : v).toLowerC
 const SURF = { light: '#ffffff', dark: '#1e1e1e' };
 for (const mode of (V ? ['light', 'dark'] : [])) {
   const pick = mode === 'dark' ? 'colorDark' : 'color';
-  // The eight hues every shade is derived from, and what area GROUPS wear.
+  // The six hues every shade is derived from.
   const fam = ev(`AREA_FAMILIES.map(f => f.${pick})`);
   V.validate(fam, { mode, surface: SURF[mode] }).report.forEach(([name, v, d]) => {
     const s_ = st_(v), band = s_ === 'relief' || s_ === 'warn';
-    check(mode + ' 8 hues: ' + name, s_ === 'pass' || band, (band ? '[' + s_ + '] ' : '') + d);
+    check(mode + ' 6 hues: ' + name, s_ === 'pass' || band, (band ? '[' + s_ + '] ' : '') + d);
+  });
+  // What area GROUPS wear. Measured separately now that it is its own list
+  // rather than a copy of the family hues - eight mutually distinguishable
+  // colours is a claim about this list, so this is where it gets checked.
+  const grpHexes = ev(`AREA_GROUP_COLORS${pick === 'colorDark' ? '_DARK' : ''}`);
+  V.validate(grpHexes, { mode, surface: SURF[mode] }).report.forEach(([name, v, d]) => {
+    const s_ = st_(v), band = s_ === 'relief' || s_ === 'warn';
+    check(mode + ' 8 group hues: ' + name, s_ === 'pass' || band, (band ? '[' + s_ + '] ' : '') + d);
   });
   // Each family read as an ordered ramp - that is what "shade within family"
   // has to mean if the shades are to be tellable apart.
@@ -118,6 +159,24 @@ for (const mode of (V ? ['light', 'dark'] : [])) {
                  .report.filter(([, v]) => ['pass', 'warn', 'relief'].indexOf(st_(v)) === -1);
     check(mode + ' ramp: ' + fname, bad.length === 0,
           ramp.join(' ') + (bad.length ? '  <- ' + bad.map(b => b[0]).join(', ') : ''));
+
+    // validateOrdinal accepts a ramp running either way, so it cannot tell a
+    // deliberate order from a lucky one. VOLUME_TYPES order is what the charts,
+    // chips and table columns follow, so pin the direction to it: reordering
+    // the areas is what silently left Top Up mid-light-dark.
+    const Ls = ramp.map(oklchL_);
+    const ascending = Ls.every((L, i) => i === 0 || L > Ls[i - 1]);
+    check(mode + ' ramp direction: ' + fname, ascending,
+          ascending ? 'later is lighter' : 'L = ' + Ls.map(l => l.toFixed(3)).join(' ') + ' - later must be lighter');
+
+    // A ramp is meant to be lightness steps of its FAMILY's hue. Nothing tied
+    // the two together, so a re-familied area could keep the hue of the family
+    // it left and still pass every check above.
+    const anchor = oklchH_(ev(`AREA_FAMILIES.filter(f => f.name === ${JSON.stringify(fname)})[0].${pick}`));
+    const drift = ramp.map(h => Math.abs(((oklchH_(h) - anchor + 540) % 360) - 180));
+    const worst = Math.max(...drift);
+    check(mode + ' ramp hue: ' + fname, worst <= 20,
+          'worst ' + worst.toFixed(1) + 'deg from the family hue');
   });
 }
 

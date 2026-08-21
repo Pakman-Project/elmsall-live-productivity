@@ -37,6 +37,10 @@ function saveUserPreferences() {
   // Never let that temporary state overwrite the user's real saved preferences.
   if (typeof tourActive !== 'undefined' && tourActive) return;
   try {
+    // The building in view holds the live copies, so fold them back into its
+    // own slot before writing - otherwise everything set up since the last
+    // building switch would be saved against nothing.
+    if (typeof captureSiteSettings_ === 'function') captureSiteSettings_(siteFilter);
     var prefs = {
       hoursRange: $('hoursRange').value,
       timeWindow: $('timeWindow').value,
@@ -45,14 +49,19 @@ function saveUserPreferences() {
       bonusViewMode: $('bonusViewMode') ? $('bonusViewMode').value : 'area',
       hiddenBonusAreas: hiddenBonusAreas,
       hiddenVolumeAreas: hiddenVolumeAreas,
-      trendSplitState: trendSplitState,
-      areaGroups: areaGroupState,
-      areaGroupSplit: areaGroupSplitState,
+      // Area groups, their split, the trend split and the volume chart's areas
+      // are all per building now - see siteSettings_ in JsState.
+      siteSettings: siteSettings_,
       chartOrder: chartOrderState,
       allowMultiBonus: allowMultiBonusFilter,
       syncAreaChips: syncAreaChips,
       siteFilter: siteFilterPreferred,
-      theme: currentTheme
+      theme: currentTheme,
+      areaOrderVersion: AREA_ORDER_VERSION,
+      // Only so the setup dialog can reopen showing what was answered. The
+      // filter it produced lives in hiddenVolumeAreas above, and that is what
+      // the dashboard actually reads.
+      onboarding: (typeof onboardingRemembered_ !== 'undefined') ? onboardingRemembered_ : null
     };
     localStorage.setItem('e3_dashboard_prefs_v1', JSON.stringify(prefs));
   } catch (e) {
@@ -122,6 +131,24 @@ function loadUserPreferences() {
     // rather than letting the pages open disagreeing with each other.
     mirrorHiddenAreasPak_('volume');
 
+    // Validated but never applied - seedOnboardingDraft_ prefers live state, and
+    // re-deriving hiddenVolumeAreas from this on every load would undo any chip
+    // the user has toggled since.
+    if (prefs.onboarding && typeof prefs.onboarding === 'object') {
+      var famNames = AREA_FAMILIES.map(function (f) { return f.name; });
+      var validOnboardKeys = {};
+      for (var ok = 0; ok < VOLUME_TYPES.length; ok++) { validOnboardKeys[VOLUME_TYPES[ok].key] = true; }
+      var knownSite = false;
+      for (var s = 0; s < SITES.length; s++) { if (SITES[s].key === prefs.onboarding.site) knownSite = true; }
+      onboardingRemembered_ = {
+        site: knownSite ? prefs.onboarding.site : 'all',
+        families: Array.isArray(prefs.onboarding.families)
+          ? prefs.onboarding.families.filter(function (f) { return famNames.indexOf(f) !== -1; }) : [],
+        areas: Array.isArray(prefs.onboarding.areas)
+          ? prefs.onboarding.areas.filter(function (k) { return validOnboardKeys[k]; }) : []
+      };
+    }
+
     var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
     for (var i = 0; i < syncedHours.length; i++) {
       syncedHours[i].value = $('hoursRange').value;
@@ -130,36 +157,6 @@ function loadUserPreferences() {
     var syncedWindows = document.querySelectorAll('[data-sync="timeWindow"]');
     for (var i = 0; i < syncedWindows.length; i++) {
       syncedWindows[i].value = $('timeWindow').value;
-    }
-
-    if (prefs.trendSplitState && typeof prefs.trendSplitState.enabled === 'boolean' && Array.isArray(prefs.trendSplitState.charts)) {
-      var validTrendKeys = {};
-      for (var vt = 0; vt < VOLUME_TYPES.length; vt++) { validTrendKeys[VOLUME_TYPES[vt].key] = true; }
-      var cleanedTrendCharts = prefs.trendSplitState.charts
-        .filter(function(c) { return Array.isArray(c); })
-        .map(function(c) { return c.filter(function(k) { return validTrendKeys[k]; }); })
-        .slice(0, MAX_TREND_CHARTS);
-      trendSplitState = { enabled: !!prefs.trendSplitState.enabled, charts: cleanedTrendCharts };
-    }
-
-    // Group indices are validated against MAX_AREA_GROUPS rather than against
-    // the current group count: the groups themselves are restored further down
-    // this same function, so the real count is not known yet. An index pointing
-    // past the end is simply skipped at render time.
-    if (prefs.areaGroupSplit && typeof prefs.areaGroupSplit.enabled === 'boolean' &&
-        Array.isArray(prefs.areaGroupSplit.charts)) {
-      var cleanedAgCharts = prefs.areaGroupSplit.charts
-        .filter(function (c) { return Array.isArray(c); })
-        .map(function (c) {
-          return c.filter(function (n) {
-            return typeof n === 'number' && n >= 0 && n < MAX_AREA_GROUPS;
-          });
-        })
-        .slice(0, MAX_AREA_GROUP_CHARTS);
-      areaGroupSplitState = {
-        enabled: !!prefs.areaGroupSplit.enabled,
-        charts: cleanedAgCharts
-      };
     }
 
     // Only keys this build knows about, and no duplicates — a stale or hand-
@@ -178,27 +175,133 @@ function loadUserPreferences() {
           return true;
         });
       }
+      // The volume zone's keys are 'vol0'..'vol18' - POSITIONS in VOLUME_TYPES,
+      // not areas - so a saved arrangement means something different the moment
+      // the areas are reordered. It would not error; it would quietly point
+      // someone's layout at other areas, which is worse. The work areas were
+      // reordered and re-familied in AREA_ORDER_VERSION 2, so an arrangement
+      // saved before that marker existed is dropped exactly once. Everything
+      // else in the blob is keyed by area and survives.
+      if (prefs.areaOrderVersion !== AREA_ORDER_VERSION) delete cleanOrder.volume;
       chartOrderState = cleanOrder;
     }
 
-    if (Array.isArray(prefs.areaGroups)) {
-      var validKeys = {};
-      for (var v = 0; v < VOLUME_TYPES.length; v++) { validKeys[VOLUME_TYPES[v].key] = true; }
-      var cleanedGroups = [];
-      for (var g = 0; g < prefs.areaGroups.length && cleanedGroups.length < MAX_AREA_GROUPS; g++) {
-        var grp = prefs.areaGroups[g];
+    // ── Per-building chart settings ────────────────────────────────────────
+    // Validation deliberately does NOT prune areas belonging to another
+    // building: each building's settings are only ever applied while that
+    // building is in view, so an out-of-scope key cannot reach a chart, and
+    // pruning would destroy a perfectly good configuration.
+    var validAreaKeys = {};
+    for (var vk = 0; vk < VOLUME_TYPES.length; vk++) { validAreaKeys[VOLUME_TYPES[vk].key] = true; }
+
+    var cleanGroups_ = function (raw) {
+      if (!Array.isArray(raw)) return null;
+      var out = [];
+      for (var g = 0; g < raw.length && out.length < MAX_AREA_GROUPS; g++) {
+        var grp = raw[g];
         // Legacy shape was a plain array of keys; current shape is {keys, showLine, showTrend}
         var keysSrc = Array.isArray(grp) ? grp : (grp && Array.isArray(grp.keys) ? grp.keys : null);
         if (!keysSrc) continue;
-        var keys = keysSrc.filter(function(k) { return validKeys[k]; });
+        var keys = keysSrc.filter(function (k) { return validAreaKeys[k]; });
         if (keys.length === 0) continue;
         var showLine = Array.isArray(grp) ? true : grp.showLine !== false;
         var showTrend = Array.isArray(grp) ? false : grp.showTrend === true;
         if (!showLine && !showTrend) showLine = true;
-        cleanedGroups.push({ keys: keys, showLine: showLine, showTrend: showTrend });
+        out.push({ keys: keys, showLine: showLine, showTrend: showTrend });
       }
-      if (cleanedGroups.length > 0) areaGroupState = cleanedGroups;
+      return out.length > 0 ? out : null;
+    };
+
+    // Group indices are validated against MAX_AREA_GROUPS rather than against
+    // the group count, which is not known here. An index past the end is simply
+    // skipped at render time.
+    var cleanGroupSplit_ = function (raw) {
+      if (!raw || typeof raw.enabled !== 'boolean' || !Array.isArray(raw.charts)) return null;
+      return {
+        enabled: !!raw.enabled,
+        charts: raw.charts
+          .filter(function (c) { return Array.isArray(c); })
+          .map(function (c) {
+            return c.filter(function (n) { return typeof n === 'number' && n >= 0 && n < MAX_AREA_GROUPS; });
+          })
+          .slice(0, MAX_AREA_GROUP_CHARTS)
+      };
+    };
+
+    var cleanTrendSplit_ = function (raw) {
+      if (!raw || typeof raw.enabled !== 'boolean' || !Array.isArray(raw.charts)) return null;
+      return {
+        enabled: !!raw.enabled,
+        charts: raw.charts
+          .filter(function (c) { return Array.isArray(c); })
+          .map(function (c) { return c.filter(function (k) { return validAreaKeys[k]; }); })
+          .slice(0, MAX_TREND_CHARTS)
+      };
+    };
+
+    var cleanKeyList_ = function (raw) {
+      if (!Array.isArray(raw)) return null;
+      return raw.filter(function (k) { return validAreaKeys[k]; });
+    };
+
+    var cleanSiteEntry_ = function (raw) {
+      if (!raw || typeof raw !== 'object') return null;
+      var entry = {};
+      var groups = cleanGroups_(raw.areaGroups);
+      if (groups) entry.areaGroups = groups;
+      var gsplit = cleanGroupSplit_(raw.areaGroupSplit);
+      if (gsplit) entry.areaGroupSplit = gsplit;
+      var tsplit = cleanTrendSplit_(raw.trendSplit);
+      if (tsplit) entry.trendSplit = tsplit;
+      var vol = cleanKeyList_(raw.overviewVolAreas);
+      if (vol) entry.overviewVolAreas = vol;
+      return entry;
+    };
+
+    // Anything that made it into storage was configured by hand at the time, so
+    // it stays configured across the reload - otherwise the first building
+    // switch would treat it as untouched and discard it.
+    var rememberTouched_ = function (site, entry) {
+      if (!entry) return;
+      for (var f = 0; f < SITE_SETTING_KEYS_.length; f++) {
+        var field = SITE_SETTING_KEYS_[f];
+        if (field === 'areaGroupSplit') continue;   // held with areaGroups
+        if (entry.hasOwnProperty(field)) markSiteSettingsTouched_(site, field);
+      }
+    };
+
+    siteSettings_ = {};
+    siteSettingsTouched_ = {};
+    if (prefs.siteSettings && typeof prefs.siteSettings === 'object') {
+      for (var ss = 0; ss < SITES.length; ss++) {
+        var sk = SITES[ss].key;
+        var cleaned = cleanSiteEntry_(prefs.siteSettings[sk]);
+        if (cleaned && Object.keys(cleaned).length > 0) {
+          siteSettings_[sk] = cleaned;
+          rememberTouched_(sk, cleaned);
+        }
+      }
+    } else {
+      // A blob from before these were per building. One shared configuration is
+      // exactly the bug - a group of E1/E2 areas offered while viewing E3 - so
+      // it is filed under the building that was in view when it was saved, and
+      // the other two start from the default rule rather than inheriting it.
+      var legacy = cleanSiteEntry_({
+        areaGroups: prefs.areaGroups,
+        areaGroupSplit: prefs.areaGroupSplit,
+        trendSplit: prefs.trendSplitState,
+        overviewVolAreas: prefs.overviewVolAreas
+      });
+      if (legacy && Object.keys(legacy).length > 0) {
+        var legacySite = prefs.siteFilter || 'all';
+        siteSettings_[legacySite] = legacy;
+        rememberTouched_(legacySite, legacy);
+      }
     }
+
+    // siteFilter was restored near the top of this function, so this hands the
+    // live values to the building the page is about to open on.
+    applySiteSettings_(siteFilter);
 
   } catch (e) {
     console.warn('Could not load preferences', e);
@@ -213,7 +316,7 @@ function loadUserPreferences() {
 // a dozen module-level variables holding preference state, and re-deriving them
 // all correctly is far more likely to go wrong than simply starting again.
 function resetAllSettingsPak() {
-  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes, row counts and the settings in the gear dialog all go back to their defaults. Your data is untouched, and other people are unaffected.')) return;
+  if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes, row counts and the settings in the gear dialog all go back to their defaults, and you will be asked which work areas you want again. Your data is untouched, and other people are unaffected.')) return;
   try {
     localStorage.removeItem('e3_dashboard_prefs_v1');
     localStorage.removeItem('e3_dashboard_payload_v1');
@@ -223,6 +326,13 @@ function resetAllSettingsPak() {
   // The tour's "already seen" flag is deliberately NOT cleared: someone
   // resetting their layout has not forgotten the tour, and replaying it
   // unasked would be a strange thing to happen.
+  //
+  // The onboarding flag IS cleared, which looks inconsistent and is not. The
+  // tour teaches the dashboard; this asks which areas you want. Wiping the
+  // hidden-area list without asking again would drop someone back into all
+  // nineteen areas with no prompt and no memory of how they had narrowed it -
+  // so resetting the layout IS a request to be asked.
+  if (typeof clearOnboardingSeen_ === 'function') clearOnboardingSeen_();
   location.reload();
 }
 

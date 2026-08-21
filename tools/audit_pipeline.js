@@ -80,7 +80,22 @@ head('[1b] palette');
     vt.forEach(t => { if (seen[t[mode]]) dup.push(seen[t[mode]] + '/' + t.key + ' ' + t[mode]); seen[t[mode]] = t.key; });
     check('no two areas share a ' + (mode === 'dark' ? 'dark' : 'light') + ' hex', dup.length === 0, dup.join('; '));
   }
-  check('AREA_FAMILIES has 8 slots', fams.length === 8, '= ' + fams.length);
+  // Six, not the eight this used to assert: BPP folded into Packing and
+  // Automation Pick into Picking. Loosening a guard to make a run go green is
+  // how the bugs these checks exist for got in, so the two compensating ones
+  // below were added in the same change - the group palette is what actually
+  // needed eight slots, and it no longer depends on how many families there are.
+  check('AREA_FAMILIES has 6 slots', fams.length === 6, '= ' + fams.length);
+  const grp = ev('AREA_GROUP_COLORS'), grpD = ev('AREA_GROUP_COLORS_DARK');
+  check('AREA_GROUP_COLORS has 8 slots', grp.length === 8, '= ' + grp.length);
+  check('AREA_GROUP_COLORS_DARK has 8 slots', grpD.length === 8, '= ' + grpD.length);
+  // MAX_AREA_GROUPS is 7 and groupColor_ wraps, so a palette shorter than that
+  // hands two groups in one dialog the same hue.
+  check('group palette covers MAX_AREA_GROUPS',
+        grp.length >= ev('MAX_AREA_GROUPS'), grp.length + ' hues for ' + ev('MAX_AREA_GROUPS') + ' groups');
+  check('group palette is not derived from AREA_FAMILIES',
+        state.indexOf('AREA_GROUP_COLORS = AREA_FAMILIES.map(') === -1,
+        'written out, so family count cannot shrink it');
   // Folding is what makes the combined chart legible; if a family ever held
   // every area it would fold to one series and say nothing.
   const sizes = {};
@@ -109,6 +124,71 @@ const sortable = grab(state, 'mainTableSortableColumns');
 check('mainTableSortableColumns', n(sortable, /\{ key:/g) === COLS, '= ' + n(sortable, /\{ key:/g));
 const detail = grab(tables, 'DETAIL_TABLE_COLUMNS');
 check('DETAIL_TABLE_COLUMNS', n(detail, /\{ key:/g) === COLS, '= ' + n(detail, /\{ key:/g));
+
+head('[2b] the column lists are in the SAME ORDER as VOLUME_TYPES');
+// Counting them is not enough. Four lists restate VOLUME_TYPES' order and
+// labels by hand, and until this block existed nothing compared them: a list
+// reordered on its own put every value under the wrong header, in both the main
+// table and the expanded-row detail table, and the suite still said ALL CHECKS
+// PASSED. The scaffolding differs - the metric list is areas only, the sortable
+// and detail lists carry 4 identity columns and a trailing Productivity % - so
+// each is sliced down to its area run before comparing.
+{
+  const sig = l => l.map(c => c.key + '|' + c.label).join('\n');
+  const want = ev('VOLUME_TYPES.map(t => ({key: t.key, label: t.label}))');
+  const wantSig = sig(want);
+  const diff = got => {
+    const a = got.split('\n'), b = wantSig.split('\n');
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      if (a[i] !== b[i]) return 'first difference at #' + (i + 1) + ': ' + (a[i] || '(missing)') + ' vs ' + (b[i] || '(missing)');
+    }
+    return '';
+  };
+
+  const metric = ev('MAIN_TABLE_METRIC_COLUMNS.map(c => ({key: c.key, label: c.label}))');
+  check('MAIN_TABLE_METRIC_COLUMNS', sig(metric) === wantSig, diff(sig(metric)));
+
+  const sortAreas = ev('mainTableSortableColumns.slice(4, -1).map(c => ({key: c.key, label: c.label}))');
+  check('mainTableSortableColumns', sig(sortAreas) === wantSig, diff(sig(sortAreas)));
+
+  // Evaluated rather than regexed so its `type` field cannot confuse the parse.
+  const detailCtx = { out: null };
+  vm.createContext(detailCtx);
+  vm.runInContext(detail + '];\nout = DETAIL_TABLE_COLUMNS;', detailCtx);
+  const detailAreas = detailCtx.out.slice(4, -1).map(c => ({ key: c.key, label: c.label }));
+  check('DETAIL_TABLE_COLUMNS', sig(detailAreas) === wantSig, diff(sig(detailAreas)));
+
+  const th = [];
+  {
+    const re = /<th data-key="([^"]+)"(?: data-site="([^"]+)")?>([^<]*)<\/th>/g;
+    let m;
+    while ((m = re.exec(idx))) th.push({ key: m[1], site: m[2] || null, label: m[3] });
+  }
+  const thAreas = th.slice(4, -1);
+  check('#mainTable <th> order', sig(thAreas) === wantSig, diff(sig(thAreas)));
+
+  // The building a column belongs to is data, not something the markup gets to
+  // restate: e1e2Inducting is e3 work despite its name (see AREA_SITE).
+  const siteWrong = thAreas
+    .filter(c => c.site !== ev('AREA_SITE[areaBaseKey_(' + JSON.stringify(c.key) + ')]'))
+    .map(c => c.key + '=' + c.site);
+  check('<th data-site> matches AREA_SITE', siteWrong.length === 0, siteWrong.join(', ') || 'all match');
+
+  // volPanel<i> shows VOLUME_TYPES[i]: the renderer indexes panels straight
+  // into the array. tagReorderItems_ overwrites both of these at init, so the
+  // markup is only the pre-JS fallback - but a fallback that names the wrong
+  // area is worse than no fallback, and only panel 0 was ever rewritten at
+  // render time, so for years the other eighteen were simply stale.
+  const panelWrong = [];
+  want.forEach((t, i) => {
+    const m = new RegExp('id="volPanel' + i + '">\\s*<div class="mini-table-title">\\s*<h2>([^<]*)</h2>\\s*<span class="tag">([^<]*)</span>').exec(idx);
+    if (!m) { panelWrong.push('volPanel' + i + ' not found'); return; }
+    const famWant = ev('VOLUME_TYPES[' + i + '].family');
+    if (m[1] !== t.label) panelWrong.push('volPanel' + i + ' h2 "' + m[1] + '" vs "' + t.label + '"');
+    else if (m[2] !== famWant) panelWrong.push('volPanel' + i + ' tag "' + m[2] + '" vs "' + famWant + '"');
+  });
+  check('volume panel headings', panelWrong.length === 0, panelWrong.join('; ') || 'all 19 match');
+}
 
 head('[3] per-area cells are GENERATED, not hand-listed');
 // The recurring bug was a hand-written run of numTdPak calls drifting out of
@@ -248,7 +328,13 @@ head('[8] syntax');
  ['Web - JsState.html', 1], ['Web - JsData.html', 1], ['Web - JsTables.html', 1],
  ['Web - JsExport.html', 1], ['Web - JsTourData.html', 1], ['Web - JsCharts.html', 1],
  ['Web - JsUi.html', 1], ['Web - JsHelpers.html', 1], ['Web - JsInit.html', 1],
- ['Web - JsShare.html', 1], ['Web - JsTour.html', 1]].forEach(pair => {
+ ['Web - JsShare.html', 1], ['Web - JsTour.html', 1],
+ // These four were simply missed. Every one is a <script> include shipped to
+ // the browser exactly like the others, so a syntax error in any of them breaks
+ // the page just as hard - being small is not being safe.
+ ['Web - JsModal.html', 1], ['Web - JsReorder.html', 1],
+ ['Web - JsToast.html', 1], ['Web - JsPullRefresh.html', 1],
+ ['Web - JsOnboarding.html', 1]].forEach(pair => {
   let body = R(pair[0]);
   if (pair[1]) body = body.replace(/^\s*<script>/, '').replace(/<\/script>\s*$/, '');
   try { new vm.Script(body, { filename: pair[0] }); check(pair[0], true); }

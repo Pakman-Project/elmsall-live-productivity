@@ -618,6 +618,20 @@
     if (scopeTag) {
       scopeTag.textContent = (siteFilter === 'all') ? 'All Areas' : 'All ' + cfg.short + ' Areas';
     }
+    // The heading names the building too, rather than leaving the tag beside it
+    // to carry that on its own. cfg is the EFFECTIVE filter, so while a bonus
+    // filter is holding the view at whole-site this says "Elmsall" - it has to
+    // agree with the tag and with what is actually plotted, not with the
+    // preference that is being overridden.
+    var perfTitle = $('perfChartTitle');
+    if (perfTitle) {
+      perfTitle.textContent = cfg.short + ' Overall Productivity %';
+      // The rearrange bar captured this panel's label once, at init, from the
+      // heading text - before any of this ran. Without updating it too, someone
+      // on E3 rearranges panels against a label still reading "Elmsall".
+      var perfPanel = perfTitle.closest('[data-reorder-key]');
+      if (perfPanel) perfPanel.setAttribute('data-reorder-label', perfTitle.textContent);
+    }
 
     try { document.title = cfg.title; } catch (e) {}
   }
@@ -1642,6 +1656,11 @@
     });
     var anySelected = cleaned.some(function(c) { return c.length > 0; });
     trendSplitState = anySelected ? { enabled: true, charts: cleaned } : { enabled: false, charts: [] };
+    // Per building: these are work-area keys, and the other buildings do not
+    // have them. Saved here rather than left to whatever saves next, so the
+    // split survives a reload on its own.
+    if (typeof markSiteSettingsTouched_ === 'function') markSiteSettingsTouched_(siteFilter, 'trendSplit');
+    if (typeof saveUserPreferences === 'function') saveUserPreferences();
     closeTrendSplit();
     applyLocalFiltersPak();
   }
@@ -1650,6 +1669,8 @@
     // Collapsing back to a single chart discards every split the user configured.
     if (!confirm('Reset back to a single deployment trend chart?\n\nThe split charts you have set up will be lost.')) return;
     trendSplitState = { enabled: false, charts: [] };
+    if (typeof forgetSiteSetting_ === 'function') forgetSiteSetting_(siteFilter, 'trendSplit');
+    if (typeof saveUserPreferences === 'function') saveUserPreferences();
     closeTrendSplit();
     applyLocalFiltersPak();
   }
@@ -1892,6 +1913,9 @@
       ? { enabled: true, charts: charts }
       : { enabled: false, charts: [] };
 
+    // Configured by hand, for THIS building. Until a building is marked, it
+    // keeps deriving its groups from whatever it currently shows.
+    if (typeof markSiteSettingsTouched_ === 'function') markSiteSettingsTouched_(siteFilter, 'areaGroups');
     saveUserPreferences();
     closeAreaGroups();
     applyLocalFiltersPak();
@@ -1900,6 +1924,10 @@
   function resetAreaGroups() {
     // Destructive and not undoable — the user may have built up several groups.
     if (!confirm('Reset the work area groups and charts back to the defaults?\n\nAny groups and charts you have built here will be lost.')) return;
+    // Back to unconfigured, not to a frozen copy of today's default: this
+    // building should follow the rule again, so hiding an area later moves its
+    // groups with it. Only the groups - the trend split is a separate answer.
+    if (typeof forgetSiteSetting_ === 'function') forgetSiteSetting_(siteFilter, 'areaGroups');
     areaGroupState = defaultAreaGroupState_();
     areaGroupSplitState = defaultAreaGroupSplitState_();
     saveUserPreferences();

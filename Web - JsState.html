@@ -7,60 +7,75 @@ var APP_CONFIG = {
 
 // ── Work-area colour ──────────────────────────────────────────────────
 // Colour carries two things at once: hue says which FAMILY of work an area
-// belongs to, lightness says which area within it. So the three Online
-// Pickings are three blues, the three Top Ups three oranges, and both BPPs
-// are yellows - the grouping reads off a chart without anyone consulting a
-// legend.
+// belongs to, lightness says which area within it. So the six Pickings are
+// six blues, the three Top Ups three oranges, and the four Packings four
+// greens - the grouping reads off a chart without anyone consulting a legend.
 //
-// Both columns are generated in OKLCH from the eight fixed hues below and
+// Both columns are generated in OKLCH from the six fixed hues below and
 // measured, not eyeballed: every colour sits inside its mode's lightness
 // band, clears the chroma floor under which a hue starts reading as grey, and
 // every family ramp is monotone with a real lightness step between
 // neighbours. The dark column is its own set of steps chosen for the dark
 // surface, not the light column lightened.
 //
+// Within a family, LATER IN THIS LIST IS LIGHTER. That is a rule, not an
+// accident, and tools/test_palette.js asserts it: the ramps used to be
+// monotone only by luck, and reordering the areas silently broke Top Up into
+// mid-light-dark, which no check would have caught.
+//
 // What colour cannot do: nineteen shades are not all tellable apart at once,
-// and no palette fixes that - it is a limit of the eye, not of the hexes. On
-// the charts that put every area on one plot, the legend and the hover
-// tooltip are what identify a series; colour groups them and narrows the
-// search, but it is not asked to carry the identification alone.
+// and no palette fixes that - it is a limit of the eye, not of the hexes. Six
+// blues in one family is close to that limit, and the tightest pairs on the
+// whole dashboard now sit INSIDE Picking rather than between families. On the
+// charts that put every area on one plot, the legend and the hover tooltip
+// are what identify a series; colour groups them and narrows the search, but
+// it is not asked to carry the identification alone.
 var VOLUME_TYPES = [
-  { key: 'pieVol', stdKey: 'pieStd', label: 'PiE', family: 'Picking', color: '#0453a5', colorDark: '#035cb3' },
-  { key: 'topUpVol', stdKey: 'topUpStd', label: 'Top Up', family: 'Top Up', color: '#913203', colorDark: '#a73a07' },
-  { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', family: 'Packing', color: '#076c49', colorDark: '#0c7954' },
+  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', family: 'Picking', color: '#014ea0', colorDark: '#0155a8' },
+  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', family: 'Picking', color: '#005fc0', colorDark: '#0267c7' },
+  { key: 'pieVol', stdKey: 'pieStd', label: 'OSR PiE', family: 'Picking', color: '#2173d5', colorDark: '#237adc' },
+  { key: 'onlinePickingDriveVol', stdKey: 'onlinePickingDriveStd', label: 'Drive - Online Picking', family: 'Picking', color: '#3786eb', colorDark: '#3a8df2' },
+  { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Way - Online Picking', family: 'Picking', color: '#4e9bfe', colorDark: '#57a2ff' },
+  { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'E3 - Online Picking', family: 'Picking', color: '#75b0ff', colorDark: '#7eb7ff' },
+  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', family: 'Top Up', color: '#913203', colorDark: '#a73a07' },
+  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Top Up', color: '#cb4b0b', colorDark: '#c94a11' },
+  { key: 'topUpVol', stdKey: 'topUpStd', label: 'OSR Top Up', family: 'Top Up', color: '#f97542', colorDark: '#e36230' },
+  { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', family: 'Packing', color: '#0b6c46', colorDark: '#0c6e4a' },
+  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', family: 'Packing', color: '#108356', colorDark: '#108559' },
+  { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', family: 'Packing', color: '#159b67', colorDark: '#159c6a' },
+  { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', family: 'Packing', color: '#23b379', colorDark: '#1fb47b' },
   { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', family: 'Parcel', color: '#95305b', colorDark: '#ae2b60' },
   { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', family: 'Parcel', color: '#db7099', colorDark: '#db5786' },
-  { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'Inbound Decanting', family: 'Decanting', color: '#016f01', colorDark: '#0a7c08' },
-  { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', family: 'Decanting', color: '#49b343', colorDark: '#3aa635' },
-  { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#5345b3', colorDark: '#6355b4' },
-  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', family: 'Inducting', color: '#8d86fa', colorDark: '#877cdf' },
-  { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', family: 'Packing', color: '#22b37d', colorDark: '#24a476' },
-  { key: 'onlinePickingDriveVol', stdKey: 'onlinePickingDriveStd', label: 'Drive - Online Picking', family: 'Picking', color: '#1d6dca', colorDark: '#1d6eca' },
-  { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Way - Online Picking', family: 'Picking', color: '#3c89e9', colorDark: '#3482e0' },
-  { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'E3 - Online Picking', family: 'Picking', color: '#64a6fd', colorDark: '#4996f5' },
-  { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', family: 'BPP', color: '#7b5100', colorDark: '#8b5b00' },
-  { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', family: 'BPP', color: '#cb8903', colorDark: '#bc7d09' },
-  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', family: 'Top Up', color: '#cb4b0b', colorDark: '#c94a11' },
-  { key: 'rspsPickVol', stdKey: 'rspsPickStd', label: 'RSPS Pick', family: 'Automation Pick', color: '#ab0b1d', colorDark: '#af343a' },
-  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Top Up', color: '#f97542', colorDark: '#e36230' },
-  { key: 'ispsPickVol', stdKey: 'ispsPickStd', label: 'ISPS Pick', family: 'Automation Pick', color: '#f85d59', colorDark: '#dc5e5e' }
+  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', family: 'Inducting', color: '#5345b3', colorDark: '#6355b4' },
+  { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#8d86fa', colorDark: '#877cdf' },
+  { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', family: 'Decanting', color: '#016f01', colorDark: '#0a7c08' },
+  { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'E3 Inbound Decanting', family: 'Decanting', color: '#49b343', colorDark: '#3aa635' }
 ];
 
-// The eight family hues every work-area shade is derived from. Their ORDER is
+// Bumped whenever VOLUME_TYPES is REORDERED (not when an area is added, renamed
+// or recoloured). The saved volume-panel arrangement is stored as positions -
+// 'vol0'..'vol18' - so it silently means different areas after a reorder;
+// loadUserPreferences drops that one saved list when this marker does not match.
+// 1 = the original order, 2 = grouped by family, Picking first.
+var AREA_ORDER_VERSION = 2;
+
+// The six family hues every work-area shade is derived from. Their ORDER is
 // a safety property, not a taste one - it is what keeps neighbouring hues
 // apart under red-green colour blindness - so it does not get re-ordered to
 // look nicer. A family hue is never handed to an individual area; the areas
-// wear lightness steps of it, and the hues themselves are what area GROUPS
-// take (see AREA_GROUP_COLORS).
+// wear lightness steps of it.
+//
+// Inducting sits fourth rather than last for exactly that reason. Dropping
+// BPP and Automation Pick from this list left Packing next to Parcel, a pair
+// that measures ΔE 2.0 under deuteranopia on the dark surface - a hard fail.
+// Moving Inducting between them puts the worst adjacent pair back at ΔE 11.6.
 var AREA_FAMILIES = [
   { name: 'Picking',      color: '#2a78d6', colorDark: '#3987e5' },
   { name: 'Top Up',       color: '#eb6834', colorDark: '#d95926' },
   { name: 'Packing',      color: '#1baf7a', colorDark: '#199e70' },
-  { name: 'BPP',          color: '#eda100', colorDark: '#c98500' },
-  { name: 'Parcel',       color: '#e87ba4', colorDark: '#d55181' },
-  { name: 'Decanting',    color: '#008300', colorDark: '#008300' },
   { name: 'Inducting',    color: '#4a3aa7', colorDark: '#9085e9' },
-  { name: 'Automation Pick', color: '#e34948', colorDark: '#e66767' }
+  { name: 'Parcel',       color: '#e87ba4', colorDark: '#d55181' },
+  { name: 'Decanting',    color: '#008300', colorDark: '#008300' }
 ];
 
 /**
@@ -125,6 +140,102 @@ function siteFilterOverridden_() {
   return siteFilterPreferred !== 'all' && effectiveSiteFilter_() === 'all';
 }
 
+// ── Per-building chart settings ─────────────────────────────────────────────
+// Anything configured as a list of AREA KEYS belongs to one building, because
+// the areas do. A single shared copy meant a group built in E1/E2 - "RSPS Pick"
+// - was still listed in the Groups & Charts dialog while viewing E3, offering a
+// chart of areas that building does not have.
+//
+// So each building keeps its own. An absent entry means "never configured
+// here", which falls back to the default rule (the first three visible areas,
+// collected by family) rather than to whatever the last building was doing.
+//
+// Deliberately NOT covering hiddenVolumeAreas: every area belongs to exactly
+// one building, so one list is already partitioned by building - hiding E3's
+// areas cannot affect what E1/E2 shows. Nor the panel ORDER, which is a
+// statement about the page rather than about any area.
+var siteSettings_ = {};
+
+var SITE_SETTING_KEYS_ = ['areaGroups', 'areaGroupSplit', 'trendSplit', 'overviewVolAreas'];
+
+function cloneJson_(v) {
+  try { return JSON.parse(JSON.stringify(v)); } catch (e) { return null; }
+}
+
+// Which buildings the user has actually configured. Recorded when a dialog is
+// applied rather than inferred by comparing the live values against the
+// default, because those two things are not the same: hiding a work area moves
+// the default, which instantly makes an untouched building's live state look
+// like a deliberate edit. Inferring froze that stale copy and the building
+// stopped following its own visible areas - the exact fallback this is for.
+// site -> { <field>: true }. Per FIELD, not per building: resetting the work
+// area groups must not also throw away that building's Deployment Trend split,
+// which is a different dialog answering a different question.
+var siteSettingsTouched_ = {};
+
+/** Records that one setting has been configured by hand for this building. */
+function markSiteSettingsTouched_(site, field) {
+  var s = site || siteFilter;
+  if (!siteSettingsTouched_[s]) siteSettingsTouched_[s] = {};
+  siteSettingsTouched_[s][field] = true;
+}
+
+/** Puts one setting back on the default rule for this building. */
+function forgetSiteSetting_(site, field) {
+  if (!site) return;
+  if (siteSettingsTouched_[site]) delete siteSettingsTouched_[site][field];
+  if (siteSettings_[site]) delete siteSettings_[site][field];
+}
+
+/**
+ * Remembers the live settings under `site`, so switching away keeps them.
+ *
+ * A building nobody has configured stays absent from siteSettings_, which is
+ * what "no save for this building" means - it keeps deriving from the rule, so
+ * hiding an area later still moves its groups onto the areas it can show.
+ *
+ * Must be called while `site` is the building in view: these are the live
+ * values, and they describe whatever is currently in scope.
+ */
+function captureSiteSettings_(site) {
+  if (!site) return;
+  var touched = siteSettingsTouched_[site] || {};
+  var entry = {};
+  // The groups and their split are one dialog and one Apply, so they are held
+  // and released together - a split is meaningless without the groups it indexes.
+  if (touched.areaGroups) {
+    entry.areaGroups = cloneJson_(areaGroupState);
+    entry.areaGroupSplit = cloneJson_(areaGroupSplitState);
+  }
+  if (touched.trendSplit) entry.trendSplit = cloneJson_(trendSplitState);
+  if (touched.overviewVolAreas) entry.overviewVolAreas = overviewVolAreas.slice();
+
+  if (Object.keys(entry).length > 0) siteSettings_[site] = entry;
+  else delete siteSettings_[site];
+}
+
+/**
+ * Makes `site`'s settings the live ones.
+ *
+ * Must run AFTER siteFilter has moved: the defaults are derived from the areas
+ * in view, so computing them against the outgoing building would seed the new
+ * one with the old one's areas - the bug this whole mechanism exists to fix.
+ */
+function applySiteSettings_(site) {
+  var s = siteSettings_[site] || {};
+  areaGroupState = s.areaGroups ? cloneJson_(s.areaGroups) : defaultAreaGroupState_();
+  areaGroupSplitState = s.areaGroupSplit ? cloneJson_(s.areaGroupSplit) : defaultAreaGroupSplitState_();
+  trendSplitState = s.trendSplit ? cloneJson_(s.trendSplit) : { enabled: false, charts: [] };
+  overviewVolAreas = s.overviewVolAreas ? s.overviewVolAreas.slice() : [];
+}
+
+/** Drops a building's saved settings, so it falls back to the default rule. */
+function forgetSiteSettings_(site) {
+  if (!site) return;
+  delete siteSettings_[site];
+  delete siteSettingsTouched_[site];
+}
+
 /**
  * Brings siteFilter into line with the preference and the bonus filter, and
  * re-scopes the payload if it moved. Called at the top of applyLocalFiltersPak,
@@ -134,7 +245,13 @@ function siteFilterOverridden_() {
 function syncSiteScope_() {
   var want = effectiveSiteFilter_();
   if (want === siteFilter) return false;
+  // Capture before the move and apply after it, so each building keeps whatever
+  // was last set up while looking at it - however it was set up. Hanging this
+  // off the switch rather than off each dialog's Apply means a change made by
+  // any route is remembered, including a legend click.
+  captureSiteSettings_(siteFilter);
   siteFilter = want;
+  applySiteSettings_(siteFilter);
   rawSideData = scopeRowsToSite_(allSideData);
   refreshBonusListForScope_();
   if (typeof syncSiteUi_ === 'function') syncSiteUi_();
@@ -195,7 +312,7 @@ function sortableColumnsActive_()  { return filterAreaList_(mainTableSortableCol
  * "Drive, Way & E3 - Online Picking".
  *
  * `sep` joins the pieces that remain: ", " by default, " & " where the
- * caller wants the two-item reading ("PiE & Top Up").
+ * caller wants the two-item reading ("OSR PiE & OSR Top Up").
  *
  * Folding is per family and order-preserving, so a mixed group still reads
  * correctly: Drive, Way and Sorter 6 Packing gives
@@ -277,25 +394,25 @@ function scopeRowsToSite_(rows) {
 // everywhere else, so the Volume page listed the two the opposite way round to
 // the rest of the dashboard; Induct comes first in both now.
 var MAIN_TABLE_METRIC_COLUMNS = [
-  { key: 'pieVol', label: 'PiE' },
-  { key: 'topUpVol', label: 'Top Up' },
-  { key: 'e3PackingVol', label: 'E3 Packing' },
-  { key: 'parcelInductVol', label: 'Parcel Induct' },
-  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
-  { key: 'inboundDecantingVol', label: 'Inbound Decanting' },
-  { key: 'osrDecantingVol', label: 'OSR Decanting' },
-  { key: 'bcrInductingVol', label: 'BCR Inducting' },
-  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
-  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
+  { key: 'rspsPickVol', label: 'RSPS Pick' },
+  { key: 'ispsPickVol', label: 'ISPS Pick' },
+  { key: 'pieVol', label: 'OSR PiE' },
   { key: 'onlinePickingDriveVol', label: 'Drive - Online Picking' },
   { key: 'onlinePickingWayVol', label: 'Way - Online Picking' },
   { key: 'onlinePickingE3Vol', label: 'E3 - Online Picking' },
-  { key: 'e3BppVol', label: 'E3 BPP' },
-  { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
   { key: 'rspsTopUpVol', label: 'RSPS Top Up' },
-  { key: 'rspsPickVol', label: 'RSPS Pick' },
   { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
-  { key: 'ispsPickVol', label: 'ISPS Pick' }
+  { key: 'topUpVol', label: 'OSR Top Up' },
+  { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
+  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
+  { key: 'e3BppVol', label: 'E3 BPP' },
+  { key: 'e3PackingVol', label: 'E3 Packing' },
+  { key: 'parcelInductVol', label: 'Parcel Induct' },
+  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
+  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'bcrInductingVol', label: 'BCR Inducting' },
+  { key: 'osrDecantingVol', label: 'OSR Decanting' },
+  { key: 'inboundDecantingVol', label: 'E3 Inbound Decanting' }
 ];
 
 // Mirrors the #mainTable <th data-key> list, used to populate the mobile sort <select>.
@@ -304,25 +421,25 @@ var mainTableSortableColumns = [
   { key: 'bonusNumber', label: 'Unique Bonus Number' },
   { key: 'hourDeployed', label: 'Est. Hours Deployed' },
   { key: 'stdHours', label: 'Standard Hours' },
-  { key: 'pieVol', label: 'PiE' },
-  { key: 'topUpVol', label: 'Top Up' },
-  { key: 'e3PackingVol', label: 'E3 Packing' },
-  { key: 'parcelInductVol', label: 'Parcel Induct' },
-  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
-  { key: 'inboundDecantingVol', label: 'Inbound Decanting' },
-  { key: 'osrDecantingVol', label: 'OSR Decanting' },
-  { key: 'bcrInductingVol', label: 'BCR Inducting' },
-  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
-  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
+  { key: 'rspsPickVol', label: 'RSPS Pick' },
+  { key: 'ispsPickVol', label: 'ISPS Pick' },
+  { key: 'pieVol', label: 'OSR PiE' },
   { key: 'onlinePickingDriveVol', label: 'Drive - Online Picking' },
   { key: 'onlinePickingWayVol', label: 'Way - Online Picking' },
   { key: 'onlinePickingE3Vol', label: 'E3 - Online Picking' },
-  { key: 'e3BppVol', label: 'E3 BPP' },
-  { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
   { key: 'rspsTopUpVol', label: 'RSPS Top Up' },
-  { key: 'rspsPickVol', label: 'RSPS Pick' },
   { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
-  { key: 'ispsPickVol', label: 'ISPS Pick' },
+  { key: 'topUpVol', label: 'OSR Top Up' },
+  { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
+  { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
+  { key: 'e3BppVol', label: 'E3 BPP' },
+  { key: 'e3PackingVol', label: 'E3 Packing' },
+  { key: 'parcelInductVol', label: 'Parcel Induct' },
+  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
+  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'bcrInductingVol', label: 'BCR Inducting' },
+  { key: 'osrDecantingVol', label: 'OSR Decanting' },
+  { key: 'inboundDecantingVol', label: 'E3 Inbound Decanting' },
   { key: 'performance', label: 'Productivity %' }
 ];
 
@@ -333,43 +450,89 @@ var lastMainTableCardMode = null;
 // chose to combine, so it has no family - it just takes the next of the eight
 // hues in their fixed order, which is the case those hues were selected and
 // checked for.
-var AREA_GROUP_COLORS = AREA_FAMILIES.map(function(f) { return f.color; });
-var AREA_GROUP_COLORS_DARK = AREA_FAMILIES.map(function(f) { return f.colorDark; });
+//
+// Written out rather than derived from AREA_FAMILIES, which is where they used
+// to come from. There are six families now and MAX_AREA_GROUPS is seven, so
+// deriving would wrap groupColor_ round to the start and hand two groups in
+// the same dialog the same hue. Eight is a property of this list - the number
+// of mutually distinguishable hues - and has nothing to do with how many
+// families happen to exist.
+var AREA_GROUP_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+var AREA_GROUP_COLORS_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
 
 /** The nth group's colour in the current theme, wrapping past the eighth. */
 function groupColor_(i) {
   var list = (currentTheme === 'dark') ? AREA_GROUP_COLORS_DARK : AREA_GROUP_COLORS;
   return list[((i % list.length) + list.length) % list.length];
 }
-// The Overall page leads on two picking areas and contrasts them with a packing
-// area. Which ones depends on the building: PiE and Top Up do not exist in
-// E1/E2, so an E1/E2 view built on them is three flat lines at zero.
-var SITE_HEADLINE = {
-  all:  { pick: ['pieVol', 'topUpVol'], pack: ['e3PackingVol'] },
-  e3:   { pick: ['pieVol', 'topUpVol'], pack: ['e3PackingVol'] },
-  e1e2: { pick: ['onlinePickingDriveVol', 'onlinePickingWayVol'], pack: ['sorter6PackingVol'] }
-};
+/**
+ * The areas the Overall page's volume chart draws.
+ *
+ * Two hard-coded picking areas used to be the answer, which meant the first
+ * chart on the dashboard showed the same thing whatever the viewer had said
+ * they cared about. It now follows their own selection, and the default falls
+ * out of that rather than being a second list to keep in step: the areas they
+ * kept visible, in VOLUME_TYPES order, first two.
+ *
+ * Never returns empty. A chart with no series is a bare axis, which reads as
+ * broken rather than as "nothing selected" - and the selection UI already
+ * refuses to remove the last area, so an empty result here means the building
+ * changed underneath a saved choice, not that the user asked for nothing.
+ */
+function overviewVolTypes_() {
+  var candidates = volumeTypesActive_().filter(function (t) {
+    return hiddenVolumeAreas.indexOf(t.key) === -1;
+  });
+  if (candidates.length === 0) candidates = filterAreaList_(VOLUME_TYPES);
+  if (candidates.length === 0) candidates = VOLUME_TYPES;
 
-function siteHeadline_() {
-  return SITE_HEADLINE[siteFilter] || SITE_HEADLINE.all;
-}
-
-/** VOLUME_TYPES entries for this building's headline picking areas. */
-function headlinePickTypes_() {
-  var want = siteHeadline_().pick, out = [];
-  for (var i = 0; i < VOLUME_TYPES.length; i++) {
-    if (want.indexOf(VOLUME_TYPES[i].key) !== -1) out.push(VOLUME_TYPES[i]);
+  if (overviewVolAreas.length) {
+    var kept = candidates.filter(function (t) {
+      return overviewVolAreas.indexOf(t.key) !== -1;
+    });
+    if (kept.length) return kept;
   }
-  return out;
+  return candidates.slice(0, 2);
 }
 
-/** The default work-area groups for the building in view. */
+/**
+ * The default work-area groups: the first three areas in view, with areas of
+ * the same family collected into one group.
+ *
+ * Grouping by family is what makes the default say something. Three areas as
+ * three separate groups is just three lines with a legend; RSPS Pick and ISPS
+ * Pick drawn as one "Picking" group against a Top Up group is a comparison -
+ * and it is the comparison the family structure already claims is meaningful.
+ *
+ * Reads the same visible set the volume chart does, so the two charts on the
+ * Overall page lead on the same work rather than disagreeing about what the
+ * viewer came to see.
+ */
 function defaultAreaGroupsForSite_() {
-  var h = siteHeadline_();
-  return [h.pick.slice(), h.pack.slice()];
+  // hiddenVolumeAreas is declared further down this file, and areaGroupState is
+  // initialised from here at parse time - so on that first call the var is
+  // hoisted but still undefined. Nothing is hidden that early anyway.
+  var hidden = (typeof hiddenVolumeAreas !== 'undefined' && hiddenVolumeAreas) ? hiddenVolumeAreas : [];
+  var visible = volumeTypesActive_().filter(function (t) {
+    return hidden.indexOf(t.key) === -1;
+  });
+  if (visible.length === 0) visible = filterAreaList_(VOLUME_TYPES);
+  if (visible.length === 0) visible = VOLUME_TYPES;
+
+  var groups = [], byFamily = {};
+  var lead = visible.slice(0, 3);
+  for (var i = 0; i < lead.length; i++) {
+    var fam = lead[i].family;
+    if (byFamily.hasOwnProperty(fam)) {
+      groups[byFamily[fam]].push(lead[i].key);
+    } else {
+      byFamily[fam] = groups.length;
+      groups.push([lead[i].key]);
+    }
+  }
+  return groups;
 }
 
-var DEFAULT_AREA_GROUPS = [['pieVol', 'topUpVol'], ['e3PackingVol']];
 var MAX_AREA_GROUPS = 7;
 
 function defaultAreaGroupState_() {
@@ -478,6 +641,10 @@ var lastRealPayload = null;
 var sideSortMetric = 'performance';
 var hiddenBonusAreas = [];
 var hiddenVolumeAreas = [];
+
+// Which areas the Overall page's volume chart draws. Empty means "decide from
+// what is visible", which is the normal state - see overviewVolTypes_.
+var overviewVolAreas = [];
 // Whether those two are one setting or two. On by default: hiding a work area
 // is nearly always a statement about what the user is interested in right now
 // rather than about one page, and keeping two independent copies of it meant

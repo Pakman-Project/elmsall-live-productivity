@@ -41,9 +41,16 @@ var _reorderMode = false;
 
 // ---- Identifying the movable panels ---------------------------------------
 
-// Stable keys, assigned once. Derived from the canvas each panel owns rather
-// than from position, so an order saved today still means the same thing after
-// panels are added or the markup is reshuffled.
+// Stable keys, assigned once. The Overall zone's keys are derived from the
+// canvas each panel owns, so an order saved today still means the same thing
+// after panels are added or the markup is reshuffled.
+//
+// The Volume zone is NOT like that, despite what this comment used to claim for
+// both: its keys are 'vol0'..'vol18', the panel's INDEX into VOLUME_TYPES. That
+// is stable against a re-render but not against the areas being reordered,
+// which silently repoints a saved layout at different areas - so VOLUME_TYPES
+// carries AREA_ORDER_VERSION, and loadUserPreferences drops this zone's saved
+// order when it changes.
 function reorderItemsInZone_(containerId) {
   var container = document.getElementById(containerId);
   if (!container) return [];
@@ -80,6 +87,15 @@ function tagReorderItems_() {
     if (!p) continue;
     p.setAttribute('data-reorder-key', 'vol' + v);
     p.setAttribute('data-reorder-label', VOLUME_TYPES[v].label);
+    // The panel headings are written from VOLUME_TYPES too, rather than being
+    // authored nineteen times in the markup. Only panel 0's heading was ever
+    // rewritten at render time, so the other eighteen kept whatever the HTML
+    // said - a hand-maintained restatement of the area order that nothing
+    // checked and that went stale the moment the areas were reordered.
+    var h2 = p.querySelector('h2');
+    if (h2) h2.textContent = VOLUME_TYPES[v].label;
+    var tag = p.querySelector('.tag');
+    if (tag) tag.textContent = VOLUME_TYPES[v].family;
   }
 }
 
@@ -309,14 +325,38 @@ function refreshChartLayoutAfterRender_() {
 
 // ---- Edit mode ------------------------------------------------------------
 
+// A panel the Volume page has switched off - an area the viewer hid, or one
+// belonging to the other building. The renderer sets this inline display on the
+// panel itself (see renderVolumeChartsPak), so this deliberately does NOT ask
+// whether the element is on screen: a whole page that is not the current one is
+// hidden too, and its panels are still real members of their zone.
+function isReorderItemHidden_(el) {
+  return !!(el && el.style && el.style.display === 'none');
+}
+
+function visibleReorderItems_(items) {
+  var out = [];
+  for (var i = 0; i < items.length; i++) {
+    if (!isReorderItemHidden_(items[i])) out.push(items[i]);
+  }
+  return out;
+}
+
 function moveReorderItem_(key, delta) {
   for (var z = 0; z < REORDER_ZONES_.length; z++) {
     var zone = REORDER_ZONES_[z];
     var items = reorderItemsInZone_(zone.containerId);
     for (var i = 0; i < items.length; i++) {
       if (items[i].getAttribute('data-reorder-key') !== key) continue;
-      var target = i + delta;
-      if (target < 0 || target >= items.length) return;   // already at an end
+      // Step to the nearest VISIBLE neighbour, not to the next slot. Eleven of
+      // the nineteen volume panels can be switched off, and swapping with a
+      // hidden one moved the panel in the saved order while changing nothing on
+      // screen - the button looked broken.
+      var target = -1;
+      for (var t = i + delta; t >= 0 && t < items.length; t += delta) {
+        if (!isReorderItemHidden_(items[t])) { target = t; break; }
+      }
+      if (target === -1) return;   // already at the last visible end
       var container = document.getElementById(zone.containerId);
       if (delta < 0) container.insertBefore(items[i], items[target]);
       else container.insertBefore(items[target], items[i]);
@@ -351,7 +391,10 @@ function refreshReorderBars_() {
 
   for (var z = 0; z < REORDER_ZONES_.length; z++) {
     var zone = REORDER_ZONES_[z];
-    var items = reorderItemsInZone_(zone.containerId);
+    // Counted over the panels actually on screen. "4/19" on a Volume page
+    // showing eight charts describes a list the viewer cannot see, and the
+    // position it names is not the one they are looking at.
+    var items = visibleReorderItems_(reorderItemsInZone_(zone.containerId));
     for (var i = 0; i < items.length; i++) {
       var el = items[i];
       var key = el.getAttribute('data-reorder-key');

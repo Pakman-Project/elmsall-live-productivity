@@ -184,6 +184,118 @@
     applyLocalFiltersPak();
   }
 
+  // ---- The Overall page's volume chart: which areas it draws ---------------
+  // A separate list from hiddenVolumeAreas on purpose. Hiding an area is a
+  // statement about the whole dashboard; choosing what this one chart leads on
+  // is not, and stacking nineteen areas here would say nothing anyway. The
+  // dialog therefore offers only areas that are visible dashboard-wide.
+  //
+  // Edited through a draft and applied in one go, like Groups & Charts and
+  // Split. Ticking six areas one at a time against a live chart would rebuild
+  // every chart on the page six times, and the intermediate states are not
+  // views anyone asked for.
+  var _overviewVolDraft = null;
+
+  function openOverviewVolAreas() {
+    _overviewVolDraft = overviewVolTypes_().map(function (t) { return t.key; });
+    renderOverviewVolEditor_();
+    hideOverviewVolError_();
+    var overlay = $('overviewVolAreasOverlay');
+    if (overlay) overlay.classList.add('active');
+  }
+
+  function closeOverviewVolAreas() {
+    _overviewVolDraft = null;
+    var overlay = $('overviewVolAreasOverlay');
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  // Only areas that are visible dashboard-wide: offering one the viewer has
+  // already hidden everywhere would be a control that contradicts itself.
+  function overviewVolCandidates_() {
+    return volumeTypesActive_().filter(function (t) {
+      return hiddenVolumeAreas.indexOf(t.key) === -1;
+    });
+  }
+
+  function renderOverviewVolEditor_() {
+    var el = $('overviewVolAreaEditor');
+    if (!el || !_overviewVolDraft) return;
+    var areas = overviewVolCandidates_();
+    var html = '';
+    for (var i = 0; i < areas.length; i++) {
+      var t = areas[i];
+      var on = _overviewVolDraft.indexOf(t.key) !== -1;
+      html += '<label class="trend-split-cb"><input type="checkbox" data-key="' + escapeAttrPak(t.key) + '"' +
+              (on ? ' checked' : '') + ' onchange="onOverviewVolCbChange(this)">' +
+              '<span class="trend-split-dot" style="background:' + areaColor_(t) + '"></span>' +
+              '<span class="area-cb-text">' + safeTextPak(t.label) + '</span></label>';
+    }
+    el.innerHTML = html;
+  }
+
+  function onOverviewVolCbChange(cb) {
+    if (!_overviewVolDraft) return;
+    var key = cb.dataset.key;
+    var at = _overviewVolDraft.indexOf(key);
+    if (cb.checked && at === -1) _overviewVolDraft.push(key);
+    else if (!cb.checked && at !== -1) _overviewVolDraft.splice(at, 1);
+    hideOverviewVolError_();
+  }
+
+  function overviewVolSelectAll_(on) {
+    if (!_overviewVolDraft) return;
+    _overviewVolDraft = on ? overviewVolCandidates_().map(function (t) { return t.key; }) : [];
+    renderOverviewVolEditor_();
+    hideOverviewVolError_();
+  }
+
+  function showOverviewVolError_(msg) {
+    var el = $('overviewVolAreasError');
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function hideOverviewVolError_() {
+    var el = $('overviewVolAreasError');
+    if (el) el.hidden = true;
+  }
+
+  // Back to "the first two you can see", which is what the onboarding answer
+  // leaves behind - not to a fixed pair, which would ignore it.
+  function resetOverviewVolAreas() {
+    overviewVolAreas = [];
+    if (typeof forgetSiteSetting_ === 'function') forgetSiteSetting_(siteFilter, 'overviewVolAreas');
+    closeOverviewVolAreas();
+    saveUserPreferences();
+    applyLocalFiltersPak();
+  }
+
+  function applyOverviewVolAreas() {
+    if (!_overviewVolDraft) return;
+    // A stacked area chart with nothing stacked is a bare axis, which reads as
+    // broken rather than as a choice.
+    if (_overviewVolDraft.length === 0) {
+      showOverviewVolError_('Pick at least one work area — the chart needs something to draw.');
+      return;
+    }
+    overviewVolAreas = _overviewVolDraft.slice();
+    // Per building - these are work-area keys, and E1/E2's are not E3's.
+    if (typeof markSiteSettingsTouched_ === 'function') markSiteSettingsTouched_(siteFilter, 'overviewVolAreas');
+    closeOverviewVolAreas();
+    saveUserPreferences();
+    applyLocalFiltersPak();
+  }
+
+  // The button is meaningless while a bonus filter is in force: that branch
+  // draws the areas the PERSON worked, not the chosen ones, so a dialog
+  // offering a choice would describe something that is not on screen.
+  function syncOverviewVolBtn_() {
+    var btn = $('overviewVolAreasBtn');
+    if (btn) btn.style.display = (selectedBonuses.length > 0) ? 'none' : '';
+  }
+
   function renderVolumeAreaToggles_(mode) {
     // Only meaningful in Separate Charts mode — Combined/Stacked already have
     // their own per-series toggle via the Chart.js legend.
@@ -337,7 +449,10 @@
     var container = $('volumeChartsContainer');
     ensureChartBoxesPak_(container);
     var primaryTitle = $('volPanel0').querySelector('h2');
-    if (mode === 'separate') { container.classList.remove('combined-mode'); primaryTitle.textContent = 'PiE'; }
+    // Panel 0 carries the first area, whichever that is - naming it here was a
+    // second place the area order had to be restated, and it said "PiE" for a
+    // while after that stopped being the first area.
+    if (mode === 'separate') { container.classList.remove('combined-mode'); primaryTitle.textContent = VOLUME_TYPES[0].label; }
     // No "E3" in the combined titles: the chart carries every work area on the
     // dashboard, and the site outgrew E3 when the Elmsall-wide areas arrived.
     else { container.classList.add('combined-mode'); primaryTitle.textContent = mode === 'stacked' ? 'Volume - Stacked Area Chart' : 'Volume - Combined Line Chart'; }
@@ -453,6 +568,15 @@
       var chart = new Chart($('volChart0'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, position: 'bottom', labels: { color: CHART_TEXT(), usePointStyle: true, pointStyle: 'rectRounded', padding: 16, font: { size: 12 } }, onClick: onVolumeLegendClick_ }, tooltip: combinedTooltip }, scales: { x: xOpt, y: volYAxis } } });
       volumeCharts.push(chart);
     }
+
+    // The panels this render just switched on or off are the ones the rearrange
+    // bars count, and the area chips stay live in that mode - so hiding an area
+    // while rearranging would otherwise leave every bar numbered against the
+    // list as it was before.
+    if (typeof _reorderMode !== 'undefined' && _reorderMode &&
+        typeof refreshReorderBars_ === 'function') {
+      refreshReorderBars_();
+    }
   }
 
   // Aggregation + shared axis/tooltip config, used by BOTH the Overall page's
@@ -504,6 +628,10 @@
     var overviewTitleEl = $('overviewVolChart').closest('.card.panel').querySelector('h2');
     var overviewDatasets = [];
     if (selectedBonuses.length > 0) {
+      // Deliberately NOT the user's chosen areas. A bonus filter is a question
+      // about a person, and the answer is the work they actually did - their
+      // chosen areas would mostly be flat zero for someone who does not work
+      // them. The selection comes back when the filter is cleared.
       // No "E3": the chart carries every area on the dashboard.
       overviewTitleEl.textContent = 'Volume - Stacked Area Chart';
       // Only the areas this person actually worked. Stacking all nineteen for
@@ -524,22 +652,24 @@
         overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: areaColor_(vType), backgroundColor: hexToRgbaPak(areaColor_(vType), CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
       }
     } else {
-      // The two headline picking areas for the building in view. Hard-coding
-      // PiE and Top Up drew three flat lines at zero on an E1/E2 dashboard,
-      // where neither area exists - see SITE_HEADLINE in JsState.
-      var headline = headlinePickTypes_();
-      // Folded, and joined with " & " rather than a comma so the E3 title stays
-      // "PiE & Top Up". E1/E2's pair shares a suffix and collapses to
-      // "Drive & Way - Online Picking" instead of naming Online Picking twice.
-      overviewTitleEl.textContent = 'Volume - ' +
-        joinAreaLabels_(headline.map(function (t) { return t.label; }), ' & ');
-      overviewDatasets = headline.map(function (t) {
+      // Whichever areas the viewer chose, defaulting to the first two they can
+      // see - see overviewVolTypes_ in JsState.
+      var chosen = overviewVolTypes_();
+      // Folded, and joined with " & " rather than a comma so a two-area title
+      // reads "OSR PiE & OSR Top Up". E1/E2's pair shares a suffix and collapses
+      // to "Drive & Way - Online Picking" instead of naming Online Picking
+      // twice. Past three areas even the folded form outgrows the panel header,
+      // so it gives up and says what the chart is - the legend names the series.
+      overviewTitleEl.textContent = (chosen.length > 3) ? 'Volume' : 'Volume - ' +
+        joinAreaLabels_(chosen.map(function (t) { return t.label; }), ' & ');
+      overviewDatasets = chosen.map(function (t) {
         return { label: 'Volume ' + t.label, data: agg.map(function (r) { return r[t.key]; }),
                  borderWidth: 2, borderColor: areaColor_(t),
                  backgroundColor: hexToRgbaPak(areaColor_(t), CHART_FILL_A(0.6)),
                  tension: 0.35, pointRadius: 2, fill: true };
       });
     }
+    syncOverviewVolBtn_();
     overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 2. OVERALL PRODUCTIVITY ---

@@ -584,6 +584,17 @@
   // main init throws, a first-time visitor still gets the tour instead of it
   // silently never appearing.
   document.addEventListener('DOMContentLoaded', function() {
+    // Setup first, tour second, and only ever one of them starts here: the
+    // dialog's own commit hands over to the tour when it closes. Running both
+    // would put the tour's spotlight behind a modal backdrop.
+    //
+    // Listeners run in registration order, so loadUserPreferences() in the main
+    // init above has already restored the building and hidden-area state that
+    // the dialog seeds itself from.
+    if (typeof shouldShowOnboarding_ === 'function' && shouldShowOnboarding_()) {
+      openOnboarding_({ chainTour: true });
+      return;
+    }
     // Shows demo data while the real data keeps loading in the background.
     maybeAutoStartTour_();
   });

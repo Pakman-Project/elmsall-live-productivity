@@ -114,7 +114,7 @@ var TOUR_STEPS = [
   // ===== Part 3 — Overall: charts & groups =================================
   { part: 3, page: 0, target: '.charts > .card.panel:nth-child(1), .charts > .card.panel:nth-child(2)', union: true,
     title: 'Overview charts (1 of 2)',
-    body: 'Two live charts: volume (PiE & Top Up as a stacked area) and overall productivity across all E3 areas over time.' },
+    body: 'Two live charts: volume as a stacked area, and overall productivity across every area in the building you are viewing. The “Areas” button on the volume chart chooses which areas it draws.' },
   { part: 3, page: 0, target: '.charts > .card.panel:nth-child(3), .trend-charts-wrap > .card.panel', union: true,
     title: 'Overview charts (2 of 2)',
     body: 'Productivity by work area, plus the deployment trend below it. The “Groups & Charts” button lets you choose which areas to compare, and how many charts to spread them over.' },
@@ -172,7 +172,7 @@ var TOUR_STEPS = [
     action: function () { if (typeof closeAreaGroups === 'function') closeAreaGroups(); },
     cleanup: function () { tourRestoreAreaGroups_(); },
     title: 'Titled by what they show',
-    body: 'Each chart is named after the groups it draws — “Productivity % - PiE, Top Up vs E3 Packing” — so a split section says what is being compared instead of “Chart A”. Your own groups come back as we move on.' },
+    body: 'Each chart is named after the groups it draws — “Productivity % - OSR PiE, OSR Top Up vs E3 Packing” — so a split section says what is being compared instead of “Chart A”. Your own groups come back as we move on.' },
 
   // ===== Part 4 — Volume page ==============================================
   { part: 4, page: 1, target: '.volume-controls',
@@ -482,6 +482,7 @@ function applyTourDefaults_() {
     volumeChartMode: $('volumeChartMode') ? $('volumeChartMode').value : null,
     hiddenBonusAreas: hiddenBonusAreas.slice(),
     hiddenVolumeAreas: hiddenVolumeAreas.slice(),
+    overviewVolAreas: overviewVolAreas.slice(),
     selectedBonuses: selectedBonuses.slice(),
     sideSortMetric: sideSortMetric,
     expandedRowKey: expandedRowKey,
@@ -499,6 +500,9 @@ function applyTourDefaults_() {
   if ($('volumeChartMode')) $('volumeChartMode').value = 'separate';
   hiddenBonusAreas = [];
   hiddenVolumeAreas = [];
+  // Back to the default two, so the narration describes what is on screen
+  // rather than whichever areas this viewer happens to lead on.
+  overviewVolAreas = [];
   selectedBonuses = [];
   sideSortMetric = 'performance';
   expandedRowKey = null;
@@ -515,6 +519,7 @@ function restoreTourState_() {
   if (st.volumeChartMode !== null && $('volumeChartMode')) $('volumeChartMode').value = st.volumeChartMode;
   hiddenBonusAreas = st.hiddenBonusAreas;
   hiddenVolumeAreas = st.hiddenVolumeAreas;
+  overviewVolAreas = st.overviewVolAreas || [];
   selectedBonuses = st.selectedBonuses;
   sideSortMetric = st.sideSortMetric;
   expandedRowKey = st.expandedRowKey;
@@ -1306,7 +1311,23 @@ function placeTourTooltip_(step) {
   tip.style.transform = 'none';
 }
 
-function maybeAutoStartTour_() {
+/**
+ * `opts.immediate` starts the tour in THIS call stack rather than after the
+ * usual settling delay.
+ *
+ * The delay exists so a cold page has finished painting before the spotlight
+ * starts pointing at things. Handing over from the setup dialog is the opposite
+ * situation - the page has been up for a while, and the 500ms was long enough
+ * to show a frame of the bare dashboard between the two dialogs. Starting
+ * synchronously means the browser never paints that frame at all.
+ */
+function maybeAutoStartTour_(opts) {
+  var immediate = !!(opts && opts.immediate);
+  var begin = function () {
+    if (immediate) startTour(true);
+    else setTimeout(function () { startTour(true); }, 500);
+  };
+
   // TOUR_FORCE comes from the ?tour= parameter / the preview menu. It exists
   // because this app usually runs inside a sandboxed iframe, where clearing the
   // "seen" flag from a browser console is unreliable — the console is almost
@@ -1317,7 +1338,7 @@ function maybeAutoStartTour_() {
     try { localStorage.removeItem(TOUR_SEEN_KEY); } catch (e) {}
   }
   if (forced === '1' || forced === 'reset') {
-    setTimeout(function() { startTour(true); }, 500);
+    begin();
     return;
   }
 
@@ -1339,7 +1360,7 @@ function maybeAutoStartTour_() {
     return;
   }
 
-  setTimeout(function() { startTour(true); }, 500);
+  begin();
 }
 
 // Wire the tooltip buttons once (markup exists before this script runs).

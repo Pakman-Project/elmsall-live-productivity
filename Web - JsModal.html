@@ -19,7 +19,8 @@
 
 var MODAL_OVERLAY_IDS_ = [
   'breakdownOverlay', 'trendSplitOverlay', 'areaGroupOverlay',
-  'shareOverlay', 'tourMenuOverlay', 'settingsOverlay'
+  'shareOverlay', 'tourMenuOverlay', 'settingsOverlay',
+  'onboardingOverlay', 'overviewVolAreasOverlay'
 ];
 
 // Each overlay's own close function, so Escape takes exactly the same path as
@@ -30,7 +31,12 @@ var MODAL_CLOSERS_ = {
   areaGroupOverlay:  function () { closeAreaGroups(); },
   shareOverlay:      function () { closeShareMenu(); },
   tourMenuOverlay:   function () { closeTourMenu(); },
-  settingsOverlay:   function () { closeSettings(); }
+  settingsOverlay:   function () { closeSettings(); },
+  // The only one whose close COMMITS something. It has no X and no backdrop
+  // click, so Escape is the sole dismissal, and dismissing it still has to
+  // leave a usable dashboard - see closeOnboarding_.
+  onboardingOverlay: function () { closeOnboarding_(); },
+  overviewVolAreasOverlay: function () { closeOverviewVolAreas(); }
 };
 
 var MODAL_FOCUSABLE_SEL_ = 'a[href], button:not([disabled]), input:not([disabled]),' +

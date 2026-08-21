@@ -1,0 +1,399 @@
+<script>
+// ============================================================================
+// First-run setup, shown once before the tour.
+//
+// The dashboard covers three buildings and nineteen work areas, and almost
+// nobody wants all of them. Everything needed to narrow it already existed -
+// the building filter and the per-area chips - but both were things you had to
+// go and find, so a first visit opened on nineteen areas of somebody else's
+// work and stayed that way.
+//
+// This asks the two questions those controls answer, and writes the answers
+// into that same state rather than inventing a parallel one: the building goes
+// through setSiteFilter_, the areas through hiddenVolumeAreas. Nothing here is
+// a new kind of filter, so every existing control still works afterwards and
+// can override it.
+//
+// What it does NOT do is change any number. Hiding an area hides panels, chips
+// and legend entries; the productivity percentages and head counts still cover
+// the whole building, because they are a statement about the building and not
+// about what one viewer chose to look at. Only the building filter rescopes
+// the maths (scopeRowsToSite_).
+// ============================================================================
+
+// A sibling of TOUR_SEEN_KEY, deliberately outside the preferences blob:
+// resetAllSettingsPak clears that blob wholesale, and this flag has to be
+// cleared on its own terms - someone resetting their layout IS asking to be
+// offered the choice again, which is the opposite of the tour's rule.
+var ONBOARD_SEEN_KEY = 'e3_onboarding_seen_v1';
+
+// What the dialog is currently showing. Nothing here reaches live state until
+// commitOnboarding_ - a half-answered dialog must not leave the dashboard in a
+// half-filtered state if the page is closed on it.
+var _onboardDraft = null;
+
+// Set while the first-run dialog is open, so its close path knows to hand over
+// to the tour. Reopening from Settings must not replay the tour.
+var _onboardChainTour = false;
+
+// Which of the two pages is showing. The second question is "which of THESE
+// areas", so it cannot be asked until the building is known.
+var _onboardPage = 1;
+
+// What was answered, purely so the dialog can be reopened showing it. The
+// operative filter is hiddenVolumeAreas - this is never read back into it, or a
+// chip toggled afterwards would be undone on the next page load.
+var onboardingRemembered_ = null;
+
+function onboardingStore_() {
+  try { return window.localStorage; } catch (e) { return null; }
+}
+
+/**
+ * Whether to ask at all.
+ *
+ * Deep links are the interesting case: ?site= or ?bonus= says the visitor was
+ * sent to one specific view, and interrupting that with a setup dialog answers
+ * a question they did not ask. The flag is deliberately left UNSET, so they get
+ * asked on their next ordinary visit rather than never.
+ */
+function shouldShowOnboarding_() {
+  var store = onboardingStore_();
+  if (!store) return false;                       // private mode: asking every
+                                                  // single visit is worse than
+                                                  // not asking.
+  if (typeof TOUR_FORCE !== 'undefined' && TOUR_FORCE === '1') return false;
+  if (typeof DEEP_SITE !== 'undefined' && DEEP_SITE) return false;
+  if (typeof DEEP_BONUS !== 'undefined' && DEEP_BONUS) return false;
+  try { return store.getItem(ONBOARD_SEEN_KEY) !== '1'; } catch (e) { return false; }
+}
+
+function markOnboardingSeen_() {
+  var store = onboardingStore_();
+  if (!store) return;
+  try { store.setItem(ONBOARD_SEEN_KEY, '1'); } catch (e) {}
+}
+
+function clearOnboardingSeen_() {
+  var store = onboardingStore_();
+  if (!store) return;
+  try { store.removeItem(ONBOARD_SEEN_KEY); } catch (e) {}
+}
+
+// ---- The areas a given building offers -------------------------------------
+
+function onboardingAreasForSite_(site) {
+  return VOLUME_TYPES.filter(function (t) {
+    return site === 'all' || AREA_SITE[areaBaseKey_(t.key)] === site;
+  });
+}
+
+// The areas a family covers, within the building in the draft. A family with
+// nothing in the chosen building would be an empty promise, so it is not
+// offered - see renderOnboardingAreas_.
+function onboardingAreasForFamily_(family, site) {
+  return onboardingAreasForSite_(site).filter(function (t) { return t.family === family; });
+}
+
+/** The area keys the current draft resolves to. */
+function onboardingSelectedKeys_() {
+  if (!_onboardDraft) return [];
+  if (_onboardDraft.site !== 'all') return _onboardDraft.areas.slice();
+  var out = [];
+  for (var i = 0; i < _onboardDraft.families.length; i++) {
+    var members = onboardingAreasForFamily_(_onboardDraft.families[i], 'all');
+    for (var m = 0; m < members.length; m++) {
+      if (out.indexOf(members[m].key) === -1) out.push(members[m].key);
+    }
+  }
+  return out;
+}
+
+// ---- Rendering --------------------------------------------------------------
+
+function renderOnboardingSites_() {
+  var el = $('onboardingSiteChoices');
+  if (!el) return;
+  var html = '';
+  for (var i = 0; i < SITES.length; i++) {
+    var s = SITES[i];
+    var n = onboardingAreasForSite_(s.key).length;
+    var on = _onboardDraft.site === s.key;
+    html += '<label class="onboarding-site' + (on ? ' selected' : '') + '">' +
+            '<input type="radio" name="onboardingSite" value="' + escapeAttrPak(s.key) + '"' +
+            (on ? ' checked' : '') + ' onchange="onOnboardingSiteChange(this)">' +
+            '<span class="onboarding-site-name">' + safeTextPak(s.title) + '</span>' +
+            '<span class="onboarding-site-count">' + n + ' work areas</span>' +
+            '</label>';
+  }
+  el.innerHTML = html;
+}
+
+function renderOnboardingAreas_() {
+  var el = $('onboardingAreaChoices');
+  if (!el) return;
+  var byFamily = _onboardDraft.site === 'all';
+  var title = $('onboardingAreaTitle'), hint = $('onboardingAreaHint');
+
+  // Whole-complex viewers pick families, not areas: nineteen checkboxes is a
+  // worse question than six, and someone looking at everything is thinking in
+  // kinds of work rather than individual areas anyway.
+  if (title) title.textContent = byFamily ? 'Which kinds of work?' : 'Which work areas?';
+  if (hint) {
+    hint.textContent = byFamily
+      ? 'Each one covers several work areas. Everything else stays out of the charts and chips until you turn it back on.'
+      : 'Everything else stays out of the charts and chips until you turn it back on.';
+  }
+
+  var html = '';
+  if (byFamily) {
+    for (var f = 0; f < AREA_FAMILIES.length; f++) {
+      var fam = AREA_FAMILIES[f];
+      var members = onboardingAreasForFamily_(fam.name, 'all');
+      if (members.length === 0) continue;
+      var on = _onboardDraft.families.indexOf(fam.name) !== -1;
+      html += '<label class="trend-split-cb"><input type="checkbox" data-family="' + escapeAttrPak(fam.name) + '"' +
+              (on ? ' checked' : '') + ' onchange="onOnboardingFamilyChange(this)">' +
+              '<span class="trend-split-dot" style="background:' + areaColor_(fam) + '"></span>' +
+              '<span class="area-cb-text">' + safeTextPak(fam.name) +
+              '<span class="onboarding-members">' + safeTextPak(members.map(function (t) { return t.label; }).join(', ')) + '</span>' +
+              '</span></label>';
+    }
+  } else {
+    var areas = onboardingAreasForSite_(_onboardDraft.site);
+    for (var a = 0; a < areas.length; a++) {
+      var t = areas[a];
+      var checked = _onboardDraft.areas.indexOf(t.key) !== -1;
+      html += '<label class="trend-split-cb"><input type="checkbox" data-key="' + escapeAttrPak(t.key) + '"' +
+              (checked ? ' checked' : '') + ' onchange="onOnboardingAreaChange(this)">' +
+              '<span class="trend-split-dot" style="background:' + areaColor_(t) + '"></span>' +
+              '<span class="area-cb-text">' + safeTextPak(t.label) + '</span></label>';
+    }
+  }
+  el.innerHTML = html;
+  hideOnboardingError_();
+}
+
+function showOnboardingError_(msg) {
+  var el = $('onboardingError');
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+function hideOnboardingError_() {
+  var el = $('onboardingError');
+  if (el) el.hidden = true;
+}
+
+// ---- Interaction ------------------------------------------------------------
+
+function onOnboardingSiteChange(input) {
+  if (!_onboardDraft) return;
+  _onboardDraft.site = input.value;
+  // Both selections start full on a building change rather than empty: the
+  // question is which areas to LEAVE OUT, and an empty dialog reads as though
+  // the previous answer was lost.
+  _onboardDraft.families = AREA_FAMILIES.map(function (f) { return f.name; });
+  _onboardDraft.areas = onboardingAreasForSite_(_onboardDraft.site).map(function (t) { return t.key; });
+  renderOnboardingSites_();
+}
+
+// ---- Paging -----------------------------------------------------------------
+
+function showOnboardingPage_(page) {
+  _onboardPage = page;
+  var p1 = $('onboardingPage1'), p2 = $('onboardingPage2');
+  if (p1) p1.hidden = page !== 1;
+  if (p2) p2.hidden = page !== 2;
+  var back = $('onboardingBackBtn'), next = $('onboardingNextBtn'), done = $('onboardingDoneBtn');
+  if (back) back.hidden = page !== 2;
+  if (next) next.hidden = page !== 1;
+  if (done) done.hidden = page !== 2;
+  hideOnboardingError_();
+}
+
+function onboardingNext_() {
+  if (!_onboardDraft) return;
+  // Rendered on the way in, not on every radio click, so the list is built once
+  // against a building the reader has settled on.
+  renderOnboardingAreas_();
+  showOnboardingPage_(2);
+}
+
+function onboardingBack_() {
+  renderOnboardingSites_();
+  showOnboardingPage_(1);
+}
+
+function onOnboardingFamilyChange(cb) {
+  if (!_onboardDraft) return;
+  var name = cb.dataset.family;
+  var at = _onboardDraft.families.indexOf(name);
+  if (cb.checked && at === -1) _onboardDraft.families.push(name);
+  else if (!cb.checked && at !== -1) _onboardDraft.families.splice(at, 1);
+  hideOnboardingError_();
+}
+
+function onOnboardingAreaChange(cb) {
+  if (!_onboardDraft) return;
+  var key = cb.dataset.key;
+  var at = _onboardDraft.areas.indexOf(key);
+  if (cb.checked && at === -1) _onboardDraft.areas.push(key);
+  else if (!cb.checked && at !== -1) _onboardDraft.areas.splice(at, 1);
+  hideOnboardingError_();
+}
+
+function onboardingSelectAll_(on) {
+  if (!_onboardDraft) return;
+  if (_onboardDraft.site === 'all') {
+    _onboardDraft.families = on ? AREA_FAMILIES.map(function (f) { return f.name; }) : [];
+  } else {
+    _onboardDraft.areas = on
+      ? onboardingAreasForSite_(_onboardDraft.site).map(function (t) { return t.key; })
+      : [];
+  }
+  renderOnboardingAreas_();
+}
+
+// ---- Opening and closing ----------------------------------------------------
+
+/**
+ * Seeds the draft from what is already in force, so reopening from Settings
+ * shows the current state rather than a blank slate.
+ *
+ * A family is checked when EVERY one of its areas is visible, and marked
+ * indeterminate when only some are. Mapping a family choice down to per-area
+ * state is lossy - a few chip clicks later there may be no family answer that
+ * is true - and showing that honestly beats reporting a tidy answer that no
+ * longer describes the dashboard.
+ */
+function seedOnboardingDraft_() {
+  var site = (typeof siteFilterPreferred !== 'undefined') ? siteFilterPreferred : 'all';
+  var visible = onboardingAreasForSite_(site)
+    .filter(function (t) { return hiddenVolumeAreas.indexOf(t.key) === -1; })
+    .map(function (t) { return t.key; });
+
+  var families = [];
+  for (var f = 0; f < AREA_FAMILIES.length; f++) {
+    var members = onboardingAreasForFamily_(AREA_FAMILIES[f].name, 'all');
+    if (members.length === 0) continue;
+    var shown = members.filter(function (t) { return hiddenVolumeAreas.indexOf(t.key) === -1; });
+    if (shown.length === members.length) families.push(AREA_FAMILIES[f].name);
+  }
+
+  // A first visit has nothing hidden, so both lists come out full - which is
+  // the right starting point for a "what do you want to leave out" question.
+  _onboardDraft = { site: site, families: families, areas: visible };
+}
+
+function openOnboarding_(opts) {
+  _onboardChainTour = !!(opts && opts.chainTour);
+  seedOnboardingDraft_();
+  renderOnboardingSites_();
+  showOnboardingPage_(1);
+  var overlay = $('onboardingOverlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+function openOnboardingFromSettings_() {
+  // Settings first, so focus-restore does not land inside a dialog that is
+  // being hidden underneath this one.
+  if (typeof closeSettings === 'function') closeSettings();
+  openOnboarding_({ chainTour: false });
+}
+
+/**
+ * The one exit that is not "Show my dashboard" - Escape.
+ *
+ * It commits the whole complex with everything selected rather than leaving no
+ * answer, because the alternative is a dashboard filtered by a dialog the user
+ * dismissed. That is also exactly what the dashboard did before this existed,
+ * so it is the least surprising thing Escape can mean here.
+ */
+function closeOnboarding_() {
+  if (_onboardDraft) {
+    _onboardDraft.site = 'all';
+    _onboardDraft.families = AREA_FAMILIES.map(function (f) { return f.name; });
+    _onboardDraft.areas = VOLUME_TYPES.map(function (t) { return t.key; });
+  }
+  commitOnboarding_();
+}
+
+// ---- Committing -------------------------------------------------------------
+
+function commitOnboarding_() {
+  if (!_onboardDraft) return;
+  var selected = onboardingSelectedKeys_();
+  if (selected.length === 0) {
+    showOnboardingError_(_onboardDraft.site === 'all'
+      ? 'Pick at least one kind of work — the dashboard needs something to show.'
+      : 'Pick at least one work area — the dashboard needs something to show.');
+    return;
+  }
+
+  // Hidden is the complement, and always by AREA key even when the answer was
+  // given as families: every other control on the dashboard is keyed by area,
+  // and storing a family here would be a second vocabulary for the same thing.
+  //
+  // Scoped to the building that was asked about, NOT to all nineteen. Choosing
+  // E3 and then OSR PiE answers "which of E3's areas", and says nothing about
+  // E1/E2 - so hiding E1/E2's areas on the strength of it would mean switching
+  // building later showed an empty dashboard the viewer never asked for. The
+  // other building is left wholly visible, ready to be narrowed on its own
+  // terms. For the whole complex the scope IS all nineteen, so this is the
+  // same thing said once.
+  var scope = onboardingAreasForSite_(_onboardDraft.site);
+  hiddenVolumeAreas = [];
+  for (var i = 0; i < scope.length; i++) {
+    var key = scope[i].key;
+    if (selected.indexOf(key) === -1) toggleAreaKeyPak_(hiddenVolumeAreas, key);
+  }
+  mirrorHiddenAreasPak_('volume');
+
+  var site = _onboardDraft.site;
+  var remembered = {
+    site: site,
+    families: _onboardDraft.families.slice(),
+    areas: _onboardDraft.areas.slice()
+  };
+  _onboardDraft = null;
+
+  onboardingRemembered_ = remembered;
+  markOnboardingSeen_();
+
+  // Re-scopes, re-renders and saves preferences in one go, so it wants the
+  // hidden list already in place - and it runs while this dialog's backdrop is
+  // still up, so the rebuild happens out of sight.
+  if (typeof setSiteFilter_ === 'function') setSiteFilter_(site);
+  else if (typeof saveUserPreferences === 'function') saveUserPreferences();
+
+  // The answer redefines what this building shows, so any chart settings saved
+  // against it describe a set of areas that is no longer on offer. Dropped
+  // rather than repaired, which puts the building back on the default rule -
+  // the first three visible areas, grouped by family - reading the answer just
+  // given. Done after the building is in view so the rule derives from it, and
+  // the other two buildings are untouched.
+  if (typeof forgetSiteSettings_ === 'function') {
+    forgetSiteSettings_(site);
+    applySiteSettings_(site);
+    if (typeof saveUserPreferences === 'function') saveUserPreferences();
+    if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
+  }
+
+  var chain = _onboardChainTour;
+  _onboardChainTour = false;
+  if (chain && typeof maybeAutoStartTour_ === 'function') {
+    // Synchronously, so the tour's own overlay is already on screen before this
+    // one comes down. Between the two there is no frame in which the bare
+    // dashboard is the top layer - the browser does not paint mid-statement,
+    // and the tour's usual settling delay is what used to let one through.
+    maybeAutoStartTour_({ immediate: true });
+  }
+
+  // Last. Dropping it earlier exposed the dashboard for however long the
+  // re-render and the tour's start took.
+  var overlay = $('onboardingOverlay');
+  if (overlay) overlay.classList.remove('active');
+}
+</script>

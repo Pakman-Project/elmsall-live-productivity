@@ -88,12 +88,17 @@
   </div>
     <div class="charts" id="page1Charts">
       <div class="card panel">
-        <div class="mini-table-title"><h2>Volume - PiE & Top Up</h2><span class="tag">Stacked Area</span></div>
+        <div class="mini-table-title">
+          <h2>Volume</h2>
+          <div style="display:flex; gap:5px; align-items:center;">
+            <button class="breakdown-btn" id="overviewVolAreasBtn" onclick="openOverviewVolAreas()"><i class="fa-solid fa-chart-area"></i> Areas</button>
+          </div>
+        </div>
         <canvas id="overviewVolChart"></canvas>
       </div>
 
       <div class="card panel">
-        <div class="mini-table-title"><h2>Overall Productivity %</h2><span class="tag" id="perfChartScopeTag">All Areas</span></div>
+        <div class="mini-table-title"><h2 id="perfChartTitle">Elmsall Overall Productivity %</h2><span class="tag" id="perfChartScopeTag">All Areas</span></div>
         <canvas id="perfChart"></canvas>
       </div>
 
