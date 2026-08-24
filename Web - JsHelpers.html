@@ -319,7 +319,14 @@ function resetAllSettingsPak() {
   if (!confirm('Reset all your saved settings?\n\nTheme, chart order, area groups, split charts, hidden work areas, display modes, row counts and the settings in the gear dialog all go back to their defaults, and you will be asked which work areas you want again. Your data is untouched, and other people are unaffected.')) return;
   try {
     localStorage.removeItem('e3_dashboard_prefs_v1');
-    localStorage.removeItem('e3_dashboard_payload_v1');
+    // Every payload version, not just the current one: the key carries the area
+    // count so that adding an area retires the old copy, which means old keys
+    // accumulate. Naming one of them here would leave the rest behind, taking
+    // up quota and ready to be painted if the count ever returned to that value.
+    for (var pk = localStorage.length - 1; pk >= 0; pk--) {
+      var k = localStorage.key(pk);
+      if (k && k.indexOf('e3_dashboard_payload_v') === 0) localStorage.removeItem(k);
+    }
   } catch (e) {
     console.warn('Could not clear saved settings', e);
   }

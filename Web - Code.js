@@ -515,11 +515,15 @@ function getDashboardData(archiveUrl) {
 
       if (yKeys.length) {
         yKeys.sort();
-        // v2 in the key, not v1: entries cached by the previous build carry no
-        // sorter6Packing field, and yesterday's rows would read as blank for
-        // that area until the old entries expired.
-        yCacheKey = 'ydayArch_v2_' + yesterdayStr + '_' + yKeys.length +
-                    '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
+        // The area COUNT is in the key, not a hand-bumped version number.
+        // Entries cached by a previous build carry no field for an area added
+        // since, so yesterday's rows read as blank for it until they expired -
+        // which happened when Sorter 6 Packing arrived, and again when the two
+        // Sorter 6 inducts did, because bumping v1 to v2 was a step someone had
+        // to remember. Keying on the count makes adding an area invalidate the
+        // cache by itself.
+        yCacheKey = 'ydayArch_v3_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
+                    '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {
           try {

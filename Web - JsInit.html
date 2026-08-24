@@ -53,7 +53,12 @@
   var _deepPageApplied = false;
   var _deepDateApplied = false;
 
-  var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v1';
+  // The area count is part of the key for the same reason the server's
+  // yesterday-archive cache carries it: a payload cached before an area existed
+  // has no field for it, and renderCachedPayload_ paints from this before the
+  // fresh data lands - so that area shows zero on arrival with nothing to say
+  // why. Adding an area changes the count and retires the old payload.
+  var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v2_' + VOLUME_TYPES.length;
   var PAYLOAD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;  // 6h: older than a shift is not worth showing
   var PAYLOAD_CACHE_MAX_CHARS = 3000000;              // stay well clear of the ~5MB localStorage quota
 
