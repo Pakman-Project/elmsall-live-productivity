@@ -23,7 +23,7 @@ var APP_CONFIG = {
 // monotone only by luck, and reordering the areas silently broke Top Up into
 // mid-light-dark, which no check would have caught.
 //
-// What colour cannot do: nineteen shades are not all tellable apart at once,
+// What colour cannot do: twenty-one shades are not all tellable apart at once,
 // and no palette fixes that - it is a limit of the eye, not of the hexes. Six
 // blues in one family is close to that limit, and the tightest pairs on the
 // whole dashboard now sit INSIDE Picking rather than between families. On the
@@ -41,13 +41,15 @@ var VOLUME_TYPES = [
   { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Top Up', color: '#cb4b0b', colorDark: '#c94a11' },
   { key: 'topUpVol', stdKey: 'topUpStd', label: 'OSR Top Up', family: 'Top Up', color: '#f97542', colorDark: '#e36230' },
   { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', family: 'Packing', color: '#0b6c46', colorDark: '#0c6e4a' },
+  { key: 'sorter6ItemInductVol', stdKey: 'sorter6ItemInductStd', label: 'Sorter 6 Item Induct', family: 'Inducting', color: '#4f41ae', colorDark: '#5a4ba9' },
+  { key: 'sorter6ParcelInductVol', stdKey: 'sorter6ParcelInductStd', label: 'Sorter 6 Parcel Induct', family: 'Inducting', color: '#6358c7', colorDark: '#6b5ebe' },
   { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', family: 'Packing', color: '#108356', colorDark: '#108559' },
   { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', family: 'Packing', color: '#159b67', colorDark: '#159c6a' },
   { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', family: 'Packing', color: '#23b379', colorDark: '#1fb47b' },
   { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', family: 'Parcel', color: '#95305b', colorDark: '#ae2b60' },
   { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', family: 'Parcel', color: '#db7099', colorDark: '#db5786' },
-  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', family: 'Inducting', color: '#5345b3', colorDark: '#6355b4' },
-  { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#8d86fa', colorDark: '#877cdf' },
+  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', family: 'Inducting', color: '#776ee0', colorDark: '#7d71d3' },
+  { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#8c86f9', colorDark: '#9085e9' },
   { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', family: 'Decanting', color: '#016f01', colorDark: '#0a7c08' },
   { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'E3 Inbound Decanting', family: 'Decanting', color: '#49b343', colorDark: '#3aa635' }
 ];
@@ -56,8 +58,9 @@ var VOLUME_TYPES = [
 // or recoloured). The saved volume-panel arrangement is stored as positions -
 // 'vol0'..'vol18' - so it silently means different areas after a reorder;
 // loadUserPreferences drops that one saved list when this marker does not match.
-// 1 = the original order, 2 = grouped by family, Picking first.
-var AREA_ORDER_VERSION = 2;
+// 1 = the original order, 2 = grouped by family Picking first, 3 = the two
+// Sorter 6 inducts added, 4 = those two moved to sit with Sorter 6 Packing.
+var AREA_ORDER_VERSION = 4;
 
 // The six family hues every work-area shade is derived from. Their ORDER is
 // a safety property, not a taste one - it is what keeps neighbouring hues
@@ -105,7 +108,9 @@ var AREA_SITE = {
   sorter6Packing: 'e1e2', onlinePickingDrive: 'e1e2', onlinePickingWay: 'e1e2',
   e1e2Bpp: 'e1e2',
   // Returns processing, all four in E1/E2.
-  rspsTopUp: 'e1e2', rspsPick: 'e1e2', ispsTopUp: 'e1e2', ispsPick: 'e1e2'
+  rspsTopUp: 'e1e2', rspsPick: 'e1e2', ispsTopUp: 'e1e2', ispsPick: 'e1e2',
+  // Sorter 6, so E1/E2 with the packing area of the same name.
+  sorter6ItemInduct: 'e1e2', sorter6ParcelInduct: 'e1e2'
 };
 
 var SITES = [
@@ -404,6 +409,8 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
   { key: 'topUpVol', label: 'OSR Top Up' },
   { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
+  { key: 'sorter6ItemInductVol', label: 'Sorter 6 Item Induct' },
+  { key: 'sorter6ParcelInductVol', label: 'Sorter 6 Parcel Induct' },
   { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
   { key: 'e3BppVol', label: 'E3 BPP' },
   { key: 'e3PackingVol', label: 'E3 Packing' },
@@ -431,6 +438,8 @@ var mainTableSortableColumns = [
   { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
   { key: 'topUpVol', label: 'OSR Top Up' },
   { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
+  { key: 'sorter6ItemInductVol', label: 'Sorter 6 Item Induct' },
+  { key: 'sorter6ParcelInductVol', label: 'Sorter 6 Parcel Induct' },
   { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
   { key: 'e3BppVol', label: 'E3 BPP' },
   { key: 'e3PackingVol', label: 'E3 Packing' },
@@ -550,7 +559,7 @@ function defaultAreaGroupSplitState_() {
   return { enabled: false, charts: [] };
 }
 
-// The Bonus page's breakdown bars, over the same nineteen areas as
+// The Bonus page's breakdown bars, over the same twenty-one areas as
 // VOLUME_TYPES - so they are DERIVED from it rather than restated. The hand
 // written copy that used to live here had to be edited in lockstep every time
 // an area was added or a colour changed, which is the same second-source-of-

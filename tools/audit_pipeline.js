@@ -47,7 +47,7 @@ vm.runInContext(
   stateCtx);
 const ev = expr => vm.runInContext(expr, stateCtx);
 
-const AREAS = 19;
+const AREAS = 21;
 const COLS = AREAS + 5;   // 4 identity columns + areas + Productivity %
 
 head('[1] work-area enumerations (expect ' + AREAS + ')');

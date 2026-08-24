@@ -49,7 +49,7 @@ head('[1] every area belongs to a declared family');
 {
   const fams = ev('AREA_FAMILIES.map(f => f.name)');
   const vt = ev('VOLUME_TYPES.map(t => ({key:t.key, family:t.family, color:t.color, dark:t.colorDark}))');
-  check('19 areas', vt.length === 19, '= ' + vt.length);
+  check('21 areas', vt.length === 21, '= ' + vt.length);
   // Six since BPP folded into Packing and Automation Pick into Picking. The
   // eight-slot requirement moved to AREA_GROUP_COLORS, which is what actually
   // needed it - see the group-palette checks below.

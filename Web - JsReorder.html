@@ -88,7 +88,7 @@ function tagReorderItems_() {
     p.setAttribute('data-reorder-key', 'vol' + v);
     p.setAttribute('data-reorder-label', VOLUME_TYPES[v].label);
     // The panel headings are written from VOLUME_TYPES too, rather than being
-    // authored nineteen times in the markup. Only panel 0's heading was ever
+    // authored twenty-one times in the markup. Only panel 0's heading was ever
     // rewritten at render time, so the other eighteen kept whatever the HTML
     // said - a hand-maintained restatement of the area order that nothing
     // checked and that went stale the moment the areas were reordered.
@@ -349,7 +349,7 @@ function moveReorderItem_(key, delta) {
     for (var i = 0; i < items.length; i++) {
       if (items[i].getAttribute('data-reorder-key') !== key) continue;
       // Step to the nearest VISIBLE neighbour, not to the next slot. Eleven of
-      // the nineteen volume panels can be switched off, and swapping with a
+      // the twenty-one volume panels can be switched off, and swapping with a
       // hidden one moved the panel in the saved order while changing nothing on
       // screen - the button looked broken.
       var target = -1;

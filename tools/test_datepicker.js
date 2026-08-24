@@ -10,7 +10,11 @@ const path = require('path');
 const REPOS = path.resolve(__dirname, '..', '..');
 
 const APPS = path.resolve(__dirname, '..') + path.sep;
-const R = f => fs.readFileSync(APPS + f, 'utf8');
+// Normalised to LF on read: this file slices JsUi on multi-line markers,
+// and a checkout under core.autocrlf=true hands back a CRLF working copy -
+// which made those markers stop matching without one line of the dashboard
+// having changed.
+const R = f => fs.readFileSync(APPS + f, 'utf8').replace(/\r\n/g, '\n');
 
 let fail = 0;
 const head = t => console.log('\n' + t);

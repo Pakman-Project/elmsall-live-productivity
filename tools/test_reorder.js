@@ -1,7 +1,7 @@
 // Rearranging the Volume page's chart panels, where up to eleven of the
 // nineteen can be switched off.
 //
-// Both failures here are silent. Numbering against all nineteen labels a panel
+// Both failures here are silent. Numbering against all twenty-one labels a panel
 // "4/19" on a page showing eight, naming a position the viewer cannot see; and
 // stepping one slot at a time swaps a visible panel with a HIDDEN neighbour,
 // which changes the saved order while changing nothing on screen - the button

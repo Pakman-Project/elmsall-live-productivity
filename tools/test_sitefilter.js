@@ -29,12 +29,12 @@ const map = vm.runInContext('AREA_SITE', ctx);
 check('every area has a building', keys.every(k => map[k]), keys.filter(k => !map[k]).join(',') || '');
 const e3 = keys.filter(k => map[k] === 'e3'), e12 = keys.filter(k => map[k] === 'e1e2');
 check('E3 count = 11', e3.length === 11, e3.length + ': ' + e3.join(' '));
-check('E1/E2 count = 8', e12.length === 8, e12.length + ': ' + e12.join(' '));
+check('E1/E2 count = 10', e12.length === 10, e12.length + ': ' + e12.join(' '));
 check('no area in both', e3.filter(k => e12.includes(k)).length === 0);
 
 // --- list filtering ----------------------------------------------------------
 console.log('\n[2] list narrowing per building');
-for (const [site, n] of [['all', 19], ['e3', 11], ['e1e2', 8]]) {
+for (const [site, n] of [['all', 21], ['e3', 11], ['e1e2', 10]]) {
   vm.runInContext(`siteFilter='${site}'`, ctx);
   const vt = vm.runInContext('volumeTypesActive_().length', ctx);
   const bd = vm.runInContext('breakdownAreasActive_().length', ctx);

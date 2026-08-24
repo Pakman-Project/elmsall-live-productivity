@@ -100,18 +100,18 @@ const hidden = () => ev('hiddenVolumeAreas.slice().sort()');
 const visible = () => ev('VOLUME_TYPES.filter(t => hiddenVolumeAreas.indexOf(t.key) === -1).map(t => t.key)');
 
 head('[1] the buildings offer the right areas');
-check('Elmsall = 19', ev('onboardingAreasForSite_("all").length') === 19);
+check('Elmsall = 21', ev('onboardingAreasForSite_("all").length') === 21);
 check('E3 = 11', ev('onboardingAreasForSite_("e3").length') === 11);
-check('E1/E2 = 8', ev('onboardingAreasForSite_("e1e2").length') === 8);
+check('E1/E2 = 10', ev('onboardingAreasForSite_("e1e2").length') === 10);
 check('the two buildings partition the whole set',
-  ev('onboardingAreasForSite_("e3").length + onboardingAreasForSite_("e1e2").length') === 19);
+  ev('onboardingAreasForSite_("e3").length + onboardingAreasForSite_("e1e2").length') === 21);
 
 head('[2] a fresh dialog starts fully selected');
 // The question is what to leave OUT, so opening with nothing ticked would read
 // as though a previous answer had been lost.
 reset();
 check('every family ticked', ev('_onboardDraft.families.length') === ev('AREA_FAMILIES.length'));
-check('resolves to all 19 areas', ev('onboardingSelectedKeys_().length') === 19);
+check('resolves to all 21 areas', ev('onboardingSelectedKeys_().length') === 21);
 
 head('[3] a family answer becomes the right AREA keys');
 reset();
@@ -121,7 +121,7 @@ check('Picking resolves to its six areas',
 check('and only Picking areas',
   ev('onboardingSelectedKeys_().every(k => VOLUME_TYPES.filter(t => t.key === k)[0].family === "Picking")'));
 ev('commitOnboarding_()');
-check('everything else is hidden', hidden().length === 13, hidden().length + ' hidden');
+check('everything else is hidden', hidden().length === 15, hidden().length + ' hidden');
 check('the six survive', visible().length === 6, visible().join(', '));
 check('hidden is stored by area key, never by family',
   ev('hiddenVolumeAreas.every(k => VOLUME_TYPES.some(t => t.key === k))'));
@@ -143,16 +143,16 @@ check('and every one of them is E3',
   ev('hiddenVolumeAreas.every(k => AREA_SITE[areaBaseKey_(k)] === "e3")'), hidden().join(', '));
 check('no E1/E2 area is touched',
   ev('onboardingAreasForSite_("e1e2").every(t => hiddenVolumeAreas.indexOf(t.key) === -1)'));
-check('so switching to E1/E2 shows all 8',
-  ev('siteFilter = "e1e2"; volumeTypesActive_().filter(t => hiddenVolumeAreas.indexOf(t.key) === -1).length') === 8);
+check('so switching to E1/E2 shows all 10',
+  ev('siteFilter = "e1e2"; volumeTypesActive_().filter(t => hiddenVolumeAreas.indexOf(t.key) === -1).length') === 10);
 check('while E3 still shows just the one',
   ev('siteFilter = "e3"; volumeTypesActive_().filter(t => hiddenVolumeAreas.indexOf(t.key) === -1).length') === 1);
 
-// The whole complex IS the scope, so there the answer covers all nineteen.
+// The whole complex IS the scope, so there the answer covers all twenty-one.
 reset();
 ev('_onboardDraft.site = "all"; _onboardDraft.families = ["Parcel"]');
 ev('commitOnboarding_()');
-check('Elmsall narrows everything', hidden().length === 17, hidden().length + ' hidden');
+check('Elmsall narrows everything', hidden().length === 19, hidden().length + ' hidden');
 
 head('[5] an empty answer is refused');
 reset();

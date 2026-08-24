@@ -187,7 +187,7 @@
   // ---- The Overall page's volume chart: which areas it draws ---------------
   // A separate list from hiddenVolumeAreas on purpose. Hiding an area is a
   // statement about the whole dashboard; choosing what this one chart leads on
-  // is not, and stacking nineteen areas here would say nothing anyway. The
+  // is not, and stacking twenty-one areas here would say nothing anyway. The
   // dialog therefore offers only areas that are visible dashboard-wide.
   //
   // Edited through a draft and applied in one go, like Groups & Charts and
@@ -517,8 +517,8 @@
       }
       observeVolumePanels_();
     } else {
-      // Combined and Stacked put every in-scope area on one plot: nineteen
-      // series on Elmsall, eleven on E3, eight on E1/E2. Colour groups them -
+      // Combined and Stacked put every in-scope area on one plot: twenty-one
+      // series on Elmsall, eleven on E3, ten on E1/E2. Colour groups them -
       // the pickings are blues, the top ups oranges - which narrows where to
       // look, but with this many series touching, the legend and the hover
       // tooltip are what actually identify a line. Colour is not asked to
@@ -634,7 +634,7 @@
       // them. The selection comes back when the filter is cleared.
       // No "E3": the chart carries every area on the dashboard.
       overviewTitleEl.textContent = 'Volume - Stacked Area Chart';
-      // Only the areas this person actually worked. Stacking all nineteen for
+      // Only the areas this person actually worked. Stacking all twenty-one for
       // one operator put a legend of flat zero lines under a chart drawn from
       // two of them, and the two that matter were no easier to find for it.
       // Judged on the plotted values, because "flat zero" is a statement about

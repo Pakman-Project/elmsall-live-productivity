@@ -330,7 +330,7 @@ function resetAllSettingsPak() {
   // The onboarding flag IS cleared, which looks inconsistent and is not. The
   // tour teaches the dashboard; this asks which areas you want. Wiping the
   // hidden-area list without asking again would drop someone back into all
-  // nineteen areas with no prompt and no memory of how they had narrowed it -
+  // twenty-one areas with no prompt and no memory of how they had narrowed it -
   // so resetting the layout IS a request to be asked.
   if (typeof clearOnboardingSeen_ === 'function') clearOnboardingSeen_();
   location.reload();

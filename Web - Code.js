@@ -283,7 +283,9 @@ var PROC_AREA_COLUMNS_ = [
   { key: 'rspsTopUp',        stdHeader: 'D.Analysis - RSPS Top Up',        volHeader: 'Volume - RSPS Top Up' },
   { key: 'rspsPick',         stdHeader: 'D.Analysis - RSPS Pick',          volHeader: 'Volume - RSPS Pick' },
   { key: 'ispsTopUp',        stdHeader: 'D.Analysis - ISPS Top Up',        volHeader: 'Volume - ISPS Top Up' },
-  { key: 'ispsPick',         stdHeader: 'D.Analysis - ISPS Pick',          volHeader: 'Volume - ISPS Pick' }
+  { key: 'ispsPick',         stdHeader: 'D.Analysis - ISPS Pick',          volHeader: 'Volume - ISPS Pick' },
+  { key: 'sorter6ItemInduct',   stdHeader: 'D.Analysis - Sorter 6 Item Induct',   volHeader: 'Volume - Sorter 6 Item Induct' },
+  { key: 'sorter6ParcelInduct', stdHeader: 'D.Analysis - Sorter 6 Parcel Induct', volHeader: 'Volume - Sorter 6 Parcel Induct' }
 ];
 
 // Headers are typed and re-typed by hand on ten-odd archive files, so they are

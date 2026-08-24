@@ -2,10 +2,10 @@
 // ============================================================================
 // First-run setup, shown once before the tour.
 //
-// The dashboard covers three buildings and nineteen work areas, and almost
+// The dashboard covers three buildings and twenty-one work areas, and almost
 // nobody wants all of them. Everything needed to narrow it already existed -
 // the building filter and the per-area chips - but both were things you had to
-// go and find, so a first visit opened on nineteen areas of somebody else's
+// go and find, so a first visit opened on twenty-one areas of somebody else's
 // work and stayed that way.
 //
 // This asks the two questions those controls answer, and writes the answers
@@ -135,7 +135,7 @@ function renderOnboardingAreas_() {
   var byFamily = _onboardDraft.site === 'all';
   var title = $('onboardingAreaTitle'), hint = $('onboardingAreaHint');
 
-  // Whole-complex viewers pick families, not areas: nineteen checkboxes is a
+  // Whole-complex viewers pick families, not areas: twenty-one checkboxes is a
   // worse question than six, and someone looking at everything is thinking in
   // kinds of work rather than individual areas anyway.
   if (title) title.textContent = byFamily ? 'Which kinds of work?' : 'Which work areas?';
@@ -336,12 +336,12 @@ function commitOnboarding_() {
   // given as families: every other control on the dashboard is keyed by area,
   // and storing a family here would be a second vocabulary for the same thing.
   //
-  // Scoped to the building that was asked about, NOT to all nineteen. Choosing
+  // Scoped to the building that was asked about, NOT to all twenty-one. Choosing
   // E3 and then OSR PiE answers "which of E3's areas", and says nothing about
   // E1/E2 - so hiding E1/E2's areas on the strength of it would mean switching
   // building later showed an empty dashboard the viewer never asked for. The
   // other building is left wholly visible, ready to be narrowed on its own
-  // terms. For the whole complex the scope IS all nineteen, so this is the
+  // terms. For the whole complex the scope IS all twenty-one, so this is the
   // same thing said once.
   var scope = onboardingAreasForSite_(_onboardDraft.site);
   hiddenVolumeAreas = [];
