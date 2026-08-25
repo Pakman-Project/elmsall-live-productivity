@@ -317,6 +317,25 @@ head('[7b] userscript backfill map <-> notebook reports');
   check('every notebook report is postable', missing.length === 0, missing.join(', ') || 'none missing');
   check('no orphan entries in the userscript', extra.length === 0, extra.join(', ') || 'none orphaned');
   check('same order as the notebook', JSON.stringify(want) === JSON.stringify(got), '');
+
+  // The backfill notebook's "Select Reports" multiselect can only offer names
+  // that exist when the widget is created. That list used to be a REPORT_NAMES
+  // literal - a second copy of the same names, restated by hand, which nothing
+  // compared against all_reports. Adding a report left the widget unable to
+  // offer it while Filter Mode "All" still ran it, so the only symptom was a
+  // name missing from a dropdown; three had gone missing before anyone noticed.
+  //
+  // Read from the PARSED source rather than the raw file: inside the .ipynb
+  // JSON every quote on that line is backslash-escaped.
+  const backSrc = (JSON.parse(nbBack).cells || [])
+    .map(c => (c.source || []).join('')).join('');
+  const derivedNames = 'REPORT_NAMES = [r["name"] for r in all_reports]';
+  check('backfill widget list is derived, not restated',
+        backSrc.indexOf(derivedNames) !== -1,
+        backSrc.indexOf('REPORT_NAMES') === -1
+          ? 'REPORT_NAMES is gone entirely'
+          : 'REPORT_NAMES comes from all_reports');
+
   // One endpoint, declared once - nineteen copies of a URL is nineteen chances
   // to repoint one of them by accident.
   const urlCount = (us.slice(from, us.indexOf(']))', from)).match(/https:\/\/script\.google\.com/g) || []).length;
