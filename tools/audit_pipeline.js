@@ -47,7 +47,7 @@ vm.runInContext(
   stateCtx);
 const ev = expr => vm.runInContext(expr, stateCtx);
 
-const AREAS = 21;
+const AREAS = 22;
 const COLS = AREAS + 5;   // 4 identity columns + areas + Productivity %
 
 head('[1] work-area enumerations (expect ' + AREAS + ')');
@@ -59,9 +59,12 @@ const counts = {
   'volume canvases': n(idx, /id="volChart/g),
   'tour AREAS': n(grab(tour, 'AREAS'), /'/g) / 2,
   PROC_AREA_COLUMNS_: n(grab(code, 'PROC_AREA_COLUMNS_'), /\{ key:/g),
+  // 'all' is a third legal value - an area worked in BOTH buildings. It has
+  // to be counted here or the map reads one area short of VOLUME_TYPES and
+  // this check fails for an area that is in fact declared.
   AREA_SITE: n(state.slice(state.indexOf('var AREA_SITE = {'),
                            state.indexOf('};', state.indexOf('var AREA_SITE = {'))),
-              /: '(e3|e1e2)'/g),
+              /: '(e3|e1e2|all)'/g),
 };
 Object.keys(counts).forEach(k => check(k, counts[k] === AREAS, '= ' + counts[k]));
 
@@ -187,7 +190,7 @@ head('[2b] the column lists are in the SAME ORDER as VOLUME_TYPES');
     if (m[1] !== t.label) panelWrong.push('volPanel' + i + ' h2 "' + m[1] + '" vs "' + t.label + '"');
     else if (m[2] !== famWant) panelWrong.push('volPanel' + i + ' tag "' + m[2] + '" vs "' + famWant + '"');
   });
-  check('volume panel headings', panelWrong.length === 0, panelWrong.join('; ') || 'all 19 match');
+  check('volume panel headings', panelWrong.length === 0, panelWrong.join('; ') || 'all ' + AREAS + ' match');
 }
 
 head('[3] per-area cells are GENERATED, not hand-listed');
@@ -217,7 +220,7 @@ keys.forEach(k => {
     ['Index th', idx.indexOf('data-key="' + k + 'Vol"') !== -1],
     ['Index th data-site', idx.indexOf('data-key="' + k + 'Vol" data-site="') !== -1],
     ['Code.js header map', code.indexOf("key: '" + k + "'") !== -1],
-    ['AREA_SITE', new RegExp('\\b' + k + ": '(e3|e1e2)'").test(state)],
+    ['AREA_SITE', new RegExp('\\b' + k + ": '(e3|e1e2|all)'").test(state)],
   ].filter(p => !p[1]).map(p => p[0]);
   check(k, missing.length === 0, missing.length ? 'MISSING: ' + missing.join(', ') : '');
 });

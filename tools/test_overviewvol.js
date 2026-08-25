@@ -55,7 +55,7 @@ check('click order does not leak in', same(keys(), ['e3PackingVol', 'parcelInduc
 set('all', [], ['e3PackingVol']);
 check('one area is a legal choice', same(keys(), ['e3PackingVol']), labels().join(', '));
 set('all', [], ev('VOLUME_TYPES.map(t => t.key)'));
-check('so is all of them', keys().length === 21, keys().length + ' areas');
+check('so is all of them', keys().length === 22, keys().length + ' areas');
 
 head('[4] a choice that no longer applies falls back rather than emptying');
 // A saved choice naming the other building is kept, not pruned - switching back
@@ -94,7 +94,7 @@ set('all', [], []);
 check('one group when the first three share a family',
   same(groups(), [['rspsPickVol', 'ispsPickVol', 'pieVol']]), JSON.stringify(groups()));
 
-// First three visible become Picking x2 + Top Up x1.
+// First three visible become Picking x2 + Returns x1.
 set('all', ['pieVol', 'onlinePickingDriveVol', 'onlinePickingWayVol', 'onlinePickingE3Vol'], []);
 check('splits when they do not',
   same(groups(), [['rspsPickVol', 'ispsPickVol'], ['rspsTopUpVol']]), JSON.stringify(groups()));
@@ -106,7 +106,7 @@ check('and never more than three groups', groups().length <= 3, groups().length 
 
 set('e1e2', [], []);
 check('stays in the building',
-  ev('defaultAreaGroupsForSite_().every(g => g.every(k => AREA_SITE[areaBaseKey_(k)] === "e1e2"))'),
+  ev('defaultAreaGroupsForSite_().every(g => g.every(k => ["e1e2", "all"].indexOf(AREA_SITE[areaBaseKey_(k)]) !== -1))'),
   JSON.stringify(groups()));
 
 // Everything hidden must still produce a chart, exactly as the volume one does.

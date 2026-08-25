@@ -49,7 +49,7 @@ head('[1] every area belongs to a declared family');
 {
   const fams = ev('AREA_FAMILIES.map(f => f.name)');
   const vt = ev('VOLUME_TYPES.map(t => ({key:t.key, family:t.family, color:t.color, dark:t.colorDark}))');
-  check('21 areas', vt.length === 21, '= ' + vt.length);
+  check('22 areas', vt.length === 22, '= ' + vt.length);
   // Six since BPP folded into Packing and Automation Pick into Picking. The
   // eight-slot requirement moved to AREA_GROUP_COLORS, which is what actually
   // needed it - see the group-palette checks below.
@@ -163,7 +163,7 @@ for (const mode of (V ? ['light', 'dark'] : [])) {
     // validateOrdinal accepts a ramp running either way, so it cannot tell a
     // deliberate order from a lucky one. VOLUME_TYPES order is what the charts,
     // chips and table columns follow, so pin the direction to it: reordering
-    // the areas is what silently left Top Up mid-light-dark.
+    // the areas is what silently left the oranges mid-light-dark.
     const Ls = ramp.map(oklchL_);
     const ascending = Ls.every((L, i) => i === 0 || L > Ls[i - 1]);
     check(mode + ' ramp direction: ' + fname, ascending,
@@ -180,11 +180,11 @@ for (const mode of (V ? ['light', 'dark'] : [])) {
   });
 }
 
-// RECORDED, not asserted. Nineteen touching series cannot clear the adjacent
+// RECORDED, not asserted. Twenty-two touching series cannot clear the adjacent
 // separation floors - that is a limit of the eye, not a defect in the hexes -
 // and the combined chart leans on its legend and hover tooltip instead. Kept
 // visible here so the cost stays known rather than forgotten.
-head('[5] all 19 on one plot, for the record');
+head('[5] all 22 on one plot, for the record');
 for (const mode of (V ? ['light', 'dark'] : [])) {
   const pick = mode === 'dark' ? 'colorDark' : 'color';
   const all = ev(`VOLUME_TYPES.map(t => t.${pick})`);

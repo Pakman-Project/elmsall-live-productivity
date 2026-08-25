@@ -31,10 +31,20 @@ const e3 = keys.filter(k => map[k] === 'e3'), e12 = keys.filter(k => map[k] === 
 check('E3 count = 11', e3.length === 11, e3.length + ': ' + e3.join(' '));
 check('E1/E2 count = 10', e12.length === 10, e12.length + ': ' + e12.join(' '));
 check('no area in both', e3.filter(k => e12.includes(k)).length === 0);
+// The third bucket: work done in BOTH buildings, which shows under either
+// filter. These are the areas the two counts above do not add up over, so
+// they are counted separately rather than by subtraction.
+const both = keys.filter(k => map[k] === 'all');
+check('both-buildings count = 1', both.length === 1, both.join(' '));
+check('every area is in exactly one bucket',
+  e3.length + e12.length + both.length === keys.length,
+  `${e3.length}+${e12.length}+${both.length} vs ${keys.length}`);
 
 // --- list filtering ----------------------------------------------------------
 console.log('\n[2] list narrowing per building');
-for (const [site, n] of [['all', 21], ['e3', 11], ['e1e2', 10]]) {
+// A building shows its own areas PLUS the both-buildings ones, so E3 and
+// E1/E2 deliberately overlap by `both.length` and no longer sum to the total.
+for (const [site, n] of [['all', 22], ['e3', 12], ['e1e2', 11]]) {
   vm.runInContext(`siteFilter='${site}'`, ctx);
   const vt = vm.runInContext('volumeTypesActive_().length', ctx);
   const bd = vm.runInContext('breakdownAreasActive_().length', ctx);

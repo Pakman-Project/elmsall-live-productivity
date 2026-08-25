@@ -8,7 +8,7 @@ var APP_CONFIG = {
 // ── Work-area colour ──────────────────────────────────────────────────
 // Colour carries two things at once: hue says which FAMILY of work an area
 // belongs to, lightness says which area within it. So the six Pickings are
-// six blues, the three Top Ups three oranges, and the four Packings four
+// six blues, the four Returns four oranges, and the four Packings four
 // greens - the grouping reads off a chart without anyone consulting a legend.
 //
 // Both columns are generated in OKLCH from the six fixed hues below and
@@ -20,10 +20,10 @@ var APP_CONFIG = {
 //
 // Within a family, LATER IN THIS LIST IS LIGHTER. That is a rule, not an
 // accident, and tools/test_palette.js asserts it: the ramps used to be
-// monotone only by luck, and reordering the areas silently broke Top Up into
-// mid-light-dark, which no check would have caught.
+// monotone only by luck, and reordering the areas silently broke the oranges
+// into mid-light-dark, which no check would have caught.
 //
-// What colour cannot do: twenty-one shades are not all tellable apart at once,
+// What colour cannot do: twenty-two shades are not all tellable apart at once,
 // and no palette fixes that - it is a limit of the eye, not of the hexes. Six
 // blues in one family is close to that limit, and the tightest pairs on the
 // whole dashboard now sit INSIDE Picking rather than between families. On the
@@ -37,9 +37,10 @@ var VOLUME_TYPES = [
   { key: 'onlinePickingDriveVol', stdKey: 'onlinePickingDriveStd', label: 'Drive - Online Picking', family: 'Picking', color: '#3786eb', colorDark: '#3a8df2' },
   { key: 'onlinePickingWayVol', stdKey: 'onlinePickingWayStd', label: 'Way - Online Picking', family: 'Picking', color: '#4e9bfe', colorDark: '#57a2ff' },
   { key: 'onlinePickingE3Vol', stdKey: 'onlinePickingE3Std', label: 'E3 - Online Picking', family: 'Picking', color: '#75b0ff', colorDark: '#7eb7ff' },
-  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', family: 'Top Up', color: '#913203', colorDark: '#a73a07' },
-  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Top Up', color: '#cb4b0b', colorDark: '#c94a11' },
-  { key: 'topUpVol', stdKey: 'topUpStd', label: 'OSR Top Up', family: 'Top Up', color: '#f97542', colorDark: '#e36230' },
+  { key: 'rspsTopUpVol', stdKey: 'rspsTopUpStd', label: 'RSPS Top Up', family: 'Returns', color: '#913203', colorDark: '#a73a07' },
+  { key: 'ispsTopUpVol', stdKey: 'ispsTopUpStd', label: 'ISPS Top Up', family: 'Returns', color: '#cb4b0b', colorDark: '#c94a11' },
+  { key: 'topUpVol', stdKey: 'topUpStd', label: 'OSR Top Up', family: 'Returns', color: '#f97542', colorDark: '#e36230' },
+  { key: 'forwardTpaVol', stdKey: 'forwardTpaStd', label: 'Forward TPA', family: 'Returns', color: '#fe9975', colorDark: '#fd7d4e' },
   { key: 'e1e2BppVol', stdKey: 'e1e2BppStd', label: 'E1/E2 BPP', family: 'Packing', color: '#0b6c46', colorDark: '#0c6e4a' },
   { key: 'sorter6ItemInductVol', stdKey: 'sorter6ItemInductStd', label: 'Sorter 6 Item Induct', family: 'Inducting', color: '#4f41ae', colorDark: '#5a4ba9' },
   { key: 'sorter6ParcelInductVol', stdKey: 'sorter6ParcelInductStd', label: 'Sorter 6 Parcel Induct', family: 'Inducting', color: '#6358c7', colorDark: '#6b5ebe' },
@@ -59,8 +60,11 @@ var VOLUME_TYPES = [
 // 'vol0'..'vol18' - so it silently means different areas after a reorder;
 // loadUserPreferences drops that one saved list when this marker does not match.
 // 1 = the original order, 2 = grouped by family Picking first, 3 = the two
-// Sorter 6 inducts added, 4 = those two moved to sit with Sorter 6 Packing.
-var AREA_ORDER_VERSION = 4;
+// Sorter 6 inducts added, 4 = those two moved to sit with Sorter 6 Packing,
+// 5 = Forward TPA inserted after OSR Top Up, which shifts every position
+// below it - inserting mid-list is a reorder even though nothing moved by
+// hand.
+var AREA_ORDER_VERSION = 5;
 
 // The six family hues every work-area shade is derived from. Their ORDER is
 // a safety property, not a taste one - it is what keeps neighbouring hues
@@ -74,7 +78,7 @@ var AREA_ORDER_VERSION = 4;
 // Moving Inducting between them puts the worst adjacent pair back at ΔE 11.6.
 var AREA_FAMILIES = [
   { name: 'Picking',      color: '#2a78d6', colorDark: '#3987e5' },
-  { name: 'Top Up',       color: '#eb6834', colorDark: '#d95926' },
+  { name: 'Returns',      color: '#eb6834', colorDark: '#d95926' },
   { name: 'Packing',      color: '#1baf7a', colorDark: '#199e70' },
   { name: 'Inducting',    color: '#4a3aa7', colorDark: '#9085e9' },
   { name: 'Parcel',       color: '#e87ba4', colorDark: '#d55181' },
@@ -110,7 +114,13 @@ var AREA_SITE = {
   // Returns processing, all four in E1/E2.
   rspsTopUp: 'e1e2', rspsPick: 'e1e2', ispsTopUp: 'e1e2', ispsPick: 'e1e2',
   // Sorter 6, so E1/E2 with the packing area of the same name.
-  sorter6ItemInduct: 'e1e2', sorter6ParcelInduct: 'e1e2'
+  sorter6ItemInduct: 'e1e2', sorter6ParcelInduct: 'e1e2',
+  // 'all' is the third answer this map can give: the work happens in BOTH
+  // buildings, so the area stays visible whichever one is picked. Forward
+  // TPA is putaway walked across E1/E2 and E3 alike - there is no one
+  // building to file it under, and filing it under either would hide real
+  // hours from the other.
+  forwardTpa: 'all'
 };
 
 var SITES = [
@@ -292,6 +302,10 @@ function areaBaseKey_(key) {
 function areaInSite_(key) {
   var base = areaBaseKey_(key);
   if (!AREA_SITE.hasOwnProperty(base)) return true;
+  // An area declared 'all' is worked in every building, so it survives
+  // every filter - the same answer this already gives for a column that is
+  // not a work area, but reached deliberately rather than by omission.
+  if (AREA_SITE[base] === 'all') return true;
   return siteFilter === 'all' || AREA_SITE[base] === siteFilter;
 }
 
@@ -408,6 +422,7 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'rspsTopUpVol', label: 'RSPS Top Up' },
   { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
   { key: 'topUpVol', label: 'OSR Top Up' },
+  { key: 'forwardTpaVol', label: 'Forward TPA' },
   { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
   { key: 'sorter6ItemInductVol', label: 'Sorter 6 Item Induct' },
   { key: 'sorter6ParcelInductVol', label: 'Sorter 6 Parcel Induct' },
@@ -437,6 +452,7 @@ var mainTableSortableColumns = [
   { key: 'rspsTopUpVol', label: 'RSPS Top Up' },
   { key: 'ispsTopUpVol', label: 'ISPS Top Up' },
   { key: 'topUpVol', label: 'OSR Top Up' },
+  { key: 'forwardTpaVol', label: 'Forward TPA' },
   { key: 'e1e2BppVol', label: 'E1/E2 BPP' },
   { key: 'sorter6ItemInductVol', label: 'Sorter 6 Item Induct' },
   { key: 'sorter6ParcelInductVol', label: 'Sorter 6 Parcel Induct' },
@@ -510,7 +526,7 @@ function overviewVolTypes_() {
  *
  * Grouping by family is what makes the default say something. Three areas as
  * three separate groups is just three lines with a legend; RSPS Pick and ISPS
- * Pick drawn as one "Picking" group against a Top Up group is a comparison -
+ * Pick drawn as one "Picking" group against a Returns group is a comparison -
  * and it is the comparison the family structure already claims is meaningful.
  *
  * Reads the same visible set the volume chart does, so the two charts on the

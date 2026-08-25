@@ -555,7 +555,11 @@
     if (key === 'all') return VOLUME_TYPES.length;
     var n = 0;
     for (var i = 0; i < VOLUME_TYPES.length; i++) {
-      if (AREA_SITE[areaBaseKey_(VOLUME_TYPES[i].key)] === key) n++;
+      // An 'all' area is worked in both buildings and shows under either, so
+      // it counts towards both. This subtitle promises how many areas the
+      // choice SHOWS, and an exact match would undercount it by one.
+      var at = AREA_SITE[areaBaseKey_(VOLUME_TYPES[i].key)];
+      if (at === key || at === 'all') n++;
     }
     return n;
   }

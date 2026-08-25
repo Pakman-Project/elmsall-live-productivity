@@ -84,7 +84,10 @@ function clearOnboardingSeen_() {
 
 function onboardingAreasForSite_(site) {
   return VOLUME_TYPES.filter(function (t) {
-    return site === 'all' || AREA_SITE[areaBaseKey_(t.key)] === site;
+    // AREA_SITE 'all' is an area worked in both buildings, so it belongs in
+    // either building's list rather than only the whole-complex one.
+    var at = AREA_SITE[areaBaseKey_(t.key)];
+    return site === 'all' || at === 'all' || at === site;
   });
 }
 
