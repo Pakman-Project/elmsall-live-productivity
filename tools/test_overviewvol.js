@@ -55,7 +55,7 @@ check('click order does not leak in', same(keys(), ['e3PackingVol', 'parcelInduc
 set('all', [], ['e3PackingVol']);
 check('one area is a legal choice', same(keys(), ['e3PackingVol']), labels().join(', '));
 set('all', [], ev('VOLUME_TYPES.map(t => t.key)'));
-check('so is all of them', keys().length === 22, keys().length + ' areas');
+check('so is all of them', keys().length === 23, keys().length + ' areas');
 
 head('[4] a choice that no longer applies falls back rather than emptying');
 // A saved choice naming the other building is kept, not pruned - switching back

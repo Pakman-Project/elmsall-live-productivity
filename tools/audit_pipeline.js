@@ -47,7 +47,7 @@ vm.runInContext(
   stateCtx);
 const ev = expr => vm.runInContext(expr, stateCtx);
 
-const AREAS = 22;
+const AREAS = 23;
 const COLS = AREAS + 5;   // 4 identity columns + areas + Productivity %
 
 head('[1] work-area enumerations (expect ' + AREAS + ')');
@@ -83,12 +83,13 @@ head('[1b] palette');
     vt.forEach(t => { if (seen[t[mode]]) dup.push(seen[t[mode]] + '/' + t.key + ' ' + t[mode]); seen[t[mode]] = t.key; });
     check('no two areas share a ' + (mode === 'dark' ? 'dark' : 'light') + ' hex', dup.length === 0, dup.join('; '));
   }
-  // Six, not the eight this used to assert: BPP folded into Packing and
-  // Automation Pick into Picking. Loosening a guard to make a run go green is
-  // how the bugs these checks exist for got in, so the two compensating ones
-  // below were added in the same change - the group palette is what actually
-  // needed eight slots, and it no longer depends on how many families there are.
-  check('AREA_FAMILIES has 6 slots', fams.length === 6, '= ' + fams.length);
+  // Seven. It was eight, then six when BPP folded into Packing and Automation
+  // Pick into Picking, and seven again with TP Retail. Loosening a guard to
+  // make a run go green is how the bugs these checks exist for got in, so the
+  // compensating ones below were added in that same change - the group palette
+  // is what actually needed eight slots, and it no longer depends on how many
+  // families there are.
+  check('AREA_FAMILIES has 7 slots', fams.length === 7, '= ' + fams.length);
   const grp = ev('AREA_GROUP_COLORS'), grpD = ev('AREA_GROUP_COLORS_DARK');
   check('AREA_GROUP_COLORS has 8 slots', grp.length === 8, '= ' + grp.length);
   check('AREA_GROUP_COLORS_DARK has 8 slots', grpD.length === 8, '= ' + grpD.length);
