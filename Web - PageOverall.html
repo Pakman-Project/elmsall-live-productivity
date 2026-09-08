@@ -16,14 +16,18 @@
             </span>
           </span>
         </div>
+        <!-- Breakdown sits INSIDE the value row so it lands to the right of
+             the trend, but it is taken out of flow there (see .kpi-cell-action)
+             so the row still centres on "178 up-4" alone. In flow it would have
+             dragged the number off-centre by half the button's width. -->
         <div class="kpi-cell-value">
           <span class="value" id="headDeployed">-</span>
           <span class="kpi-trend" id="headDeployedTrend"></span>
+          <button class="breakdown-btn kpi-cell-action" onclick="showHeadBreakdown()" title="View breakdown by area">
+            <i class="fa-solid fa-chart-pie"></i> Breakdown
+          </button>
         </div>
         <div class="kpi-cell-sub">Last 4 blocks</div>
-        <button class="breakdown-btn kpi-cell-action" onclick="showHeadBreakdown()" title="View breakdown by area">
-          <i class="fa-solid fa-chart-pie"></i> Breakdown
-        </button>
       </div>
 
       <div class="kpi-divider" aria-hidden="true"></div>
@@ -72,7 +76,7 @@
         <div class="mini-table-title">
           <h2>Volume</h2>
           <div style="display:flex; gap:5px; align-items:center;">
-            <button class="breakdown-btn" id="overviewVolAreasBtn" onclick="openOverviewVolAreas()"><i class="fa-solid fa-chart-area"></i> Areas</button>
+            <button class="breakdown-btn icon-only" id="overviewVolAreasBtn" onclick="openOverviewVolAreas()" title="Choose areas" aria-label="Choose areas"><i class="fa-solid fa-gear"></i></button>
           </div>
         </div>
         <canvas id="overviewVolChart"></canvas>
@@ -93,7 +97,7 @@
           <div class="mini-table-title">
             <h2 id="areaGroupChartTitle">Productivity % by Work Area</h2>
             <div style="display:flex; gap:5px; align-items:center;">
-              <button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups &amp; Charts</button>
+              <button class="breakdown-btn icon-only" onclick="openAreaGroups()" title="Groups &amp; charts" aria-label="Groups and charts"><i class="fa-solid fa-gear"></i></button>
             </div>
           </div>
           <canvas id="areaGroupChart"></canvas>
@@ -111,7 +115,7 @@
           <div class="mini-table-title">
             <h2>Deployment Trend</h2>
             <div style="display:flex; gap:5px; align-items:center;">
-              <button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button>
+              <button class="breakdown-btn icon-only" onclick="openTrendSplit()" title="Split" aria-label="Split"><i class="fa-solid fa-gear"></i></button>
             </div>
           </div>
           <canvas></canvas>

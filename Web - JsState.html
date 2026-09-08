@@ -523,19 +523,30 @@ function groupColor_(i) {
  * changed underneath a saved choice, not that the user asked for nothing.
  */
 function overviewVolTypes_() {
-  var candidates = volumeTypesActive_().filter(function (t) {
-    return hiddenVolumeAreas.indexOf(t.key) === -1;
-  });
-  if (candidates.length === 0) candidates = filterAreaList_(VOLUME_TYPES);
-  if (candidates.length === 0) candidates = VOLUME_TYPES;
+  var inSite = filterAreaList_(VOLUME_TYPES);
+  if (inSite.length === 0) inSite = VOLUME_TYPES;
 
+  // An EXPLICIT choice is honoured whatever the chips are hiding. The chips
+  // filter the Volume page's panels; this chart is its own question, and
+  // intersecting the two meant a deliberately chosen area silently vanished
+  // from here because it had been hidden somewhere else.
+  //
+  // Still filtered by BUILDING: a saved choice naming the other building is
+  // kept rather than pruned, so it has to be excluded at read time.
   if (overviewVolAreas.length) {
-    var kept = candidates.filter(function (t) {
+    var kept = inSite.filter(function (t) {
       return overviewVolAreas.indexOf(t.key) !== -1;
     });
     if (kept.length) return kept;
   }
-  return candidates.slice(0, 2);
+
+  // With no choice made, the DEFAULT still follows what is visible - "the
+  // first two you can see" is what the onboarding answer meant.
+  var visible = inSite.filter(function (t) {
+    return hiddenVolumeAreas.indexOf(t.key) === -1;
+  });
+  if (visible.length === 0) visible = inSite;
+  return visible.slice(0, 2);
 }
 
 /**

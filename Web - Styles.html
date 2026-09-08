@@ -5773,7 +5773,31 @@ textarea:focus-visible {
   color: var(--muted);
 }
 
-.kpi-cell-action { margin-top: 6px; }
+/* Out of flow, pinned to the right edge of the value row. left:100% puts it
+   just past the trend badge; because it is absolute it contributes no width, so
+   the row centres on the figure and its trend exactly as it did before the
+   button was in there. */
+.kpi-cell-action {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 10px;
+  white-space: nowrap;
+}
+.kpi-cell-value { position: relative; }
+
+/* On a phone there is no room to the side, so it goes back under the figure
+   and back into flow. */
+@media (max-width: 700px) {
+  .kpi-cell-action {
+    position: static;
+    transform: none;
+    margin-left: 0;
+    margin-top: 6px;
+  }
+  .kpi-cell-value { flex-wrap: wrap; justify-content: center; }
+}
 
 /* The tooltip was a block-level div inside a flex column; inside the label it
    has to be inline, and its bubble positions against the label. */
@@ -6345,11 +6369,13 @@ body.page-scrolled .hc-field .warehouse-caret { font-size: 0.6rem; }
    user is reading rather than navigating. Hidden with clip rather than display,
    so the label text remains the accessible name for screen readers and the
    tour even while it is off-screen. */
-body.page-scrolled .next-rail .rail-label {
-  position: absolute;
-  width: 1px; height: 1px;
-  margin: -1px; padding: 0; border: 0;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+@media (max-width: 700px) {
+  body.page-scrolled .next-rail .rail-label {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
 }
 
 /* ---- the burger only when the actions are not on screen ----
@@ -6376,25 +6402,11 @@ body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
     padding-top: 12px;
   }
 }
-.next-rail {
-  transition: flex-basis 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-              width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-/* Desktop only. On a phone the rail is a full-width horizontal strip, so
-   forcing a 64px width collapsed the whole bar into the left-hand corner -
-   which is what the strip did when the page was scrolled. */
-@media (min-width: 701px) {
-  body.page-scrolled .next-rail {
-    flex: 0 0 64px;
-    width: 64px;
-    gap: 6px;
-    padding-top: 10px;
-  }
-  body.page-scrolled .next-rail .rail-item .rail-icon {
-    width: 44px;
-    height: 34px;
-  }
-}
+/* The desktop rail does not move. It is a fixed column beside the content, not
+   part of the scrolling area, so collapsing it bought width the page was not
+   short of and animated a thing the user was not looking at. Only the phone's
+   horizontal strip still gives space back, because there the rail is stacked
+   ABOVE the content and its height is genuinely in the way. */
 
 /* No head any more, so the filter row is the first thing in the card and the
    12px that used to separate it from the title was just a gap at the top. */
@@ -6561,8 +6573,7 @@ body.page-scrolled .hc-field select.hc-control { font-size: 0.64rem; }
 .hc-control,
 .hc-field #datePickerBtn,
 .hc-field #bonusSearch,
-.next-rail .rail-item .rail-icon,
-.next-rail .rail-label {
+.next-rail .rail-item .rail-icon {
   transition-property: height, min-height, font-size, padding, margin, gap, width;
   transition-duration: 0.22s;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -6577,10 +6588,60 @@ body.page-scrolled .hc-field select.hc-control { font-size: 0.64rem; }
   .hc-control,
   .hc-field #datePickerBtn,
   .hc-field #bonusSearch,
-  .next-rail,
   .next-rail .rail-item .rail-icon,
   .next-rail .rail-label {
     transition: none;
   }
+}
+
+/* ============================================================
+   Control panel: one row on desktop, square corners
+   ============================================================ */
+
+/* All six across at desktop width. They are equal columns rather than sized to
+   content, because a row whose fields jump width as their values change reads
+   as unstable. */
+@media (min-width: 701px) {
+  .hc-filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+/* Square. The card's rounded corners left a visible wedge of page showing
+   through where it met the rail and the top edge - a gap that only existed
+   because of the radius. */
+.app-headercard {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   Chart panel buttons, and clearance under the rail
+   ============================================================ */
+
+/* Areas / Groups & Charts / Split are a gear each now. They were the only
+   text buttons on the panels and each named its own dialog, which put three
+   different words in three title bars for what is the same gesture: open this
+   chart's settings. The words survive as title/aria-label. */
+.breakdown-btn.icon-only {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+.breakdown-btn.icon-only i { margin: 0; font-size: 13px; }
+
+/* Embedded in a Google Site, whose own floating info button sits in the
+   bottom-right of the frame and covered the theme toggle. The rail keeps a
+   button's worth of clear space below the last action - it costs nothing on a
+   rail that has room to spare, and nothing here has to know how big the host's
+   button is. */
+@media (min-width: 701px) {
+  .rail-actions { padding-bottom: 52px; }
 }
 </style>

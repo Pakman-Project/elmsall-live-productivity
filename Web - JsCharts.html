@@ -210,12 +210,12 @@
     if (overlay) overlay.classList.remove('active');
   }
 
-  // Only areas that are visible dashboard-wide: offering one the viewer has
-  // already hidden everywhere would be a control that contradicts itself.
+  // Every area in the chosen building, whatever the chips are doing. The chips
+  // filter the PANELS on the Volume page; which series this chart draws is a
+  // separate question, and tying the two meant an area could not be plotted
+  // here without also being un-hidden everywhere else.
   function overviewVolCandidates_() {
-    return volumeTypesActive_().filter(function (t) {
-      return hiddenVolumeAreas.indexOf(t.key) === -1;
-    });
+    return volumeTypesActive_();
   }
 
   function renderOverviewVolEditor_() {
@@ -780,7 +780,7 @@
           // section, and repeating them per chart would imply otherwise.
           if (agIdx === 0) {
             titleHtml += '<div style="display:flex; gap:5px; align-items:center;">' +
-              '<button class="breakdown-btn" onclick="openAreaGroups()"><i class="fa-solid fa-layer-group"></i> Groups &amp; Charts</button></div>';
+              '<button class="breakdown-btn icon-only" onclick="openAreaGroups()" title="Groups &amp; charts" aria-label="Groups and charts"><i class="fa-solid fa-gear"></i></button></div>';
           }
           // Wrapped before construction, not after: Chart.js measures the
           // parent during its own constructor.
@@ -843,7 +843,7 @@
         }
         var titleHtml = '<h2>' + safeTextPak(trendTitles[idx]) + '</h2>';
         if (idx === 0) {
-          titleHtml += '<div style="display:flex; gap:5px; align-items:center;"><button class="breakdown-btn" onclick="openTrendSplit()"><i class="fa-solid fa-table-columns"></i> Split</button></div>';
+          titleHtml += '<div style="display:flex; gap:5px; align-items:center;"><button class="breakdown-btn icon-only" onclick="openTrendSplit()" title="Split" aria-label="Split"><i class="fa-solid fa-gear"></i></button></div>';
         }
         panelEl.innerHTML = '<div class="mini-table-title">' + titleHtml + '</div><canvas id="trendChart_' + idx + '"></canvas>';
         trendWrap.appendChild(panelEl);

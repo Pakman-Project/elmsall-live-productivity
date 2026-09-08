@@ -69,6 +69,21 @@ set('e1e2', [], ['pieVol', 'sorter6PackingVol']);
 check('a partly-applicable choice keeps the part that applies',
       same(keys(), ['sorter6PackingVol']), labels().join(', '));
 
+head('[4b] an explicit choice ignores the chips');
+// The chips filter the Volume page's PANELS. Which series this chart draws is a
+// separate question, and tying the two meant an area deliberately picked here
+// disappeared because it had been hidden somewhere else.
+set('all', ['e3PackingVol'], ['e3PackingVol']);
+check('a hidden area can still be plotted', same(keys(), ['e3PackingVol']), labels().join(', '));
+set('all', ['e3PackingVol', 'parcelInductVol'], ['e3PackingVol', 'parcelInductVol']);
+check('several hidden areas too', same(keys(), ['e3PackingVol', 'parcelInductVol']), labels().join(', '));
+// The DEFAULT still follows what is visible - that is what onboarding meant.
+set('all', ['rspsPickVol'], []);
+check('but the default still skips hidden areas', keys().indexOf('rspsPickVol') === -1, labels().join(', '));
+// Building still wins: a choice naming the other building is kept, not plotted.
+set('e1e2', [], ['pieVol']);
+check('and the building filter still applies', allIn('e1e2'), labels().join(', '));
+
 head('[5] every area hidden still draws a chart');
 // hiddenVolumeAreas is a display filter for the panels below; it must not be
 // able to leave this chart a bare axis.
