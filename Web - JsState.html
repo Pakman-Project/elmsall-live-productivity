@@ -11,7 +11,7 @@ var APP_CONFIG = {
 // six blues, the four Returns four oranges, and the four Packings four
 // greens - the grouping reads off a chart without anyone consulting a legend.
 //
-// Both columns are generated in OKLCH from the seven fixed hues below and
+// Both columns are generated in OKLCH from the eight fixed hues below and
 // measured, not eyeballed: every colour sits inside its mode's lightness
 // band, clears the chroma floor under which a hue starts reading as grey, and
 // every family ramp is monotone with a real lightness step between
@@ -23,7 +23,7 @@ var APP_CONFIG = {
 // monotone only by luck, and reordering the areas silently broke the oranges
 // into mid-light-dark, which no check would have caught.
 //
-// What colour cannot do: twenty-three shades are not all tellable apart at once,
+// What colour cannot do: twenty-four shades are not all tellable apart at once,
 // and no palette fixes that - it is a limit of the eye, not of the hexes. Six
 // blues in one family is close to that limit, and the tightest pairs on the
 // whole dashboard now sit INSIDE Picking rather than between families. On the
@@ -53,7 +53,8 @@ var VOLUME_TYPES = [
   { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#8c86f9', colorDark: '#9085e9' },
   { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', family: 'Decanting', color: '#016f01', colorDark: '#0a7c08' },
   { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'E3 Inbound Decanting', family: 'Decanting', color: '#49b343', colorDark: '#3aa635' },
-  { key: 'tpRetailVol', stdKey: 'tpRetailStd', label: 'TP Retail', family: 'TP Retail', color: '#946407', colorDark: '#956307' }
+  { key: 'tpRetailVol', stdKey: 'tpRetailStd', label: 'TP Retail', family: 'TP Retail', color: '#946407', colorDark: '#956307' },
+  { key: 'rtfVol', stdKey: 'rtfStd', label: 'RTF', family: 'RTF', color: '#1086af', colorDark: '#1085b0' }
 ];
 
 // Bumped whenever VOLUME_TYPES is REORDERED (not when an area is added, renamed
@@ -67,7 +68,7 @@ var VOLUME_TYPES = [
 // hand.
 var AREA_ORDER_VERSION = 5;
 
-// The seven family hues every work-area shade is derived from. Their ORDER is
+// The eight family hues every work-area shade is derived from. Their ORDER is
 // a safety property, not a taste one - it is what keeps neighbouring hues
 // apart under red-green colour blindness - so it does not get re-ordered to
 // look nicer. A family hue is never handed to an individual area; the areas
@@ -90,7 +91,8 @@ var AREA_FAMILIES = [
   { name: 'Packing',      color: '#1baf7a', colorDark: '#199e70' },
   { name: 'Inducting',    color: '#4a3aa7', colorDark: '#9085e9' },
   { name: 'Parcel',       color: '#e87ba4', colorDark: '#d55181' },
-  { name: 'Decanting',    color: '#008300', colorDark: '#008300' }
+  { name: 'Decanting',    color: '#008300', colorDark: '#008300' },
+  { name: 'RTF',          color: '#0e7ca3', colorDark: '#1392c0' }
 ];
 
 /**
@@ -130,7 +132,9 @@ var AREA_SITE = {
   // hours from the other.
   forwardTpa: 'all',
   // Despatch, packing retail boxsets in E1/E2.
-  tpRetail: 'e1e2'
+  tpRetail: 'e1e2',
+  // Returns-to-fulfilment putaway, E1/E2.
+  rtf: 'e1e2'
 };
 
 var SITES = [
@@ -445,7 +449,8 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'inboundDecantingVol', label: 'E3 Inbound Decanting' },
-  { key: 'tpRetailVol', label: 'TP Retail' }
+  { key: 'tpRetailVol', label: 'TP Retail' },
+  { key: 'rtfVol', label: 'RTF' }
 ];
 
 // Mirrors the #mainTable <th data-key> list, used to populate the mobile sort <select>.
@@ -477,6 +482,7 @@ var mainTableSortableColumns = [
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'inboundDecantingVol', label: 'E3 Inbound Decanting' },
   { key: 'tpRetailVol', label: 'TP Retail' },
+  { key: 'rtfVol', label: 'RTF' },
   { key: 'performance', label: 'Productivity %' }
 ];
 

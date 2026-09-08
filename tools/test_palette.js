@@ -49,12 +49,12 @@ head('[1] every area belongs to a declared family');
 {
   const fams = ev('AREA_FAMILIES.map(f => f.name)');
   const vt = ev('VOLUME_TYPES.map(t => ({key:t.key, family:t.family, color:t.color, dark:t.colorDark}))');
-  check('23 areas', vt.length === 23, '= ' + vt.length);
+  check('24 areas', vt.length === 24, '= ' + vt.length);
   // Seven: six after BPP folded into Packing and Automation Pick into Picking,
   // then TP Retail's gold. The eight-slot requirement moved to
   // AREA_GROUP_COLORS, which is what actually needed it - see the
   // group-palette checks below.
-  check('7 family hues', fams.length === 7, '= ' + fams.length);
+  check('8 family hues', fams.length === 8, '= ' + fams.length);
   const grp = ev('AREA_GROUP_COLORS'), grpD = ev('AREA_GROUP_COLORS_DARK');
   check('8 group hues', grp.length === 8 && grpD.length === 8,
         grp.length + ' / ' + grpD.length);
@@ -137,11 +137,11 @@ const st_ = v => String(v === true ? 'pass' : v === false ? 'fail' : v).toLowerC
 const SURF = { light: '#ffffff', dark: '#1e1e1e' };
 for (const mode of (V ? ['light', 'dark'] : [])) {
   const pick = mode === 'dark' ? 'colorDark' : 'color';
-  // The seven hues every shade is derived from.
+  // The eight hues every shade is derived from.
   const fam = ev(`AREA_FAMILIES.map(f => f.${pick})`);
   V.validate(fam, { mode, surface: SURF[mode] }).report.forEach(([name, v, d]) => {
     const s_ = st_(v), band = s_ === 'relief' || s_ === 'warn';
-    check(mode + ' 7 hues: ' + name, s_ === 'pass' || band, (band ? '[' + s_ + '] ' : '') + d);
+    check(mode + ' 8 hues: ' + name, s_ === 'pass' || band, (band ? '[' + s_ + '] ' : '') + d);
   });
   // What area GROUPS wear. Measured separately now that it is its own list
   // rather than a copy of the family hues - eight mutually distinguishable
@@ -181,11 +181,11 @@ for (const mode of (V ? ['light', 'dark'] : [])) {
   });
 }
 
-// RECORDED, not asserted. Twenty-three touching series cannot clear the adjacent
+// RECORDED, not asserted. Twenty-four touching series cannot clear the adjacent
 // separation floors - that is a limit of the eye, not a defect in the hexes -
 // and the combined chart leans on its legend and hover tooltip instead. Kept
 // visible here so the cost stays known rather than forgotten.
-head('[5] all 23 on one plot, for the record');
+head('[5] all 24 on one plot, for the record');
 for (const mode of (V ? ['light', 'dark'] : [])) {
   const pick = mode === 'dark' ? 'colorDark' : 'color';
   const all = ev(`VOLUME_TYPES.map(t => t.${pick})`);
