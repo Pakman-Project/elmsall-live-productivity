@@ -204,6 +204,22 @@ check('CSV header and row share one list', exp.indexOf('function rawDataCsvColum
 check('no stale hardcoded CSV header', exp.indexOf('RAW_DATA_CSV_HEADERS_ =') === -1);
 check('mobile sort select filters by building', tables.indexOf('sortableColumnsActive_()') !== -1);
 check('table headers hide by building', tables.indexOf('th[data-site]') !== -1);
+// The Bonus page's By Work Area panels looped VOLUME_TYPES raw, so they honoured
+// the chips' hidden list but not the building filter - an E3 panel rendered on
+// the E1/E2 page, with no chip beside it to turn off. It showed a head count
+// because scopeRowsToSite_ keeps a cross-building operator's row and copies
+// every area key onto it, so their E3 hours travel into E1/E2-scoped data.
+// Comments are stripped before the test: the fix carries an explanatory comment
+// naming volumeTypesActive_(), and matching raw text let that comment satisfy
+// the check on its own - it passed with the fix reverted.
+{
+  const areaBranch = tables.slice(tables.indexOf("if (mode === 'area')"),
+                                  tables.indexOf('buildBonusPanel_(t.label'));
+  const code = areaBranch.replace(/\/\/[^\n]*/g, '');
+  check('bonus work-area panels filter by building',
+        code.indexOf('volumeTypesActive_()') !== -1 && code.indexOf('VOLUME_TYPES') === -1,
+        'renderSideTablesPak iterates volumeTypesActive_(), not VOLUME_TYPES');
+}
 
 head('[4] every area key reaches the paths still keyed by name');
 const keys = [];

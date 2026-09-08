@@ -710,8 +710,16 @@ function renderSideTablesPak(rowsLimit) {
 
   var html = '';
   if (mode === 'area') {
-    for (var v = 0; v < VOLUME_TYPES.length; v++) {
-      var t = VOLUME_TYPES[v];
+    // volumeTypesActive_(), not VOLUME_TYPES: these panels follow the building
+    // filter, exactly as the chips above them do. Iterating the raw list put an
+    // E3 panel on the E1/E2 page - scopeRowsToSite_ keeps an operator who
+    // worked in THIS building but copies every area key across, so one person
+    // who worked both buildings still carries their E3 standard hours, and an
+    // area that has no chip and cannot be turned off rendered a panel from
+    // them.
+    var inScope = volumeTypesActive_();
+    for (var v = 0; v < inScope.length; v++) {
+      var t = inScope[v];
       if (hiddenBonusAreas.indexOf(t.key) !== -1) continue;
       var rows = computeBonusRows_(windowData, t.stdKey);
       if (rows.length === 0) continue;
