@@ -5777,12 +5777,18 @@ textarea:focus-visible {
    just past the trend badge; because it is absolute it contributes no width, so
    the row centres on the figure and its trend exactly as it did before the
    button was in there. */
+/* Centred with auto margins rather than translateY(-50%). The transform
+   property is already spoken for: .breakdown-btn:hover lifts the button with
+   translateY(-1px), which REPLACES a centring transform rather than adding to
+   it - so hovering dropped the button half its own height and it snapped back
+   on mouse-out. Auto margins leave transform free for the hover. */
 .kpi-cell-action {
   position: absolute;
   left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-left: 10px;
+  top: 0;
+  bottom: 0;
+  height: fit-content;
+  margin: auto 0 auto 10px;
   white-space: nowrap;
 }
 .kpi-cell-value { position: relative; }
@@ -5792,9 +5798,10 @@ textarea:focus-visible {
 @media (max-width: 700px) {
   .kpi-cell-action {
     position: static;
-    transform: none;
-    margin-left: 0;
-    margin-top: 6px;
+    top: auto;
+    bottom: auto;
+    height: auto;
+    margin: 6px 0 0;
   }
   .kpi-cell-value { flex-wrap: wrap; justify-content: center; }
 }
