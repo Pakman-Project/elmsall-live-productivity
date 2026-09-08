@@ -27,9 +27,30 @@
   --color-good: #3c6939;            /* --mat-sys-success */
   --color-warn: #cc4b00;            /* --mat-sys-warning */
   --color-bad: #d32f2f;             /* --mat-sys-error */
-  --header-bg: #000000;             /* black top bar */
+  /* App bar, from the WHDS template (Theme.html appBar/appBarText). The bar was
+     black in BOTH themes; the template's is the surface colour - white on light,
+     #1d1d1d on dark - so it reads as part of the page rather than a band across
+     the top of it. Every colour the bar needs is a token, so reverting to the
+     black bar is one line here and one under .dark-theme. */
+  --header-bg: #ffffff;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.10);
   --radius-card: 8px;
+
+  /* Solid + soft status pairs, from the WHDS template's Theme.html. These are
+     deliberately IDENTICAL in both themes - a status tint carries meaning, and
+     the template holds it fixed so "good" reads the same shade on either
+     surface. That is why they sit here and are not restated under .dark-theme.
+
+     The soft variant is the solid one at 12% - enough to tint a chip's
+     background without competing with the figure printed on it. Note
+     --status-bad-solid is NOT --color-bad: the template pairs its chips with a
+     deeper red (#b3261e) than the one it uses for text and icons. */
+  --status-good-solid: #3c6939;
+  --status-good-soft:  rgba(60, 105, 57, 0.12);
+  --status-warn-solid: #cc4b00;
+  --status-warn-soft:  rgba(204, 75, 0, 0.12);
+  --status-bad-solid:  #b3261e;
+  --status-bad-soft:   rgba(179, 38, 30, 0.12);
 
   --w2: rgba(0, 0, 0, 0.02);
   --w3: rgba(0, 0, 0, 0.03);
@@ -124,7 +145,7 @@
   --color-good: #a1d399;
   --color-warn: #ff9d5c;
   --color-bad: #f44336;
-  --header-bg: #000000;
+  --header-bg: #1d1d1d;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.45);
   --radius-card: 8px;
 
@@ -1656,6 +1677,13 @@ th {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* 500, not the browser's default bold for <th>. The template sets its table
+     heads to medium (MuiTableCell.head), and at this size uppercase already
+     carries the emphasis - bold on top of it reads as shouting and competes
+     with the figures underneath. Size stays 11px rather than the template's
+     12px: the main table now shows up to 29 columns, and a point of header
+     size there costs a wrapped line. */
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
   z-index: 10;
@@ -5161,10 +5189,14 @@ kbd {
    .page is scrolled off the top. Deliberately mobile-only — desktop has room.
    ============================================================ */
 @media (max-width: 700px) {
-  /* Only the ICONS are hidden. The page names stay visible and tappable, so
-     navigation is never lost — this just trades the icon's height for content. */
+  /* The rail is icons now, so the icon is the ONLY thing left to show - hiding
+     it here (which is what this rule used to do, back when the labels stayed
+     visible) would empty the rail completely and lose navigation. It shrinks
+     instead, which buys back most of the same height. */
   body.page-scrolled .next-rail .rail-item .rail-icon {
-    display: none;
+    width: 34px;
+    height: 22px;
+    font-size: 15px;
   }
   body.page-scrolled .next-rail .rail-item {
     gap: 0;
@@ -5174,11 +5206,11 @@ kbd {
     padding-bottom: 5px;
   }
 
-  /* With the icon pill gone, the active page is marked on its label instead. */
-  body.page-scrolled .next-rail .rail-item.active .rail-label {
-    font-weight: 700;
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  /* The active page is marked on the icon, since that is what is on screen.
+     It was marked on the label while the label was the visible half. */
+  body.page-scrolled .next-rail .rail-item.active .rail-icon {
+    background: var(--accent-10);
+    color: var(--accent);
   }
 
   /* The status and last-update line hides too. The stale-data warning and the
@@ -5672,4 +5704,883 @@ textarea:focus-visible {
   thead { display: table-header-group; }
 }
 
+/* ============================================================
+   WHDS multi-split KPI card
+   Three figures in one card, divided - the template's OverviewStats
+   "multi-split" variant. Label and value sizes are the template's labelStyle
+   (0.6875rem/700/0.06em/uppercase) and valueStyle (2rem/400), which are also
+   what this stylesheet already uses for table headers, so the two agree.
+   ============================================================ */
+.kpi-multi {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: stretch;
+  padding: 18px 8px;
+  gap: 0;
+}
+
+.kpi-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  text-align: center;
+}
+
+.kpi-divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+.kpi-cell-label {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.kpi-cell-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: center;
+}
+
+.kpi-cell-value .value {
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.kpi-cell-sub {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.kpi-cell-action { margin-top: 6px; }
+
+/* The tooltip was a block-level div inside a flex column; inside the label it
+   has to be inline, and its bubble positions against the label. */
+.kpi-cell-label .kpi-tooltip { display: inline-flex; position: relative; }
+.kpi-cell-label .kpi-tooltip-content { display: none; }
+.kpi-cell-label .kpi-tooltip:hover .kpi-tooltip-content,
+.kpi-cell-label .kpi-tooltip:focus-within .kpi-tooltip-content {
+  display: block;
+}
+.kpi-cell-label .kpi-tooltip-content .tt-title { display: block; font-weight: 700; margin-bottom: 4px; }
+
+/* Mobile: one column, horizontal rules between cells. A 1px vertical divider
+   between stacked blocks divides nothing. */
+@media (max-width: 700px) {
+  .kpi-multi {
+    grid-column: 1 / -1;
+    flex-direction: column;
+    padding: 14px 10px;
+  }
+  .kpi-cell { padding: 10px 4px; }
+  .kpi-divider { flex: 0 0 1px; align-self: auto; width: 100%; height: 1px; }
+  .kpi-cell-value .value { font-size: 1.75rem; }
+}
+
+/* ============================================================
+   WHDS header card + rail actions
+   The black app bar is gone: this dashboard is embedded in a Google Site that
+   already provides one, so a second bar repeated the frame around it. What the
+   bar carried moved to two places - a header CARD at the top of the main
+   column, and the seven action icons to the foot of the left rail.
+   ============================================================ */
+
+/* Undo the bar. .next-header is still on the element so the control styling
+   scoped to it keeps applying; everything that made it a full-width black
+   strip is reset here. */
+.app-headercard {
+  display: block;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+  position: relative;
+  z-index: 60;
+  gap: 0;
+}
+
+.hc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hc-titlewrap { position: relative; min-width: 0; }
+
+.hc-title { margin: 0; font-size: inherit; font-weight: inherit; }
+
+.app-headercard .next-header-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hc-subtitle {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The filter row. Labels sit above their control, as in the template's
+   outlined fields, so a control reads as answering a named question. */
+.hc-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.hc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hc-field-grow { flex: 1 1 220px; min-width: 180px; }
+
+.hc-field-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hc-field .row-select { min-width: 140px; }
+
+.hc-threshold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  min-width: 90px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* The card is a positioning context for the menus that used to hang off the
+   bar, so they stay anchored to their buttons. */
+.app-headercard .site-menu,
+.app-headercard .date-menu,
+.app-headercard .search-dropdown { z-index: 70; }
+
+/* ---- rail: pages at the top, tools at the foot ---- */
+.rail-spacer { flex: 1 1 auto; min-height: 8px; }
+
+.rail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding-bottom: 10px;
+}
+
+.rail-actions .header-icon-btn {
+  color: var(--muted);
+  width: 44px;
+  height: 40px;
+  border-radius: var(--radius-card);
+}
+
+.rail-actions .header-icon-btn:hover {
+  color: var(--text);
+  background: var(--w6);
+}
+
+/* ---- mobile ----
+   The rail is a horizontal strip on a phone, which has room for the four page
+   tabs and nothing else. The actions collapse behind the card's burger, which
+   is what header-compact already did when they lived in the bar - so the
+   existing toggleHeaderMenu_ keeps working unchanged. */
+@media (max-width: 700px) {
+  .app-headercard {
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: var(--radius-card);
+  }
+  .app-headercard .next-header-title { font-size: 1.05rem; }
+  .hc-filters { gap: 8px; }
+  .hc-field { flex: 1 1 calc(50% - 8px); }
+  .hc-field .row-select { min-width: 0; width: 100%; }
+  .hc-field-grow { flex: 1 1 100%; }
+  .rail-spacer { display: none; }
+
+  /* The actions are hidden and revealed by the EXISTING header-compact
+     machinery (body.header-compact .next-header-actions), which already builds
+     a proper labelled dropdown from data-menu-label - so it is reused rather
+     than replaced, and toggleHeaderMenu_ needs no change.
+
+     Only the anchoring is corrected. Those rules position the menu absolutely
+     against the header it used to live in; the actions now sit inside
+     .next-rail, which has overflow-y:auto and would clip an absolutely
+     positioned child. Fixed takes it out of that box entirely. */
+  body.header-compact .next-header-actions {
+    position: fixed;
+    top: auto;
+    right: 10px;
+    width: auto;
+    padding: 6px;
+  }
+}
+
+/* No rule for .header-menu-btn here on purpose: it is already hidden by default
+   and revealed by body.header-compact, which JS sets on every phone and on any
+   desktop narrow enough to clip the title. Restating it here only risked
+   showing a burger next to a rail that already has room for every action. */
+
+/* ============================================================
+   WHDS control panel — six controls of one shape
+   Date, Hours Range, Time Window, Warehouse, Filter by Bonus, Threshold.
+   They were six different heights and three different backgrounds because each
+   inherited from wherever it used to live (the black bar, a KPI card, a search
+   row). .hc-control is the single shape they now share.
+
+   !important is unfortunately load-bearing: several of the originals set
+   background and colour with !important for the black bar, and this has to
+   outrank them without deleting rules that still matter on other pages.
+   ============================================================ */
+.hc-control {
+  box-sizing: border-box;
+  height: 38px;
+  min-height: 38px;
+  width: 100%;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-card) !important;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  box-shadow: none !important;
+}
+
+.hc-control:hover { border-color: var(--field-border-hover, var(--muted)) !important; }
+.hc-control:focus,
+.hc-control:focus-visible { outline: none; border-color: var(--accent) !important; }
+
+/* Native selects need the chrome removed before they match the others, and a
+   caret drawn back on. */
+select.hc-control {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.hc-field .date-picker,
+.hc-field .warehouse-picker,
+.hc-field .bonus-search-container,
+.hc-field .search-row,
+.hc-field .search-input-wrap { width: 100%; position: relative; }
+
+.hc-control.date-picker-btn { justify-content: flex-start; cursor: pointer; }
+.hc-control.date-picker-btn .date-picker-label { flex: 1 1 auto; text-align: left; }
+.hc-control.warehouse-btn { justify-content: space-between; cursor: pointer; }
+.hc-threshold { justify-content: center; font-family: 'Roboto Mono', ui-monospace, monospace; font-weight: 600; }
+
+/* The bonus field keeps its clear button and magnifier, so the input is the
+   control and the icons sit inside it. */
+.hc-field .search-input-wrap .fa-search {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+.hc-field #bonusSearch { padding-right: 34px; }
+.hc-field .clear-filter-btn { flex: 0 0 auto; }
+
+/* ---- Warehouse menu ---- */
+.warehouse-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  z-index: 4200;
+  padding: 6px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+}
+.warehouse-menu.open { display: block; }
+
+.warehouse-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.warehouse-item:hover { background: var(--w6); }
+
+.warehouse-check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--accent-contrast);
+}
+.warehouse-check.on { background: var(--accent); border-color: var(--accent); }
+
+/* ============================================================
+   Calendar date picker + control-panel layout
+   ============================================================ */
+.date-calendar {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 4200;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.date-calendar.open { display: block; }
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cal-title { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.cal-nav {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--muted);
+  border-radius: 50%; cursor: pointer;
+}
+.cal-nav:hover { background: var(--w6); color: var(--text); }
+
+.cal-dow, .cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-dow {
+  margin-bottom: 4px;
+}
+.cal-dow span {
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.cal-cell {
+  aspect-ratio: 1 / 1;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.cal-cell:hover:not(.cal-disabled):not(.cal-blank) { background: var(--w8); }
+.cal-blank { cursor: default; }
+
+/* A day with no archive is shown, not hidden - the gap is information - but it
+   is plainly not choosable. */
+.cal-disabled { color: var(--muted); opacity: 0.35; cursor: default; }
+
+.cal-today:not(.cal-selected) { box-shadow: inset 0 0 0 1px var(--border); }
+.cal-selected { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.cal-selected:hover { background: var(--accent); }
+
+.cal-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.cal-action {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cal-action:hover { background: var(--w6); }
+
+/* ---- three controls per row ----
+   Six fields, two rows of three, at every width above the phone breakpoint.
+   The bonus field no longer grows: an even grid is what makes the panel read
+   as one block rather than a row that happens to wrap. */
+.hc-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+.hc-field-grow { flex: none; min-width: 0; }
+
+@media (max-width: 700px) {
+  .hc-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+}
+
+/* ---- the title and status line are gone from the card ----
+   The Google Site around this already names the page, and "Loaded" is noise
+   once the data is on screen. Both elements STAY in the DOM: $('status') is
+   written unguarded from ten places, and the error path puts a Retry button
+   inside it, so removing it would break loading and hide failures.
+
+   Hidden only while it is saying something routine. When it holds an error or a
+   retry button it comes back - a status line you cannot see is fine right up
+   until the moment it is the only thing telling you the page is broken. */
+.app-headercard .hc-head { display: none; }
+
+.app-headercard #status {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.app-headercard:has(#status .bad) .hc-head,
+.app-headercard:has(#status button) .hc-head { display: flex; }
+.app-headercard:has(#status .bad) #status,
+.app-headercard:has(#status button) #status {
+  position: static;
+  width: auto; height: auto;
+  margin: 0; overflow: visible; clip: auto; white-space: normal;
+}
+
+/* ---- one shape, enforced ----
+   The six controls disagreed because each still inherited from wherever it used
+   to live. These are the properties that actually differed - background, height
+   and the font size of the LABEL INSIDE the control, which is a separate
+   element on the date and warehouse buttons and so did not inherit. */
+.hc-field .date-picker-label,
+.hc-field .warehouse-label,
+.hc-field .hc-threshold,
+.hc-field #bonusSearch,
+.hc-field select.hc-control {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.hc-field .date-picker-icon,
+.hc-field .date-picker-caret,
+.hc-field .warehouse-caret { font-size: 0.75rem; color: var(--muted); }
+
+/* Filter by Bonus keeps a filled ground: it is the one control you TYPE into,
+   and the fill is what says so. Everything else is white. */
+.hc-field #bonusSearch {
+  background: var(--w4) !important;
+}
+.hc-field #bonusSearch:focus { background: var(--panel) !important; }
+
+/* The date button is the other one that was grey - that was the black bar's
+   fill, not a signal, so it goes white with the rest. */
+.hc-control.date-picker-btn { background: var(--panel) !important; }
+
+/* ---- mobile: shrunken sizes apply to the inner labels too ---- */
+@media (max-width: 700px) {
+  body.page-scrolled .hc-field .date-picker-label,
+  body.page-scrolled .hc-field .warehouse-label,
+  body.page-scrolled .hc-field .hc-threshold,
+  body.page-scrolled .hc-field #bonusSearch,
+  body.page-scrolled .hc-field #bonusSearch::placeholder,
+  body.page-scrolled .hc-field select.hc-control {
+    font-size: 0.64rem;
+  }
+  body.page-scrolled .hc-field .date-picker-icon,
+  body.page-scrolled .hc-field .date-picker-caret,
+  body.page-scrolled .hc-field .warehouse-caret { font-size: 0.55rem; }
+}
+
+/* ============================================================
+   Control panel — final height/shrink rules
+   ============================================================ */
+
+/* Date and Bonus were taller than the rest because the phone rules give them
+   a 44px touch target - `#datePickerBtn { min-height: 44px }` and a padded
+   `#bonusSearch` with !important. min-height beats height, and an id beats a
+   class, so .hc-control never stood a chance. Scoping by .hc-field puts a class
+   AND an id on the left, which outranks both. */
+.hc-field #datePickerBtn,
+.hc-field #bonusSearch {
+  height: 38px !important;
+  min-height: 38px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  font-size: 0.875rem !important;
+  box-sizing: border-box !important;
+}
+.hc-field #bonusSearch { padding-left: 10px !important; padding-right: 34px !important; }
+
+/* ---- shrink on scroll at EVERY width, not just on a phone ----
+   The panel is always on screen now, so it costs height on a desktop exactly
+   as it does on a phone. page-scrolled is set from scrollTop with no width
+   test, so the same class drives both. */
+body.page-scrolled .app-headercard { padding: 6px 8px; margin-bottom: 6px; }
+body.page-scrolled .hc-field-label { display: none; }
+body.page-scrolled .hc-filters { margin-top: 0; gap: 6px; }
+
+body.page-scrolled .hc-control {
+  height: 28px;
+  min-height: 28px;
+  font-size: 0.75rem;
+  padding: 0 8px;
+  border-radius: 6px !important;
+}
+body.page-scrolled .hc-field #datePickerBtn,
+body.page-scrolled .hc-field #bonusSearch {
+  height: 28px !important;
+  min-height: 28px !important;
+  font-size: 0.75rem !important;
+  padding-right: 26px !important;
+}
+body.page-scrolled .hc-field .date-picker-label,
+body.page-scrolled .hc-field .warehouse-label,
+body.page-scrolled .hc-field .hc-threshold,
+body.page-scrolled .hc-field #bonusSearch::placeholder,
+body.page-scrolled .hc-field select.hc-control { font-size: 0.75rem; }
+body.page-scrolled select.hc-control {
+  padding-right: 22px;
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+}
+body.page-scrolled .hc-field .search-input-wrap .fa-search { right: 8px; font-size: 0.7rem; }
+body.page-scrolled .hc-field .date-picker-icon,
+body.page-scrolled .hc-field .date-picker-caret,
+body.page-scrolled .hc-field .warehouse-caret { font-size: 0.6rem; }
+
+/* Nothing tightens further on a phone: the compact size IS the phone's default
+   now (see the mobile block at the end of this file), and scrolling there takes
+   the labels away and nothing else. */
+
+/* ---- the rail: icon AND word normally, icon alone once shrunk ----
+   The word is what makes the rail learnable, so it stays until the moment the
+   user is reading rather than navigating. Hidden with clip rather than display,
+   so the label text remains the accessible name for screen readers and the
+   tour even while it is off-screen. */
+body.page-scrolled .next-rail .rail-label {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ---- the burger only when the actions are not on screen ----
+   header-compact is precisely "the seven do not fit", so it is the right
+   condition: if all seven are visible there is nothing behind the burger. */
+/* .next-rail .rail-item sets display:flex at (0,2,0); a bare .rail-burger at
+   (0,1,0) never beat it, so the burger showed even with all seven actions on
+   screen. Matched specificity is the fix, not !important. */
+.next-rail .rail-burger { display: none; }
+body.header-compact .next-rail .rail-burger { display: flex; }
+body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
+
+/* ============================================================
+   Rail width, panel spacing, and the mobile default size
+   ============================================================ */
+
+/* 96px is what a word under an icon needs, so that is the width while the words
+   are there. Once shrunk the words go and the rail hands back the 32px it was
+   only holding for them - which is the horizontal space that looked out of
+   proportion with the vertical gaps. */
+@media (min-width: 701px) {
+  .next-rail {
+    gap: 8px;
+    padding-top: 12px;
+  }
+}
+.next-rail {
+  transition: flex-basis 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Desktop only. On a phone the rail is a full-width horizontal strip, so
+   forcing a 64px width collapsed the whole bar into the left-hand corner -
+   which is what the strip did when the page was scrolled. */
+@media (min-width: 701px) {
+  body.page-scrolled .next-rail {
+    flex: 0 0 64px;
+    width: 64px;
+    gap: 6px;
+    padding-top: 10px;
+  }
+  body.page-scrolled .next-rail .rail-item .rail-icon {
+    width: 44px;
+    height: 34px;
+  }
+}
+
+/* No head any more, so the filter row is the first thing in the card and the
+   12px that used to separate it from the title was just a gap at the top. */
+.hc-filters { margin-top: 0; }
+.app-headercard { padding: 12px; }
+
+/* The Volume page's control row sat in a full-width band of its own. It holds
+   one select, so it takes the height of one select. */
+.volume-controls { padding-bottom: 6px; }
+
+/* ---- mobile: the compact size IS the size ----
+   Requested: on a phone the panel is always the tight one, and scrolling only
+   takes the labels away. So the control metrics move OUT of :page-scrolled and
+   become the mobile default; page-scrolled now changes exactly one thing. */
+@media (max-width: 700px) {
+  .app-headercard { padding: 8px; margin-bottom: 8px; }
+  .hc-filters { gap: 6px; }
+
+  .hc-control,
+  .hc-field #datePickerBtn,
+  .hc-field #bonusSearch {
+    height: 30px !important;
+    min-height: 30px !important;
+    font-size: 0.7rem !important;
+    padding: 0 8px !important;
+    border-radius: 6px !important;
+  }
+  .hc-field #bonusSearch { padding-right: 26px !important; }
+
+  .hc-field .date-picker-label,
+  .hc-field .warehouse-label,
+  .hc-field .hc-threshold,
+  .hc-field #bonusSearch::placeholder,
+  .hc-field select.hc-control { font-size: 0.7rem; }
+
+  .hc-field .date-picker-icon,
+  .hc-field .date-picker-caret,
+  .hc-field .warehouse-caret { font-size: 0.6rem; }
+
+  select.hc-control {
+    padding-right: 22px !important;
+    background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+    background-size: 4px 4px, 4px 4px;
+  }
+  .hc-field .search-input-wrap .fa-search { right: 8px; font-size: 0.7rem; }
+
+  /* The ONLY thing scrolling changes on a phone. */
+  body.page-scrolled .hc-field-label { display: none; }
+  body.page-scrolled .app-headercard { padding: 6px 8px; margin-bottom: 6px; }
+}
+
+/* ============================================================
+   Overflow menu escape, and a tighter control panel
+   ============================================================ */
+
+/* The actions dropdown is absolutely positioned inside #headerActions, which
+   now lives in the rail - and the rail scrolls (overflow-y: auto, for a rail
+   too tall to fit). An absolutely positioned child of a scroll container is
+   CLIPPED by it, which is why the menu stopped after four items instead of
+   showing all seven. The rail is a single row on a phone and has nothing to
+   scroll, so it can let the menu out. */
+@media (max-width: 700px) {
+  .next-rail { overflow: visible; position: relative; }
+}
+
+/* Halved-ish. Literally halving 38px leaves a native <select> at 19px, which
+   no longer renders its own text properly on Windows, so this stops at the
+   smallest size the controls still read at. */
+.hc-control {
+  height: 24px;
+  min-height: 24px;
+  font-size: 0.72rem;
+  padding: 0 8px;
+}
+.hc-field #datePickerBtn,
+.hc-field #bonusSearch {
+  height: 24px !important;
+  min-height: 24px !important;
+  font-size: 0.72rem !important;
+  padding-right: 26px !important;
+}
+.hc-field .date-picker-label,
+.hc-field .warehouse-label,
+.hc-field .hc-threshold,
+.hc-field #bonusSearch::placeholder,
+.hc-field select.hc-control { font-size: 0.72rem; }
+.hc-field .date-picker-icon,
+.hc-field .date-picker-caret,
+.hc-field .warehouse-caret { font-size: 0.62rem; }
+select.hc-control {
+  padding-right: 22px;
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+}
+.hc-field .search-input-wrap .fa-search { right: 8px; font-size: 0.68rem; }
+.hc-field-label { font-size: 0.6rem; }
+
+/* Shrunk, on desktop. */
+body.page-scrolled .hc-control,
+body.page-scrolled .hc-field #datePickerBtn,
+body.page-scrolled .hc-field #bonusSearch {
+  height: 20px !important;
+  min-height: 20px !important;
+  font-size: 0.64rem !important;
+}
+body.page-scrolled .hc-field .date-picker-label,
+body.page-scrolled .hc-field .warehouse-label,
+body.page-scrolled .hc-field .hc-threshold,
+body.page-scrolled .hc-field #bonusSearch::placeholder,
+body.page-scrolled .hc-field select.hc-control { font-size: 0.64rem; }
+
+/* On a phone the size never changes - only the labels come and go. */
+@media (max-width: 700px) {
+  .hc-control,
+  .hc-field #datePickerBtn,
+  .hc-field #bonusSearch,
+  body.page-scrolled .hc-control,
+  body.page-scrolled .hc-field #datePickerBtn,
+  body.page-scrolled .hc-field #bonusSearch {
+    height: 24px !important;
+    min-height: 24px !important;
+    font-size: 0.68rem !important;
+  }
+  .hc-field .date-picker-label,
+  .hc-field .warehouse-label,
+  .hc-field .hc-threshold,
+  .hc-field #bonusSearch::placeholder,
+  .hc-field select.hc-control,
+  body.page-scrolled .hc-field .date-picker-label,
+  body.page-scrolled .hc-field .warehouse-label,
+  body.page-scrolled .hc-field .hc-threshold,
+  body.page-scrolled .hc-field #bonusSearch::placeholder,
+  body.page-scrolled .hc-field select.hc-control { font-size: 0.68rem; }
+}
+
+/* ============================================================
+   Overflow menu on a phone, and the shrink transition
+   ============================================================ */
+
+/* position:fixed, not absolute. Absolute made the menu a descendant of the
+   rail's containing block, and every ancestor between it and the viewport gets
+   to clip it - the rail's own overflow first, then .app-body's overflow:hidden.
+   That is why the list stopped after four entries. Fixed is measured against
+   the viewport and cannot be clipped by either, and max-height keeps all seven
+   reachable on a short screen. */
+@media (max-width: 700px) {
+  body.header-compact .next-header-actions {
+    position: fixed;
+    top: 64px;
+    right: 8px;
+    left: auto;
+    max-height: calc(100dvh - 96px);
+    overflow-y: auto;
+  }
+}
+
+/* ---- a calmer shrink ----
+   The panel was interpolating only height and font-size, and only on some of
+   the elements, so the pieces arrived at different times and it read as a jump.
+   Everything that moves is listed, on one duration and one easing curve. */
+.app-headercard,
+.hc-filters,
+.hc-field-label,
+.hc-control,
+.hc-field #datePickerBtn,
+.hc-field #bonusSearch,
+.next-rail .rail-item .rail-icon,
+.next-rail .rail-label {
+  transition-property: height, min-height, font-size, padding, margin, gap, width;
+  transition-duration: 0.22s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Honour the system setting - a control panel resizing under the cursor is
+   exactly the kind of motion this preference exists for. */
+@media (prefers-reduced-motion: reduce) {
+  .app-headercard,
+  .hc-filters,
+  .hc-field-label,
+  .hc-control,
+  .hc-field #datePickerBtn,
+  .hc-field #bonusSearch,
+  .next-rail,
+  .next-rail .rail-item .rail-icon,
+  .next-rail .rail-label {
+    transition: none;
+  }
+}
 </style>

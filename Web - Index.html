@@ -79,8 +79,6 @@
     </div>
 
     <div class="wrap">
-      <?!= include('Web - Header'); ?>
-
       <div class="app-body">
         <nav class="next-rail" aria-label="Pages">
           <button type="button" class="rail-item active" onclick="goToPage(0)" title="Overall Productivity" aria-current="page">
@@ -99,9 +97,53 @@
             <i class="rail-icon fa-solid fa-table-list" aria-hidden="true"></i>
             <span class="rail-label">Data Table</span>
           </button>
+
+          <!-- Mobile only. The rail is a horizontal strip of the four page tabs
+               on a phone and the seven actions have nowhere to sit beside them,
+               so they collapse behind this - which lives IN the strip, as the
+               fifth item, rather than in the card above it. Hidden on desktop,
+               where every action is visible in the rail already. -->
+          <button type="button" class="rail-item rail-burger" id="headerMenuBtn"
+                  onclick="toggleHeaderMenu_()" title="Menu" aria-label="Menu"
+                  aria-expanded="false" aria-controls="headerActions">
+            <i class="rail-icon fa-solid fa-bars" aria-hidden="true"></i>
+            <span class="rail-label">More</span>
+          </button>
+
+          <!-- Pushes the actions to the foot of the rail: pages at the top,
+               tools at the bottom, which is the template's rail. On a phone the
+               rail turns into a horizontal strip and this collapses to nothing,
+               with the actions moving behind the header card's burger. -->
+          <div class="rail-spacer" aria-hidden="true"></div>
+
+          <div class="next-header-actions rail-actions" id="headerActions">
+            <button class="header-icon-btn refresh-btn" onclick="loadDataPak()" data-menu-label="Refresh" title="Refresh" aria-label="Refresh">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+            <button class="header-icon-btn" id="autoRefreshBtn" data-menu-label="Auto-refresh" onclick="toggleAutoRefresh_()" title="Pause auto-refresh" aria-label="Pause auto-refresh">
+              <i class="fa-solid fa-pause"></i>
+            </button>
+            <button class="header-icon-btn" id="reorderBtn" data-menu-label="Rearrange charts" onclick="toggleReorderMode_()" title="Rearrange charts" aria-label="Rearrange charts" aria-pressed="false">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button class="header-icon-btn" id="shareBtn" data-menu-label="Share this view" onclick="openShareMenu()" title="Share this view" aria-label="Share this view">
+              <i class="fa-solid fa-share-nodes"></i>
+            </button>
+            <button class="header-icon-btn" id="settingsBtn" onclick="openSettings()" data-menu-label="Settings" title="Settings" aria-label="Settings">
+              <i class="fa-solid fa-gear"></i>
+            </button>
+            <button class="header-icon-btn tour-help-btn" onclick="openTourMenu()" data-menu-label="Take the tour" title="Take the tour" aria-label="Take the tour">
+              <i class="fa-solid fa-circle-question"></i>
+            </button>
+            <button class="header-icon-btn" id="themeToggleBtn" data-menu-label="Theme" onclick="toggleTheme_()" title="Switch to dark mode" aria-label="Switch to dark mode">
+              <i class="fa-solid fa-moon"></i>
+            </button>
+          </div>
         </nav>
 
         <div class="app-main">
+          <?!= include('Web - Header'); ?>
+
           <div id="activeFilterBanner" class="active-filter-banner">
             <i class="fa-solid fa-filter"></i>
             <span class="active-filter-banner-text"><span class="afb-word">Filtering by</span> <span id="activeFilterCount">0</span> <span class="afb-word">bonus number(s):</span></span>
@@ -117,25 +159,7 @@
           <div class="page">
             <div class="volume-charts" id="volumeChartsContainer">
               <div class="volume-controls">
-                <div class="vol-control-group">
-                  <label for="hoursRangeVol">Hours Range:</label>
-                  <select id="hoursRangeVol" class="row-select" data-sync="hoursRange" onchange="handleControlChangePak(this, 'hoursRange')">
-                    <option value="3" selected>3 Hours</option>
-                    <option value="6">6 Hours</option>
-                    <option value="9">9 Hours</option>
-                    <option value="12">12 Hours</option>
-                    <option value="24">24 Hours</option>
-                  </select>
-                </div>
 
-                <div class="vol-control-group">
-                  <label for="timeWindowVol">Time Window:</label>
-                  <select id="timeWindowVol" class="row-select" data-sync="timeWindow" onchange="handleControlChangePak(this, 'timeWindow')">
-                    <option value="15">15 Minutes</option>
-                    <option value="30">30 Minutes</option>
-                    <option value="60">60 Minutes</option>
-                  </select>
-                </div>
 
                 <div class="vol-control-group vol-control-group-wide">
                   <label for="volumeChartMode">Display Mode:</label>

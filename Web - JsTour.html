@@ -91,9 +91,11 @@ var TOUR_STEPS = [
     body: 'Overall, Volume, Bonus Numbers and Data Table. Click an icon in the rail to jump straight to a page, or swipe left and right to move between them.' },
 
   // ===== Part 2 — Overall: KPIs & breakdown =================================
-  { part: 2, page: 0, target: '.grid .kpi:not(:last-child)', union: true,
+  // The three KPIs are one divided card now, not three cards, so the union of
+  // ".kpi:not(:last-child)" no longer describes them.
+  { part: 2, page: 0, target: '.kpi-multi',
     title: 'Hour-at-a-glance KPIs',
-    body: 'These three cards summarise the last hour: heads deployed, how many are hitting target, and overall productivity.' },
+    body: 'These three figures summarise the last hour: heads deployed, how many are hitting target, and overall productivity.' },
   { part: 2, page: 0, target: 'button[onclick="showHeadBreakdown()"]',
     interactive: { sel: 'button[onclick="showHeadBreakdown()"]', type: 'click' },
     title: 'Open the head breakdown',
@@ -107,9 +109,11 @@ var TOUR_STEPS = [
     cleanup: function () { if (typeof closeBreakdown === 'function') closeBreakdown(); },
     title: 'Head breakdown by area',
     body: 'Deployed heads by work area. The From/To range at the top re-slices it, and the × closes it.' },
-  { part: 2, page: 0, target: '.kpi-controls-row',
-    title: 'Time controls',
-    body: 'Change how many hours are shown and the window size (15 / 30 / 60 min). These stay in sync across every page.' },
+  // The time controls moved out of the Overall page's fourth KPI card and into
+  // the header card, alongside the date and the bonus filter.
+  { part: 2, page: 0, target: '.hc-filters',
+    title: 'Date, building and time controls',
+    body: 'Pick the day, narrow to one building, and change how many hours are shown and the window size (15 / 30 / 60 min). These stay in sync across every page.' },
 
   // ===== Part 3 — Overall: charts & groups =================================
   { part: 3, page: 0, target: '.charts > .card.panel:nth-child(1), .charts > .card.panel:nth-child(2)', union: true,
@@ -316,7 +320,7 @@ var TOUR_STEPS = [
     cleanup: function () { tourRestoreReorder_(); } },
 
   // ===== Part 9 — Your settings are remembered =============================
-  { part: 9, page: 0, target: '.kpi-controls-row',
+  { part: 9, page: 0, target: '.hc-filters',
     title: 'It remembers your setup',
     body: 'You don’t have to set things up twice. Your Hours Range and Time Window are saved in this browser and come back automatically next time you open the dashboard.' },
   { part: 9, page: 0, target: null,

@@ -541,8 +541,16 @@
     var btn = $('headerMenuBtn');
     if (btn) {
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // Swap ONLY the glyph. Assigning className wholesale used to wipe every
+      // other class on the icon - which was fine while the button lived in the
+      // header, and stopped being fine the moment it became a rail item and
+      // carried `rail-icon`: the first click dropped the sizing and the icon
+      // changed size on screen.
       var icon = btn.querySelector('i');
-      if (icon) icon.className = open ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+      if (icon) {
+        icon.classList.toggle('fa-bars', !open);
+        icon.classList.toggle('fa-xmark', open);
+      }
     }
   }
 
@@ -601,6 +609,9 @@
     var cfg = siteConfig_(siteFilter);
     var title = $('siteTitle');
     if (title) title.textContent = cfg.title;
+    // The Warehouse control reads siteFilter, so it has to be repainted from
+    // the same place everything else that names the building is.
+    if (typeof renderWarehouseMenu_ === 'function') renderWarehouseMenu_();
     var btn = $('sitePickerBtn');
     if (btn) {
       btn.classList.toggle('filtered', siteFilter !== 'all');
@@ -730,44 +741,80 @@
     return out;
   }
 
+  // The month currently on screen, as a Date on its 1st. Null until first open,
+  // so the calendar can land on the selected day's month rather than always on
+  // this one.
+  var _calMonth = null;
+
+  function pad2_(n) { return (n < 10 ? '0' : '') + n; }
+  function calKey_(d) {
+    return d.getFullYear() + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate());
+  }
+
+  // 'yyyy-mm-dd' -> the hidden select's value for that day. Built from the same
+  // options the list used, so "which days exist" has one source, not two.
+  function calAvailable_() {
+    var map = {};
+    var entries = dateMenuEntries_();
+    for (var i = 0; i < entries.length; i++) {
+      var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(entries[i].sub || '');
+      if (m) map[m[3] + '-' + m[2] + '-' + m[1]] = entries[i].value;
+    }
+    return map;
+  }
+
   function renderDateMenu_() {
-    var list = $('dateMenuList');
-    if (!list) return;
-    var box = $('dateMenuSearch');
-    var q = box ? box.value.trim().toLowerCase() : '';
-    var terms = q ? q.split(/\s+/) : [];
+    var grid = $('calGrid');
+    if (!grid) return;
+
+    var avail = calAvailable_();
     var sel = $('archiveSelect');
     var current = sel ? sel.value : '';
-
-    var entries = dateMenuEntries_().filter(function (e) {
-      // Live is never filtered out. It is the way back to today, and hiding it
-      // behind a half-typed search is a trap rather than a tidier list.
-      if (!e.value) return true;
-      return terms.every(function (t) { return e.hay.indexOf(t) !== -1; });
-    });
-
-    var html = '', lastMonth = null, dated = 0;
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      if (e.value) dated++;
-      if (e.month && e.month !== lastMonth) {
-        lastMonth = e.month;
-        html += '<div class="date-menu-month">' + safeTextPak(e.month) + '</div>';
+    var curKey = '';
+    if (current) {
+      for (var k in avail) {
+        if (Object.prototype.hasOwnProperty.call(avail, k) && avail[k] === current) { curKey = k; break; }
       }
-      html += '<button type="button" class="date-menu-item" role="option" ' +
-              'aria-selected="' + (e.value === current ? 'true' : 'false') + '" ' +
-              'data-value="' + escapeAttrPak(e.value) + '">' +
-              '<i class="fa-solid fa-check date-menu-check" aria-hidden="true"></i>' +
-              '<span class="date-menu-text">' + safeTextPak(e.label) +
-              (e.sub ? '<span class="date-menu-sub">' + safeTextPak(e.sub) + '</span>' : '') +
-              '</span></button>';
     }
-    if (!dated) {
-      html += '<div class="date-menu-empty">' +
-              (terms.length ? 'No archived day matches that.'
-                            : 'No archived days yet \u2014 only Live.') + '</div>';
+
+    if (!_calMonth) {
+      var base = curKey
+        ? new Date(Number(curKey.slice(0, 4)), Number(curKey.slice(5, 7)) - 1, 1)
+        : new Date();
+      _calMonth = new Date(base.getFullYear(), base.getMonth(), 1);
     }
-    list.innerHTML = html;
+
+    var title = $('calTitle');
+    if (title) title.textContent = DATE_MONTHS_[_calMonth.getMonth()] + ' ' + _calMonth.getFullYear();
+
+    // Monday-first, which is how a UK shift rota reads.
+    var firstDow = (new Date(_calMonth.getFullYear(), _calMonth.getMonth(), 1).getDay() + 6) % 7;
+    var days = new Date(_calMonth.getFullYear(), _calMonth.getMonth() + 1, 0).getDate();
+    var todayKey = calKey_(new Date());
+
+    var html = '';
+    for (var b = 0; b < firstDow; b++) html += '<span class="cal-cell cal-blank"></span>';
+    for (var d = 1; d <= days; d++) {
+      var key = calKey_(new Date(_calMonth.getFullYear(), _calMonth.getMonth(), d));
+      var has = Object.prototype.hasOwnProperty.call(avail, key);
+      var cls = 'cal-cell' +
+                (has ? '' : ' cal-disabled') +
+                (key === curKey ? ' cal-selected' : '') +
+                (key === todayKey ? ' cal-today' : '');
+      // A day with no archive is a span: not focusable, not clickable, no
+      // handler to guard.
+      html += has
+        ? '<button type="button" class="' + cls + '" data-cal="' + key + '"' +
+          (key === curKey ? ' aria-current="date"' : '') + '>' + d + '</button>'
+        : '<span class="' + cls + '" aria-hidden="true">' + d + '</span>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function calShiftMonth_(delta) {
+    if (!_calMonth) renderDateMenu_();
+    _calMonth = new Date(_calMonth.getFullYear(), _calMonth.getMonth() + delta, 1);
+    renderDateMenu_();
   }
 
   function toggleDateMenu_(force) {
@@ -775,20 +822,13 @@
     if (!menu || !btn) return;
     var open = (typeof force === 'boolean') ? force : !menu.classList.contains('open');
     if (open) {
-      var box = $('dateMenuSearch');
-      if (box) box.value = '';
+      // Re-open lands on the selected day's month rather than wherever the last
+      // browse left off.
+      _calMonth = null;
       renderDateMenu_();
     }
     menu.classList.toggle('open', open);
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (!open) return;
-    var box2 = $('dateMenuSearch');
-    // Focus the field with a pointer, but not on a phone: the keyboard would
-    // slide up over the list the user just opened.
-    var narrow = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-    if (box2 && !narrow) box2.focus();
-    var cur = menu.querySelector('.date-menu-item[aria-selected="true"]');
-    if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
   }
 
   function pickDate_(value) {
@@ -821,24 +861,31 @@
   }
 
   function initDatePicker_() {
-    var list = $('dateMenuList');
-    if (list) {
-      // Delegated: the list is rebuilt on every keystroke, so per-item
-      // listeners would be re-bound hundreds of times a search.
-      list.addEventListener('click', function (e) {
-        var item = e.target.closest ? e.target.closest('.date-menu-item') : null;
-        if (item) pickDate_(item.getAttribute('data-value') || '');
-      });
-    }
-    var box = $('dateMenuSearch');
-    if (box) {
-      box.addEventListener('input', renderDateMenu_);
-      box.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter' || !box.value.trim()) return;
-        // Enter takes the first DATED match, never Live - Live is always in the
-        // list, so taking "the first item" would jump to today on every search.
-        var first = $('dateMenuList').querySelector('.date-menu-item[aria-selected]:not([data-value=""])');
-        if (first) { e.preventDefault(); pickDate_(first.getAttribute('data-value') || ''); }
+    var menu = $('dateMenu');
+    if (menu) {
+      // Delegated: the grid is rebuilt on every month change, so per-cell
+      // listeners would be re-bound twelve times a year of browsing.
+      menu.addEventListener('click', function (e) {
+        if (!e.target.closest) return;
+        var nav = e.target.closest('[data-cal-nav]');
+        if (nav) { calShiftMonth_(Number(nav.getAttribute('data-cal-nav'))); return; }
+
+        var act = e.target.closest('[data-cal-action]');
+        if (act) {
+          var which = act.getAttribute('data-cal-action');
+          // Clear returns to Live; Today only moves the VIEW, because today may
+          // well have no archive yet and a dead button is worse than none.
+          if (which === 'clear') pickDate_('');
+          else { _calMonth = new Date(); _calMonth.setDate(1); renderDateMenu_(); }
+          return;
+        }
+
+        var cell = e.target.closest('[data-cal]');
+        if (cell) {
+          var avail = calAvailable_();
+          var v = avail[cell.getAttribute('data-cal')];
+          if (v !== undefined) pickDate_(v);
+        }
       });
     }
     syncDateUi_();
@@ -1938,5 +1985,96 @@
     closeAreaGroups();
     applyLocalFiltersPak();
   }
+
+// ── Warehouse picker ────────────────────────────────────────────────────────
+// A multi-select over the two buildings, replacing the old three-way title
+// picker. It is a different SHAPE on the same state, not new state: siteFilter
+// still holds 'all' | 'e1e2' | 'e3', and those are exactly the three legal tick
+// combinations. Nothing downstream of siteFilter changed.
+//
+// Both ticked means Elmsall. Unticking the last one is refused rather than
+// silently reinterpreted - an empty warehouse selection describes nothing, and
+// quietly turning it back into "all" would look like the click was ignored.
+var WAREHOUSE_OPTIONS_ = [
+  { key: 'e1e2', label: 'E1/E2' },
+  { key: 'e3',   label: 'E3' }
+];
+
+function warehouseSelection_() {
+  if (siteFilter === 'e1e2') return ['e1e2'];
+  if (siteFilter === 'e3') return ['e3'];
+  return ['e1e2', 'e3'];
+}
+
+function warehouseKeyFor_(sel) {
+  return sel.length === WAREHOUSE_OPTIONS_.length ? 'all' : sel[0];
+}
+
+function renderWarehouseMenu_() {
+  var menu = document.getElementById('warehouseMenu');
+  var sel = warehouseSelection_();
+  if (menu) {
+    menu.innerHTML = WAREHOUSE_OPTIONS_.map(function (o) {
+      var on = sel.indexOf(o.key) !== -1;
+      return '<button type="button" class="warehouse-item" role="option" ' +
+             'aria-selected="' + (on ? 'true' : 'false') + '" ' +
+             'data-wh="' + o.key + '">' +
+             '<span class="warehouse-check' + (on ? ' on' : '') + '" aria-hidden="true">' +
+             (on ? '<i class="fa-solid fa-check"></i>' : '') + '</span>' +
+             '<span>' + safeTextPak(o.label) + '</span></button>';
+    }).join('');
+  }
+  var label = document.getElementById('warehouseLabel');
+  if (label) {
+    label.textContent = WAREHOUSE_OPTIONS_
+      .filter(function (o) { return sel.indexOf(o.key) !== -1; })
+      .map(function (o) { return o.label; })
+      .join(', ');
+  }
+  var btn = document.getElementById('warehouseBtn');
+  if (btn) btn.classList.toggle('filtered', siteFilter !== 'all');
+}
+
+function toggleWarehouse_(key) {
+  var sel = warehouseSelection_();
+  var i = sel.indexOf(key);
+  if (i === -1) sel.push(key);
+  else sel.splice(i, 1);
+
+  if (sel.length === 0) {
+    if (typeof showToastPak === 'function') showToastPak('Pick at least one warehouse');
+    return;
+  }
+  // Keep the declared order, so 'all' is recognised by length alone and the
+  // label never reads "E3, E1/E2".
+  sel = WAREHOUSE_OPTIONS_
+    .map(function (o) { return o.key; })
+    .filter(function (k) { return sel.indexOf(k) !== -1; });
+
+  setSiteFilter_(warehouseKeyFor_(sel));
+  renderWarehouseMenu_();
+}
+
+function toggleWarehouseMenu_(force) {
+  var menu = document.getElementById('warehouseMenu');
+  var btn = document.getElementById('warehouseBtn');
+  if (!menu || !btn) return;
+  var open = (typeof force === 'boolean') ? force : !menu.classList.contains('open');
+  renderWarehouseMenu_();
+  menu.classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+// Click-away, matching how the other header menus close.
+document.addEventListener('click', function (e) {
+  if (!e.target || !e.target.closest) return;
+  var item = e.target.closest('.warehouse-item');
+  if (item && item.getAttribute('data-wh')) {
+    toggleWarehouse_(item.getAttribute('data-wh'));
+    return;
+  }
+  // Click-away, matching how the other header menus close.
+  if (!e.target.closest('.warehouse-picker')) toggleWarehouseMenu_(false);
+});
 
 </script>

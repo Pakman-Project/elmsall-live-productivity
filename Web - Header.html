@@ -1,115 +1,152 @@
-<header class="next-header">
-  <div class="next-header-left">
-    <div class="next-brand">
-      <a class="next-logo" href="#" onclick="return false;" aria-label="NEXT">
-        <svg viewBox="0 0 100 24" role="img" aria-hidden="true" focusable="false">
-          <path fill-rule="evenodd" clip-rule="evenodd" fill="currentColor" d="M0 0L16.7597 15.4457V0.676146H20.3707V24L3.61129 8.36204V23.2856H0V0ZM57.086 0.674973L63.7132 8.91418L70.34 0.674973L75.0087 0.675852L66.0259 11.7085L75.0087 23.2862H70.34L63.7129 14.6921L57.086 23.285H52.4174L61.4001 11.7073L52.4174 0.674973H57.086ZM46.3298 0.676731V4.17853H32.794V10.1872H45.0967V13.657H32.794V19.7844H46.3295V23.2856H29.183V0.676731H46.3298ZM99.488 0.673507V4.17472H91.206V23.2818H87.595V4.17472H79.3131V0.673507H99.488Z"/>
-        </svg>
-      </a>
-      <span class="next-header-divider" aria-hidden="true"></span>
-      <!-- The title IS the building picker. A separate control would compete
-           for header width that is already tight enough to collapse the action
-           buttons behind a burger, and would let the heading disagree with what
-           is actually on screen. The h1 wraps the button rather than the other
-           way round: a button may not contain a heading. -->
-      <h1 class="next-header-h1">
-        <button type="button" class="site-picker-btn" id="sitePickerBtn"
-                onclick="toggleSiteMenu_()" aria-haspopup="listbox"
-                aria-expanded="false" aria-controls="siteMenu"
-                title="Show one building" aria-label="Building: Elmsall. Change building.">
-          <span class="next-header-title" id="siteTitle">Elmsall Live Productivity</span>
-          <i class="fa-solid fa-chevron-down site-picker-caret" aria-hidden="true"></i>
-        </button>
-      </h1>
-      <div class="site-menu" id="siteMenu" role="listbox" aria-label="Building"></div>
+<!-- The header CARD, not a bar. This used to be a black app bar across the top
+     of the page; the dashboard is embedded in a Google Site that already
+     supplies one, so a second bar was a band of chrome repeating what the frame
+     around it already said. Everything it carried lives on:
+
+       - the title and the status line -> the card's head
+       - date, hours range, time window, warehouse, bonus filter,
+         threshold -> its filter row, six controls of one shape
+       - the seven action icons -> the left rail (see Web - Index.html)
+
+     Modelled on the WHDS template's HeaderCard: an outlined surface holding a
+     title, a subtitle and a row of labelled controls.
+
+     The control IDs are unchanged on purpose. hoursRange, timeWindow and
+     thresholdDisplay are read directly by $() in JsCharts, JsData, JsHelpers and
+     JsInit, so they moved with their ids rather than being rebuilt. -->
+<!-- next-header is deliberately NOT in the class list. Every rule still scoped
+     to it is black-bar styling - white text, white-alpha fills, a fixed 36px
+     date button - and several carry !important on an ID selector, so they beat
+     .hc-control no matter how late it is declared. That is what made the six
+     controls disagree on height and background. The card styles its own
+     controls instead. -->
+<section class="app-headercard card" id="appHeaderCard">
+  <div class="hc-head">
+    <div class="hc-titlewrap">
+      <!-- The title no longer doubles as the building picker: Warehouse is its
+           own control in the row below, so this is a plain heading. It still
+           carries the id syncSiteUi_ writes, so it keeps naming what is on
+           screen. -->
+      <h1 class="hc-title"><span class="next-header-title" id="siteTitle">Elmsall Live Productivity</span></h1>
+
+      <!-- Note first: it carries whatever someone has deliberately written for
+           the floor to read, so it outranks the machine-generated status beside
+           it. Empty most of the time, and collapses to nothing when it is. -->
+      <div class="next-header-meta hc-subtitle">
+        <span id="noteText" class="note-text"></span>
+        <span id="status" aria-live="polite">Loading...</span>
+        <span id="staleWarning" class="stale-warning" style="display:none;" role="status"></span>
+        <span id="lastUpdateText">-</span>
+      </div>
     </div>
-    <!-- Note first: it carries whatever someone has deliberately written for
-         the floor to read, so it outranks the machine-generated status beside
-         it. It is empty most of the time and collapses to nothing when it is. -->
-    <div class="next-header-meta">
-      <span id="noteText" class="note-text"></span>
-      <span id="status" aria-live="polite">Loading...</span>
-      <span id="staleWarning" class="stale-warning" style="display:none;" role="status"></span>
-      <span id="lastUpdateText">-</span>
-    </div>
+
   </div>
 
-  <div class="next-header-right">
-    <div class="next-header-controls">
-      <!-- The <select> is still the single source of truth for which day is
-           on screen - loadDataPak, the share link and the ?date= deep link all
-           read it - but it is no longer what anyone clicks. With the fortnight
-           cap lifted the list runs to hundreds of days, which a native select
-           handles badly: no search, and on a phone it becomes a wheel you
-           scroll blind. The button below opens a searchable menu over it. -->
+  <div class="hc-filters">
+    <div class="hc-field">
+      <span class="hc-field-label" id="hcDateLabel">Date</span>
       <select id="archiveSelect" class="date-native" tabindex="-1" aria-hidden="true">
         <option value="" selected>Live</option>
       </select>
-
       <div class="date-picker">
-        <button type="button" class="date-picker-btn" id="datePickerBtn"
-                onclick="toggleDateMenu_()" aria-haspopup="listbox"
+        <button type="button" class="hc-control date-picker-btn" id="datePickerBtn"
+                onclick="toggleDateMenu_()" aria-haspopup="dialog"
                 aria-expanded="false" aria-controls="dateMenu"
                 title="Live, or an earlier day" aria-label="Showing: Live. Change date.">
           <i class="fa-solid fa-calendar-day date-picker-icon" aria-hidden="true"></i>
           <span class="date-picker-label" id="datePickerLabel">Live</span>
           <i class="fa-solid fa-chevron-down date-picker-caret" aria-hidden="true"></i>
         </button>
-        <div class="date-menu" id="dateMenu" role="dialog" aria-label="Choose a date">
-          <div class="date-menu-search">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="text" id="dateMenuSearch" class="date-menu-input"
-                   placeholder="Jump to a date..." autocomplete="off"
-                   aria-label="Filter dates" aria-controls="dateMenuList">
+        <!-- A calendar, not the searchable list this used to be. The list
+             existed because the archive runs to hundreds of days and a native
+             select handled that badly; a month grid answers the same problem
+             better, because people know a date by where it sits in a month.
+             Days with no archive are rendered as plain spans, not buttons, so
+             they cannot be picked or focused. -->
+        <div class="date-menu date-calendar" id="dateMenu" role="dialog" aria-label="Choose a date">
+          <div class="cal-head">
+            <button type="button" class="cal-nav" data-cal-nav="-1" aria-label="Previous month">
+              <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+            </button>
+            <span class="cal-title" id="calTitle" aria-live="polite"></span>
+            <button type="button" class="cal-nav" data-cal-nav="1" aria-label="Next month">
+              <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </button>
           </div>
-          <div class="date-menu-list" id="dateMenuList" role="listbox" aria-label="Available dates"></div>
+          <div class="cal-dow" aria-hidden="true">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+          </div>
+          <div class="cal-grid" id="calGrid" role="grid" aria-labelledby="calTitle"></div>
+          <div class="cal-foot">
+            <button type="button" class="cal-action" data-cal-action="clear">Clear</button>
+            <button type="button" class="cal-action" data-cal-action="today">Today</button>
+          </div>
         </div>
       </div>
+    </div>
 
+    <div class="hc-field">
+      <label class="hc-field-label" for="hoursRange">Hours Range</label>
+      <select id="hoursRange" class="hc-control row-select" data-sync="hoursRange"
+              onchange="handleControlChangePak(this, 'hoursRange')">
+        <option value="3" selected>3 Hours</option>
+        <option value="6">6 Hours</option>
+        <option value="9">9 Hours</option>
+        <option value="12">12 Hours</option>
+        <option value="24">24 Hours</option>
+      </select>
+    </div>
+
+    <div class="hc-field">
+      <label class="hc-field-label" for="timeWindow">Time Window</label>
+      <select id="timeWindow" class="hc-control row-select" data-sync="timeWindow"
+              onchange="handleControlChangePak(this, 'timeWindow')">
+        <option value="15">15 Minutes</option>
+        <option value="30">30 Minutes</option>
+        <option value="60">60 Minutes</option>
+      </select>
+    </div>
+
+    <!-- Warehouse: a multi-select of the two buildings rather than the old
+         three-way title picker. Both ticked IS "Elmsall", so the three states
+         the rest of the dashboard already understands ('all' / 'e1e2' / 'e3')
+         are exactly the three legal tick combinations - siteFilter is unchanged
+         and every consumer of it is untouched. Unticking the last one is
+         refused; an empty warehouse selection has nothing to show. -->
+    <div class="hc-field">
+      <span class="hc-field-label">Warehouse</span>
+      <div class="warehouse-picker">
+        <button type="button" class="hc-control warehouse-btn" id="warehouseBtn"
+                onclick="toggleWarehouseMenu_()" aria-haspopup="listbox"
+                aria-expanded="false" aria-controls="warehouseMenu"
+                title="Choose which buildings to show">
+          <span class="warehouse-label" id="warehouseLabel">E1/E2, E3</span>
+          <i class="fa-solid fa-chevron-down warehouse-caret" aria-hidden="true"></i>
+        </button>
+        <div class="warehouse-menu" id="warehouseMenu" role="listbox"
+             aria-multiselectable="true" aria-label="Warehouse"></div>
+      </div>
+      <div class="site-menu" id="siteMenu" role="listbox" aria-label="Building"></div>
+    </div>
+
+    <div class="hc-field hc-field-threshold">
+      <span class="hc-field-label">Threshold</span>
+      <div class="hc-control hc-threshold"><span id="thresholdDisplay">-</span></div>
+    </div>
+    <div class="hc-field hc-field-grow">
+      <label class="hc-field-label" for="bonusSearch">Filter by Bonus</label>
       <div class="bonus-search-container">
         <div class="search-row">
           <button id="clearFilterBtn" class="clear-filter-btn" onclick="clearAllBonuses()">
             <i class="fa-solid fa-xmark"></i>
           </button>
           <div id="searchInputWrap" class="search-input-wrap">
-            <input id="bonusSearch" class="input" type="text" placeholder="Filter by Bonus..." autocomplete="off">
+            <input id="bonusSearch" class="hc-control input" type="text" placeholder="Filter by Bonus..." autocomplete="off">
             <i class="fa fa-search"></i>
           </div>
         </div>
         <div id="searchDropdown" class="search-dropdown"></div>
       </div>
     </div>
-
-    <!-- Mobile only: the six action buttons were overrunning the title on a
-         phone, so they collapse behind this. Hidden on desktop by CSS. -->
-    <button class="header-icon-btn header-menu-btn" id="headerMenuBtn"
-            onclick="toggleHeaderMenu_()" title="Menu" aria-label="Menu"
-            aria-expanded="false" aria-controls="headerActions">
-      <i class="fa-solid fa-bars"></i>
-    </button>
-
-    <div class="next-header-actions" id="headerActions">
-      <button class="header-icon-btn refresh-btn" onclick="loadDataPak()" data-menu-label="Refresh" title="Refresh" aria-label="Refresh">
-        <i class="fa-solid fa-arrows-rotate"></i>
-      </button>
-      <button class="header-icon-btn" id="autoRefreshBtn" data-menu-label="Auto-refresh" onclick="toggleAutoRefresh_()" title="Pause auto-refresh" aria-label="Pause auto-refresh">
-        <i class="fa-solid fa-pause"></i>
-      </button>
-      <button class="header-icon-btn" id="reorderBtn" data-menu-label="Rearrange charts" onclick="toggleReorderMode_()" title="Rearrange charts" aria-label="Rearrange charts" aria-pressed="false">
-        <i class="fa-solid fa-pen-to-square"></i>
-      </button>
-      <button class="header-icon-btn" id="shareBtn" data-menu-label="Share this view" onclick="openShareMenu()" title="Share this view" aria-label="Share this view">
-        <i class="fa-solid fa-share-nodes"></i>
-      </button>
-      <button class="header-icon-btn" id="settingsBtn" onclick="openSettings()" data-menu-label="Settings" title="Settings" aria-label="Settings">
-        <i class="fa-solid fa-gear"></i>
-      </button>
-      <button class="header-icon-btn tour-help-btn" onclick="openTourMenu()" data-menu-label="Take the tour" title="Take the tour" aria-label="Take the tour">
-        <i class="fa-solid fa-circle-question"></i>
-      </button>
-      <button class="header-icon-btn" id="themeToggleBtn" data-menu-label="Theme" onclick="toggleTheme_()" title="Switch to dark mode" aria-label="Switch to dark mode">
-        <i class="fa-solid fa-moon"></i>
-      </button>
-    </div>
   </div>
-</header>
+</section>

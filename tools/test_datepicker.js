@@ -44,7 +44,7 @@ function el(id) {
 }
 
 const nodes = {};
-['archiveSelect', 'datePickerBtn', 'datePickerLabel', 'dateMenu', 'dateMenuSearch', 'dateMenuList']
+['archiveSelect', 'datePickerBtn', 'datePickerLabel', 'dateMenu', 'calGrid', 'calTitle']
   .forEach(id => { nodes[id] = el(id); nodes[id].classList.__o = {}; });
 
 const ctx = {
@@ -88,29 +88,64 @@ check('31 September rejected', ev("dateOptionParts_('31/09/2026')") === null, ''
 check('29 Feb on a leap year kept', ev("dateOptionParts_('29/02/2024').short") === 'Thu 29 Feb',
       ev("dateOptionParts_('29/02/2024') && dateOptionParts_('29/02/2024').short"));
 
-head('[2] the search');
-const search = q => {
-  nodes.dateMenuSearch.value = q;
-  ev('renderDateMenu_()');
-  return (nodes.dateMenuList.innerHTML.match(/data-value="[^"]*"/g) || [])
-    .map(m => m.slice(12, -1)).filter(v => v);
-};
-check('empty query lists every day', search('').length === DAYS.length, '= ' + search('').length);
-check('numeric day', search('12/08').length === 1, search('12/08').join());
-check('month name', search('aug').length === 3, '= ' + search('aug').length);
-check('weekday name', search('monday').length === 1, '= ' + search('monday').length);
-check('year narrows to that year', search('2025').length === 1, '= ' + search('2025').length);
-check('two terms are AND', search('aug 2026').length === 3, '= ' + search('aug 2026').length);
-check('no match yields none', search('zzz').length === 0, '');
-check('Live survives every search',
-      nodes.dateMenuList.innerHTML.indexOf('data-value=""') !== -1, 'still offered after a no-match query');
-search('');
-check('one heading per month, none for Live',
-      (nodes.dateMenuList.innerHTML.match(/date-menu-month/g) || []).length === 3,
-      'expect Aug 2026, Jul 2026, Mar 2025');
+head('[2] the calendar grid');
+// The widget is a month grid now, not a searchable list. What has to hold is
+// that only days WITH an archive are choosable, that the shape of the month is
+// right, and that browsing months never invents a day.
+const cells = () => (nodes.calGrid.innerHTML.match(/<(button|span)[^>]*class="cal-cell[^"]*"/g) || []);
+const pickable = () => (nodes.calGrid.innerHTML.match(/data-cal="[^"]*"/g) || []).map(m => m.slice(10, -1));
+
+ev('_calMonth = new Date(2026, 7, 1)');   // August 2026
+ev('renderDateMenu_()');
+
+check('title names the month', nodes.calTitle.textContent === 'August 2026', nodes.calTitle.textContent);
+// August 2026 starts on a Saturday, so Monday-first gives 5 leading blanks.
+check('31 day cells plus leading blanks', cells().length === 31 + 5, '= ' + cells().length);
+check('leading blanks land the 1st on Saturday',
+      (nodes.calGrid.innerHTML.match(/cal-blank/g) || []).length === 5,
+      '= ' + (nodes.calGrid.innerHTML.match(/cal-blank/g) || []).length);
+check('only archived days are choosable',
+      pickable().join() === '2026-08-12,2026-08-17,2026-08-18',
+      pickable().join());
+check('days without an archive are not buttons',
+      nodes.calGrid.innerHTML.indexOf('<button type="button" class="cal-cell cal-disabled') === -1, '');
+check('unarchived days are still shown',
+      (nodes.calGrid.innerHTML.match(/cal-disabled/g) || []).length === 31 - 3,
+      '= ' + (nodes.calGrid.innerHTML.match(/cal-disabled/g) || []).length);
+
+// A month with no archives at all still renders, and offers nothing.
+ev('_calMonth = new Date(2026, 8, 1)');   // September 2026
+ev('renderDateMenu_()');
+check('a month with no archives offers none', pickable().length === 0, pickable().join());
+check('and still draws its 30 days',
+      (nodes.calGrid.innerHTML.match(/cal-cell/g) || []).length >= 30,
+      '= ' + (nodes.calGrid.innerHTML.match(/cal-cell/g) || []).length);
+
+head('[2b] month navigation');
+ev('_calMonth = new Date(2026, 7, 1); renderDateMenu_();');
+ev('calShiftMonth_(-1)');
+check('back a month', nodes.calTitle.textContent === 'July 2026', nodes.calTitle.textContent);
+check('July offers its one archived day', pickable().join() === '2026-07-31', pickable().join());
+ev('calShiftMonth_(1)');
+ev('calShiftMonth_(1)');
+check('forward across the year holds', nodes.calTitle.textContent === 'September 2026', nodes.calTitle.textContent);
+// December -> January is where a naive month counter breaks.
+ev('_calMonth = new Date(2026, 11, 1); renderDateMenu_(); calShiftMonth_(1);');
+check('December rolls into January', nodes.calTitle.textContent === 'January 2027', nodes.calTitle.textContent);
+
+head('[2c] the selected day is marked');
+nodes.archiveSelect.value = 'https://docs.google.com/x/12-08-2026';
+ev('_calMonth = new Date(2026, 7, 1)');
+ev('renderDateMenu_()');
+check('selected day carries the class',
+      /class="cal-cell cal-selected[^"]*" data-cal="2026-08-12"/.test(nodes.calGrid.innerHTML) ||
+      /data-cal="2026-08-12"/.test(nodes.calGrid.innerHTML) && nodes.calGrid.innerHTML.indexOf('cal-selected') !== -1, '');
+check('exactly one day is selected',
+      (nodes.calGrid.innerHTML.match(/cal-selected/g) || []).length === 1,
+      '= ' + (nodes.calGrid.innerHTML.match(/cal-selected/g) || []).length);
+nodes.archiveSelect.value = '';
 
 head('[3] picking writes through the select');
-nodes.dateMenuSearch.value = '';
 ev('renderDateMenu_()');
 const target = 'https://docs.google.com/x/12-08-2026';
 nodes.archiveSelect.__dispatched = null;
