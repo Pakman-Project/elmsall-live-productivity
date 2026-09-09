@@ -282,23 +282,8 @@ function syncSiteScope_() {
   siteFilter = want;
   applySiteSettings_(siteFilter);
   rawSideData = scopeRowsToSite_(allSideData);
-  refreshBonusListForScope_();
   if (typeof syncSiteUi_ === 'function') syncSiteUi_();
   return true;
-}
-
-/**
- * The operator list, rebuilt from whatever is currently in scope.
- *
- * Derived rather than filtered in place, because the scope widens as well as
- * narrows: picking E3 and then filtering to someone flips the view back to the
- * whole site, and a list left narrowed to E3 would offer a smaller set of
- * people than the dashboard is showing.
- */
-function refreshBonusListForScope_() {
-  var present = {};
-  for (var r = 0; r < rawSideData.length; r++) { present[rawSideData[r].bonus] = true; }
-  allBonusList = Object.keys(present).sort();
 }
 
 // The unscoped payload. rawSideData holds the SCOPED view, so every existing
@@ -658,6 +643,13 @@ function applyConfigToCSSPak() {
 
 var timeRanges = [];
 var rawSideData = [];
+// Every operator in the payload, WHATEVER building is in view. It used to be
+// narrowed to the building, on the reasoning that someone who never worked in
+// E3 would only ever produce an empty E3 dashboard - but that stopped being
+// true once a bonus filter began forcing whole-site scope (see
+// effectiveSiteFilter_). Picking an E1/E2 operator from an E3 view now widens
+// the view to them, so the only thing the narrowing still achieved was hiding
+// people from the search, most visibly anyone whose whole day was OS.
 var allBonusList = [];
 // Bonus number -> { tm, email }, from the 'TM List' tab. Keyed on the
 // upper-cased code, matching how bonus numbers are canonicalised everywhere

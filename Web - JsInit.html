@@ -216,8 +216,9 @@
     allSideData = data.rawSideData || [];
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
+    // The server's list is already every operator on site, which is what the
+    // search wants regardless of the building in view.
     allBonusList = data.bonusList || [];
-    if (siteFilter !== 'all') refreshBonusListForScope_();
     if (typeof syncSiteUi_ === 'function') syncSiteUi_();
     currentThreshold = parseFloat(data.threshold) || 0;
     if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }

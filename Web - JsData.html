@@ -331,9 +331,10 @@ function aggregateTrendRows(rows, windowMinutes) {
     if (windowMinutes === 30) { var m = groupDate.getMinutes(); groupDate.setMinutes(m >= 30 ? 30 : 0, 0, 0); }
     else if (windowMinutes === 60) { groupDate.setMinutes(0, 0, 0); }
     var k = groupDate.getTime();
-    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, stdBreakdown: {} }; }
+    if (!groups[k]) { groups[k] = { startTime: groupDate, blockCount: 0, hourDeployed: 0, stdHours: 0, os: false, stdBreakdown: {} }; }
     var g = groups[k];
     g.blockCount++;
+    if (r.os) { g.os = true; }
     g.hourDeployed += (Number(r.hourDeployed) || 0);
     g.stdHours += (Number(r.stdHours) || 0); 
     if (r.stdBreakdown) {
@@ -351,7 +352,7 @@ function aggregateTrendRows(rows, windowMinutes) {
     var g = groups[k];
     var start = g.startTime;
     var end = new Date(start.getTime() + (windowMinutes * 60000));
-    result.push({ dateTime: formatDatePak(start) + ' - ' + formatDatePak(end), hourDeployed: g.hourDeployed, stdHours: g.stdHours, stdBreakdown: g.stdBreakdown });
+    result.push({ dateTime: formatDatePak(start) + ' - ' + formatDatePak(end), hourDeployed: g.hourDeployed, stdHours: g.stdHours, os: g.os, stdBreakdown: g.stdBreakdown });
   });
   return result;
 }
@@ -379,7 +380,10 @@ function generateTrendRowsForAreas_(data, timeList, areaKeys) {
       }
       if (hasActivity) { totalDeployed += 0.25; }
     }
-    rows.push({ dateTime: tr, hourDeployed: totalDeployed, stdBreakdown: stdBreakdown });
+    // Read off blockData, not qualifiedData: an OS row has no hours and so is
+    // never qualified, which is the whole reason the band needs to say why.
+    var osFlag = blockData.some(function(r) { return r.os === true; });
+    rows.push({ dateTime: tr, hourDeployed: totalDeployed, stdBreakdown: stdBreakdown, os: osFlag });
   });
   return rows;
 }

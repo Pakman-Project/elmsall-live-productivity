@@ -666,13 +666,9 @@
     syncSiteScope_();
     syncSiteUi_();
 
-    // The operator list follows the building: someone who never worked in E3
-    // has nothing to show on an E3 dashboard, so offering them in the search
-    // would only ever produce an empty view. syncSiteScope_ has already done
-    // this when the scope moved; this covers the case where it did not - the
-    // preference changed while a bonus filter held the view at whole-site.
-    refreshBonusListForScope_();
-
+    // The operator list deliberately does NOT follow the building - see
+    // allBonusList in JsState. Changing building leaves the search offering
+    // everyone, because picking any of them widens the view to whole-site.
     if (typeof renderBonusChips === 'function') renderBonusChips();
     if (typeof updateClearBtnVisibility === 'function') updateClearBtnVisibility();
 

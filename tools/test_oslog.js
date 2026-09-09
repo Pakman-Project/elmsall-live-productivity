@@ -20,14 +20,22 @@ const check = (label, ok, detail) => {
 const strip = s => s.replace(/<\/?script>/g, '');
 
 // ── the data layer, as the browser runs it ──────────────────────────────────
-const ctx = { console, currentThreshold: 0.05, selectedBonuses: [] };
+const ctx = { console, document: undefined };
 vm.createContext(ctx);
 vm.runInContext(strip(fs.readFileSync(APPS + 'Web - JsHelpers.html', 'utf8')), ctx);
+// The area lists, which the trend builder reads to find each area's std key.
+vm.runInContext(
+  strip(fs.readFileSync(APPS + 'Web - JsState.html', 'utf8'))
+    .split('function applyConfigToCSSPak')[0], ctx);
 vm.runInContext(strip(fs.readFileSync(APPS + 'Web - JsData.html', 'utf8')), ctx);
 // Only the theme helpers and the OS band code - the rest of JsCharts wants a
 // live Chart.js and a DOM.
 vm.runInContext(
   strip(fs.readFileSync(APPS + 'Web - JsCharts.html', 'utf8')).split('// ── Hover crosshair')[0], ctx);
+
+// Set AFTER JsState, which declares both and would otherwise reset them.
+ctx.currentThreshold = 0.05;
+ctx.selectedBonuses = [];
 
 const TR = ['09/09/2026 06:00 - 09/09/2026 06:15',
             '09/09/2026 06:15 - 09/09/2026 06:30',
@@ -135,10 +143,50 @@ head('[6] nothing draws unless a bonus is filtered');
 const chartsSrc = fs.readFileSync(APPS + 'Web - JsCharts.html', 'utf8').replace(/\/\/[^\n]*/g, '');
 check('osBands is gated on selectedBonuses',
       /osBands\s*=\s*\(\s*selectedBonuses\.length\s*>\s*0\s*\)\s*\?\s*mergeOsBands_/.test(chartsSrc));
+// Volume, productivity, area group and deployment trend - the four families
+// that plot the same time axis. Not a global register, which would band the
+// doughnuts and the bonus-page charts too.
 check('the plugin is attached per-chart, never registered globally',
       chartsSrc.indexOf('Chart.register(osBandPlugin_') === -1 &&
-      (chartsSrc.match(/plugins:\s*\[osBandPlugin_\]/g) || []).length === 3,
-      'registering it globally would band every canvas in the app');
+      (chartsSrc.match(/plugins:\s*\[osBandPlugin_\]/g) || []).length === 4,
+      (chartsSrc.match(/plugins:\s*\[osBandPlugin_\]/g) || []).length + ' attachments');
+
+head('[6b] the trend chart carries the flag too');
+// Its rows come from a different builder and a different aggregator than the
+// other three, so the flag has to be plumbed through both or the band draws
+// on three charts and silently not the fourth.
+{
+  const trendRows = ctx.generateTrendRowsForAreas_(
+    BASE.concat(OS_ROWS), TR, ['pieVol']);
+  check('generateTrendRowsForAreas_ sets os', trendRows.map(r => r.os).join(',') === 'true,true,true,true',
+        trendRows.map(r => r.os).join(','));
+  check('and leaves it clear without OS rows',
+        ctx.generateTrendRowsForAreas_(BASE, TR, ['pieVol']).every(r => r.os === false));
+  check('aggregateTrendRows ORs it up',
+        ctx.aggregateTrendRows(trendRows, 60).every(r => r.os === true));
+  // The bands are indices into the shared label array, so a trend chart can
+  // only line up with them if it aggregates to the same number of buckets.
+  check('same bucket count as the other charts',
+        ctx.aggregateTrendRows(trendRows, 30).length ===
+        ctx.getAggregatedDataPak(rows(BASE.concat(OS_ROWS), true), 30).length,
+        'otherwise the band would sit over the wrong windows');
+}
+
+head('[6c] the bonus search is not narrowed by building');
+// It used to be, so that someone who never worked in E3 was hidden on an E3
+// dashboard. A bonus filter forces whole-site scope, so picking them widens
+// the view rather than emptying it - and the narrowing was hiding anyone whose
+// whole day was OS, since they have no area anywhere.
+{
+  const state = fs.readFileSync(APPS + 'Web - JsState.html', 'utf8');
+  const init = fs.readFileSync(APPS + 'Web - JsInit.html', 'utf8');
+  const ui = fs.readFileSync(APPS + 'Web - JsUi.html', 'utf8');
+  check('the scoping function is gone entirely',
+        (state + init + ui).indexOf('refreshBonusListForScope_') === -1,
+        'a surviving caller would re-narrow the list');
+  check('the list comes straight from the payload',
+        /allBonusList\s*=\s*data\.bonusList\s*\|\|\s*\[\]/.test(init));
+}
 
 head('[7] an OS-only operator is findable under a building filter');
 // The bonus search offers whatever is in scope, and scopeRowsToSite_ decides

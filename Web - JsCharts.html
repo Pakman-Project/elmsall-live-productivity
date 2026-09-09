@@ -63,8 +63,10 @@
     }
   }
 
-  // Attached per-chart, never Chart.register'd - registering globally would put
-  // grey bands on every canvas in the app, including the trend charts.
+  // Attached per-chart, never Chart.register'd. It goes on the four time-series
+  // families - volume, productivity, area group and deployment trend - and
+  // registering it globally would band every other canvas too, including the
+  // doughnuts and the bonus-page charts, where a time band means nothing.
   var osBandPlugin_ = {
     id: 'osBand',
     beforeDatasetsDraw: function(chart, args, opts) {
@@ -952,7 +954,7 @@
         // From the panel, not by id: the id is not unique for the instant
         // between a rebuild and the hoist that follows it, and getElementById
         // would return whichever came first in document order.
-        trendCharts[idx] = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
+        trendCharts[idx] = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
           var others = [perfChart, overviewVolChart].concat(areaGroupCharts);
           for (var k = 0; k < trendCharts.length; k++) { if (k !== idx && trendCharts[k]) others.push(trendCharts[k]); }
           syncToTargets(trendCharts[idx], others, event, elements);
