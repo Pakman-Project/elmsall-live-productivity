@@ -140,7 +140,47 @@ check('the plugin is attached per-chart, never registered globally',
       (chartsSrc.match(/plugins:\s*\[osBandPlugin_\]/g) || []).length === 3,
       'registering it globally would band every canvas in the app');
 
-head('[7] an OS-only block cannot roll the timeline forward');
+head('[7] an OS-only operator is findable under a building filter');
+// The bonus search offers whatever is in scope, and scopeRowsToSite_ decides
+// that by summing the areas - which is zero for an OS block in every building.
+// So YT4, on OS all afternoon, existed in the sheet and in the payload but
+// could not be searched for unless the view happened to be on Elmsall.
+{
+  const s = { console, document: undefined };
+  vm.createContext(s);
+  vm.runInContext(
+    strip(fs.readFileSync(APPS + 'Web - JsState.html', 'utf8'))
+      .split('function applyConfigToCSSPak')[0], s);
+
+  s.__rows = [
+    { bonus: 'AAA', timeRange: 'T1', value: 0.25, pieStd: 0.25, pie: 90 },      // E3
+    { bonus: 'CCC', timeRange: 'T1', value: 0.15, e1e2BppStd: 0.15, e1e2Bpp: 30 }, // E1/E2
+    Object.assign(osRow('T1', 'YT4'), { value: 0 })                             // OS, no area
+  ];
+  const scope = site => {
+    vm.runInContext('siteFilter = ' + JSON.stringify(site), s);
+    return vm.runInContext('scopeRowsToSite_(__rows)', s)
+      .map(function (r) { return r.bonus; });
+  };
+  ['all', 'e3', 'e1e2'].forEach(function (site) {
+    check('YT4 survives ' + site, scope(site).indexOf('YT4') !== -1, scope(site).join(','));
+  });
+  // The rule is the OS flag, not "keep every empty row" - a genuinely empty
+  // row is still someone with nothing in this building, and still goes.
+  s.__rows = [Object.assign(osRow('T1', 'ZZZ'), { os: false })];
+  check('a zero row WITHOUT the flag is still dropped', scope('e3').length === 0,
+        'otherwise this stops being a building filter');
+  // And the flag must not smuggle hours across: value is recomputed per
+  // building, so an OS row reads as zero hours wherever it is shown.
+  s.__rows = [Object.assign(osRow('T1', 'YT4'), { value: 9 })];
+  vm.runInContext('siteFilter = "e3"', s);
+  const kept = vm.runInContext('scopeRowsToSite_(__rows)', s);
+  check('its hours still resolve to this building (0)',
+        kept.length === 1 && kept[0].value === 0,
+        kept.length ? String(kept[0].value) : 'row was dropped');
+}
+
+head('[8] an OS-only block cannot roll the timeline forward');
 // A shift is logged to 18:00 the moment it starts, so at 09:00 the sheet already
 // holds OS rows for blocks the pipeline has published nothing into. The trailing
 // trim exists to stop the axis running past real data; run the real block.

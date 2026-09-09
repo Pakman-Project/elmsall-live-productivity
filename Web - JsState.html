@@ -412,7 +412,14 @@ function scopeRowsToSite_(rows) {
     var row = rows[r], std = 0, vol = 0;
     for (var s = 0; s < stdKeys.length; s++) { std += Number(row[stdKeys[s]]) || 0; }
     for (var v = 0; v < volKeys.length; v++) { vol += Number(row[volKeys[v]]) || 0; }
-    if (std <= 0 && vol <= 0) continue;
+    // An OS block is zero in every area by definition, so this test alone
+    // drops it from every building - and with it the operator, who then
+    // cannot be found in the bonus search at all unless the view happens to
+    // be on Elmsall. OS belongs to no building because the log records no
+    // area, so rather than guess one, keep it in both: the alternative is a
+    // person who was demonstrably on site being invisible. Their `value`
+    // still resolves to 0 below, so they stay inert in every figure.
+    if (std <= 0 && vol <= 0 && !row.os) continue;
 
     var copy = {};
     for (var k in row) { if (row.hasOwnProperty(k)) copy[k] = row[k]; }
