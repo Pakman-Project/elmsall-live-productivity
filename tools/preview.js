@@ -16,6 +16,7 @@
 //   node tools/preview.js                       # then open tools/preview.html
 //   node tools/preview.js --page=volume --site=e3
 //   node tools/preview.js --tour=1
+//   node tools/preview.js --os          # one bonus put on OS, filtered to them
 //
 // In VS Code: right-click preview.html -> Open with Live Preview. Prefer that
 // over opening the file directly - the page uses localStorage, which browsers
@@ -87,6 +88,42 @@ if (leftover) {
 const STUB = `
 <script>
 (function () {
+  // --os: give one demo bonus a spell of OS / Indirect work and filter to them,
+  // so the grey band has something to draw. The tour's bonus codes are random
+  // per load, so the bonus is chosen here rather than passed in.
+  //
+  // It models the harder of the two real cases: the person has NO productive
+  // rows for those windows at all, which is what the notebook synthesises for
+  // someone with no BonusHub events. Their productive rows are removed rather
+  // than merely flagged, because a row with hours on it would still draw a
+  // productivity bar and the band would be explaining nothing.
+  var OS_PREVIEW = ${args.os ? 'true' : 'false'};
+  function withOsSpell_(d) {
+    if (!OS_PREVIEW || !d || !d.bonusList || !d.bonusList.length) return d;
+    var bonus = d.bonusList[0];
+    var trs = d.timeRanges || [];
+    var from = Math.floor(trs.length * 0.35);
+    var to = Math.floor(trs.length * 0.62);
+    var want = {};
+    for (var i = from; i <= to && i < trs.length; i++) { want[trs[i]] = true; }
+
+    d.rawSideData = d.rawSideData.filter(function (r) {
+      return !(r.bonus === bonus && want[r.timeRange]);
+    });
+    var blank = {};
+    Object.keys(d.rawSideData[0] || {}).forEach(function (k) {
+      if (k !== 'timeRange' && k !== 'bonus') blank[k] = 0;
+    });
+    Object.keys(want).forEach(function (tr) {
+      var row = Object.assign({}, blank, { timeRange: tr, bonus: bonus, value: 0, os: true });
+      d.rawSideData.push(row);
+    });
+    // Bands only draw under a bonus filter, so apply one.
+    window.DEEP_BONUS = bonus;
+    console.log('PREVIEW: ' + bonus + ' put on OS for ' + Object.keys(want).length + ' blocks');
+    return d;
+  }
+
   function archiveLinks() {
     var out = [], d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -111,7 +148,7 @@ const STUB = `
     return {
       withSuccessHandler: function (f) { return runner(f, fail); },
       withFailureHandler: function (f) { return runner(ok, f); },
-      getDashboardData: function () { reply(function () { return buildTourDummyData_(); }); },
+      getDashboardData: function () { reply(function () { return withOsSpell_(buildTourDummyData_()); }); },
       getArchiveLinks: function () { reply(archiveLinks); },
       getLastRefreshTimestamp: function () { reply(function () { return null; }); }
     };

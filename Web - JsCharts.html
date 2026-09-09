@@ -10,6 +10,82 @@
   // Area-fill shading: keep it minimal in light mode so charts stay clean.
   function CHART_FILL_A(a) { return _isLightTheme_() ? +(a * 0.35).toFixed(3) : a; }
   function CHART_CROSSHAIR() { return _isLightTheme_() ? "rgba(0,0,0,0.38)" : "rgba(255,255,255,0.45)"; }
+  // OS band: neutral by intent. Every other colour on these charts means a work
+  // area or a threshold verdict, and OS is neither - it is the absence of
+  // productive work, so it reads as a grey wash rather than as another series.
+  function CHART_OS_BAND() { return _isLightTheme_() ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.09)"; }
+
+  // ── OS / Indirect bands ────────────────────────────────────────────────────
+  // A bonus on an indirect task produces a genuine 0% - no volume, no standard
+  // hours - which on its own reads as "this person did nothing". Shading those
+  // windows says why the zero is there.
+  //
+  // Contiguous windows merge into ONE region with ONE label: a 06:00-18:00 OS
+  // shift is forty-eight 15-minute blocks, and forty-eight grey bars each
+  // captioned "OS" would be noise rather than an explanation.
+  function mergeOsBands_(agg) {
+    var bands = [];
+    var start = -1;
+    for (var i = 0; i < agg.length; i++) {
+      if (agg[i] && agg[i].os) {
+        if (start === -1) start = i;
+      } else if (start !== -1) {
+        bands.push({ from: start, to: i - 1 });
+        start = -1;
+      }
+    }
+    if (start !== -1) bands.push({ from: start, to: agg.length - 1 });
+    return bands;
+  }
+
+  // Walks each band and hands the caller its pixel span. A category axis puts
+  // the tick at the CENTRE of its slot, so a band has to reach half a step past
+  // the first and last index to cover them rather than stopping at their middles.
+  function eachOsBand_(chart, opts, fn) {
+    if (!opts || !opts.bands || !opts.bands.length) return;
+    var x = chart.scales.x;
+    var area = chart.chartArea;
+    if (!x || !area) return;
+    var half = Math.abs(x.getPixelForValue(1) - x.getPixelForValue(0)) / 2;
+    if (!isFinite(half) || half <= 0) {
+      var n = (chart.data.labels || []).length;
+      half = (x.right - x.left) / Math.max(1, n) / 2;
+    }
+    var ctx = chart.ctx;
+    for (var b = 0; b < opts.bands.length; b++) {
+      var band = opts.bands[b];
+      var x0 = Math.max(x.left, x.getPixelForValue(band.from) - half);
+      var x1 = Math.min(x.right, x.getPixelForValue(band.to) + half);
+      if (!(x1 > x0)) continue;
+      ctx.save();
+      fn(ctx, x0, x1, area);
+      ctx.restore();
+    }
+  }
+
+  // Attached per-chart, never Chart.register'd - registering globally would put
+  // grey bands on every canvas in the app, including the trend charts.
+  var osBandPlugin_ = {
+    id: 'osBand',
+    beforeDatasetsDraw: function(chart, args, opts) {
+      eachOsBand_(chart, opts, function(ctx, x0, x1, area) {
+        ctx.fillStyle = CHART_OS_BAND();
+        ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
+      });
+    },
+    afterDatasetsDraw: function(chart, args, opts) {
+      eachOsBand_(chart, opts, function(ctx, x0, x1, area) {
+        // Below this the word overflows its own band and collides with the
+        // neighbouring one. The shading still reads without it.
+        if (x1 - x0 < 22) return;
+        ctx.fillStyle = CHART_MUTED();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = '600 11px ' + (getComputedStyle(chart.canvas).fontFamily || 'sans-serif');
+        ctx.fillText('OS', (x0 + x1) / 2, area.top + 6);
+      });
+    }
+  };
 
   // ── Hover crosshair ────────────────────────────────────────────────────────
   // The charts already sync on hover: pointing at 14:30 on the volume chart
@@ -603,8 +679,15 @@
     var xOpt = { ticks: xTicksConfig, grid: { color: CHART_GRID() }, title: { display: true, text: 'Date & Time', color: CHART_MUTED(), font: { size: 12 } } };
     var tOpt = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) : ''); } } };
 
+    // Empty unless a bonus filter is active, and that is the whole of the
+    // "filtered view only" rule - the plugin never has to know about filters.
+    // Unfiltered, someone somewhere is almost always on OS, so the bands would
+    // be permanent wallpaper saying nothing about the site as a whole.
+    var osBands = (selectedBonuses.length > 0) ? mergeOsBands_(agg) : [];
+
     _chartCommon = { agg: agg, labels: labels, rl: rl, pieData: pieData, topUpData: topUpData,
-                     yMax: yMax, xOpt: xOpt, tOpt: tOpt, wm: wm, hRange: hRange };
+                     yMax: yMax, xOpt: xOpt, tOpt: tOpt, wm: wm, hRange: hRange,
+                     osBands: osBands };
     return _chartCommon;
   }
 
@@ -622,7 +705,7 @@
     if (!_c) { return; }
     var agg = _c.agg, labels = _c.labels, rl = _c.rl, pieData = _c.pieData,
         topUpData = _c.topUpData, yMax = _c.yMax, xOpt = _c.xOpt, tOpt = _c.tOpt,
-        wm = _c.wm, hRange = _c.hRange;
+        wm = _c.wm, hRange = _c.hRange, osBands = _c.osBands;
 
     // --- 1. VOLUME ---
     var overviewTitleEl = $('overviewVolChart').closest('.card.panel').querySelector('h2');
@@ -670,10 +753,10 @@
       });
     }
     syncOverviewVolBtn_();
-    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
+    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 2. OVERALL PRODUCTIVITY ---
-    perfChart = new Chart($('perfChart'), { type: 'bar', data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
+    perfChart = new Chart($('perfChart'), { type: 'bar', plugins: [osBandPlugin_], data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 3. AREA GROUP (1 to MAX_AREA_GROUP_CHARTS charts) ---
     var areaGroupBuckets = [];
@@ -789,7 +872,7 @@
           agWrap.appendChild(panelEl);
           ensureChartBoxesPak_(panelEl);
 
-          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
+          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
             var others = [perfChart, overviewVolChart].concat(trendCharts);
             for (var oc = 0; oc < areaGroupCharts.length; oc++) { if (oc !== agIdx) others.push(areaGroupCharts[oc]); }
             syncToTargets(areaGroupCharts[agIdx], others, event, elements);

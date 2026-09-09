@@ -15,6 +15,7 @@ Run them all before a commit, and always after adding a work area:
     node tools/test_onboarding.js
     node tools/test_reorder.js
     node tools/test_sitesettings.js
+    node tools/test_oslog.js
 
 Or in VS Code: **Run Test Task** (the "Check: everything" task in
 `Elmsall Pipeline.code-workspace`).
@@ -28,6 +29,7 @@ Or in VS Code: **Run Test Task** (the "Check: everything" task in
 | `test_onboarding.js` | The first-run setup dialog. That a family answer becomes the right *area* keys, that it narrows only the building it asked about and leaves the other fully visible, that an empty answer is refused rather than committed, that Escape still leaves a usable dashboard, and that a deep link skips the dialog without marking it seen. |
 | `test_sitesettings.js` | Chart settings that are lists of area keys, kept per building. That a group built in E1/E2 never appears in E3, that an unconfigured building follows the default rule (and keeps following it when an area is hidden), and that resetting one dialog leaves the others alone. |
 | `test_reorder.js` | Rearranging chart panels when some are switched off. That the position badge counts the panels on screen rather than all nineteen, and that moving steps over hidden neighbours instead of swapping with one invisibly. |
+| `test_oslog.js` | OS / Indirect rows — the first rows ever admitted to the payload with no standard hours behind them. Chiefly that admitting them moves no existing figure on either threshold path, and that the exclusion is explicit rather than a side effect of the threshold happening to be positive. Also that the flag survives aggregation, that contiguous windows merge into one band, that the band is gated on the bonus filter, and that an OS-only block cannot roll the time axis past the newest real data. |
 | `test_datepicker.js` | The header date picker. Archive-name parsing (including rejecting impossible dates), what the search matches, and that picking a day writes through the hidden `<select>` every other module reads. |
 
 ## Notes

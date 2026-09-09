@@ -256,6 +256,14 @@ function getArchiveLinks() {
 // ─────────────────────────────────────────────
 var PROC_TOTAL_HEADER_ = 'Sum of Std hrs';
 
+// OS is not a work area: it carries no volume and no standard hours, so it gets
+// no entry above. It is a per-row annotation saying the block was spent on an
+// indirect task, which is why a bonus can show 0% and still have been working.
+// The spelling — including the space after the slash — must match the notebook's
+// PROC_HEADER exactly. Typed differently there, this resolves to -1, every row
+// reads os:false, and the feature disappears with no error anywhere.
+var PROC_OS_HEADER_ = 'OS/ Indirect';
+
 var PROC_AREA_COLUMNS_ = [
   { key: 'pie',              stdHeader: 'D.Analysis - OSR PiE',            volHeader: 'Volume - PiE' },
   { key: 'topUp',            stdHeader: 'D.Analysis - OSR Topup',          volHeader: 'Volume - Top Up' },
@@ -308,7 +316,12 @@ function buildProcColumnMap_(headerRow) {
   }
 
   var totalIdx = idx[normaliseProcHeader_(PROC_TOTAL_HEADER_)];
-  var map = { total: (totalIdx === undefined) ? -1 : totalIdx, areas: [] };
+  var osIdx = idx[normaliseProcHeader_(PROC_OS_HEADER_)];
+  var map = {
+    total: (totalIdx === undefined) ? -1 : totalIdx,
+    os: (osIdx === undefined) ? -1 : osIdx,
+    areas: []
+  };
 
   // The current name first, then any it used to go by — so renaming an area
   // does not blank it out on every archive cut before the rename.
@@ -343,7 +356,8 @@ function legacyProcColumnMap_(isV2) {
                     'inboundDecanting', 'osrDecanting', 'bcrInducting', 'e1e2Inducting'];
   var n = isV2 ? 9 : 7;
   var total = 3 + n;
-  var map = { total: total, areas: [] };
+  // No OS column on a file old enough to need this fallback.
+  var map = { total: total, os: -1, areas: [] };
 
   for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
     var key = PROC_AREA_COLUMNS_[i].key;
@@ -369,7 +383,7 @@ function readProcRows_(sheet, lastRow) {
   }
 
   return {
-    vals: sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, map.total + 1)).getValues(),
+    vals: sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, map.total + 1, map.os + 1)).getValues(),
     // Only columns A:C are ever needed as display values — buildSideEntry_ reads
     // dispsRow[0] (time range) and dispsRow[2] (bonus) and takes every other
     // field from vals. Reading 3 columns instead of the full width removes most
@@ -383,7 +397,8 @@ function buildSideEntry_(valsRow, dispsRow, map) {
   var entry = {
     timeRange: String(dispsRow[0]).trim(),
     bonus: String(dispsRow[2]).trim(),
-    value: map.total >= 0 ? toNumber_(valsRow[map.total]) : 0
+    value: map.total >= 0 ? toNumber_(valsRow[map.total]) : 0,
+    os: map.os >= 0 && String(valsRow[map.os]).trim().toUpperCase() === 'YES'
   };
   for (var i = 0; i < map.areas.length; i++) {
     var a = map.areas[i];
@@ -525,7 +540,10 @@ function getDashboardData(archiveUrl) {
         // Sorter 6 inducts did, because bumping v1 to v2 was a step someone had
         // to remember. Keying on the count makes adding an area invalidate the
         // cache by itself.
-        yCacheKey = 'ydayArch_v3_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
+        // v4: entries gained an `os` field. The area count in the key does not
+        // move when a FIELD is added, so without the bump yesterday's cached
+        // rows would come back missing it for up to fifteen minutes.
+        yCacheKey = 'ydayArch_v4_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
                     '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {
@@ -546,7 +564,9 @@ function getDashboardData(archiveUrl) {
             for (var i = 0; i < aRead.vals.length; i++) {
               var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
               if (!yesterdayTRSet[aEntry.timeRange]) continue;
-              if (!aEntry.bonus || aEntry.value <= 0) continue;
+              // An OS block has no standard hours by definition, so the value
+              // test alone would drop exactly the rows the OS band needs.
+              if (!aEntry.bonus || (aEntry.value <= 0 && !aEntry.os)) continue;
               yEntries.push(aEntry);
             }
           }
@@ -569,7 +589,7 @@ function getDashboardData(archiveUrl) {
 
       for (var i = 0; i < lRead.vals.length; i++) {
         var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.map);
-        if (!lEntry.bonus || lEntry.value <= 0) continue;
+        if (!lEntry.bonus || (lEntry.value <= 0 && !lEntry.os)) continue;
 
         var lKey = lEntry.timeRange + '||' + lEntry.bonus;
 
@@ -608,7 +628,7 @@ function getDashboardData(archiveUrl) {
 
       for (var i = 0; i < sRead.vals.length; i++) {
         var entry = buildSideEntry_(sRead.vals[i], sRead.disps[i], sRead.map);
-        if (timeSet[entry.timeRange] && entry.bonus && entry.value > 0) {
+        if (timeSet[entry.timeRange] && entry.bonus && (entry.value > 0 || entry.os)) {
           rawSideData.push(entry);
           bonusSet[entry.bonus] = true;
         }
@@ -628,8 +648,16 @@ function getDashboardData(archiveUrl) {
   // every consumer consistent, because they all derive their windows from
   // timeRanges. Blocks earlier in the day with no data are left in place — only
   // the unpublished tail is removed.
+  //
+  // Judged on rows with hours, NOT on every row. An OS Log entry is typed ahead
+  // of time — a shift logged to 18:00 exists in the sheet at 09:00 — so counting
+  // OS-only rows as "data" would roll the axis forward into empty blocks, which
+  // is the exact failure described above. Every row admitted before OS existed
+  // had value > 0, so this leaves the trim byte-identical to what it was.
   var presentTR = {};
-  for (var pi = 0; pi < rawSideData.length; pi++) { presentTR[rawSideData[pi].timeRange] = true; }
+  for (var pi = 0; pi < rawSideData.length; pi++) {
+    if (rawSideData[pi].value > 0) { presentTR[rawSideData[pi].timeRange] = true; }
+  }
   var newestWithData = -1;
   for (var ti2 = timeRanges.length - 1; ti2 >= 0; ti2--) {
     if (presentTR[timeRanges[ti2]]) { newestWithData = ti2; break; }

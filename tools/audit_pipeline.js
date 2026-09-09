@@ -304,7 +304,32 @@ head('[7] notebook internals');
   check(tag + 'pivot Date Time Range r[9]', src.indexOf('key = (r[9].strip()') !== -1);
   check(tag + 'pivot StdHours r[6]', src.indexOf('_f(r[6])') !== -1);
   check(tag + 'pivot Quantity r[5]', src.indexOf('_f(r[5])') !== -1);
+
+  // OS / Indirect is joined by header NAME on the dashboard side, so the two
+  // repos agree on one literal or they agree on nothing. Spelled differently
+  // here - the space after the slash is the easy one to lose - the column
+  // resolves to -1, every row reads os:false, and the bands simply never draw.
+  // No error is raised anywhere along that path, which is why this is a check
+  // rather than a comment.
+  check(tag + 'OS column in PROC_HEADER', src.indexOf('"OS/ Indirect"') !== -1);
+  // It has to stay LAST. legacyProcColumnMap_ addresses the standard-hours and
+  // volume blocks positionally for files too old to have a usable header row,
+  // and those offsets only hold while nothing is inserted ahead of them.
+  check(tag + 'OS column is last', /\+\s*\[\s*"OS\/ Indirect"\s*\]\s*\)/.test(src.replace(/\s*\n\s*/g, ' ')));
 });
+
+head('[7c] OS column agrees across repos');
+{
+  // The dashboard half of the same literal.
+  const code = fs.readFileSync(APPS + 'Web - Code.js', 'utf8').replace(/\/\/[^\n]*/g, '');
+  const m = code.match(/PROC_OS_HEADER_\s*=\s*'([^']+)'/);
+  check('Code.js declares PROC_OS_HEADER_', !!m, m ? m[1] : 'missing');
+  const nbSrc = JSON.parse(fs.readFileSync(DBX + 'Elmsall Live Productivity.ipynb', 'utf8'))
+    .cells.map(c => c.source.join('')).join('\n');
+  check('and it matches the notebook byte for byte',
+        !!m && nbSrc.indexOf('"' + m[1] + '"') !== -1,
+        m ? JSON.stringify(m[1]) : '');
+}
 
 head('[7b] userscript backfill map <-> notebook reports');
 {
