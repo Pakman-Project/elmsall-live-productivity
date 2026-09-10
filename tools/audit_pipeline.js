@@ -405,6 +405,58 @@ head('[8] syntax');
   catch (e) { check(pair[0], false, e.message); }
 });
 
+head('[' + 'a class that sets display cannot un-hide a [hidden] element' + ']');
+{
+  // [hidden] and a class selector both have specificity (0,1,0), so whichever
+  // rule is declared LATER in the stylesheet wins - regardless of which one is
+  // "supposed" to apply. A class with its own `display:` sets exactly that
+  // trap: .note-banner { display: flex } sat after the browser's built-in
+  // [hidden] rule and silently defeated it, so `el.hidden = true` stopped
+  // hiding anything. There is no error, no warning - the element is simply
+  // visible when it should not be.
+  //
+  // So: any class this codebase toggles `.hidden` on, that ALSO declares its
+  // own `display`, must carry an explicit `.class[hidden] { display: none }`
+  // override - the fix already in place for .onboarding-error.
+  const styles = R('Web - Styles.html');
+  const scripts = fs.readdirSync(APPS).filter(f => /^Web - Js.*\.html$/.test(f))
+    .map(f => R(f)).join('\n');
+
+  // Two passes rather than a line-proximity guess, which missed the very case
+  // this check exists for: JsInit looks noteBanner up on one line and sets
+  // .hidden five lines later, well outside a small window. Pass 1 maps every
+  // `var x = $('someId')` / `x = $('someId')` binding; pass 2 walks every
+  // `<name>.hidden =` and resolves through that map when the name is not
+  // itself a literal id lookup.
+  const idFor = {};
+  let bm;
+  const bindRe = /(?:var\s+)?(\w+)\s*=\s*\$\(\s*['"]([\w-]+)['"]\s*\)/g;
+  while ((bm = bindRe.exec(scripts))) { idFor[bm[1]] = bm[2]; }
+
+  const idsToggled = new Set();
+  let hm;
+  const hiddenRe = /\$\(\s*['"]([\w-]+)['"]\s*\)\s*\.hidden\s*=|(\w+)\s*\.hidden\s*=/g;
+  while ((hm = hiddenRe.exec(scripts))) {
+    if (hm[1]) idsToggled.add(hm[1]);
+    else if (idFor[hm[2]]) idsToggled.add(idFor[hm[2]]);
+  }
+
+  const index = R('Web - Index.html') + R('Web - Header.html');
+  let bad = [];
+  idsToggled.forEach(id => {
+    const tag = new RegExp('id=["\']' + id + '["\'][^>]*class=["\']([^"\']+)["\']|class=["\']([^"\']+)["\'][^>]*id=["\']' + id + '["\']');
+    const hit = index.match(tag);
+    if (!hit) return;
+    const classes = (hit[1] || hit[2]).split(/\s+/);
+    classes.forEach(cls => {
+      const declares = new RegExp('\\.' + cls + '\\s*\\{[^}]*\\bdisplay\\s*:', 's').test(styles);
+      const overridden = new RegExp('\\.' + cls + '\\[hidden\\]').test(styles);
+      if (declares && !overridden) bad.push(id + ' (.' + cls + ')');
+    });
+  });
+  check('every such class has a [hidden] override', bad.length === 0, bad.join(', '));
+}
+
 head('[' + 'nothing scrolls outside the iframe' + ']');
 {
   // The dashboard is embedded in a Google Site, and Element.scrollIntoView()

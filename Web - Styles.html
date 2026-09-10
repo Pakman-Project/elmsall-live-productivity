@@ -1230,6 +1230,13 @@ body.loading-skeleton #mainTableWrapper::after {
    Tinted rather than solid red: a solid bar at the top of every page reads as
    the dashboard being broken, and this is a person leaving a message, not an
    error. The left border and the icon carry the urgency instead. */
+/* [hidden] and .note-banner both have specificity (0,1,0), so without this
+   the class - declared later - wins and the banner shows even while hidden.
+   Same fix as .onboarding-error[hidden] below. */
+.note-banner[hidden] {
+  display: none;
+}
+
 .note-banner {
   display: flex;
   align-items: flex-start;
