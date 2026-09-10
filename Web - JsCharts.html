@@ -38,24 +38,37 @@
     return bands;
   }
 
-  // Walks each band and hands the caller its pixel span. A category axis puts
-  // the tick at the CENTRE of its slot, so a band has to reach half a step past
-  // the first and last index to cover them rather than stopping at their middles.
+  // Walks each band and hands the caller its pixel span.
+  //
+  // Both edges land ON their OS point rather than half a step outside it.
+  // Covering the whole first and last window is arguably the truer statement,
+  // but it puts grey outside the points the hover line sits on, which reads as
+  // the band overrunning where the OS actually started and stopped. Cutting at
+  // the points makes the edges and the hover line agree.
+  //
+  // The cost is that a band of ONE window has no width at all, so it gets a
+  // minimum, centred on its point. That is the one case where the edges are not
+  // the honest thing - being invisible would be worse.
+  var OS_BAND_MIN_W = 8;
+
   function eachOsBand_(chart, opts, fn) {
     if (!opts || !opts.bands || !opts.bands.length) return;
     var x = chart.scales.x;
     var area = chart.chartArea;
     if (!x || !area) return;
-    var half = Math.abs(x.getPixelForValue(1) - x.getPixelForValue(0)) / 2;
-    if (!isFinite(half) || half <= 0) {
-      var n = (chart.data.labels || []).length;
-      half = (x.right - x.left) / Math.max(1, n) / 2;
-    }
     var ctx = chart.ctx;
     for (var b = 0; b < opts.bands.length; b++) {
       var band = opts.bands[b];
-      var x0 = Math.max(x.left, x.getPixelForValue(band.from) - half);
-      var x1 = Math.min(x.right, x.getPixelForValue(band.to) + half);
+      var p0 = x.getPixelForValue(band.from);
+      var p1 = x.getPixelForValue(band.to);
+      if (!isFinite(p0) || !isFinite(p1)) continue;
+      if (p1 - p0 < OS_BAND_MIN_W) {
+        var mid = (p0 + p1) / 2;
+        p0 = mid - OS_BAND_MIN_W / 2;
+        p1 = mid + OS_BAND_MIN_W / 2;
+      }
+      var x0 = Math.max(x.left, p0);
+      var x1 = Math.min(x.right, p1);
       if (!(x1 > x0)) continue;
       ctx.save();
       fn(ctx, x0, x1, area);
@@ -262,6 +275,15 @@
     applyLocalFiltersPak();
   }
 
+  // Same path as toggleVolumeArea, so the mirror to Bonus and the saved
+  // preference follow exactly as they do for a single chip.
+  function setAllVolumeAreas(show) {
+    setAllAreaKeysPak_(hiddenVolumeAreas, show);
+    mirrorHiddenAreasPak_('volume');
+    saveUserPreferences();
+    applyLocalFiltersPak();
+  }
+
   // ---- The Overall page's volume chart: which areas it draws ---------------
   // A separate list from hiddenVolumeAreas on purpose. Hiding an area is a
   // statement about the whole dashboard; choosing what this one chart leads on
@@ -382,7 +404,8 @@
       visible: mode === 'separate',
       hiddenKeys: hiddenVolumeAreas,
       orderKeys: (typeof areaKeyOrderForZone_ === 'function') ? areaKeyOrderForZone_('volume') : null,
-      onToggle: 'toggleVolumeArea'
+      onToggle: 'toggleVolumeArea',
+      onSetAll: 'setAllVolumeAreas'
     });
   }
 
@@ -791,14 +814,15 @@
       buildAreaGroupDatasets_ = function (groupsForChart) {
         var ds = [];
         groupsForChart.forEach(function (group) {
-          // null, not 0, where nothing was deployed: Chart.js breaks the line
-          // at a null and draws a dive to the axis for a 0. An area that is
-          // simply not running was being drawn as productivity collapsing to
-          // nothing, which is a different claim entirely - and it dragged the
-          // minimum to 0, which would have pinned the axis below.
+          // 0, not null, where nothing was deployed. This used to be null so
+          // that "not running" and "running at 0%" stayed distinguishable -
+          // Chart.js breaks the line at a null and dives to the axis for a 0 -
+          // but the break was read as the chart giving up rather than as the
+          // area being idle, and it made this chart behave differently from
+          // the volume chart beside it, which runs along zero. Continuous and
+          // consistent won; the y-axis minimum is pinned at 0 as a result.
           var dataArr = perfSplitAgg.map(function (r) {
-            var deployed = Number(r[group.id + '_dep']) || 0;
-            return deployed > 0 ? (r[group.id] || 0) : null;
+            return r[group.id] || 0;
           });
           if (group.showLine) {
             ds.push({ label: group.label, data: dataArr, borderWidth: 2, borderColor: group.color, backgroundColor: hexToRgbaPak(group.color, 0.1), tension: 0.35, pointRadius: 2, fill: false });
@@ -986,8 +1010,9 @@
         var arr = ds[d].data || [];
         for (var i = 0; i < arr.length; i++) {
           var v = Number(arr[i]);
-          // Skips the nulls that mark an idle block, and the nulls a trend line
-          // returns when it has too few points to fit.
+          // Skips the nulls a trend line returns when it has too few points to
+          // fit. Idle blocks are 0 rather than null now, so they DO pull the
+          // floor to zero - which is the accepted cost of an unbroken line.
           if (!Number.isFinite(v)) continue;
           if (v < min) min = v;
           if (v > max) max = v;

@@ -47,9 +47,9 @@ var VOLUME_TYPES = [
   { key: 'sorter6PackingVol', stdKey: 'sorter6PackingStd', label: 'Sorter 6 Packing', family: 'Packing', color: '#108356', colorDark: '#108559' },
   { key: 'e3BppVol', stdKey: 'e3BppStd', label: 'E3 BPP', family: 'Packing', color: '#159b67', colorDark: '#159c6a' },
   { key: 'e3PackingVol', stdKey: 'e3PackingStd', label: 'E3 Packing', family: 'Packing', color: '#23b379', colorDark: '#1fb47b' },
-  { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'Parcel Induct', family: 'Parcel', color: '#95305b', colorDark: '#ae2b60' },
-  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'Parcel Sortation', family: 'Parcel', color: '#db7099', colorDark: '#db5786' },
-  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E1/E2 Inducting', family: 'Inducting', color: '#776ee0', colorDark: '#7d71d3' },
+  { key: 'parcelInductVol', stdKey: 'parcelInductStd', label: 'E3 Parcel Induct', family: 'Parcel', color: '#95305b', colorDark: '#ae2b60' },
+  { key: 'parcelSortationVol', stdKey: 'parcelSortationStd', label: 'E3 Parcel Sortation', family: 'Parcel', color: '#db7099', colorDark: '#db5786' },
+  { key: 'e1e2InductingVol', stdKey: 'e1e2InductingStd', label: 'E3 EDW Induct', family: 'Inducting', color: '#776ee0', colorDark: '#7d71d3' },
   { key: 'bcrInductingVol', stdKey: 'bcrInductingStd', label: 'BCR Inducting', family: 'Inducting', color: '#8c86f9', colorDark: '#9085e9' },
   { key: 'osrDecantingVol', stdKey: 'osrDecantingStd', label: 'OSR Decanting', family: 'Decanting', color: '#016f01', colorDark: '#0a7c08' },
   { key: 'inboundDecantingVol', stdKey: 'inboundDecantingStd', label: 'E3 Inbound Decanting', family: 'Decanting', color: '#49b343', colorDark: '#3aa635' },
@@ -112,9 +112,13 @@ function areaColor_(t) {
 // title doubles as the picker, so what the dashboard says it is showing and
 // what it IS showing cannot drift apart.
 //
-// E1/E2 Inducting is E3 work despite the name: the operator stands in E3
-// inducting totes that arrived from E1/E2. The building is where the hours are
-// earned, not where the stock came from.
+// E3 EDW Induct is filed under E3 because that is where the hours are earned:
+// the operator stands in E3 inducting totes that arrived from the E1/E2
+// warehouse. It was called "E1/E2 Inducting", which read as an E1/E2 area and
+// made this mapping look like a mistake; the name now says the building and
+// the source, so it no longer needs defending. The key is still
+// e1e2Inducting, because renaming that would break every saved layout and
+// every archive's column map.
 var AREA_SITE = {
   pie: 'e3', topUp: 'e3', e3Packing: 'e3', parcelInduct: 'e3',
   parcelSortation: 'e3', inboundDecanting: 'e3', osrDecanting: 'e3',
@@ -435,9 +439,9 @@ var MAIN_TABLE_METRIC_COLUMNS = [
   { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
   { key: 'e3BppVol', label: 'E3 BPP' },
   { key: 'e3PackingVol', label: 'E3 Packing' },
-  { key: 'parcelInductVol', label: 'Parcel Induct' },
-  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
-  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'parcelInductVol', label: 'E3 Parcel Induct' },
+  { key: 'parcelSortationVol', label: 'E3 Parcel Sortation' },
+  { key: 'e1e2InductingVol', label: 'E3 EDW Induct' },
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'inboundDecantingVol', label: 'E3 Inbound Decanting' },
@@ -467,9 +471,9 @@ var mainTableSortableColumns = [
   { key: 'sorter6PackingVol', label: 'Sorter 6 Packing' },
   { key: 'e3BppVol', label: 'E3 BPP' },
   { key: 'e3PackingVol', label: 'E3 Packing' },
-  { key: 'parcelInductVol', label: 'Parcel Induct' },
-  { key: 'parcelSortationVol', label: 'Parcel Sortation' },
-  { key: 'e1e2InductingVol', label: 'E1/E2 Inducting' },
+  { key: 'parcelInductVol', label: 'E3 Parcel Induct' },
+  { key: 'parcelSortationVol', label: 'E3 Parcel Sortation' },
+  { key: 'e1e2InductingVol', label: 'E3 EDW Induct' },
   { key: 'bcrInductingVol', label: 'BCR Inducting' },
   { key: 'osrDecantingVol', label: 'OSR Decanting' },
   { key: 'inboundDecantingVol', label: 'E3 Inbound Decanting' },
@@ -639,6 +643,24 @@ function applyConfigToCSSPak() {
     var a = ACCENT_ALPHAS[i];
     root.style.setProperty('--accent-' + a, hexToRgbaPak(accent, a / 100));
   }
+
+  // Every area-picking dialog lays its checkboxes out in equal columns, and
+  // they were fixed at nine across - which is narrower than the longest area
+  // name, so the names were being truncated to "E3 - Onlin...". Sizing the
+  // column to the longest label instead means the count per row falls out of
+  // however wide the dialog is, the columns stay equal so the ticks line up
+  // vertically, and nothing needs revisiting when an area is added or renamed.
+  //
+  // Measured in ch off the longest label rather than by reading offsetWidth:
+  // these dialogs are display:none until opened, so a real measurement reads
+  // zero at the moment this runs. ch is the width of a '0', which for a
+  // proportional font over-estimates slightly - which is the safe direction.
+  var longest = 0;
+  for (var v = 0; v < VOLUME_TYPES.length; v++) {
+    longest = Math.max(longest, String(VOLUME_TYPES[v].label || '').length);
+  }
+  // The checkbox, the colour dot and the two gaps beside them.
+  root.style.setProperty('--area-chip-w', 'calc(' + longest + 'ch + 46px)');
 }
 
 var timeRanges = [];

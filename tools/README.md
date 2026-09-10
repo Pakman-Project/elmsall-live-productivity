@@ -16,6 +16,7 @@ Run them all before a commit, and always after adding a work area:
     node tools/test_reorder.js
     node tools/test_sitesettings.js
     node tools/test_oslog.js
+    node tools/test_bonuspanel.js
     python tools/test_oslog_dates.py
 
 Or in VS Code: **Run Test Task** (the "Check: everything" task in
@@ -31,6 +32,7 @@ Or in VS Code: **Run Test Task** (the "Check: everything" task in
 | `test_sitesettings.js` | Chart settings that are lists of area keys, kept per building. That a group built in E1/E2 never appears in E3, that an unconfigured building follows the default rule (and keeps following it when an area is hidden), and that resetting one dialog leaves the others alone. |
 | `test_reorder.js` | Rearranging chart panels when some are switched off. That the position badge counts the panels on screen rather than all nineteen, and that moving steps over hidden neighbours instead of swapping with one invisibly. |
 | `test_oslog.js` | OS / Indirect rows — the first rows ever admitted to the payload with no standard hours behind them. Chiefly that admitting them moves no existing figure on either threshold path, and that the exclusion is explicit rather than a side effect of the threshold happening to be positive. Also that the flag survives aggregation, that contiguous windows merge into one band, that the band is gated on the bonus filter, and that an OS-only block cannot roll the time axis past the newest real data. |
+| `test_bonuspanel.js` | The Bonus page's area panels. Chiefly that the area's own productivity totals standard hours and deployed hours before dividing, rather than averaging the per-operator percentages - which would weight a two-block operator like a full shift and disagree with the charts. Also that it is cross-checked against the chart's own code path, that no hours deployed reports nothing rather than 0%, and that deployed hours are carried rather than reconstructed. |
 | `test_oslog_dates.py` | How a logged OS spell becomes 15-minute windows — the notebook's own `_os_windows`, lifted out and run rather than re-implemented. Chiefly that the Date column is the PRODUCTION day, which starts at 06:00, so a spell logged before then belongs to the next calendar date; also midnight crossings, month/year boundaries, grid flooring, the over-long-spell cap, and that both notebooks carry the same copy. The only Python suite: the logic under test is Python. |
 | `test_datepicker.js` | The header date picker. Archive-name parsing (including rejecting impossible dates), what the search matches, and that picking a day writes through the hidden `<select>` every other module reads. |
 

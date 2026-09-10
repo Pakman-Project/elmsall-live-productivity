@@ -330,9 +330,9 @@ var DETAIL_TABLE_COLUMNS = [
   { key: 'sorter6PackingVol',      label: 'Sorter 6 Packing',        type: 'num' },
   { key: 'e3BppVol',               label: 'E3 BPP',                  type: 'num' },
   { key: 'e3PackingVol',           label: 'E3 Packing',              type: 'num' },
-  { key: 'parcelInductVol',        label: 'Parcel Induct',           type: 'num' },
-  { key: 'parcelSortationVol',     label: 'Parcel Sortation',        type: 'num' },
-  { key: 'e1e2InductingVol',       label: 'E1/E2 Inducting',         type: 'num' },
+  { key: 'parcelInductVol',        label: 'E3 Parcel Induct',           type: 'num' },
+  { key: 'parcelSortationVol',     label: 'E3 Parcel Sortation',        type: 'num' },
+  { key: 'e1e2InductingVol',       label: 'E3 EDW Induct',         type: 'num' },
   { key: 'bcrInductingVol',        label: 'BCR Inducting',           type: 'num' },
   { key: 'osrDecantingVol',        label: 'OSR Decanting',           type: 'num' },
   { key: 'inboundDecantingVol',    label: 'E3 Inbound Decanting',    type: 'num' },
@@ -532,6 +532,11 @@ function computeBonusRows_(data, stdKey) {
     rows.push({
       bonus: bonus,
       standardHour: totalStandardHours,
+      // Carried so the panel can total the area properly. Recovering it from
+      // standardHour and performance divides by zero for anyone at 0%, and
+      // averaging the per-operator percentages is a different figure again -
+      // it weights a two-block operator the same as a full shift.
+      deployedHour: deployedHours,
       performance: deployedHours > 0 ? (totalStandardHours / deployedHours) * 100 : 0
     });
   });
@@ -584,6 +589,22 @@ function buildBonusMiniTable_(rows, metric) {
   return html;
 }
 
+// The area's productivity over the selected window, as one figure: total
+// standard hours earned divided by total hours deployed. Summing both sides
+// before dividing is the whole point - the mean of the per-operator
+// percentages would weight somebody who worked two blocks the same as somebody
+// who worked the entire window, and read differently from the charts, which
+// total first. Returns null when nobody was deployed, since 0% would claim
+// the area ran badly rather than not at all.
+function areaTotalPerformance_(rows) {
+  var std = 0, dep = 0;
+  for (var i = 0; i < rows.length; i++) {
+    std += Number(rows[i].standardHour) || 0;
+    dep += Number(rows[i].deployedHour) || 0;
+  }
+  return dep > 0 ? (std / dep) * 100 : null;
+}
+
 function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
   var minUnderPerf = (currentThreshold / 0.25) * 100;
   var metric = sideSortMetric;
@@ -630,7 +651,16 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
       ' data-reorder-label="' + escapeAttrPak(title) + '"'
     : '';
   var html = '<div class="card panel"' + reorderAttrs + '>';
-  html += '<div class="mini-table-title"><h2>' + safeTextPak(title) + '</h2><span class="tag">' + allRows.length + ' head' + (allRows.length !== 1 ? 's' : '') + '</span></div>';
+  // The area's own productivity, beside its name: the two tables below rank
+  // operators against each other, and neither says how the area did overall.
+  var areaPerf = areaTotalPerformance_(allRows);
+  var areaPerfHtml = (areaPerf === null) ? '' :
+    '<span class="pill ' + perfClassPak(areaPerf) + '">' +
+    Math.round(normalizePerfPak(areaPerf)) + '%</span>';
+  html += '<div class="mini-table-title' + (areaPerfHtml ? ' has-area-perf' : '') +
+          '"><h2>' + safeTextPak(title) + '</h2>' +
+          areaPerfHtml +
+          '<span class="tag">' + allRows.length + ' head' + (allRows.length !== 1 ? 's' : '') + '</span></div>';
   html += '<div class="bonus-two-tables">';
   html += '<div><div class="bonus-table-caption good"><i class="fa-solid fa-arrow-trend-up"></i> Productive</div>';
   html += '<div class="table-wrap">' + buildBonusMiniTable_(topRows, metric) + '</div></div>';
@@ -655,13 +685,27 @@ function toggleBonusArea(key) {
   refreshBonusTables();
 }
 
+// Same path as toggleBonusArea above, including the sync branch.
+function setAllBonusAreas(show) {
+  setAllAreaKeysPak_(hiddenBonusAreas, show);
+
+  if (syncAreaChips) {
+    mirrorHiddenAreasPak_('bonus');
+    applyLocalFiltersPak();
+    return;
+  }
+
+  refreshBonusTables();
+}
+
 function renderBonusAreaToggles_(mode) {
   renderAreaToggleChips_({
     containerId: 'bonusAreaToggles',
     visible: mode === 'area',
     hiddenKeys: hiddenBonusAreas,
     orderKeys: (typeof areaKeyOrderForZone_ === 'function') ? areaKeyOrderForZone_('bonus') : null,
-    onToggle: 'toggleBonusArea'
+    onToggle: 'toggleBonusArea',
+    onSetAll: 'setAllBonusAreas'
   });
 }
 

@@ -127,12 +127,6 @@
           <div class="rail-spacer" aria-hidden="true"></div>
 
           <div class="next-header-actions rail-actions" id="headerActions">
-            <button class="header-icon-btn refresh-btn" onclick="loadDataPak()" data-menu-label="Refresh" title="Refresh" aria-label="Refresh">
-              <i class="fa-solid fa-arrows-rotate"></i>
-            </button>
-            <button class="header-icon-btn" id="autoRefreshBtn" data-menu-label="Auto-refresh" onclick="toggleAutoRefresh_()" title="Pause auto-refresh" aria-label="Pause auto-refresh">
-              <i class="fa-solid fa-pause"></i>
-            </button>
             <button class="header-icon-btn" id="reorderBtn" data-menu-label="Rearrange charts" onclick="toggleReorderMode_()" title="Rearrange charts" aria-label="Rearrange charts" aria-pressed="false">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
@@ -313,7 +307,7 @@
 
               <div class="card panel vol-chart-panel" id="volPanel16">
                 <div class="mini-table-title">
-                  <h2>Parcel Induct</h2>
+                  <h2>E3 Parcel Induct</h2>
                   <span class="tag">Parcel</span>
                 </div>
                 <canvas id="volChart16"></canvas>
@@ -321,7 +315,7 @@
 
               <div class="card panel vol-chart-panel" id="volPanel17">
                 <div class="mini-table-title">
-                  <h2>Parcel Sortation</h2>
+                  <h2>E3 Parcel Sortation</h2>
                   <span class="tag">Parcel</span>
                 </div>
                 <canvas id="volChart17"></canvas>
@@ -329,7 +323,7 @@
 
               <div class="card panel vol-chart-panel" id="volPanel18">
                 <div class="mini-table-title">
-                  <h2>E1/E2 Inducting</h2>
+                  <h2>E3 EDW Induct</h2>
                   <span class="tag">Inducting</span>
                 </div>
                 <canvas id="volChart18"></canvas>
@@ -459,9 +453,9 @@
                         <th data-key="sorter6PackingVol" data-site="e1e2">Sorter 6 Packing</th>
                         <th data-key="e3BppVol" data-site="e3">E3 BPP</th>
                         <th data-key="e3PackingVol" data-site="e3">E3 Packing</th>
-                        <th data-key="parcelInductVol" data-site="e3">Parcel Induct</th>
-                        <th data-key="parcelSortationVol" data-site="e3">Parcel Sortation</th>
-                        <th data-key="e1e2InductingVol" data-site="e3">E1/E2 Inducting</th>
+                        <th data-key="parcelInductVol" data-site="e3">E3 Parcel Induct</th>
+                        <th data-key="parcelSortationVol" data-site="e3">E3 Parcel Sortation</th>
+                        <th data-key="e1e2InductingVol" data-site="e3">E3 EDW Induct</th>
                         <th data-key="bcrInductingVol" data-site="e3">BCR Inducting</th>
                         <th data-key="osrDecantingVol" data-site="e3">OSR Decanting</th>
                         <th data-key="inboundDecantingVol" data-site="e3">E3 Inbound Decanting</th>

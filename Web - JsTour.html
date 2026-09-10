@@ -40,28 +40,17 @@ var TOUR_STEPS = [
   { part: 1, page: 0, target: null,
     title: 'Welcome 👋',
     body: 'This is Elmsall Live Productivity — a live view of warehouse output across every work area in the Elmsall complex. This tour plays itself using example data while your real data loads in the background — sit back and watch. Pause any time, step through with Back and Next, or skip out entirely.' },
-  // On a phone the action buttons live inside the burger menu, so it has to be
-  // opened BEFORE the steps that ring them — otherwise those steps point at
-  // display:none elements, which measure 0x0 and get no visible ring. The menu
-  // is opened here and held open across the two button steps below, then closed.
   { part: 1, page: 0, target: '#sitePickerBtn',
     title: 'One site, or all of it',
     body: 'Elmsall is three buildings. The title is also a filter — pick E3 or E1/E2 and the whole dashboard narrows to it: every figure, chart and column, not just a change of heading. The name you see is always the data you are looking at, and your choice is remembered.' },
   { part: 1, page: 0, target: '#headerMenuBtn', whenCollapsed: true,
     interactive: { sel: '#headerMenuBtn', type: 'click' },
-    title: 'Everything else lives here',
-    body: 'When the window is too narrow to show them, the action buttons fold into this menu — refresh, auto-refresh, rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
-  { part: 1, page: 0, target: '.refresh-btn',
-    // Idempotent, and only does anything when the header is collapsed: this
-    // keeps the menu open whether the step is reached forwards or backwards.
-    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
-    title: 'Refresh any time',
-    body: 'The dashboard keeps itself up to date, but tap here whenever you want to pull the very latest figures immediately.' },
-  { part: 1, page: 0, target: '#autoRefreshBtn',
-    action: function () { tourOpenHeaderMenuIfCollapsed_(); },
+    // This step opens the menu, so it has to close it again. It used to be left
+    // open across the two refresh-button steps that followed and closed by the
+    // last of them; with those gone, the cleanup belongs here.
     cleanup: function () { if (typeof toggleHeaderMenu_ === 'function') toggleHeaderMenu_(false); },
-    title: 'Auto-refresh — and how to pause it',
-    body: 'The dashboard checks for new data every minute on its own. Hover this button to see how long until the next check, or click it to pause updating — handy when you are reading a number and don’t want it changing under you. Click again to resume.' },
+    title: 'Everything else lives here',
+    body: 'When the window is too narrow to show them, the action buttons fold into this menu — rearranging, sharing, this tour and the light/dark switch. Watch it open.' },
   { part: 1, page: 0, target: '#datePickerBtn',
     cleanup: function () { if (typeof toggleDateMenu_ === 'function') toggleDateMenu_(false); },
     title: 'Live vs history',

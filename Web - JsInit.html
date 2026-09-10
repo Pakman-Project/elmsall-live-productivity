@@ -252,12 +252,12 @@
   }
 
   // ── Auto-refresh: countdown + pause ────────────────────────────────────────
-  // The dashboard silently polled every 60s, so users had no idea whether it was
-  // about to update, or any way to hold it still while reading. A 1s ticker
-  // drives both the visible countdown and the poll itself.
+  // Polls every 60s. There was a header button carrying a countdown in its
+  // tooltip and a pause, on the reasoning that a figure changing under you
+  // while you read it is unwelcome; both are gone, along with the manual
+  // refresh beside them, so the polling is silent again and always on.
   var POLL_INTERVAL_MS = 60000;
   var nextPollAt = 0;
-  var autoRefreshPaused = false;
 
   function pollForUpdates_() {
     if (lastRefreshTimestamp === null) return;
@@ -269,50 +269,12 @@
     }).getLastRefreshTimestamp();
   }
 
-  // The countdown lives in the auto-refresh button's tooltip rather than as
-  // header text — the header meta row was getting crowded, and the countdown is
-  // only interesting when you go looking for it.
-  function setAutoRefreshTooltip_(text) {
-    var btn = $('autoRefreshBtn');
-    if (!btn) return;
-    btn.setAttribute('title', text);
-    btn.setAttribute('aria-label', text);
-  }
-
   function refreshTick_() {
     // Archive snapshots are static — nothing to poll for.
-    if (currentArchiveUrl) {
-      setAutoRefreshTooltip_('Auto-refresh (not used for history snapshots)');
-      return;
-    }
-
-    if (autoRefreshPaused) {
-      setAutoRefreshTooltip_('Auto-refresh paused — click to resume');
-      return;
-    }
-
-    var remaining = nextPollAt - Date.now();
-    if (remaining <= 0) {
-      nextPollAt = Date.now() + POLL_INTERVAL_MS;
-      remaining = POLL_INTERVAL_MS;
-      pollForUpdates_();
-    }
-    var secs = Math.ceil(remaining / 1000);
-    setAutoRefreshTooltip_('Pause auto-refresh — next check in ' +
-      Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0'));
-  }
-
-  function toggleAutoRefresh_() {
-    autoRefreshPaused = !autoRefreshPaused;
-    // Restart the countdown on resume rather than firing immediately.
-    if (!autoRefreshPaused) nextPollAt = Date.now() + POLL_INTERVAL_MS;
-    var btn = $('autoRefreshBtn');
-    if (btn) {
-      var icon = btn.querySelector('i');
-      if (icon) icon.className = autoRefreshPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
-      btn.classList.toggle('paused', autoRefreshPaused);
-    }
-    refreshTick_();  // refreshes the tooltip text for the new state
+    if (currentArchiveUrl) return;
+    if (Date.now() < nextPollAt) return;
+    nextPollAt = Date.now() + POLL_INTERVAL_MS;
+    pollForUpdates_();
   }
 
   // ── Stale-data warning ─────────────────────────────────────────────────────

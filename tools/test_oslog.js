@@ -136,6 +136,59 @@ check('the whole series', bands([true, true, true]) === '[{"from":0,"to":2}]',
 check('nothing at all', bands([false, false]) === '[]');
 check('an empty series', bands([]) === '[]');
 
+head('[5b] the band cuts on its own points, not half a step outside them');
+// Revised twice: it covered the full first and last window, which put grey
+// beyond the points the hover line sits on and read as the band overrunning
+// where the OS started and stopped. Pinned here because "which pixel" is
+// invisible to every other check, and a plausible-looking edit either way
+// silently changes what the shading claims.
+{
+  // The fill colour is theme-aware, so the plugin reads the document even
+  // though only geometry is under test here.
+  const savedDoc = ctx.document;
+  ctx.document = { documentElement: { classList: { contains: () => false } } };
+
+  const N = 20, left = 50, right = 450, step = (right - left) / N;
+  const painted = [];
+  const stub = {
+    ctx: {
+      save() {}, restore() {},
+      fillRect(x, y, w) { painted.push([+x.toFixed(1), +(x + w).toFixed(1)]); },
+      fillText() {},
+      set fillStyle(v) {}, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}
+    },
+    canvas: {},
+    data: { labels: new Array(N).fill('x') },
+    chartArea: { top: 10, bottom: 210, left: left, right: right },
+    // A category axis puts the tick at the CENTRE of its slot.
+    scales: { x: { left: left, right: right, getPixelForValue: i => left + step * (i + 0.5) } }
+  };
+  const tick = i => left + step * (i + 0.5);
+  const span = bands => {
+    painted.length = 0;
+    ctx.osBandPlugin_.beforeDatasetsDraw(stub, null, { bands: bands });
+    return painted[0];
+  };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  check('a mid-series band runs point to point', same(span([{ from: 2, to: 5 }]), [tick(2), tick(5)]),
+        JSON.stringify(span([{ from: 2, to: 5 }])) + ' want ' + JSON.stringify([tick(2), tick(5)]));
+  check('and so does one starting at the first window',
+        same(span([{ from: 0, to: 3 }]), [tick(0), tick(3)]),
+        JSON.stringify(span([{ from: 0, to: 3 }])));
+  // Point to point makes a one-window band zero-width, so it gets a minimum.
+  const one = span([{ from: 7, to: 7 }]);
+  check('a single window is still visible', one[1] - one[0] > 0, one[1] - one[0] + 'px wide');
+  check('and is centred on its own point', Math.abs((one[0] + one[1]) / 2 - tick(7)) < 0.01);
+  // Chart.js will happily be asked to paint outside the plot; it must not.
+  const edge = span([{ from: 0, to: 0 }]);
+  check('nothing is painted left of the axis', edge[0] >= left, 'x0 ' + edge[0] + ' vs left ' + left);
+  check('nor right of it', span([{ from: N - 1, to: N - 1 }])[1] <= right);
+  check('no bands, nothing painted', span([]) === undefined);
+
+  ctx.document = savedDoc;
+}
+
 head('[6] nothing draws unless a bonus is filtered');
 // Unfiltered, someone is nearly always on OS somewhere, so the bands would be
 // permanent wallpaper. getChartCommon_ is what enforces this, so read the rule

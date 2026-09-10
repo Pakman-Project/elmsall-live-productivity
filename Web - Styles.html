@@ -374,7 +374,6 @@ body {
   opacity: 0.75;
   white-space: nowrap;
 }
-.header-icon-btn.paused { color: var(--color-warn); }
 
 /* ── Skeleton loading ──────────────────────────────────────────────────────
    Shown on a COLD first load only (a returning user is painted instantly from
@@ -985,8 +984,18 @@ body.loading-skeleton #mainTableWrapper::after {
 .search-row {
   display: flex;
   align-items: stretch;
+  gap: 6px;
 }
 
+/* A control of its own, not a cap butted against the input.
+   It used to be flush - no right border, left corners rounded, right corners
+   square - which needs the input's LEFT corners square to meet it. The input
+   is a .hc-control now, and that sets border-radius with !important, so the
+   input kept its full radius and the two no longer met: a rounded edge sat
+   against a square one with a sliver of gap showing between them.
+   Overriding that !important to restore the seam would mean this button
+   dictating the shape of a shared header control, so it becomes a separate
+   pill instead - which is also how every other control in this header reads. */
 .clear-filter-btn {
   display: none;
   align-items: center;
@@ -994,10 +1003,9 @@ body.loading-skeleton #mainTableWrapper::after {
   width: 36px;
   min-width: 36px;
   border: 1px solid rgba(255, 122, 122, 0.25);
-  border-right: none;
   background: rgba(255, 122, 122, 0.10);
   color: var(--color-bad);
-  border-radius: 10px 0 0 10px;
+  border-radius: var(--radius-card);
   cursor: pointer;
   font-size: 12px;
 }
@@ -1008,15 +1016,14 @@ body.loading-skeleton #mainTableWrapper::after {
   min-width: 0;
 }
 
+/* No border-radius here: .hc-control sets it with !important, so anything
+   stated would be decoration that never applies. The square-left-corner rules
+   that used to live here existed for the flush clear button - see
+   .clear-filter-btn. */
 .search-input-wrap .input {
   width: 100%;
   padding: 6px 30px 6px 10px;
-  border-radius: 0 10px 10px 0;
   font-size: 13px;
-}
-
-.search-input-wrap.with-clear .input {
-  border-radius: 0 10px 10px 0;
 }
 
 .search-input-wrap i.fa-search {
@@ -1855,6 +1862,19 @@ canvas {
   text-align: left;
   margin: 0;
   font-size: 16px;
+}
+
+/* The bonus panels put the area's own productivity beside its name, so there
+   the heading shrinks to its text instead of filling the row - otherwise the
+   pill is pushed to the far right and reads as belonging to the head count
+   rather than to the area. margin-right:auto on the pill takes over the job of
+   holding the head count against the right edge. */
+.mini-table-title.has-area-perf h2 {
+  flex: 0 1 auto;
+}
+
+.mini-table-title.has-area-perf .pill {
+  margin-right: auto;
 }
 
 .tag {
@@ -3366,6 +3386,19 @@ body.page-scrolled-far .back-to-top {
   transition: border-color 0.2s;
 }
 
+/* On the Bonus page these sit in the same control row as Display Mode and
+   Rows, and were noticeably taller: .row-select settles at 3px/11px while
+   .breakdown-time-select is 5px/12px. Matched here rather than by changing
+   .breakdown-time-select itself, which is also the KPI breakdown dialog's
+   control and is sized for that. Kept in step with .row-select by hand -
+   there is no shared token for control metrics to hang this off. */
+.bonus-time-bar .breakdown-time-select {
+  padding: 3px 6px;
+  padding-right: 15px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
 .breakdown-time-select:focus {
   border-color: var(--accent);
 }
@@ -3503,7 +3536,12 @@ body.page-scrolled-far .back-to-top {
 
 .area-group-areas {
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
+  /* auto-fill, not a fixed nine: the column is as wide as the longest area
+     name (--area-chip-w, set in applyConfigToCSSPak), so names are never
+     truncated, and how many fit per row follows from the dialog's own width
+     rather than being asserted here. 1fr as the max keeps the columns equal
+     and the tick boxes aligned down the grid. */
+  grid-template-columns: repeat(auto-fill, minmax(var(--area-chip-w, 190px), 1fr));
   gap: 0 10px;
 }
 
@@ -3515,10 +3553,11 @@ body.page-scrolled-far .back-to-top {
   gap: 6px;
 }
 
+/* No ellipsis: the column is sized to the longest name, so there is nothing
+   to truncate. nowrap keeps every row one line tall, which is what makes the
+   ticks line up across the grid. */
 .area-cb-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -3694,6 +3733,43 @@ body.page-scrolled-far .back-to-top {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* Show-all / hide-all, leading the chip strip. Deliberately NOT chip-shaped:
+   these act ON the chips rather than being two more of them, and a pill with a
+   dot-less label sitting in the same row read as an area whose colour had
+   failed to load. Square-ish, bordered, no dot. */
+.area-chip-bulk {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-right: 4px;
+}
+
+.area-chip-bulk-btn {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.area-chip-bulk-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Already all-on or all-off: the button would do nothing, and saying so is
+   better than letting it look available. */
+.area-chip-bulk-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .bonus-area-chip {
@@ -4125,6 +4201,25 @@ body.page-scrolled-far .back-to-top {
   }
   .mini-table-title h2 {
     font-size: 18px;
+  }
+  /* The stacking above is right for the volume panels, whose tag is a second
+     line of information. It is wrong for a bonus panel's productivity figure,
+     which dropped below the area name and read as a heading of its own. Here
+     it stays on the title's line, in the corner - and since the head-count tag
+     is hidden at this width, the row has only these two things in it. */
+  .mini-table-title.has-area-perf {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+  .mini-table-title.has-area-perf h2 {
+    flex: 1;
+  }
+  .mini-table-title.has-area-perf .pill {
+    /* Cancels the desktop rule, which uses this to hold the head count against
+       the right edge - there is no head count to hold here. */
+    margin-right: 0;
+    flex: 0 0 auto;
   }
   .tag {
     font-size: 12px;

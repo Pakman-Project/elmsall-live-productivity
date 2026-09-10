@@ -182,5 +182,43 @@ check('and it comes back on return',
 check('while the groups re-derive',
   ev('JSON.stringify(areaGroupState) === JSON.stringify(defaultAreaGroupState_())'), groupKeys());
 
+head('[' + 'select all / select none on the area chips' + ']');
+// The chip strips gained bulk buttons. They act on the areas IN VIEW, and the
+// hidden list also carries the other building's choices - kept on purpose, so
+// switching back restores what was set up there. "Select none" while looking at
+// E3 must therefore not swallow the E1/E2 entries, and "select all" must not
+// resurrect them: either way the other building silently changes behind the
+// user, which is the same class of bug this file already exists for.
+vm.runInContext(
+  fs.readFileSync(APPS + 'Web - JsHelpers.html', 'utf8')
+    .replace(/<\/?script>/g, ''), ctx);
+{
+  const e3 = ev('volumeTypesActive_ && (siteFilter = "e3", volumeTypesActive_().map(t => t.key))');
+  // One E1/E2 area, chosen so it is definitely NOT in the E3 list above.
+  const foreign = ev('VOLUME_TYPES.map(t => t.key).filter(k => AREA_SITE[areaBaseKey_(k)] === "e1e2")')[0];
+  check('the fixture area really is out of scope on E3', e3.indexOf(foreign) === -1, foreign);
+
+  ev('__hidden = ' + JSON.stringify([foreign]));
+  ev('setAllAreaKeysPak_(__hidden, false)');
+  let after = ev('__hidden.slice()');
+  check('select none hides every area in view', e3.every(k => after.indexOf(k) !== -1),
+        after.length + ' hidden');
+  check('and keeps the other building untouched', after.indexOf(foreign) !== -1,
+        'E1/E2 choice must survive an E3 bulk action');
+
+  ev('setAllAreaKeysPak_(__hidden, true)');
+  after = ev('__hidden.slice()');
+  check('select all shows every area in view', e3.every(k => after.indexOf(k) === -1),
+        JSON.stringify(after));
+  check('and still keeps the other building untouched',
+        after.length === 1 && after[0] === foreign, JSON.stringify(after));
+
+  // Applying the same one twice must not double up entries.
+  ev('setAllAreaKeysPak_(__hidden, false); setAllAreaKeysPak_(__hidden, false)');
+  after = ev('__hidden.slice()');
+  check('running it twice adds nothing extra', after.length === new Set(after).size,
+        after.length + ' entries, ' + new Set(after).size + ' distinct');
+}
+
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
 process.exit(fail ? 1 : 0);
