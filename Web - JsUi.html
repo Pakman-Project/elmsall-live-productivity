@@ -110,9 +110,7 @@
       items[i].classList.toggle('active', i === idx);
     }
     // The highlighted row is often below the fold of the 250px-tall list.
-    if (items[idx].scrollIntoView) {
-      items[idx].scrollIntoView({ block: 'nearest' });
-    }
+    scrollIntoViewPak_(items[idx], 'nearest');
     $('bonusSearch').setAttribute('aria-activedescendant', items[idx].id);
   }
 

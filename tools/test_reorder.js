@@ -76,6 +76,10 @@ vm.runInContext(`
   function captureChartOrder_() {}
   function reorderChipsToMatch_() {}
   function refreshOddCentering_() {}
+  // Lives in JsHelpers, and needs real layout to do anything - it reads
+  // getBoundingClientRect, which this DOM shim has no notion of. Where the
+  // moved panel ends up on screen is not what the arithmetic below is about.
+  function scrollIntoViewPak_() {}
   _reorderMode = true;
 `, ctx);
 const ev = e => vm.runInContext(e, ctx);

@@ -372,7 +372,7 @@ function moveReorderItem_(key, delta) {
       refreshReorderBars_();
       // Keep the panel the user is working on in view — it has just jumped a
       // full panel's height, which on a phone is most of the screen.
-      try { items[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+      scrollIntoViewPak_(items[i], 'nearest');
       return;
     }
   }

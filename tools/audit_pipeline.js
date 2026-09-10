@@ -405,5 +405,31 @@ head('[8] syntax');
   catch (e) { check(pair[0], false, e.message); }
 });
 
+head('[' + 'nothing scrolls outside the iframe' + ']');
+{
+  // The dashboard is embedded in a Google Site, and Element.scrollIntoView()
+  // scrolls every scrollable ancestor INCLUDING the host page - the tour, which
+  // centres one ringed element after another, dragged the Site up and down and
+  // left it parked below the embed showing its own empty space. Every call goes
+  // through scrollIntoViewPak_, which stops at the app's own scroll container.
+  //
+  // A textual check because there is no way to observe the host page from a
+  // test, and the symptom appears only when embedded - never in preview.html,
+  // never in the Apps Script /exec page on its own.
+  const files = fs.readdirSync(APPS).filter(f => /^Web - .*\.(html|js)$/.test(f));
+  const offenders = [];
+  files.forEach(f => {
+    // Comments name it on purpose, explaining why it is not used.
+    const body = fs.readFileSync(APPS + f, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    if (/(?<!Pak_)\bscrollIntoView\s*\(/.test(body)) offenders.push(f);
+  });
+  check('no raw scrollIntoView in ' + files.length + ' web files',
+        offenders.length === 0, offenders.join(', '));
+  check('and the helper it must go through exists',
+        /function scrollIntoViewPak_/.test(R('Web - JsHelpers.html')));
+}
+
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
 process.exit(fail ? 1 : 0);

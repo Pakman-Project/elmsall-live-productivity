@@ -397,6 +397,55 @@ function numTdPak(n, d) {
 // global answer would make the marker disagree with the numbers beside it.
 // Adds or removes a work-area key in place. Used by both pages' chips so the
 // two cannot drift apart in how they read a click.
+// ---- Scrolling, without reaching outside the app -----------------------------
+// Element.scrollIntoView() scrolls EVERY scrollable ancestor, and the frame
+// tree counts: called in here it also scrolls the Google Site the dashboard is
+// embedded in. The tour made that obvious - it centres each ringed element in
+// turn, so the host page was dragged up and down with it and left parked below
+// the embed, showing the Site's own empty space under the iframe as a band of
+// white that had nothing to do with the dashboard.
+//
+// So nothing in the app calls scrollIntoView. This scrolls the app's OWN
+// scroll container (a .page, or a scrolling modal body) and stops there. When
+// there is nothing scrollable to move, it does nothing at all rather than
+// falling back to scrollIntoView - the fallback was the bug.
+function scrollableAncestorPak_(el) {
+  var node = el && el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    var oy = window.getComputedStyle(node).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight + 1) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+// mode 'center' centres the element; 'nearest' moves only far enough to bring
+// it inside, and not at all when it is already there.
+function scrollIntoViewPak_(el, mode) {
+  if (!el || !el.getBoundingClientRect) return;
+  var box = scrollableAncestorPak_(el);
+  if (!box) return;
+
+  var e = el.getBoundingClientRect();
+  var b = box.getBoundingClientRect();
+  var delta;
+
+  if (mode === 'center') {
+    delta = (e.top + e.height / 2) - (b.top + b.height / 2);
+  } else {
+    if (e.top >= b.top && e.bottom <= b.bottom) return;
+    delta = (e.top < b.top) ? (e.top - b.top) : (e.bottom - b.bottom);
+  }
+  if (!delta) return;
+
+  var top = Math.max(0, Math.min(box.scrollHeight - box.clientHeight,
+                                 box.scrollTop + delta));
+  if (box.scrollTo) { box.scrollTo({ top: top, behavior: 'smooth' }); }
+  else { box.scrollTop = top; }
+}
+
 function toggleAreaKeyPak_(list, key) {
   var i = list.indexOf(key);
   if (i === -1) list.push(key);

@@ -908,7 +908,10 @@ function flashDemoTarget_(el) {
 // in, rather than appearing fully formed out of nowhere.
 function typeIntoDemo_(el, value, perCharMs) {
   if (!el) return;
-  el.focus();
+  // preventScroll for the same reason the tour does not call scrollIntoView:
+  // focusing an element scrolls it into view, and that walks out through the
+  // iframe into the host Site. The tour has already positioned the page.
+  try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
   el.value = '';
   var i = 0;
   (function tick() {
@@ -981,17 +984,12 @@ function performStepDemo_(step) {
 // 'nearest' inside a modal so the dialog is nudged just enough rather than
 // yanked to centre, which looks like a jump when the control was already
 // mostly visible.
+//
+// Deliberately NOT scrollIntoView - see scrollIntoViewPak_ in JsHelpers. That
+// scrolls the embedding Google Site as well as this page, and the tour, which
+// centres one element after another, is what made it obvious.
 function scrollTourTargetIntoView_(el, insideModal) {
-  if (!el || !el.scrollIntoView) return;
-  try {
-    el.scrollIntoView({
-      block: insideModal ? 'nearest' : 'center',
-      inline: 'nearest',
-      behavior: 'smooth'
-    });
-  } catch (e) {
-    try { el.scrollIntoView(); } catch (e2) {}
-  }
+  scrollIntoViewPak_(el, insideModal ? 'nearest' : 'center');
 }
 
 function setTourProgress_(pct, durationMs) {
