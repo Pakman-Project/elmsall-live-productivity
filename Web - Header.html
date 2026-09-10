@@ -29,17 +29,26 @@
            screen. -->
       <h1 class="hc-title"><span class="next-header-title" id="siteTitle">Elmsall Live Productivity</span></h1>
 
-      <!-- Note first: it carries whatever someone has deliberately written for
-           the floor to read, so it outranks the machine-generated status beside
-           it. Empty most of the time, and collapses to nothing when it is. -->
       <div class="next-header-meta hc-subtitle">
-        <span id="noteText" class="note-text"></span>
         <span id="status" aria-live="polite">Loading...</span>
         <span id="staleWarning" class="stale-warning" style="display:none;" role="status"></span>
         <span id="lastUpdateText">-</span>
       </div>
     </div>
 
+  </div>
+
+  <!-- Front!G3, typed by hand for the floor to read. It used to sit under the
+       title, which the header card no longer shows - so it was being written
+       into a hidden element and nobody saw it. A banner above the controls
+       instead: it is the one thing on this card a person deliberately put
+       there, so it outranks every control below it.
+
+       hidden until there is something to say, set from JsInit rather than by
+       :empty, so it cannot be left showing an empty red bar. -->
+  <div class="note-banner" id="noteBanner" role="status" hidden>
+    <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+    <span id="noteText" class="note-text"></span>
   </div>
 
   <div class="hc-filters">

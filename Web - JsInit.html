@@ -234,8 +234,12 @@
 
     $('status').textContent = 'Loaded';
     var noteEl = $('noteText');
-    if (data.note && String(data.note).trim() !== '') { noteEl.textContent = String(data.note).trim(); }
-    else { noteEl.textContent = ''; }
+    var noteBanner = $('noteBanner');
+    var noteStr = (data.note === null || data.note === undefined) ? '' : String(data.note).trim();
+    noteEl.textContent = noteStr;
+    // The banner is the whole red bar, so it goes with the text - left showing
+    // on an empty note it would read as an alert with nothing behind it.
+    if (noteBanner) noteBanner.hidden = (noteStr === '');
     updateStaleWarning_();
 
     // Switch to the linked page once there is something rendered to show.

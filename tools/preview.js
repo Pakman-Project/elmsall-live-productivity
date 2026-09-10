@@ -17,6 +17,7 @@
 //   node tools/preview.js --page=volume --site=e3
 //   node tools/preview.js --tour=1
 //   node tools/preview.js --os          # one bonus put on OS, filtered to them
+//   node tools/preview.js --note="NOTE TEST"   # what Front!G3 renders as
 //
 // In VS Code: right-click preview.html -> Open with Live Preview. Prefer that
 // over opening the file directly - the page uses localStorage, which browsers
@@ -97,6 +98,16 @@ const STUB = `
   // someone with no BonusHub events. Their productive rows are removed rather
   // than merely flagged, because a row with hours on it would still draw a
   // productivity bar and the band would be explaining nothing.
+  // --note stands in for Front!G3, which Code.js reads verbatim
+  // (noteVal = sheet.getRange('G3').getValue()) and hands back as
+  // payload.note. JsInit writes it into #noteText untouched - no formatting,
+  // no truncation - so the string here is exactly what would show.
+  var NOTE_PREVIEW = ${JSON.stringify(args.note || '')};
+  function withNote_(d) {
+    if (NOTE_PREVIEW && d) { d.note = NOTE_PREVIEW; }
+    return d;
+  }
+
   var OS_PREVIEW = ${args.os ? 'true' : 'false'};
   function withOsSpell_(d) {
     if (!OS_PREVIEW || !d || !d.bonusList || !d.bonusList.length) return d;
@@ -148,7 +159,7 @@ const STUB = `
     return {
       withSuccessHandler: function (f) { return runner(f, fail); },
       withFailureHandler: function (f) { return runner(ok, f); },
-      getDashboardData: function () { reply(function () { return withOsSpell_(buildTourDummyData_()); }); },
+      getDashboardData: function () { reply(function () { return withNote_(withOsSpell_(buildTourDummyData_())); }); },
       getArchiveLinks: function () { reply(archiveLinks); },
       getLastRefreshTimestamp: function () { reply(function () { return null; }); }
     };
