@@ -69,10 +69,27 @@ function buildTourDummyData_() {
   // operators the same second area on every run.
   var bonusArea2 = {};
   var bonusOs = {};
+  var bonusRate = {};
   for (var m = 0; m < bonuses.length; m++) {
     var other = AREAS[Math.floor(rnd() * AREAS.length)];
     if (rnd() < 0.25 && other !== bonusArea[bonuses[m]]) bonusArea2[bonuses[m]] = other;
     if (rnd() < 0.11) bonusOs[bonuses[m]] = true;
+
+    // A rate that persists for the operator, so somebody having a bad shift
+    // has it all the way down the table rather than block by block.
+    //
+    // Every demo operator used to sit between 0.16 and 0.245 standard hours a
+    // block, which is 64% to 98% - so once the Bonus page's two tables became
+    // a clean split at 60%, the Unproductive one had nobody to list and
+    // rendered "None in selected range" on every panel. A demo where a whole
+    // table is always empty teaches the wrong thing about the page, and the
+    // tour steps pointing at it had nothing to show.
+    //
+    // Roughly a quarter are below the line, which is also a more honest
+    // picture of a shift than everybody clearing target.
+    bonusRate[bonuses[m]] = (rnd() < 0.26)
+      ? 0.35 + rnd() * 0.30     // 35-65% of target: the Unproductive table
+      : 0.80 + rnd() * 0.35;    // 80-115%: comfortably productive
   }
 
   var rawSideData = [];
@@ -81,7 +98,9 @@ function buildTourDummyData_() {
       if (rnd() < 0.22) continue; // ~78% of operators active per block
       var bn = bonuses[j];
       var area = bonusArea[bn];
-      var value = 0.16 + rnd() * 0.085;        // std hours per block: 0.16..0.245
+      // 0.25 std hours in a 15-minute block is 100%, so the operator's own
+      // rate scales straight off it, with a little block-to-block wobble.
+      var value = 0.25 * bonusRate[bn] * (0.94 + rnd() * 0.12);
       var volume = Math.round(20 + rnd() * 160); // items/parcels this block
       // Zeroed from AREAS rather than written out by hand. The hand-written
       // list had silently fallen five areas behind - every Online Picking and

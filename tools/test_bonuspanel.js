@@ -229,16 +229,99 @@ check('Total Prod %', rsrc.indexOf('Total Prod %') !== -1);
 check('and the old headings are gone',
       rsrc.indexOf('>Standard Hours<') === -1 && rsrc.indexOf('>Productivity %<') === -1);
 
-head('[12] an OS operator is listed rather than falling through both tables');
-// 0% sits below minUnderPerf, so the floor dropped them from Unproductive
-// while the red-badge rule kept them out of Productive: they counted as a head
-// and then appeared nowhere, which put the OS tag out of reach of exactly the
-// people it exists to explain.
-check('the floor exempts OS rows',
-      /currentBonusOsMap\[r\.bonus\] === true/.test(rsrc));
-check('the tag is emitted beside the name',
+head('[12] the two tables split at 60% and cover everybody exactly once');
+// The rule as given: 61% or more is Productive, 60% or below is Unproductive.
+//
+// Neither held before. The old pair of rules tested the BADGE colour, which
+// has three bands where the tables have two - so 60-79% satisfied both rules
+// and was listed TWICE on one panel under opposite headings, while anything
+// under the live threshold satisfied neither and vanished from the panel
+// entirely. The worst performers in the building were the missing ones.
+ctx.tmDirectory = {};
+ctx.selectedBonuses = [];
+ctx.sideSortMetric = 'performance';
+ctx.currentBonusAreaCount = {};
+ctx.currentBonusOsMap = {};
+ctx.currentThreshold = 0.15;
+
+const placeOf = perf => {
+  const html = ctx.buildBonusPanel_('T', [
+    { bonus: 'ZZZ', standardHour: 1, deployedHour: 1, performance: perf }
+  ], 10);
+  const halves = html.split('Unproductive');
+  return { top: halves[0].indexOf('ZZZ') !== -1, under: halves[1].indexOf('ZZZ') !== -1 };
+};
+
+// Every operator lands in exactly one table - the property that was broken.
+let both = [], neither = [];
+for (let p = 0; p <= 120; p += 0.5) {
+  const at = placeOf(p);
+  if (at.top && at.under) both.push(p);
+  if (!at.top && !at.under) neither.push(p);
+}
+check('nobody is listed in both tables', both.length === 0,
+      both.length ? 'at ' + both.slice(0, 6).join(', ') + '%' : '0 to 120% in 0.5% steps');
+check('and nobody is left out of both', neither.length === 0,
+      neither.length ? 'at ' + neither.slice(0, 6).join(', ') + '%' : 'every figure is placed');
+
+check('60% is Unproductive', placeOf(60).under && !placeOf(60).top);
+check('61% is Productive', placeOf(61).top && !placeOf(61).under);
+check('0% is Unproductive', placeOf(0).under);
+check('100% is Productive', placeOf(100).top);
+
+// The comparison is on the printed figure, not the raw one. 60.2% renders as
+// "60%", and a row badged 60% sitting under "Productive" is the rule visibly
+// not being followed.
+check('60.2% follows its badge into Unproductive', placeOf(60.2).under,
+      'rounds to 60%');
+check('60.5% follows its badge into Productive', placeOf(60.5).top,
+      'rounds to 61%');
+
+// Retired by the new rule: the exception only existed because the old lower
+// bound dropped a 0% operator out of both tables.
+check('the OS exception is gone, not just unused',
+      rsrc.indexOf('currentBonusOsMap[r.bonus] === true') === -1,
+      'a 0% operator is Unproductive by the rule itself now');
+check('and the split no longer moves with the live threshold',
+      rsrc.indexOf('minUnderPerf') === -1 &&
+      /var BONUS_TABLE_SPLIT_PCT = 60;/.test(rsrc));
+
+head('[13] an OS operator still reaches a table, and is tagged there');
+ctx.currentBonusOsMap = { OSGUY: true };
+const osHtml = ctx.buildBonusPanel_('T', [
+  { bonus: 'OSGUY', standardHour: 0, deployedHour: 0, performance: 0 }
+], 10);
+check('listed', osHtml.indexOf('OSGUY') !== -1);
+check('in Unproductive', osHtml.split('Unproductive')[1].indexOf('OSGUY') !== -1);
+check('with the tag beside the name', /OSGUY[\s\S]{0,120}os-tag|os-tag[\s\S]{0,120}OSGUY/.test(osHtml));
+ctx.currentBonusOsMap = {};
+check('the tag is emitted at all three render sites',
       (rsrc.match(/osTagHtmlPak_/g) || []).length === 3,
       'bonus rows + both Data Table detail layouts');
+
+head('[14] productivity is measured over the blocks worked, not the window');
+// A short spell at a good rate is a good rate. Dividing by the selected window
+// would turn "worked two blocks well" into a poor figure, and the window is a
+// viewing choice - changing it must not change anybody's productivity.
+const WIN8 = [];
+for (let i = 0; i < 8; i++) WIN8.push('09/09/2026 ' + (6 + i) + ':00 - x');
+const twoBlocks = [
+  { timeRange: WIN8[0], bonus: 'SHORT', value: 0.25, pieStd: 0.25 },
+  { timeRange: WIN8[1], bonus: 'SHORT', value: 0.25, pieStd: 0.25 }
+];
+const short = ctx.computeBonusRows_(twoBlocks, null)[0];
+check('two full-rate blocks read 100%', near(short.performance, 100),
+      short.performance.toFixed(1) + '%');
+check('deployed for the blocks worked, not the window',
+      near(short.deployedHour, 0.5), short.deployedHour + ' h of a 2 h window');
+// Present but idle: those blocks carry no hours, so they are not deployment.
+const idle = twoBlocks.slice();
+for (let i = 2; i < 8; i++) idle.push({ timeRange: WIN8[i], bonus: 'SHORT', value: 0, pieStd: 0 });
+const withIdle = ctx.computeBonusRows_(idle, null)[0];
+check('and a row with no hours on it does not become deployment',
+      near(withIdle.deployedHour, short.deployedHour) &&
+      near(withIdle.performance, short.performance),
+      withIdle.deployedHour + ' h, ' + withIdle.performance.toFixed(1) + '%');
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
 process.exit(fail ? 1 : 0);

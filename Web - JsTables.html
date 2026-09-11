@@ -614,49 +614,49 @@ function areaTotalPerformance_(rows) {
   return dep > 0 ? (std / dep) * 100 : null;
 }
 
+// The two tables split the panel's operators at one figure: above it
+// Productive, at it or below it Unproductive. Every operator lands in exactly
+// one, and none is left out of both.
+//
+// That was not true before. The old pair of rules tested the BADGE colour -
+// red kept out of Productive, green kept out of Unproductive - and the badge
+// has three bands where the tables have two, so the middle band belonged to
+// neither rule and fell into both: every operator between 60% and 79% was
+// listed twice on the same panel, in tables with opposite headings. Below 60%
+// the reverse happened. The lower bound on Unproductive was the live threshold
+// (0.15 std hrs per block, which is 60% expressed as a percentage), so anybody
+// under it was dropped from Unproductive while the red-badge rule kept them
+// out of Productive - they counted toward "N heads" and then appeared nowhere.
+// The worst performers in the building were the ones missing.
+//
+// A single comparison replaces both rules and subsumes what they were for: no
+// row above the split can carry a red badge (red ends at 60), and none at or
+// below it can carry a green one (green starts at 80), so the tables still
+// cannot contradict the colour beside them. It also retires the OS exception
+// that used to be needed here - an operator who spent the period on indirect
+// work sits at 0% and is now simply Unproductive, which is where the OS tag
+// beside their name explains the figure.
+var BONUS_TABLE_SPLIT_PCT = 60;
+
 function buildBonusPanel_(title, allRows, rowsLimit, reorderKey, areaPerfOverride) {
-  var minUnderPerf = (currentThreshold / 0.25) * 100;
   var metric = sideSortMetric;
 
-  // Anything the pill colours red is kept out of Productive, however short the
-  // list gets — the mirror of the rule that keeps green out of Unproductive. A
-  // table headed "Productive" listing someone with a red badge contradicts
-  // itself, and in a work area with only a handful of heads the tail of the
-  // ranking was filling it with exactly that.
-  //
-  // Tested through perfClassPak rather than against the threshold directly, so
-  // the table and the badge beside it cannot drift apart if the thresholds are
-  // retuned.
+  // Compared on the ROUNDED figure, the one actually printed in the cell.
+  // Against the raw value, an operator on 60.2% would sit in Productive under
+  // a badge reading "60%" - and the rule people have been given is about the
+  // number they can see, not the fourteen decimal places behind it.
+  var isProductive = function (r) {
+    return Math.round(normalizePerfPak(r.performance)) > BONUS_TABLE_SPLIT_PCT;
+  };
+
   var topRows = allRows
     .slice()
-    .filter(function (r) {
-      return perfClassPak(r.performance) !== APP_CONFIG.classes.bad;
-    })
+    .filter(isProductive)
     .sort(function (a, b) { return b[metric] - a[metric]; })
     .slice(0, rowsLimit);
 
-  // Anything the pill colours green is excluded from Unproductive, however
-  // short the list gets. The upper bound used to be a flat 100%, but green
-  // starts at APP_CONFIG.thresholds.good (80%) — so every operator between 80%
-  // and 100% appeared here with a green badge next to them, calling them
-  // unproductive. In a work area with only a handful of heads there was often
-  // nobody below 80%, so the table filled with green rows.
-  //
-  // The test goes through perfClassPak rather than comparing against the
-  // threshold directly, so this table and the colour it displays can never
-  // drift apart if the thresholds are retuned.
-  //
-  // OS is the exception to the lower bound. Somebody who spent the period on
-  // indirect work sits at 0%, below minUnderPerf, so the floor dropped them
-  // from Unproductive while the red-badge rule kept them out of Productive -
-  // they counted toward "N heads" and then appeared in neither table. That put
-  // the OS tag out of reach of exactly the people it was added to explain.
-  // They are listed, tagged, and the tag says why the figure reads as it does.
   var underRows = allRows
-    .filter(function (r) {
-      return (r.performance >= minUnderPerf || currentBonusOsMap[r.bonus] === true) &&
-             perfClassPak(r.performance) !== APP_CONFIG.classes.good;
-    })
+    .filter(function (r) { return !isProductive(r); })
     .sort(function (a, b) { return a[metric] - b[metric]; })
     .slice(0, rowsLimit);
 
