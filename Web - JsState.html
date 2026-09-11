@@ -686,6 +686,21 @@ var currentMainRows = [];
 // expanded Data Table row cover different periods and must not share an answer.
 var currentBonusAreaCount = {};
 var currentDetailAreaCount = {};
+// Bonus number -> was on OS at some point in the period being drawn. Same
+// shape and lifecycle as the two above, rebuilt per render by bonusOsMapPak_.
+var currentBonusOsMap = {};
+var currentDetailOsMap = {};
+// 'all' | 'single' | 'multi' - whether to show everyone, only people who
+// stayed in one work area, or only the ones who moved between several.
+//
+// Two of them, and neither is persisted. Two because the Bonus page and the
+// head breakdown cover different periods and are configured independently, so
+// one shared value would mean setting the filter on one surface silently
+// narrowed the other. Not persisted because a hidden filter surviving a reload
+// looks exactly like missing data - the area chips are saved, but those are
+// visible as chips, and this is one small button.
+var bonusAreaCountFilter = 'all';
+var breakdownAreaCountFilter = 'all';
 // Filtering by more than one bonus number at a time. Off by default: a pick
 // replaces the filter and jumps to the top of Overall. Lifted from the "?"
 // dialog, and persisted with the rest of the preferences.

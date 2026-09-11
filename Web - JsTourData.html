@@ -54,6 +54,27 @@ function buildTourDummyData_() {
     }
   }
 
+  // A second area for one operator in every four, and an OS spell for one in
+  // every nine.
+  //
+  // Every demo operator used to be pinned to exactly one area and no OS at
+  // all, which meant four things the tour now explains had nothing to point
+  // at: the multi-area marker never rendered, the All / single / multi filter
+  // did nothing whichever way it was cycled, the OS tag never appeared, and
+  // the work-area groups had no cross-boundary worker to leave out - so a step
+  // saying "counts only people working solely in these areas" demonstrated a
+  // rule with no visible effect.
+  //
+  // Deterministic like everything else here: the same seed gives the same
+  // operators the same second area on every run.
+  var bonusArea2 = {};
+  var bonusOs = {};
+  for (var m = 0; m < bonuses.length; m++) {
+    var other = AREAS[Math.floor(rnd() * AREAS.length)];
+    if (rnd() < 0.25 && other !== bonusArea[bonuses[m]]) bonusArea2[bonuses[m]] = other;
+    if (rnd() < 0.11) bonusOs[bonuses[m]] = true;
+  }
+
   var rawSideData = [];
   for (var i = 0; i < timeRanges.length; i++) {
     for (var j = 0; j < bonuses.length; j++) {
@@ -74,6 +95,32 @@ function buildTourDummyData_() {
       }
       row[area] = volume;
       row[area + 'Std'] = value;
+
+      // Their second area, when they have one: the block's work splits across
+      // the two rather than being doubled, so the totals stay honest and a
+      // multi-area operator really does show one quarter-hour of deployment.
+      var area2 = bonusArea2[bn];
+      if (area2) {
+        var half = value / 2;
+        row[area] = Math.round(volume / 2);
+        row[area + 'Std'] = half;
+        row[area2] = Math.round(volume / 2);
+        row[area2 + 'Std'] = half;
+      }
+
+      // An OS block: no volume and no standard hours anywhere, which is what
+      // the notebook synthesises for somebody with no BonusHub events. Their
+      // productive work for the block is replaced rather than annotated - a
+      // row with hours on it would still draw a bar, and the tag would be
+      // explaining nothing.
+      if (bonusOs[bn] && rnd() < 0.3) {
+        for (var q = 0; q < AREAS.length; q++) {
+          row[AREAS[q]] = 0;
+          row[AREAS[q] + 'Std'] = 0;
+        }
+        row.value = 0;
+        row.os = true;
+      }
       rawSideData.push(row);
     }
   }

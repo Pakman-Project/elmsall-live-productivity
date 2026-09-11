@@ -79,6 +79,12 @@
             <select id="breakdownTo" class="breakdown-time-select" onchange="updateBreakdownRange()"></select>
             <span id="breakdownRangeBadge" class="breakdown-range-badge">-</span>
           </div>
+          <!-- The multi-area filter. Rendered from JS rather than written out
+               here, so the Bonus page's copy and this one come from one
+               builder and cannot drift apart. The footer below explains why
+               the totals exceed Head Deployed; this is the control that lets
+               you see exactly who is causing it. -->
+          <div class="time-row time-row-count" id="breakdownCountFilter"></div>
         </div>
         <div class="breakdown-body" id="breakdownBody"></div>
         <div class="breakdown-footer">

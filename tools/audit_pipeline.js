@@ -483,5 +483,81 @@ head('[' + 'nothing scrolls outside the iframe' + ']');
         /function scrollIntoViewPak_/.test(R('Web - JsHelpers.html')));
 }
 
+
+// ---------------------------------------------------------------------------
+head('[the manager card opens from every surface that claims to have it]');
+{
+  // The hover / tap machinery matches ONE selector. The card used to live only
+  // on bonus numbers in a table; it is now also on the active-filter chip and
+  // on the head breakdown's chips, neither of which is a .clickable-bonus. A
+  // surface that emits the card without the host class shows nothing at all,
+  // and a surface that claims the class without emitting a card opens an empty
+  // box - both silent, and both invisible to any arithmetic test.
+  const ui = R('Web - JsUi.html');
+  const machinery = (ui.match(/closestPak_\([^)]*'\.bonus-tip-host'\)/g) || []).length;
+  check('the machinery matches .bonus-tip-host', machinery === 4,
+        machinery + ' of 4 call sites (hover in, hover out, still-inside, tap)');
+  check('and no longer matches .clickable-bonus directly',
+        !/closestPak_\([^)]*'\.clickable-bonus'\)/.test(ui));
+
+  // Every emitter of the card must also emit the class, and vice versa.
+  const emitters = ['Web - JsTables.html', 'Web - JsUi.html'];
+  emitters.forEach(f => {
+    const body = R(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const cards = (body.match(/bonusTipHtmlPak_\(/g) || []).length;
+    // Only class ATTRIBUTES count as emitting the host. The machinery's own
+    // selectors name the class too, and they are not surfaces.
+    const hosts = (body.match(/class="[^"]*bonus-tip-host/g) || []).length;
+    check(f + ': a host class for every card', cards === hosts,
+          cards + ' cards, ' + hosts + ' hosts');
+  });
+
+  // Two tooltips on one element: the browser's own from title=, and the card.
+  const bodyU = R('Web - JsUi.html').replace(/\/\/[^\n]*/g, '');
+  const chipLine = (bodyU.match(/[^\n]*breakdown-bonus-chip[^\n]*/) || [''])[0];
+  check('the breakdown chip dropped its title attribute',
+        chipLine.indexOf('bonusTitleAttrPak_') === -1,
+        'the card replaces it; both at once shows two tooltips');
+  const bannerLine = (bodyU.match(/[^\n]*class="chip bonus-tip-host[^\n]*/) || [''])[0];
+  check('and so did the active-filter chip',
+        bannerLine.indexOf('bonusTitleAttrPak_') === -1);
+
+  // The card is reparented to <body>, so it has to clear whatever it opened
+  // on top of. The breakdown overlay is the tallest thing it can open over.
+  const css = R('Web - Styles.html');
+  const floatZ = /\.bonus-tip\.tip-floating \{[^}]*z-index:\s*(\d+)/.exec(css);
+  const overlayZ = /\.breakdown-overlay \{[^}]*z-index:\s*(\d+)/.exec(css);
+  check('the floating card clears the breakdown overlay',
+        floatZ && overlayZ && Number(floatZ[1]) > Number(overlayZ[1]),
+        floatZ && overlayZ ? floatZ[1] + ' vs ' + overlayZ[1]
+                           : 'could not read both z-indexes');
+  check('and .tip-open is keyed on the shared host class',
+        /\.bonus-tip-host\.tip-open \.bonus-tip/.test(css));
+}
+
+// ---------------------------------------------------------------------------
+head('[the multi-area filter has a control wherever it applies]');
+{
+  // A filter that is applied but whose control is off screen is
+  // indistinguishable from missing data.
+  const tables = R('Web - JsTables.html');
+  const ui = R('Web - JsUi.html');
+  check('the Bonus page strip is shown in both view modes',
+        /visible: true,\s*\n\s*areaChips: mode === 'area'/.test(
+          tables.replace(/\/\/[^\n]*\n/g, '')),
+        'Overall mode needs the chip even with no area chips to show');
+  check('the Bonus page passes its filter state to the chip',
+        /countFilter: \{ mode: bonusAreaCountFilter/.test(tables));
+  check('the head breakdown renders its own copy',
+        ui.indexOf("areaCountFilterChipHtmlPak_(\n        breakdownAreaCountFilter") !== -1 ||
+        /areaCountFilterChipHtmlPak_\([\s\S]{0,80}breakdownAreaCountFilter/.test(ui));
+  check('and there is a container for it',
+        R('Web - Index.html').indexOf('id="breakdownCountFilter"') !== -1);
+  check('both handlers exist',
+        /function setBonusAreaCountFilter/.test(tables) &&
+        /function setBreakdownAreaCountFilter/.test(ui));
+  check('the chip is styled', /\.area-count-chip \{/.test(R('Web - Styles.html')));
+}
+
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
 process.exit(fail ? 1 : 0);

@@ -302,6 +302,7 @@ function buildMainRowDetail(rowData) {
   // Scoped to this row's window: within the 15-60 minutes the row covers, who
   // moved between areas.
   currentDetailAreaCount = bonusAreaCountMapPak(slice);
+  currentDetailOsMap = bonusOsMapPak_(slice);
 
   var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryDetailPak);
   return isCardModePak() ? buildMainDetailCardsHtml_(entryRows) : buildMainDetailTableHtml_(entryRows);
@@ -394,10 +395,12 @@ function buildEntryDetailCardHtml_(r) {
       // The card mode is the touchscreen layout, where a title attribute never
       // renders at all — so this carries the real tooltip card, the one a tap
       // can open.
-      '<span class="clickable-bonus' + (isActive ? ' active' : '') + '"' +
+      '<span class="clickable-bonus bonus-tip-host' + (isActive ? ' active' : '') + '"' +
         ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
         multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
-        safeTextPak(r.bonus) + ' <i class="fa-solid fa-filter filter-icon"></i>' +
+        safeTextPak(r.bonus) +
+        osTagHtmlPak_(currentDetailOsMap[r.bonus]) +
+        ' <i class="fa-solid fa-filter filter-icon"></i>' +
         bonusTipHtmlPak_(r.bonus, isActive) +
       '</span>' +
       '<span class="pill ' + perfClassPak(r.performance) + '">' + pctPak(r.performance, 0) + '</span>' +
@@ -420,9 +423,10 @@ function buildEntryDetailRowHtml_(r) {
   var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
   return '<tr>' +
     '<td>' + safeTextPak(trimTimeLabelPak(r.timeRange)) + '</td>' +
-    '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
+    '<td><span class="clickable-bonus bonus-tip-host' + (isActive ? ' active' : '') + '" onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedBonus + '\')">' +
     multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
+    osTagHtmlPak_(currentDetailOsMap[r.bonus]) +
     ' <i class="fa-solid fa-filter filter-icon"></i>' +
     bonusTipHtmlPak_(r.bonus, isActive) +
     '</span></td>' +
@@ -547,9 +551,10 @@ function buildBonusRowHtml_(r) {
   var escapedBonus = escapeAttrPak(r.bonus);
   var isActive = selectedBonuses.indexOf(r.bonus) !== -1;
   return '<tr>' +
-    '<td><span class="clickable-bonus' + (isActive ? ' active' : '') + '" onclick="toggleBonusFilter(\'' + escapedBonus + '\')">' +
+    '<td><span class="clickable-bonus bonus-tip-host' + (isActive ? ' active' : '') + '" onclick="toggleBonusFilter(\'' + escapedBonus + '\')">' +
     multiAreaIconHtmlPak(currentBonusAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
+    osTagHtmlPak_(currentBonusOsMap[r.bonus]) +
     ' <i class="fa-solid fa-filter filter-icon"></i>' +
     bonusTipHtmlPak_(r.bonus, isActive) +
     '</span></td>' +
@@ -579,8 +584,12 @@ function buildPerfCellHtml_(performance) {
 function buildBonusMiniTable_(rows, metric) {
   var html = '<table class="side-table"><thead><tr>';
   html += '<th class="no-sort">Bonus Number</th>';
-  html += '<th class="' + (metric === 'standardHour' ? 'active-sort' : '') + '" onclick="setSideTableSort(\'standardHour\')">Standard Hours</th>';
-  html += '<th class="' + (metric === 'performance' ? 'active-sort' : '') + '" onclick="setSideTableSort(\'performance\')">Productivity %</th>';
+  // "Total", because these are the operator's figures across EVERY work area,
+  // not this panel's area alone - a person who worked two areas shows the same
+  // pair of numbers in both panels. Without the word, the obvious reading is
+  // that the column sums to the area's throughput, and it does not.
+  html += '<th class="' + (metric === 'standardHour' ? 'active-sort' : '') + '" onclick="setSideTableSort(\'standardHour\')">Total Std Hrs</th>';
+  html += '<th class="' + (metric === 'performance' ? 'active-sort' : '') + '" onclick="setSideTableSort(\'performance\')">Total Prod %</th>';
   html += '</tr></thead><tbody>';
   html += rows.length
     ? rows.map(buildBonusRowHtml_).join('')
@@ -605,7 +614,7 @@ function areaTotalPerformance_(rows) {
   return dep > 0 ? (std / dep) * 100 : null;
 }
 
-function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
+function buildBonusPanel_(title, allRows, rowsLimit, reorderKey, areaPerfOverride) {
   var minUnderPerf = (currentThreshold / 0.25) * 100;
   var metric = sideSortMetric;
 
@@ -636,9 +645,16 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
   // The test goes through perfClassPak rather than comparing against the
   // threshold directly, so this table and the colour it displays can never
   // drift apart if the thresholds are retuned.
+  //
+  // OS is the exception to the lower bound. Somebody who spent the period on
+  // indirect work sits at 0%, below minUnderPerf, so the floor dropped them
+  // from Unproductive while the red-badge rule kept them out of Productive -
+  // they counted toward "N heads" and then appeared in neither table. That put
+  // the OS tag out of reach of exactly the people it was added to explain.
+  // They are listed, tagged, and the tag says why the figure reads as it does.
   var underRows = allRows
     .filter(function (r) {
-      return r.performance >= minUnderPerf &&
+      return (r.performance >= minUnderPerf || currentBonusOsMap[r.bonus] === true) &&
              perfClassPak(r.performance) !== APP_CONFIG.classes.good;
     })
     .sort(function (a, b) { return a[metric] - b[metric]; })
@@ -653,7 +669,13 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
   var html = '<div class="card panel"' + reorderAttrs + '>';
   // The area's own productivity, beside its name: the two tables below rank
   // operators against each other, and neither says how the area did overall.
-  var areaPerf = areaTotalPerformance_(allRows);
+  // Handed in by the caller in By Work Area mode, where it is the AREA's own
+  // figure and can no longer be recovered from allRows - those rows carry each
+  // person's total across every area. Overall mode has no single area to
+  // describe and falls back to totalling the rows, where the two agree.
+  var areaPerf = (areaPerfOverride !== undefined)
+    ? areaPerfOverride
+    : areaTotalPerformance_(allRows);
   var areaPerfHtml = (areaPerf === null) ? '' :
     '<span class="pill ' + perfClassPak(areaPerf) + '">' +
     Math.round(normalizePerfPak(areaPerf)) + '%</span>';
@@ -668,6 +690,16 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey) {
   html += '<div class="table-wrap">' + buildBonusMiniTable_(underRows, metric) + '</div></div>';
   html += '</div></div>';
   return html;
+}
+
+// All / single-area only / multi-area only. Purely a display filter over rows
+// that are already computed, so nothing is recalculated and no figure moves -
+// the same person's total is the same number whether or not their neighbours
+// are on screen. Not mirrored to the head breakdown's copy: see the comment on
+// bonusAreaCountFilter in JsState.
+function setBonusAreaCountFilter(mode) {
+  bonusAreaCountFilter = mode;
+  refreshBonusTables();
 }
 
 function toggleBonusArea(key) {
@@ -701,11 +733,16 @@ function setAllBonusAreas(show) {
 function renderBonusAreaToggles_(mode) {
   renderAreaToggleChips_({
     containerId: 'bonusAreaToggles',
-    visible: mode === 'area',
+    // Shown in both modes now. Overall mode gets the multi-area filter on its
+    // own - it applies to that table too, and hiding its only control would
+    // leave a narrowed table with nothing on screen to explain it.
+    visible: true,
+    areaChips: mode === 'area',
     hiddenKeys: hiddenBonusAreas,
     orderKeys: (typeof areaKeyOrderForZone_ === 'function') ? areaKeyOrderForZone_('bonus') : null,
     onToggle: 'toggleBonusArea',
-    onSetAll: 'setAllBonusAreas'
+    onSetAll: 'setAllBonusAreas',
+    countFilter: { mode: bonusAreaCountFilter, onSet: 'setBonusAreaCountFilter' }
   });
 }
 
@@ -745,6 +782,7 @@ function renderSideTablesPak(rowsLimit) {
   // the whole window rather than per panel: the panels are per work area, so a
   // panel's own rows can never tell you that someone also worked elsewhere.
   currentBonusAreaCount = bonusAreaCountMapPak(windowData);
+  currentBonusOsMap = bonusOsMapPak_(windowData);
 
   var modeSel = $('bonusViewMode');
   var mode = modeSel ? modeSel.value : 'overall';
@@ -762,12 +800,52 @@ function renderSideTablesPak(rowsLimit) {
     // area that has no chip and cannot be turned off rendered a panel from
     // them.
     var inScope = volumeTypesActive_();
+
+    // Every person's figures, totalled across every area, computed ONCE.
+    //
+    // This is the whole of the fix. These panels used to call
+    // computeBonusRows_(windowData, t.stdKey), which charges a full 0.25 h of
+    // deployment for any block the area saw standard hours in - so somebody
+    // who split one block between two areas was billed 0.5 h of deployment
+    // for 0.25 h of real time, once in each panel, and both panels understated
+    // them. There is no honest way to divide a block between areas after the
+    // fact, so the figure stops being per-area: a person has one set of
+    // standard hours and one productivity % for the period, and a panel says
+    // who worked in that area rather than recomputing their number.
+    var totalRows = computeBonusRows_(windowData, null);
+    var totalsByBonus = {};
+    for (var tr = 0; tr < totalRows.length; tr++) {
+      totalsByBonus[totalRows[tr].bonus] = totalRows[tr];
+    }
+
     for (var v = 0; v < inScope.length; v++) {
       var t = inScope[v];
       if (hiddenBonusAreas.indexOf(t.key) !== -1) continue;
-      var rows = computeBonusRows_(windowData, t.stdKey);
+
+      // Who worked here at all. Standard hours rather than volume, matching
+      // what the panel's own pill measures, and ANY block qualifies - one
+      // block in an area is still having worked in it.
+      var members = {};
+      for (var w = 0; w < windowData.length; w++) {
+        if ((Number(windowData[w][t.stdKey]) || 0) > 0) members[windowData[w].bonus] = true;
+      }
+
+      var rows = [];
+      var memberNames = Object.keys(members);
+      for (var m = 0; m < memberNames.length; m++) {
+        var totalRow = totalsByBonus[memberNames[m]];
+        if (totalRow) rows.push(totalRow);
+      }
+      rows = filterByAreaCountPak_(rows, currentBonusAreaCount, bonusAreaCountFilter);
       if (rows.length === 0) continue;
-      html += buildBonusPanel_(t.label, rows, rowsLimit, t.key);
+
+      // The pill keeps the per-area calculation the rows just gave up, and
+      // that is deliberate: it is the one number on the panel that genuinely
+      // describes the AREA rather than the people in it. It will not equal the
+      // sum of the column beneath it, which is why that column is headed
+      // "Total Std Hrs".
+      var areaPerf = areaTotalPerformance_(computeBonusRows_(windowData, t.stdKey));
+      html += buildBonusPanel_(t.label, rows, rowsLimit, t.key, areaPerf);
     }
     if (!html) {
       html = '<div class="card panel bonus-empty-panel"><i class="fa-solid ' +
@@ -775,7 +853,9 @@ function renderSideTablesPak(rowsLimit) {
                                          : 'fa-ghost"></i>No activity in the selected range') + '</div>';
     }
   } else {
-    html = buildBonusPanel_('All Work Areas', computeBonusRows_(windowData, null), rowsLimit);
+    var overallRows = filterByAreaCountPak_(
+      computeBonusRows_(windowData, null), currentBonusAreaCount, bonusAreaCountFilter);
+    html = buildBonusPanel_('All Work Areas', overallRows, rowsLimit);
   }
 
   container.innerHTML = html;

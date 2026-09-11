@@ -104,13 +104,25 @@ var TOUR_STEPS = [
     title: 'Date, building and time controls',
     body: 'Pick the day, narrow to one building, and change how many hours are shown and the window size (15 / 30 / 60 min). These stay in sync across every page.' },
 
+  { part: 2, page: 0, target: '#breakdownOverlay .breakdown-bonus-chip', modal: true,
+    action: function () {
+      var ov = $('breakdownOverlay');
+      if (ov && !ov.classList.contains('active')) showHeadBreakdown();
+      // The chips live inside a collapsed area row, so one has to be opened.
+      var row = document.querySelector('#breakdownBody .breakdown-row.clickable-row');
+      if (row && !row.classList.contains('expanded')) toggleBreakdownDetail(row);
+    },
+    cleanup: function () { closeBreakdown(); },
+    title: 'Who is in each area',
+    body: 'Opening an area lists the operators in it, worst first, each with their productivity. The same card is here too — hover a number for the manager and their email — and the button above filters out the people working across several areas, which is what makes this total exceed Head Deployed.' },
+
   // ===== Part 3 — Overall: charts & groups =================================
   { part: 3, page: 0, target: '.charts > .card.panel:nth-child(1), .charts > .card.panel:nth-child(2)', union: true,
     title: 'Overview charts (1 of 2)',
     body: 'Two live charts: volume as a stacked area, and overall productivity across every area in the building you are viewing. The “Areas” button on the volume chart chooses which areas it draws.' },
   { part: 3, page: 0, target: '.charts > .card.panel:nth-child(3), .trend-charts-wrap > .card.panel', union: true,
     title: 'Overview charts (2 of 2)',
-    body: 'Productivity by work area, plus the deployment trend below it. The “Groups & Charts” button lets you choose which areas to compare, and how many charts to spread them over.' },
+    body: 'Productivity by work area, plus the deployment trend below it. A group counts only operators who worked solely within its areas — there is no honest way to split one person’s quarter-hour between two — and it shows standard hours instead of a percentage once you filter to a single bonus number. The “Groups & Charts” button chooses which areas to compare, and how many charts to spread them over.' },
   { part: 3, page: 0, target: 'button[onclick="openAreaGroups()"]',
     interactive: { sel: 'button[onclick="openAreaGroups()"]', type: 'click' },
     title: 'Open Groups & Charts',
@@ -191,7 +203,7 @@ var TOUR_STEPS = [
   { part: 5, page: 2, target: '#bonusTablesContainer',
     cleanup: function () { var s = $('bonusViewMode'); if (s) { s.value = 'area'; if (typeof refreshBonusTables === 'function') refreshBonusTables(); } },
     title: 'Overall ranking',
-    body: 'Now every operator sits in one combined league table.' },
+    body: 'Now every operator sits in one combined league table. The figures are the same either way: each person’s standard hours and productivity across every area they worked, totalled — so a panel ranks who worked in that area rather than scoring them again on it.' },
   { part: 5, page: 2, target: '#bonusAreaToggles .bonus-area-chip',
     interactive: { sel: '#bonusAreaToggles .bonus-area-chip', type: 'click' },
     title: 'Show / hide work areas',
@@ -200,10 +212,30 @@ var TOUR_STEPS = [
     cleanup: function () { hiddenBonusAreas = []; if (typeof refreshBonusTables === 'function') refreshBonusTables(); },
     title: 'Areas filtered',
     body: 'That area drops out of the tables. Toggle chips to focus on just the areas you care about.' },
+  { part: 5, page: 2, target: '#bonusAreaToggles .area-count-chip',
+    interactive: { sel: '#bonusAreaToggles .area-count-chip', type: 'click' },
+    // Left where the tour found it: the chip cycles, so a single click has
+    // moved it on, and the next step's cleanup puts it back.
+    title: 'Operators who moved between areas',
+    body: 'Somebody who worked two areas appears in both panels with the same totals, marked with a stacked icon. This button cycles between everyone, only people who stayed in one area, and only the ones who moved — watch it change.' },
+  { part: 5, page: 2, target: '#bonusTablesContainer',
+    cleanup: function () {
+      bonusAreaCountFilter = 'all';
+      if (typeof refreshBonusTables === 'function') refreshBonusTables();
+    },
+    title: 'Narrowed to those operators',
+    body: 'Useful both ways round: hide them to compare like with like, or isolate them when the head count is higher than the number of people on shift.' },
+  // Needs an operator who actually spent a block on OS, so the step filters to
+  // one rather than hoping one is on screen.
+  { part: 5, page: 2, target: '.side-table .os-tag',
+    action: function () { tourEnsureOsBonus_(); },
+    cleanup: function () { tourClearOsBonus_(); },
+    title: 'Why a figure reads low',
+    body: 'An “OS” tag means part of that period went on OS or indirect work — clearing RSPS, the dumpchute, anything that earns no standard hours. Their productivity is genuinely low, and this says why, so a zero is not read as somebody having done nothing.' },
   { part: 5, page: 2, target: '.side-table th[onclick^="setSideTableSort"]',
     interactive: { sel: '.side-table th[onclick^="setSideTableSort"]', type: 'click' },
     title: 'Sort the tables',
-    body: 'A column header — Standard Hours or Productivity % — re-sorts every table by it.' },
+    body: 'A column header — Total Std Hrs or Total Prod % — re-sorts every table by it.' },
   // Ringed as a union of the number and its card, so the highlight covers the
   // thing being described rather than the number it hangs off. Both selectors
   // only match once the action below has opened one.
@@ -689,7 +721,11 @@ var TOUR_DEMO_TM_EMAIL_ = 'john.doe@next.co.uk';
 
 function tourShowBonusTip_() {
   tourHideBonusTip_();
-  var span = document.querySelector('#bonusTablesContainer .clickable-bonus');
+  // .bonus-tip-host, not .clickable-bonus: the same card is opened from the
+  // active-filter chip and from the head breakdown's chips too, so a step
+  // ringing either of those needs the stand-in just as much.
+  var span = document.querySelector('#bonusTablesContainer .bonus-tip-host') ||
+             document.querySelector('.bonus-tip-host');
   if (!span) return;
   var tip = span.querySelector('.bonus-tip');
   if (!tip) return;
@@ -714,8 +750,33 @@ function tourShowBonusTip_() {
   tip.classList.add('tour-tip-shown');
 }
 
+// The OS tag only renders for somebody who spent a block on OS, and there is
+// no guarantee one is among the rows on screen - the tables show the top and
+// bottom of a ranking, and an OS operator sits at zero, which is neither.
+// Filtering to one puts them on screen with certainty.
+//
+// Idempotent, so stepping backwards onto the step lands on the same view.
+var _tourOsPrevBonuses_ = null;
+
+function tourEnsureOsBonus_() {
+  if (document.querySelector('.side-table .os-tag')) return;
+  var osMap = (typeof bonusOsMapPak_ === 'function') ? bonusOsMapPak_(rawSideData) : {};
+  var who = Object.keys(osMap)[0];
+  if (!who) return;
+  if (_tourOsPrevBonuses_ === null) _tourOsPrevBonuses_ = selectedBonuses.slice();
+  selectedBonuses = [who];
+  if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
+}
+
+function tourClearOsBonus_() {
+  if (_tourOsPrevBonuses_ === null) return;
+  selectedBonuses = _tourOsPrevBonuses_;
+  _tourOsPrevBonuses_ = null;
+  if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
+}
+
 function tourHideBonusTip_() {
-  var spans = document.querySelectorAll('.clickable-bonus.tip-open');
+  var spans = document.querySelectorAll('.bonus-tip-host.tip-open');
   for (var i = 0; i < spans.length; i++) spans[i].classList.remove('tip-open');
   var tips = document.querySelectorAll('.bonus-tip.tour-tip-shown');
   for (var j = 0; j < tips.length; j++) tips[j].classList.remove('tour-tip-shown');

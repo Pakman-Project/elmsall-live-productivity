@@ -360,7 +360,13 @@
     }
     $('activeFilterCount').textContent = selectedBonuses.length;
     chipsEl.innerHTML = selectedBonuses.map(function(b) {
-      return '<span class="chip"' + bonusTitleAttrPak_(b) + '>' + b + ' <span class="remove-chip" onclick="removeBonus(\'' + b.replace(/'/g, "\\'") + '\')">&times;</span></span>';
+      // bonus-tip-host, not a title attribute: this chip is the one place a
+      // bonus number is guaranteed to be on screen, so it is where somebody
+      // reaches for the manager's email - and a title attribute cannot be
+      // copied from, nor does it render at all on a touchscreen.
+      return '<span class="chip bonus-tip-host">' + safeTextPak(b) +
+        ' <span class="remove-chip" onclick="removeBonus(\'' + b.replace(/'/g, "\\'") + '\')">&times;</span>' +
+        bonusTipHtmlPak_(b, true) + '</span>';
     }).join('');
     banner.classList.add('active');
   }
@@ -1336,7 +1342,7 @@
       // the page, closing the card out from under the button being pressed.
       if (closestPak_(e.target, '.bonus-tip')) return;
 
-      var span = closestPak_(e.target, '.clickable-bonus');
+      var span = closestPak_(e.target, '.bonus-tip-host');
 
       // Anywhere else, or on a number whose card is already open: put the cards
       // away and let the click carry on to whatever it hit.
@@ -1382,7 +1388,7 @@
       if (bonusTipTapModePak_()) return;
       if (typeof tourActive !== 'undefined' && tourActive) return;
 
-      var span = closestPak_(e.target, '.clickable-bonus');
+      var span = closestPak_(e.target, '.bonus-tip-host');
       var onOpenTip = _openTipEl && closestPak_(e.target, '.bonus-tip') === _openTipEl;
 
       // Already open, or the pointer is on the card that belongs to it —
@@ -1402,12 +1408,12 @@
       if (bonusTipTapModePak_()) return;
       if (!_openTipSpan) return;
 
-      var leavingOwner = closestPak_(e.target, '.clickable-bonus') === _openTipSpan ||
+      var leavingOwner = closestPak_(e.target, '.bonus-tip-host') === _openTipSpan ||
         (_openTipEl && closestPak_(e.target, '.bonus-tip') === _openTipEl);
       if (!leavingOwner) return;
 
       var to = e.relatedTarget;
-      var stillInside = to && (closestPak_(to, '.clickable-bonus') === _openTipSpan ||
+      var stillInside = to && (closestPak_(to, '.bonus-tip-host') === _openTipSpan ||
         (_openTipEl && closestPak_(to, '.bonus-tip') === _openTipEl));
       if (stillInside) return;
 
@@ -1530,6 +1536,7 @@
     // Table detail rows, so it lives in one place — two copies of "works across
     // several areas" would eventually come to mean two different things.
     var bonusAreaCount = bonusAreaCountMapPak(rangeData);
+    var bonusOs = bonusOsMapPak_(rangeData);
 
     var allBonuses = {};
     for (var i = 0; i < rangeData.length; i++) { allBonuses[rangeData[i].bonus] = true; }
@@ -1548,6 +1555,14 @@
       }
       var bonusList = Object.keys(areaBonuses);
       bonusList.sort(function(a, b) { return (bonusProductivity[b] || 0) - (bonusProductivity[a] || 0); });
+      // Applied after the sort, and the count recomputed from what survives:
+      // the bar length IS the head count, so a bar drawn from the unfiltered
+      // list above a filtered set of chips would contradict the chips under it.
+      // filterByAreaCountPak_ wants rows, and these are bare strings.
+      bonusList = filterByAreaCountPak_(
+        bonusList.map(function (b) { return { bonus: b }; }),
+        bonusAreaCount, breakdownAreaCountFilter
+      ).map(function (r) { return r.bonus; });
       var count = bonusList.length;
       if (count > 0) {
         breakdown.push({ label: area.label, count: count, color: areaColor_(area), bonuses: bonusList });
@@ -1558,6 +1573,12 @@
 
     var sumOfAreas = 0;
     for (var i = 0; i < breakdown.length; i++) { sumOfAreas += breakdown[i].count; }
+
+    var countEl = document.getElementById('breakdownCountFilter');
+    if (countEl) {
+      countEl.innerHTML = areaCountFilterChipHtmlPak_(
+        breakdownAreaCountFilter, 'setBreakdownAreaCountFilter');
+    }
 
     var body = document.getElementById('breakdownBody');
     var html = '<div class="breakdown-summary">';
@@ -1587,7 +1608,12 @@
         var multiClass = isMulti ? ' multi-area' : '';
         var multiIcon = isMulti ? '<i class="fa-solid fa-layer-group breakdown-multi-icon"></i>' : '';
         var escapedB = escapeAttrPak(bonusName);
-        html += '<span class="breakdown-bonus-chip ' + bClass + multiClass + '"' + bonusTitleAttrPak_(bonusName) + ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + safeTextPak(bonusName) + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span></span>';
+        // bonus-tip-host + the real card, replacing the plain title attribute.
+        // This modal is often the first place a manager sees a number they do
+        // not recognise, and a title attribute gives them nothing to copy and
+        // nothing at all on a phone.
+        var osTag = osTagHtmlPak_(bonusOs[bonusName]);
+        html += '<span class="breakdown-bonus-chip bonus-tip-host ' + bClass + multiClass + '"' + ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + safeTextPak(bonusName) + osTag + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span>' + bonusTipHtmlPak_(bonusName, selectedBonuses.indexOf(bonusName) !== -1) + '</span>';
       }
       html += '</div>';
       html += '<div class="breakdown-detail-hint">Click a bonus number to filter the main view' + (sumOfAreas > totalUniqueHeads ? ' · <i class="fa-solid fa-layer-group" style="font-size:9px;margin:0 2px;"></i> = works across multiple areas' : '') + '</div>';
@@ -1605,6 +1631,13 @@
         bars[i].style.width = bars[i].dataset.target + '%';
       }
     }, 60);
+  }
+
+  // The breakdown's own copy of the multi-area filter. Separate state from the
+  // Bonus page's - see the comment on breakdownAreaCountFilter in JsState.
+  function setBreakdownAreaCountFilter(mode) {
+    breakdownAreaCountFilter = mode;
+    renderBreakdownBody();
   }
 
   function toggleBreakdownDetail(rowEl) {

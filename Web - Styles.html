@@ -2032,6 +2032,41 @@ canvas {
   opacity: 0.8;
 }
 
+/* "OS" - the operator spent part of this period on OS / indirect work, which
+   is why their productivity reads low or zero. Same register as the marker
+   above: a quiet footnote on the name, not a status badge, so it explains a
+   figure without competing with it for attention.
+
+   A box rather than another glyph because it is a word, and because the two
+   can appear side by side on the same name - a person who moved between areas
+   AND spent a block on OS - where two similar icons would be unreadable.
+   currentColor so it inherits the good/bad colouring of the row it sits in. */
+.os-tag {
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  padding: 1px 2px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.clickable-bonus:hover .os-tag,
+.clickable-bonus.active .os-tag {
+  opacity: 0.8;
+}
+
+/* Both non-table hosts. The card is absolutely positioned against its host
+   until it is lifted out to <body>, so the host needs to be a containing
+   block; and neither may clip it, or it is cut off before the lift happens. */
+.chip.bonus-tip-host,
+.breakdown-bonus-chip.bonus-tip-host {
+  position: relative;
+  overflow: visible;
+}
+
 .bonus-tip {
   display: none;
   position: absolute;
@@ -2166,8 +2201,21 @@ canvas {
    .tip-open, not by :hover directly — a plain :hover rule showed the card in
    place, unclamped, and let .swipe-container's edge-clipping (needed for the
    paging swipe) cut off a card centred near a page's left edge. */
-.clickable-bonus.tip-open .bonus-tip {
+/* Keyed on .bonus-tip-host, not .clickable-bonus: the same card is now opened
+   from the active-filter chip and from the head breakdown's chips, which are
+   not bonus numbers in a table. Every surface that carries a card carries that
+   class, and the machinery in JsUi matches on it too. */
+.bonus-tip-host.tip-open .bonus-tip {
   display: block;
+}
+
+/* The card is reparented to <body> and positioned against the viewport, so it
+   has to clear anything it can be opened from top of. .breakdown-overlay sits
+   at 10001, and the breakdown's chips are one of the three surfaces that open
+   this card - at the base 2500 the card rendered BEHIND the modal that
+   launched it, which reads as the tooltip simply not working. */
+.bonus-tip.tip-floating {
+  z-index: 10050;
 }
 
 /* An opened card is moved out to <body> (see openBonusTipPak_), so it is no
@@ -3808,6 +3856,64 @@ body.page-scrolled-far .back-to-top {
   cursor: default;
 }
 
+/* A one-line qualifier under a chart's heading, for when the figure needs a
+   caveat the title cannot carry. Quiet on purpose - it is a footnote, and it
+   sits above a chart that still has to be the thing being read. */
+.chart-note {
+  margin: -2px 0 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+/* All areas / single-area only / multi-area only. One button that cycles,
+   rather than three radio-style chips: it is off ("All areas") almost all of
+   the time, and three controls permanently occupying the row to express one
+   occasional choice is a poor trade - on a phone especially, where this strip
+   already scrolls sideways.
+
+   It borrows the bulk buttons' shape above so the row reads as one group, and
+   lights up in the accent colour whenever it is doing something, because a
+   filter you cannot see is indistinguishable from missing data. */
+.area-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.area-count-chip i {
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
+.area-count-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.area-count-chip.on {
+  border-color: var(--accent);
+  background: var(--accent-14);
+  color: var(--accent);
+}
+
+/* Inside the head breakdown's time bar it sits on its own row, pushed to the
+   end so it does not crowd the From / To selects beside it. */
+.time-row-count {
+  margin-left: auto;
+}
+
 .bonus-area-chip {
   display: inline-flex;
   align-items: center;
@@ -5265,7 +5371,11 @@ kbd {
      value matters more here than type size. */
   .breakdown-time-bar {
     display: flex;
-    flex-wrap: nowrap;
+    /* Wrapping, but the From/To pair below still claims a full row each at
+       flex: 1 1 0, so they stay side by side exactly as before - only the
+       multi-area chip drops to a line of its own. nowrap would have squeezed
+       it into a third of the width and clipped its label. */
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     padding: 10px 12px;
@@ -5281,6 +5391,11 @@ kbd {
     flex: 1 1 0;
     min-width: 0;
     width: auto;
+  }
+  .time-row-count {
+    flex: 0 0 100%;
+    margin-left: 0;
+    justify-content: flex-start;
   }
   .breakdown-time-label {
     font-size: 10px;
@@ -5598,6 +5713,32 @@ kbd {
   #bonusAreaToggles {
     grid-column: 1 / -1;
     margin-top: 2px;
+  }
+
+  /* The strip scrolls sideways, so three controls ahead of the area chips push
+     the chips themselves off screen. The label goes and the glyph carries the
+     state - which is why the three states have three different glyphs. The
+     title attribute still says what it does on a long press. */
+  .area-count-chip {
+    padding: 4px 7px;
+  }
+
+  /* The bonus-number column is pinned to a third of the width here, and the
+     name already shares it with the filter icon and the multi-area marker.
+     Tighter, and never the thing that wraps - a tag on its own second line
+     reads as a stray word rather than as a label on the name above it. */
+  .os-tag {
+    font-size: 7px;
+    padding: 0 2px;
+    white-space: nowrap;
+  }
+  .area-count-chip-text {
+    display: none;
+  }
+  /* Except in the breakdown, where it has a row to itself and the word is
+     what makes an unfamiliar icon legible. */
+  .breakdown-time-bar .area-count-chip-text {
+    display: inline;
   }
 
   /* Scrolled: shrink the header search controls to claw back space. */

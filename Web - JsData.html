@@ -402,23 +402,69 @@ function getTrendTitle(areaKeys) {
   return 'Deployment Trend - ' + joinAreaLabels_(labels);
 }
 
-function generatePerfSplitRows_(data, timeList, groups) {
+// pureOnly: count ONLY people whose work in the block fell entirely inside the
+// group's areas.
+//
+// Without it, a row joined a group on having any standard hours in any of its
+// areas, and then contributed a full 0.25 h of deployment while contributing
+// only the group's share of the standard hours. So somebody who split a block
+// between RSPS Pick and ISPS Pick dragged an RSPS Pick group down using
+// deployment they had spent in ISPS - the group's percentage was being charged
+// for time that was never its own. There is no way to divide a block between
+// areas after the fact, so the honest fix is to leave those people out: what
+// remains is a denominator that genuinely belongs to the numerator.
+//
+// "Outside the group" means all 24 areas, both buildings. scopeRowsToSite_
+// copies every area field across and only rewrites `value`, so a row still
+// carries its out-of-building standard hours - and time spent in the other
+// building dilutes a percentage exactly as much as time spent in the next aisle.
+//
+// The cost is that the groups no longer cover the whole area: anyone working
+// across a group boundary is now in no group at all. That is stated under the
+// chart title, because unexplained it reads as productivity having dropped.
+function generatePerfSplitRows_(data, timeList, groups, pureOnly) {
   var rows = [];
+
+  // Resolved once per call, not once per row per group. This runs over every
+  // block times every group, and VOLUME_TYPES.find inside that loop was
+  // already the hot path here.
+  var groupStdKeys = groups.map(function (group) {
+    var keys = [];
+    group.keys.forEach(function (areaKey) {
+      var volType = VOLUME_TYPES.find(function (v) { return v.key === areaKey; });
+      if (volType) keys.push(volType.stdKey);
+    });
+    return keys;
+  });
+  var outsideStdKeys = groups.map(function (group, gi) {
+    var mine = groupStdKeys[gi];
+    var out = [];
+    for (var i = 0; i < VOLUME_TYPES.length; i++) {
+      if (mine.indexOf(VOLUME_TYPES[i].stdKey) === -1) out.push(VOLUME_TYPES[i].stdKey);
+    }
+    return out;
+  });
+
   timeList.forEach(function(tr) {
     var blockData = data.filter(function(r) { return r.timeRange === tr; });
     var row = { dateTime: tr };
-    groups.forEach(function(group) {
+    groups.forEach(function(group, gi) {
       var totalStd = 0;
       var deployedCount = 0;
+      var mineKeys = groupStdKeys[gi];
+      var outKeys = outsideStdKeys[gi];
       blockData.forEach(function(r) {
         var hasActivity = false;
         var bonusStd = 0;
-        group.keys.forEach(function(areaKey) {
-          var volType = VOLUME_TYPES.find(function(v) { return v.key === areaKey; });
-          if (!volType) return;
-          var stdVal = Number(r[volType.stdKey]) || 0;
+        for (var k = 0; k < mineKeys.length; k++) {
+          var stdVal = Number(r[mineKeys[k]]) || 0;
           if (stdVal > 0) { hasActivity = true; bonusStd += stdVal; }
-        });
+        }
+        if (hasActivity && pureOnly) {
+          for (var o = 0; o < outKeys.length; o++) {
+            if ((Number(r[outKeys[o]]) || 0) > 0) { hasActivity = false; break; }
+          }
+        }
         if (hasActivity) { totalStd += bonusStd; deployedCount++; }
       });
       var deployedHours = deployedCount * 0.25;
@@ -470,6 +516,11 @@ function getAggregatedPerfSplitDataPak(rows, windowMinutes, splitGroups) {
       // and produced nothing both read as 0% here, and they mean opposite
       // things: one is "not running", the other is "running badly".
       row[grp.id + '_dep'] = dep;
+      // Kept as well as the ratio, because under a bonus filter this chart
+      // draws standard hours instead of a percentage. One filtered operator's
+      // percentage is the same story told once per area they touched, where
+      // the hours say how their time actually divided up.
+      row[grp.id + '_std'] = std;
     });
     result.push(row);
   });

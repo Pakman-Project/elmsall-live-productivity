@@ -300,5 +300,40 @@ check('an OS-only future block does not extend it',
       'the axis must stop at the newest block with hours in it');
 check('and OS alone leaves nothing to trim to', runTrim([osRow(TR[2], 'HJW')]) === TR.length);
 
+head('[9] the flag reaches the tables, not just the charts');
+// The band explains a zero on a chart. On the Bonus page and in the head
+// breakdown the same zero is a number in a column with nothing to explain it,
+// which is where "did nothing" gets read into "was on indirect duty".
+check('a map of who was on OS', JSON.stringify(
+        ctx.bonusOsMapPak_([osRow(TR[0], 'HJW'), work(TR[0], 'AAA', 0.2, 10)])) ===
+      '{"HJW":true}');
+check('one flagged block in the window is enough',
+      ctx.bonusOsMapPak_([work(TR[0], 'AAA', 0.2, 10), osRow(TR[1], 'AAA')]).AAA === true,
+      'somebody who cleared RSPS for one block was still on OS');
+check('the tag renders for them', ctx.osTagHtmlPak_(true).indexOf('os-tag') !== -1);
+check('and nothing at all for everybody else', ctx.osTagHtmlPak_(false) === '',
+      'so callers can concatenate it unconditionally');
+check('undefined is not on OS', ctx.osTagHtmlPak_(undefined) === '',
+      'a bonus absent from the map reads as undefined, not false');
+
+const tsrc = fs.readFileSync(APPS + 'Web - JsTables.html', 'utf8');
+const usrc = fs.readFileSync(APPS + 'Web - JsUi.html', 'utf8');
+check('the Bonus page builds the map per render',
+      /currentBonusOsMap = bonusOsMapPak_\(windowData\)/.test(tsrc));
+check('the Data Table detail rows build their own for their own window',
+      /currentDetailOsMap = bonusOsMapPak_\(slice\)/.test(tsrc));
+check('and the head breakdown builds one too',
+      /var bonusOs = bonusOsMapPak_\(rangeData\)/.test(usrc));
+check('the breakdown chip emits it',
+      usrc.indexOf('osTagHtmlPak_(bonusOs[bonusName])') !== -1);
+
+head('[10] the CSS exists for the class the JS emits');
+// A tag styled by nothing renders as bare text mid-name, which reads as data
+// corruption rather than as a label.
+const ossCss = fs.readFileSync(APPS + 'Web - Styles.html', 'utf8');
+check('.os-tag is styled', /\.os-tag \{/.test(ossCss));
+check('and it is boxed, so it reads as a label beside the name',
+      /\.os-tag \{[^}]*border:/.test(ossCss));
+
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
 process.exit(fail ? 1 : 0);

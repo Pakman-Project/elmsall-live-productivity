@@ -625,6 +625,81 @@ function multiAreaIconHtmlPak(areaCount) {
          ' title="Works across ' + n + ' work areas in this period"></i>';
 }
 
+// Which bonus numbers spent any of this period on OS / indirect work. Read off
+// the raw rows here rather than recomputed per surface, for the same reason
+// bonusAreaCountMapPak lives here: "was on OS" has to mean one thing on the
+// Bonus page, in the head breakdown and in the Data Table detail rows.
+//
+// ANY flagged block in the window counts. Somebody who cleared RSPS for one
+// block and picked for the rest genuinely was on OS, and the tag is there to
+// explain the dent that leaves in their figure.
+function bonusOsMapPak_(entries) {
+  var out = {};
+  if (!entries || !entries.length) return out;
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].os === true) out[entries[i].bonus] = true;
+  }
+  return out;
+}
+
+// The tag itself. Returns nothing when they were not on OS, so callers can
+// concatenate it unconditionally - same contract as multiAreaIconHtmlPak.
+function osTagHtmlPak_(isOs) {
+  if (!isOs) return '';
+  return '<span class="os-tag" title="On OS / indirect work in this period"' +
+         ' aria-label="On OS">OS</span>';
+}
+
+// All / single-area only / multi-area only, over rows carrying a `bonus`.
+//
+// The count comes from bonusAreaCountMapPak - the SAME map multiAreaIconHtmlPak
+// reads. If this counted areas its own way, a row could show the multi-area
+// marker and still survive "single-area only", which reads as the filter being
+// broken rather than as two definitions quietly disagreeing.
+//
+// An unrecognised mode means "all": a filter nobody asked for hides data, and
+// this is reached from three call sites.
+function filterByAreaCountPak_(rows, countMap, mode) {
+  if (mode !== 'single' && mode !== 'multi') return rows;
+  var map = countMap || {};
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var isMulti = (map[rows[i].bonus] || 0) > 1;
+    if (mode === 'multi' ? isMulti : !isMulti) out.push(rows[i]);
+  }
+  return out;
+}
+
+// The chip that cycles those three states. Rendered on the Bonus page beside
+// Select all / none, and again in the head breakdown's time bar. One builder
+// for both so the two cannot drift into different wording or a different cycle
+// order.
+var AREA_COUNT_FILTER_MODES_ = ['all', 'single', 'multi'];
+var AREA_COUNT_FILTER_LABELS_ = {
+  all: 'All areas',
+  single: 'Single-area only',
+  multi: 'Multi-area only'
+};
+
+function nextAreaCountFilterPak_(mode) {
+  var i = AREA_COUNT_FILTER_MODES_.indexOf(mode);
+  return AREA_COUNT_FILTER_MODES_[(i + 1) % AREA_COUNT_FILTER_MODES_.length];
+}
+
+function areaCountFilterChipHtmlPak_(mode, handler) {
+  var m = AREA_COUNT_FILTER_MODES_.indexOf(mode) === -1 ? 'all' : mode;
+  // A distinct glyph per state, because the label truncates first on a phone.
+  var icon = (m === 'all') ? 'fa-layer-group'
+           : (m === 'single') ? 'fa-user' : 'fa-user-group';
+  return '<button type="button" class="area-count-chip' +
+    (m === 'all' ? '' : ' on') + '" data-count-mode="' + m + '"' +
+    ' onclick="' + handler + "('" + nextAreaCountFilterPak_(m) + "')" + '"' +
+    ' title="Click to cycle: all areas, single-area only, multi-area only">' +
+    '<i class="fa-solid ' + icon + '" aria-hidden="true"></i>' +
+    '<span class="area-count-chip-text">' +
+    safeTextPak(AREA_COUNT_FILTER_LABELS_[m]) + '</span></button>';
+}
+
 function pctPak(n, d) {
   d = d !== undefined ? d : 1;
   if (typeof n === 'string' && n.indexOf('%') !== -1) {
@@ -659,6 +734,13 @@ function renderAreaToggleChips_(opts) {
 
   var hidden = opts.hiddenKeys || [];
 
+  // Overall mode on the Bonus page renders ONE combined table, so there are no
+  // per-area panels for the area chips to be a legend for - but the multi-area
+  // filter still applies to that table, and a filter whose control is off
+  // screen is indistinguishable from missing data. So the strip can be shown
+  // carrying the count chip alone.
+  var wantAreaChips = opts.areaChips !== false;
+
   // The chips are a legend for the panels below them, so they follow whatever
   // order the user has arranged those panels into. Falls back to the authored
   // VOLUME_TYPES order when the caller has no arrangement to offer, and appends
@@ -686,7 +768,7 @@ function renderAreaToggleChips_(opts) {
   // chart modes that have their own per-series legend, where these would be
   // controls with nothing to control.
   var html = '';
-  if (opts.onSetAll) {
+  if (opts.onSetAll && wantAreaChips) {
     var anyOn = false, anyOff = false;
     for (var s = 0; s < ordered.length; s++) {
       if (hidden.indexOf(ordered[s].key) === -1) anyOn = true; else anyOff = true;
@@ -696,8 +778,20 @@ function renderAreaToggleChips_(opts) {
             (anyOff ? '' : ' disabled') + '>Select all</button>' +
             '<button type="button" class="area-chip-bulk-btn" onclick="' + opts.onSetAll + '(false)"' +
             (anyOn ? '' : ' disabled') + '>Select none</button>' +
+            // Same row, because it filters the same population the chips do -
+            // one narrows by area, the other by how many areas. A second
+            // control strip for a single button would cost more vertical space
+            // than the button is worth, on a phone especially.
+            (opts.countFilter
+              ? areaCountFilterChipHtmlPak_(opts.countFilter.mode, opts.countFilter.onSet)
+              : '') +
+            '</span>';
+  } else if (opts.countFilter) {
+    html += '<span class="area-chip-bulk">' +
+            areaCountFilterChipHtmlPak_(opts.countFilter.mode, opts.countFilter.onSet) +
             '</span>';
   }
+  if (!wantAreaChips) { togglesEl.innerHTML = html; return; }
   for (var v = 0; v < ordered.length; v++) {
     var t = ordered[v];
     var off = hidden.indexOf(t.key) !== -1;
