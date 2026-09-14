@@ -23,7 +23,18 @@
  *
  * so nothing arriving through Databricks needs correcting at all. What is left
  * for this file is rows that arrive some OTHER way — a manual paste, an
- * import, a hand edit. Those are rare, so an hourly trigger is plenty; the
+ * import, a hand edit.
+ *
+ * Except that for a while it was doing the damage itself. correctNameColumn_
+ * wrote the corrected values and set the plain-text format AFTERWARDS, and
+ * setValues parses a string the way typing it would unless the cell is already
+ * text — so the repaired "1AM" was stored as the time serial 1/24, and the
+ * format change then froze that number as the text "0.04166666667". Running
+ * hourly over the whole tab, it destroyed exactly the codes it exists to
+ * protect, on rows Databricks had written perfectly. See correctNameColumn_
+ * for the order, and recoverMangledNameValue_ for the clean-up.
+ *
+ * Hand-added rows are rare, so an hourly trigger is plenty; the
  * 5-minute cadence was sized for a job this no longer does, and rewriting
  * every cell of column C 288 times a day is pure overhead.
  *
@@ -117,16 +128,89 @@ function correctNameValue_(display) {
 
   if (NAME_TIME_MAP_[v]) return NAME_TIME_MAP_[v];
 
+  // Last, so an exact lookup always beats a reconstruction.
+  var recovered = recoverMangledNameValue_(v);
+  if (recovered) return recovered;
+
   return v;
+}
+
+function pad2Name_(n) { return (n < 10 ? '0' : '') + n; }
+
+/**
+ * A value Sheets already destroyed -> the code it came from, or '' when the
+ * shape is not recognisable damage.
+ *
+ * This repairs cells that were wrecked before the write order in
+ * correctNameColumn_ was fixed, and it has to work off a NUMBER rather than a
+ * rendered clock time, because a number is what was frozen into the cell:
+ * "1AM" was parsed to the time serial 1/24 and then given a text format, so
+ * the cell reads "0.04166666667" and no lookup in NAME_TIME_MAP_ will ever
+ * find it.
+ *
+ * Deliberately narrow. Every rule here has to match a shape a real bonus code
+ * cannot have, because a false repair invents an operator who was never on
+ * shift:
+ *
+ *   a fraction of a day      0.75 -> 18:00 -> "6PM". A code cannot contain a
+ *                            decimal point, so nothing legitimate looks like
+ *                            this. Whole hours only, and only the hours that
+ *                            HAVE a code - 10:00 and 11:00 do not, so they are
+ *                            left alone rather than guessed at.
+ *
+ *   a power of ten >= 1000   100000000 -> "1E8", 3000 -> "3E3" - the same
+ *                            notation correctNameValue_ already normalises
+ *                            "3.00E+03" to. The floor at 1000 keeps
+ *                            three-digit numeric codes safe, which costs the
+ *                            recovery of "1E2"; that is the right way round.
+ *
+ * NOT recovered: "0". Both "000" and "0AM" collapse to it and nothing
+ * distinguishes them, so NAME_ZERO_MAP_'s existing choice of "000" stands
+ * rather than this guessing differently.
+ */
+function recoverMangledNameValue_(v) {
+  // Digits and at most one decimal point. Anything else is either a real code
+  // or damage of a shape this does not claim to understand.
+  if (!/^\d+(?:\.\d+)?$/.test(v)) return '';
+  var n = Number(v);
+  if (!isFinite(n)) return '';
+
+  if (n > 0 && n < 1) {
+    var hours = n * 24;
+    var h = Math.round(hours);
+    // 0.04166666667 is a rounded rendering of 1/24, so the comparison has to
+    // tolerate what the cell lost.
+    if (Math.abs(hours - h) > 1e-6) return '';
+    return NAME_TIME_MAP_[pad2Name_(h) + ':00'] || '';
+  }
+
+  if (n >= 1000 && Math.floor(n) === n) {
+    var exp = 0, base = n;
+    while (base % 10 === 0) { base /= 10; exp++; }
+    if (base >= 1 && base <= 9) return base + 'E' + exp;
+  }
+
+  return '';
 }
 
 /**
  * Corrects column C for a block of rows.
  *
- * The number format is forced to plain text AFTER the write. Without it Sheets
- * re-reads "3E3" as a number and renders it straight back as 3.00E+03, undoing
- * the correction on the way in. The same applies to "000", which would
- * otherwise collapse straight back to 0.
+ * The plain-text format goes on BEFORE the write, and the order is the whole
+ * correctness of this function.
+ *
+ * setValues does not store a string verbatim: it parses each one the way
+ * typing it into the cell would, unless the cell is already formatted as text.
+ * So with the format applied afterwards, writing the corrected "1AM" stored
+ * the time serial 1/24, and setNumberFormat then froze that number as the text
+ * "0.04166666667". "1E8" became 100000000 and "000" became 0 the same way.
+ * Every correction this file made was undone by the act of making it, and
+ * because the result no longer looks like a clock time, correctNameValue_
+ * could not recognise it on the next pass either - so the damage was
+ * permanent, and it accumulated hourly across rows Databricks had written
+ * correctly with RAW.
+ *
+ * Formatting first, setValues has nothing left to interpret.
  */
 function correctNameColumn_(sheet, startRow, numRows) {
   if (numRows < 1) return;
@@ -137,8 +221,8 @@ function correctNameColumn_(sheet, startRow, numRows) {
     return [correctNameValue_(row[0])];
   });
 
-  range.setValues(corrected);
   range.setNumberFormat('@');
+  range.setValues(corrected);
 }
 
 /**
