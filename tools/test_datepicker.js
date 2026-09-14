@@ -47,8 +47,23 @@ const nodes = {};
 ['archiveSelect', 'datePickerBtn', 'datePickerLabel', 'dateMenu', 'calGrid', 'calTitle']
   .forEach(id => { nodes[id] = el(id); nodes[id].classList.__o = {}; });
 
+// "Today" is now a day the calendar offers, so what today IS decides what the
+// grid contains - and a suite whose expectations move at midnight is a suite
+// that fails on a date nobody chose. Pinned to a Monday in a month with no
+// archives in the fixture below, which is the interesting case: the only
+// pickable day in September is today.
+const REAL_DATE = Date;
+const TODAY = [2026, 8, 14];            // 14 September 2026
+function FakeDate() {
+  return arguments.length
+    ? new REAL_DATE(...arguments)
+    : new REAL_DATE(TODAY[0], TODAY[1], TODAY[2]);
+}
+FakeDate.prototype = REAL_DATE.prototype;
+
 const ctx = {
   console,
+  Date: FakeDate,
   $: id => nodes[id] || null,
   safeTextPak: s => String(s),
   escapeAttrPak: s => String(s).replace(/"/g, '&quot;'),
@@ -113,13 +128,93 @@ check('unarchived days are still shown',
       (nodes.calGrid.innerHTML.match(/cal-disabled/g) || []).length === 31 - 3,
       '= ' + (nodes.calGrid.innerHTML.match(/cal-disabled/g) || []).length);
 
-// A month with no archives at all still renders, and offers nothing.
+// A month with no archives at all still renders, and offers only today.
 ev('_calMonth = new Date(2026, 8, 1)');   // September 2026
 ev('renderDateMenu_()');
-check('a month with no archives offers none', pickable().length === 0, pickable().join());
+check('a month with no archives offers only today', pickable().join() === '2026-09-14',
+      pickable().join());
 check('and still draws its 30 days',
       (nodes.calGrid.innerHTML.match(/cal-cell/g) || []).length >= 30,
       '= ' + (nodes.calGrid.innerHTML.match(/cal-cell/g) || []).length);
+
+head('[2a] today is a day you can pick, and it means Live');
+// It used to be excluded for having no ARCHIVE entry, which greyed out the one
+// date people open this calendar to get back to and put the "today" ring on a
+// dead cell. Worse, the Today button only moved the VIEW - so on today's own
+// month, the month the calendar already opens on, it did nothing at all and
+// read as broken. That is what was reported.
+{
+  const avail = () => ev('JSON.stringify(calAvailable_())') && JSON.parse(ev('JSON.stringify(calAvailable_())'));
+  check('today is in the available map', '2026-09-14' in avail(), Object.keys(avail()).join());
+  check('and picking it means Live, not an archive', avail()['2026-09-14'] === '',
+        JSON.stringify(avail()['2026-09-14']));
+  check('today is a button, not a dead span',
+        /<button[^>]*data-cal="2026-09-14"/.test(nodes.calGrid.innerHTML), '');
+  check('and is not marked unavailable',
+        !/data-cal="2026-09-14"[^>]*cal-disabled/.test(nodes.calGrid.innerHTML) &&
+        !/cal-disabled[^"]*"[^>]*data-cal="2026-09-14"/.test(nodes.calGrid.innerHTML), '');
+  check('it still carries the today marker', /cal-today/.test(nodes.calGrid.innerHTML), '');
+
+  // On Live, the grid used to highlight nothing whatsoever.
+  nodes.archiveSelect.value = '';
+  ev('renderDateMenu_()');
+  check('on Live, today is the selected cell',
+        /data-cal="2026-09-14"/.test(nodes.calGrid.innerHTML) &&
+        (nodes.calGrid.innerHTML.match(/cal-selected/g) || []).length === 1,
+        '= ' + (nodes.calGrid.innerHTML.match(/cal-selected/g) || []).length + ' selected');
+
+  // Clicking it goes to Live rather than doing nothing.
+  nodes.archiveSelect.value = 'https://docs.google.com/x/12-08-2026';
+  nodes.archiveSelect.__dispatched = null;
+  ev("pickDate_(calAvailable_()['2026-09-14'])");
+  check('picking today returns the dashboard to Live', nodes.archiveSelect.value === '',
+        JSON.stringify(nodes.archiveSelect.value));
+  check('and actually reloads', nodes.archiveSelect.__dispatched === 'change', '');
+
+  // An archive cut for today, if one ever exists, must keep the cell - or the
+  // day becomes unreachable.
+  const saved = nodes.archiveSelect.options;
+  nodes.archiveSelect.options = saved.concat(
+    [{ value: 'https://docs.google.com/x/14-09-2026', textContent: '14/09/2026' }]);
+  check('an archive for today wins over Live',
+        avail()['2026-09-14'] === 'https://docs.google.com/x/14-09-2026',
+        String(avail()['2026-09-14']));
+  nodes.archiveSelect.options = saved;
+  nodes.archiveSelect.value = '';
+}
+
+head('[2a2] one footer action, and it works from today\'s own month');
+{
+  // The delegated listener the real page binds at startup.
+  ev('initDatePicker_()');
+  const menu = nodes.dateMenu;
+  const handler = (menu.events.find(e => e[0] === 'click') || [])[1];
+  check('the menu has a click handler', typeof handler === 'function', '');
+
+  const header = R('Web - Header.html');
+  check('Clear is gone', header.indexOf('data-cal-action="clear"') === -1,
+        'it meant "back to Live" without saying so, which is what Today now does');
+  check('one action button remains',
+        (header.match(/data-cal-action=/g) || []).length === 1,
+        '= ' + (header.match(/data-cal-action=/g) || []).length);
+  check('and it names both things it does', /Today \(Live\)/.test(header), '');
+
+  if (typeof handler === 'function') {
+    // The reported case exactly: already on this month, already the month the
+    // calendar opens on. The old code re-rendered the same view and stopped.
+    ev('_calMonth = new Date(2026, 8, 1); renderDateMenu_();');
+    nodes.archiveSelect.value = 'https://docs.google.com/x/12-08-2026';
+    nodes.archiveSelect.__dispatched = null;
+    const btn = { getAttribute: () => 'today' };
+    handler({ target: { closest: s => (s === '[data-cal-action]' ? btn : null) } });
+    check('pressing it on today\'s month returns to Live',
+          nodes.archiveSelect.value === '', JSON.stringify(nodes.archiveSelect.value));
+    check('and is not a silent no-op', nodes.archiveSelect.__dispatched === 'change',
+          'the whole bug was a button that did nothing visible');
+    check('the menu closes behind it', nodes.dateMenu.classList.contains('open') === false, '');
+    nodes.archiveSelect.value = '';
+  }
+}
 
 head('[2b] month navigation');
 ev('_calMonth = new Date(2026, 7, 1); renderDateMenu_();');

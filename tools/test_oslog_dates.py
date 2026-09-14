@@ -46,8 +46,9 @@ ns = {}
 exec(re.search(r"def _dtr\(.*?\n\n", dtr_src, re.S).group(0), ns)
 # Everything above the first bare statement: the constants and the two helpers,
 # without the gspread call that follows them.
-exec(os_src[:os_src.index("OS_KEYS = set()")].replace("from datetime import", "from datetime import"), ns)
+exec(os_src[:os_src.index("OS_STATUS = {}")], ns)
 win = ns["_os_windows"]
+status_of = ns["_os_status"]
 
 
 def span(day, a, b):
@@ -125,7 +126,73 @@ check("an over-long spell is capped", win("09/09/2026", "06:00", "05:59")[1] == 
 check("16 hours exactly is still allowed", win("09/09/2026", "06:00", "22:00")[1] is None)
 check("17 hours is not", win("09/09/2026", "06:00", "23:00")[1] == "too_long")
 
-head("[7] the two notebooks agree")
+head("[7] the Record Status becomes something a reader recognises")
+# Column Q is the approval form's own wording. Two values are re-spelled on the
+# way past - nobody outside that process reads "OK" as "this was approved", and
+# "authorise or reject" is an instruction to an approver rather than a state.
+check('"OK" -> Approved', status_of("OK") == "Approved", status_of("OK"))
+check("whatever case it arrives in",
+      status_of("ok") == "Approved" and status_of("Ok") == "Approved",
+      status_of("ok") + " / " + status_of("Ok"))
+check('"authorise or reject" -> Awaiting Approval',
+      status_of("authorise or reject") == "Awaiting Approval",
+      status_of("authorise or reject"))
+check("and that one too", status_of("Authorise or Reject") == "Awaiting Approval",
+      status_of("Authorise or Reject"))
+check("Rejected passes straight through", status_of("Rejected") == "Rejected",
+      status_of("Rejected"))
+# The old code dropped every row that was not OK, so these vanished entirely -
+# leaving a zero on the dashboard with nothing to explain it.
+check("a status nobody thought of survives",
+      status_of("Escalated to Ops") == "Escalated to Ops",
+      "a fallback here would hide the next status the form grows")
+check("surrounding space is trimmed", status_of("  Rejected ") == "Rejected",
+      status_of("  Rejected "))
+check("an empty cell reads as it always did",
+      status_of("") == "YES" and status_of(None) == "YES",
+      "the spell happened; nothing has been decided about it yet")
+
+head("[8] the strongest verdict wins a block claimed twice")
+# Two logged spells can cover the same block, most often a record re-submitted
+# rather than edited, and the output column has room for one answer. Without an
+# order the winner is whichever row the sheet happened to list last.
+rank = ns["OS_STATUS_RANK"]
+check("approved beats awaiting", rank["Approved"] > rank["Awaiting Approval"])
+check("awaiting beats undecided", rank["Awaiting Approval"] > rank["YES"])
+check("and anything known beats a status with no rank",
+      rank.get("Rejected", 0) < rank["YES"],
+      "rejected does not out-rank a spell that is still being decided")
+
+head("[9] the columns it reads, which are the fragile part")
+# The Apps Script picks source columns by index into a list, so dropping one
+# shifts every output column after it - which is exactly what happened when the
+# log went from 25 columns to 20. A wrong index here reads a POPULATED cell, so
+# the failure is every row quietly rejected as unparseable rather than an error
+# anybody sees. Pinned to the layout the script actually writes.
+check("the range covers the 20-column layout", 'OS_RANGE = "A7:T"' in os_src,
+      "A7:Y was the old width")
+check("date is column A", "_os_cell(_r, 0)" in os_src)
+check("bonus is column B, not D",
+      "_os_cell(_r, 1).upper()" in os_src and "_os_cell(_r, 3).upper()" not in os_src,
+      "D held the bonus under the 25-column layout")
+check("start and finish are H and I, not J and K",
+      "_os_cell(_r, 7), _os_cell(_r, 8)" in os_src,
+      "J and K were the old positions")
+check("status is column Q, not V",
+      "_os_status(_os_cell(_r, 16))" in os_src and "_os_cell(_r, 21)" not in os_src,
+      "V held it under the 25-column layout")
+check("and it is no longer a gate",
+      'if _os_cell(_r, 16).upper() != "OK"' not in os_src,
+      "dropping non-OK rows is what hid rejected spells")
+
+# The Apps Script is the other half of this contract: these indices are only
+# right for as long as it writes that layout.
+script = open(os.path.join(HERE, "..", "Spreadsheet - OS Log.js"), encoding="utf-8").read()
+check("the script still writes 20 columns",
+      "combinedResults.length, 20)" in script,
+      "if this widens again, every index above moves")
+
+head("[10] the two notebooks agree")
 back = os.path.join(DBX, "Elmsall Live Productivity - Backfill Mode.ipynb")
 bcells = ["".join(c["source"]) for c in json.load(open(back, encoding="utf-8"))["cells"]]
 bsrc = next((c for c in bcells if "def _os_windows(" in c), None)

@@ -212,12 +212,13 @@ var TOUR_STEPS = [
     cleanup: function () { hiddenBonusAreas = []; if (typeof refreshBonusTables === 'function') refreshBonusTables(); },
     title: 'Areas filtered',
     body: 'That area drops out of the tables. Toggle chips to focus on just the areas you care about.' },
-  { part: 5, page: 2, target: '#bonusAreaToggles .area-count-chip',
-    interactive: { sel: '#bonusAreaToggles .area-count-chip', type: 'click' },
-    // Left where the tour found it: the chip cycles, so a single click has
-    // moved it on, and the next step's cleanup puts it back.
+  // A dropdown up in the page controls now, beside Display Mode and Rows -
+  // it used to be a cycling chip among the area toggles. The next step's
+  // cleanup puts it back to All.
+  { part: 5, page: 2, target: '#bonusAreaCount',
+    interactive: { sel: '#bonusAreaCount', type: 'change', changeValue: 'multi' },
     title: 'Operators who moved between areas',
-    body: 'Somebody who worked two areas appears in both panels with the same totals, marked with a stacked icon. This button cycles between everyone, only people who stayed in one area, and only the ones who moved — watch it change.' },
+    body: 'Somebody who worked two areas appears in both panels with the same totals, marked with a stacked icon. This narrows the page to everyone, to only the people who stayed put, or to only the ones who moved — watch the panels shrink.' },
   { part: 5, page: 2, target: '#bonusTablesContainer',
     cleanup: function () {
       bonusAreaCountFilter = 'all';

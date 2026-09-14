@@ -397,6 +397,23 @@
                     <option value="20">20 Rows</option>
                   </select>
                 </div>
+                <div class="bonus-control-group">
+                  <!-- Was a cycling chip down among the area toggles, where it
+                       read as one of them - a chip that filtered by HOW MANY
+                       areas, sitting in a row of chips that each filtered to
+                       one. Three named options in a list say what the states
+                       are without having to click through them, and up here it
+                       sits with the other two controls that shape the whole
+                       page rather than a slice of it.
+
+                       Options are written by renderBonusAreaCountSelect_ from
+                       the same list the breakdown's chip reads, so the two
+                       cannot drift into different wording. -->
+                  <label for="bonusAreaCount" class="bonus-rows-label">Areas:</label>
+                  <select id="bonusAreaCount" class="row-select"
+                          onchange="setBonusAreaCountFilter(this.value)"
+                          title="Everyone, only operators who stayed in one area, or only those who moved between areas"></select>
+                </div>
               </div>
               <div class="breakdown-time-bar bonus-time-bar">
                 <div class="time-row time-row-from">

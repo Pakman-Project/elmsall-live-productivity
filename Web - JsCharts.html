@@ -15,6 +15,30 @@
   // productive work, so it reads as a grey wash rather than as another series.
   function CHART_OS_BAND() { return _isLightTheme_() ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.09)"; }
 
+  // The approval status tints the band's LABEL. The band itself stays grey.
+  //
+  // Washing the plot area red/amber/green was the ask, and it collides with
+  // what is already drawn there: an OS block has no standard hours, so on the
+  // productivity chart its bar is ALREADY red - 0% is below every threshold -
+  // and a pale green "Approved" wash would sit directly behind that red bar.
+  // Two RAG signals in the same few pixels saying opposite things, with
+  // nothing on screen to tell the reader that this one grades the paperwork
+  // rather than the performance.
+  //
+  // Tinting the word keeps the status readable at a glance without the fill
+  // competing with the bars, and leaves the wash free to say which KIND of
+  // band it is once there is more than one kind.
+  //
+  // Anything unrecognised reads as red rather than as neutral: a status this
+  // function has never heard of is a decision made outside it, and the safe
+  // reading of an unknown verdict is that the absence is not yet excused.
+  function CHART_OS_STATUS(status) {
+    var s = String(status || '').toLowerCase();
+    if (s === 'approved') return APP_CONFIG.colors.good;
+    if (s === 'awaiting approval') return APP_CONFIG.colors.warn;
+    return APP_CONFIG.colors.bad;
+  }
+
   // ── OS / Indirect bands ────────────────────────────────────────────────────
   // A bonus on an indirect task produces a genuine 0% - no volume, no standard
   // hours - which on its own reads as "this person did nothing". Shading those
@@ -23,18 +47,33 @@
   // Contiguous windows merge into ONE region with ONE label: a 06:00-18:00 OS
   // shift is forty-eight 15-minute blocks, and forty-eight grey bars each
   // captioned "OS" would be noise rather than an explanation.
+  // A change of approval status also closes a band. Merged straight through
+  // it, one label would have to speak for two different verdicts, and
+  // whichever it picked would be wrong about half its own width - so a shift
+  // approved until 10:00 and awaiting a decision after it draws as two
+  // adjacent bands with a label each, not as one band making a claim about
+  // both.
   function mergeOsBands_(agg) {
     var bands = [];
     var start = -1;
+    var status = '';
     for (var i = 0; i < agg.length; i++) {
-      if (agg[i] && agg[i].os) {
-        if (start === -1) start = i;
-      } else if (start !== -1) {
-        bands.push({ from: start, to: i - 1 });
+      var on = !!(agg[i] && agg[i].os);
+      var st = on ? (agg[i].osStatus || '') : '';
+      if (on && start !== -1 && st !== status) {
+        bands.push({ from: start, to: i - 1, status: status });
+        start = i;
+        status = st;
+      } else if (on && start === -1) {
+        start = i;
+        status = st;
+      } else if (!on && start !== -1) {
+        bands.push({ from: start, to: i - 1, status: status });
         start = -1;
+        status = '';
       }
     }
-    if (start !== -1) bands.push({ from: start, to: agg.length - 1 });
+    if (start !== -1) bands.push({ from: start, to: agg.length - 1, status: status });
     return bands;
   }
 
@@ -71,7 +110,7 @@
       var x1 = Math.min(x.right, p1);
       if (!(x1 > x0)) continue;
       ctx.save();
-      fn(ctx, x0, x1, area);
+      fn(ctx, x0, x1, area, band);
       ctx.restore();
     }
   }
@@ -89,15 +128,28 @@
       });
     },
     afterDatasetsDraw: function(chart, args, opts) {
-      eachOsBand_(chart, opts, function(ctx, x0, x1, area) {
+      eachOsBand_(chart, opts, function(ctx, x0, x1, area, band) {
         // Below this the word overflows its own band and collides with the
         // neighbouring one. The shading still reads without it.
         if (x1 - x0 < 22) return;
-        ctx.fillStyle = CHART_MUTED();
+        var fam = getComputedStyle(chart.canvas).fontFamily || 'sans-serif';
+        var mid = (x0 + x1) / 2;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.font = '600 11px ' + (getComputedStyle(chart.canvas).fontFamily || 'sans-serif');
-        ctx.fillText('OS', (x0 + x1) / 2, area.top + 6);
+        ctx.fillStyle = CHART_MUTED();
+        ctx.font = '600 11px ' + fam;
+        ctx.fillText('OS', mid, area.top + 6);
+
+        // The status on a second line under it, and only when the whole word
+        // fits inside the band: clipped to "(Appro" it reads as some other
+        // status rather than as a truncation, and the band already says the
+        // thing it has to say without it.
+        var label = (band && band.status) ? '(' + band.status + ')' : '';
+        if (!label) return;
+        ctx.font = '600 9px ' + fam;
+        if (ctx.measureText(label).width > x1 - x0 - 4) return;
+        ctx.fillStyle = CHART_OS_STATUS(band.status);
+        ctx.fillText(label, mid, area.top + 19);
       });
     }
   };

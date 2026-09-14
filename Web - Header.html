@@ -86,9 +86,13 @@
             <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
           </div>
           <div class="cal-grid" id="calGrid" role="grid" aria-labelledby="calTitle"></div>
+          <!-- One button, where Clear and Today both used to sit. Clear meant
+               "back to Live" without saying so, and Today only scrolled the
+               view to this month - which did nothing at all on the month the
+               calendar already opens on. Today's cell is now pickable and
+               means Live, so the two were one request wearing two labels. -->
           <div class="cal-foot">
-            <button type="button" class="cal-action" data-cal-action="clear">Clear</button>
-            <button type="button" class="cal-action" data-cal-action="today">Today</button>
+            <button type="button" class="cal-action" data-cal-action="today">Today (Live)</button>
           </div>
         </div>
       </div>

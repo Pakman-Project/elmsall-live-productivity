@@ -128,10 +128,12 @@ check('one 15-min spell shades its 60-min bucket',
 
 head('[5] contiguous windows merge into one band');
 const bands = a => JSON.stringify(ctx.mergeOsBands_(a.map(os => ({ os: os }))));
-check('a single run', bands([false, true, true, false, true]) === '[{"from":1,"to":2},{"from":4,"to":4}]',
+check('a single run',
+      bands([false, true, true, false, true]) ===
+      '[{"from":1,"to":2,"status":""},{"from":4,"to":4,"status":""}]',
       bands([false, true, true, false, true]));
-check('a run to the end', bands([false, true, true]) === '[{"from":1,"to":2}]');
-check('the whole series', bands([true, true, true]) === '[{"from":0,"to":2}]',
+check('a run to the end', bands([false, true, true]) === '[{"from":1,"to":2,"status":""}]');
+check('the whole series', bands([true, true, true]) === '[{"from":0,"to":2,"status":""}]',
       'a full OS shift is ONE band, not one per window');
 check('nothing at all', bands([false, false]) === '[]');
 check('an empty series', bands([]) === '[]');
@@ -326,6 +328,162 @@ check('and the head breakdown builds one too',
       /var bonusOs = bonusOsMapPak_\(rangeData\)/.test(usrc));
 check('the breakdown chip emits it',
       usrc.indexOf('osTagHtmlPak_(bonusOs[bonusName])') !== -1);
+
+head('[11] the approval status travels with the flag');
+// OS/ Indirect used to be YES or NO, and the notebook dropped every log row
+// that was not "OK" - so a rejected or not-yet-approved spell left a zero with
+// nothing to explain it, indistinguishable from somebody who did nothing. The
+// column now carries the status itself, and this is what must not regress: a
+// status nobody enumerated has to still read as "on OS".
+{
+  const csrc = fs.readFileSync(APPS + 'Web - Code.js', 'utf8');
+  const osOf = raw => {
+    const c = { console };
+    vm.createContext(c);
+    vm.runInContext(csrc.slice(csrc.indexOf('function procOsStatus_')).split('\nfunction buildSideEntry_')[0], c);
+    return c.procOsStatus_(raw);
+  };
+  check('NO is not on OS', osOf('NO') === '' && osOf('no') === '', JSON.stringify(osOf('no')));
+  check('an empty cell is not on OS', osOf('') === '' && osOf(null) === '' && osOf(undefined) === '');
+  check('YES still is', osOf('YES') === 'YES');
+  check('Approved is', osOf('Approved') === 'Approved');
+  check('Awaiting Approval is', osOf('Awaiting Approval') === 'Awaiting Approval');
+  check('Rejected is', osOf('Rejected') === 'Rejected',
+        'this is the one the old YES-only test silently dropped');
+  check('and so is a status this code has never heard of',
+        osOf('Escalated to Ops') === 'Escalated to Ops',
+        'matching a known list would lose the band for every status added later');
+  check('surrounding space does not change the answer', osOf('  Approved  ') === 'Approved');
+
+  check('the flag is derived from the status, not a second read of the cell',
+        /os: osStatus !== ''/.test(csrc));
+  check('YES is not repeated into the payload',
+        /osStatus\.toUpperCase\(\) !== 'YES'/.test(csrc),
+        'it says nothing os:true has not already said, on every row of a full day');
+  check('the yesterday cache is bumped for the new field',
+        csrc.indexOf("'ydayArch_v5_'") !== -1 && csrc.indexOf("'ydayArch_v4_'") === -1,
+        'cached v4 rows carry the flag and no status, so the band would draw ' +
+        'unlabelled on yesterday and labelled on today');
+}
+
+head('[12] one bucket, one verdict - or none');
+// A 60-minute bucket can hold two 15-minute spells that were decided
+// differently. Labelling it with either one is a claim the reader cannot see
+// is only half true.
+check('agreement carries through', ctx.osStatusOfPak_(['Approved', 'Approved']) === 'Approved');
+check('disagreement carries nothing', ctx.osStatusOfPak_(['Approved', 'Rejected']) === '',
+      'a plain OS band is honest; a wrong label is not');
+check('an undecided block is not a vote against',
+      ctx.osStatusOfPak_(['', 'Approved', '']) === 'Approved',
+      'it says the spell happened without saying what was decided');
+check('nothing at all', ctx.osStatusOfPak_([]) === '' && ctx.osStatusOfPak_(['', '']) === '');
+
+// End to end, through the real row builders rather than the helper alone.
+{
+  const st = (tr, bonus, status) => Object.assign(osRow(tr, bonus), { osStatus: status });
+  const r15 = ctx.generateMainRows_(
+    [st(TR[0], 'HJW', 'Approved'), st(TR[1], 'HJW', 'Rejected')], TR, { applyThreshold: true });
+  check('a 15-minute row keeps its own status',
+        r15[0].osStatus === 'Approved' && r15[1].osStatus === 'Rejected',
+        r15[0].osStatus + ' / ' + r15[1].osStatus);
+  const r60 = ctx.getAggregatedDataPak(r15, 60);
+  check('and an hour holding both claims neither', r60[0].osStatus === '',
+        JSON.stringify(r60[0].osStatus));
+  const same60 = ctx.getAggregatedDataPak(ctx.generateMainRows_(
+    [st(TR[0], 'HJW', 'Approved'), st(TR[1], 'HJW', 'Approved')], TR,
+    { applyThreshold: true }), 60);
+  check('an hour that agrees keeps the label', same60[0].osStatus === 'Approved',
+        JSON.stringify(same60[0].osStatus));
+  check('the flag itself is unaffected either way', r60[0].os === true && same60[0].os === true);
+}
+
+head('[13] a change of status cuts the band');
+// Merged straight through it, one label speaks for two verdicts and is wrong
+// about half its own width.
+{
+  const b = list => ctx.mergeOsBands_(list.map(s =>
+    s === null ? { os: false } : { os: true, osStatus: s }));
+  check('two verdicts, two bands',
+        JSON.stringify(b(['Approved', 'Approved', 'Rejected'])) ===
+        '[{"from":0,"to":1,"status":"Approved"},{"from":2,"to":2,"status":"Rejected"}]',
+        JSON.stringify(b(['Approved', 'Approved', 'Rejected'])));
+  check('one verdict stays one band',
+        b(['Approved', 'Approved', 'Approved']).length === 1,
+        'the split must not fire on every window');
+  check('a gap still separates them',
+        b(['Approved', null, 'Approved']).length === 2);
+  check('and the status survives a gap',
+        b(['Approved', null, 'Rejected']).map(x => x.status).join() === 'Approved,Rejected');
+  check('an unlabelled run is still one band',
+        b(['', '', '']).length === 1 && b(['', '', ''])[0].status === '');
+  check('labelled then unlabelled is a cut, not a merge',
+        b(['Approved', '']).length === 2,
+        'or the label would run on over windows it says nothing about');
+}
+
+head('[14] the band says the status under the word OS');
+{
+  const savedDoc = ctx.document;
+  ctx.document = { documentElement: { classList: { contains: () => false } } };
+  ctx.getComputedStyle = () => ({ fontFamily: 'sans-serif' });
+
+  const painted = [];
+  let fill = '';
+  const stub = w => ({
+    ctx: {
+      save() {}, restore() {},
+      fillRect() {}, measureText: t => ({ width: t.length * 5 }),
+      fillText(t, x, y) { painted.push({ text: t, y: y, fill: fill }); },
+      set fillStyle(v) { fill = v; }, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}
+    },
+    canvas: {},
+    chartArea: { top: 10, bottom: 210, left: 0, right: w },
+    scales: { x: { left: 0, right: w, getPixelForValue: i => i * w } }
+  });
+  const draw = (band, w) => {
+    painted.length = 0;
+    ctx.osBandPlugin_.afterDatasetsDraw(stub(w), null, { bands: [band] });
+    return painted;
+  };
+
+  let out = draw({ from: 0, to: 1, status: 'Approved' }, 300);
+  check('the word OS is still drawn', out[0] && out[0].text === 'OS', JSON.stringify(out));
+  check('with the status beneath it in brackets',
+        out[1] && out[1].text === '(Approved)', JSON.stringify(out.map(o => o.text)));
+  check('on a second line, not alongside', out[1] && out[1].y > out[0].y,
+        out[0].y + ' then ' + out[1].y);
+  check('tinted green for approved', out[1] && out[1].fill === ctx.APP_CONFIG.colors.good,
+        String(out[1] && out[1].fill));
+
+  out = draw({ from: 0, to: 1, status: 'Awaiting Approval' }, 400);
+  check('amber for awaiting', out[1] && out[1].fill === ctx.APP_CONFIG.colors.warn,
+        String(out[1] && out[1].fill));
+  out = draw({ from: 0, to: 1, status: 'Rejected' }, 300);
+  check('red for rejected', out[1] && out[1].fill === ctx.APP_CONFIG.colors.bad,
+        String(out[1] && out[1].fill));
+  out = draw({ from: 0, to: 1, status: 'Escalated to Ops' }, 400);
+  check('and red for anything unrecognised', out[1] && out[1].fill === ctx.APP_CONFIG.colors.bad,
+        'an unknown verdict is not an excused one');
+
+  out = draw({ from: 0, to: 1, status: '' }, 300);
+  check('no status, no second line', out.length === 1,
+        'a spell logged without a verdict renders exactly as it did before');
+
+  // Clipped to "(Appro" it reads as a different status rather than a truncation.
+  out = draw({ from: 0, to: 1, status: 'Awaiting Approval' }, 40);
+  check('a band too narrow for the whole word drops it',
+        out.length === 1 && out[0].text === 'OS', JSON.stringify(out.map(o => o.text)));
+  out = draw({ from: 0, to: 1, status: 'Approved' }, 15);
+  check('and one too narrow for OS itself draws neither', out.length === 0,
+        JSON.stringify(out.map(o => o.text)));
+
+  check('the wash itself is still neutral',
+        /function CHART_OS_BAND\(\) \{ return _isLightTheme_\(\) \? "rgba\(0,0,0/.test(
+          fs.readFileSync(APPS + 'Web - JsCharts.html', 'utf8')),
+        'RAG on the fill would sit a green wash behind the red 0% bar it explains');
+
+  ctx.document = savedDoc;
+}
 
 head('[10] the CSS exists for the class the JS emits');
 // A tag styled by nothing renders as bare text mid-name, which reads as data

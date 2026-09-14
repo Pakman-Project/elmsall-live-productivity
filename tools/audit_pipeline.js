@@ -546,8 +546,28 @@ head('[the multi-area filter has a control wherever it applies]');
         /visible: true,\s*\n\s*areaChips: mode === 'area'/.test(
           tables.replace(/\/\/[^\n]*\n/g, '')),
         'Overall mode needs the chip even with no area chips to show');
-  check('the Bonus page passes its filter state to the chip',
-        /countFilter: \{ mode: bonusAreaCountFilter/.test(tables));
+  // The Bonus page's control is a dropdown in bonus-page-controls now, beside
+  // Display Mode and Rows; the breakdown kept the cycling chip. Different
+  // shapes, but they must offer the same three states under the same names, so
+  // the options are written from the arrays the chip also reads rather than
+  // typed into the markup.
+  check('the Bonus page has a dropdown for it',
+        R('Web - Index.html').indexOf('id="bonusAreaCount"') !== -1 &&
+        /onchange="setBonusAreaCountFilter\(this\.value\)"/.test(R('Web - Index.html')));
+  check('its options are generated, not hand-typed',
+        /sel\.innerHTML = areaCountFilterOptionsHtmlPak_\(bonusAreaCountFilter\)/.test(tables) &&
+        R('Web - Index.html').indexOf('Multi-area only') === -1,
+        'typed twice, the dropdown and the chip would drift apart');
+  check('and it is re-synced on every render',
+        /renderBonusAreaCountSelect_\(\);/.test(tables) &&
+        (tables.match(/renderBonusAreaCountSelect_\(\)/g) || []).length >= 3,
+        'the tour sets the state directly, so the select must follow it');
+  check('both controls read one list of modes',
+        /AREA_COUNT_FILTER_MODES_/.test(R('Web - JsHelpers.html')) &&
+        (R('Web - JsHelpers.html').match(/AREA_COUNT_FILTER_LABELS_\[/g) || []).length >= 2);
+  check('the Bonus page no longer also renders the chip',
+        !/countFilter: \{ mode: bonusAreaCountFilter/.test(tables),
+        'two controls for one filter would disagree the moment either moved');
   check('the head breakdown renders its own copy',
         ui.indexOf("areaCountFilterChipHtmlPak_(\n        breakdownAreaCountFilter") !== -1 ||
         /areaCountFilterChipHtmlPak_\([\s\S]{0,80}breakdownAreaCountFilter/.test(ui));

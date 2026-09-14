@@ -757,6 +757,18 @@
       var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(entries[i].sub || '');
       if (m) map[m[3] + '-' + m[2] + '-' + m[1]] = entries[i].value;
     }
+    // Today is a day you can pick, and picking it means Live - the live sheet
+    // IS today. It used to be left out because it has no ARCHIVE entry, which
+    // greyed out the one date people open this calendar to get back to, put
+    // the "today" ring on a dead cell, and left the grid with nothing
+    // highlighted at all whenever the dashboard was live.
+    //
+    // The archive is cut for a day that has finished, so today is normally
+    // absent from the list above. If a cut for today ever does exist it keeps
+    // this cell: an explicit dated copy is the more specific answer, and
+    // overwriting it here would make the day unreachable.
+    var todayKey = calKey_(new Date());
+    if (!Object.prototype.hasOwnProperty.call(map, todayKey)) map[todayKey] = '';
     return map;
   }
 
@@ -767,11 +779,12 @@
     var avail = calAvailable_();
     var sel = $('archiveSelect');
     var current = sel ? sel.value : '';
+    // Runs for Live as well, which now resolves to today's cell, so exactly
+    // one day is highlighted whatever the dashboard is showing. Only Live
+    // carries the empty value, so the match stays unambiguous.
     var curKey = '';
-    if (current) {
-      for (var k in avail) {
-        if (Object.prototype.hasOwnProperty.call(avail, k) && avail[k] === current) { curKey = k; break; }
-      }
+    for (var k in avail) {
+      if (Object.prototype.hasOwnProperty.call(avail, k) && avail[k] === current) { curKey = k; break; }
     }
 
     if (!_calMonth) {
@@ -869,11 +882,17 @@
 
         var act = e.target.closest('[data-cal-action]');
         if (act) {
-          var which = act.getAttribute('data-cal-action');
-          // Clear returns to Live; Today only moves the VIEW, because today may
-          // well have no archive yet and a dead button is worse than none.
-          if (which === 'clear') pickDate_('');
-          else { _calMonth = new Date(); _calMonth.setDate(1); renderDateMenu_(); }
+          // One action where there were two, because they had become the same
+          // request. "Clear" returned to Live. "Today" only moved the VIEW to
+          // this month - and since the calendar already opens on the selected
+          // day's month, pressing it on today's month did nothing whatsoever
+          // and read as a broken button. Today's cell now means Live, so both
+          // were asking to go back to the live day: this does that, and lands
+          // the view on it.
+          _calMonth = new Date();
+          _calMonth.setDate(1);
+          renderDateMenu_();
+          pickDate_('');
           return;
         }
 

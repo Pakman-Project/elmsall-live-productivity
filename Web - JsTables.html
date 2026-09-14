@@ -699,7 +699,19 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey, areaPerfOverrid
 // bonusAreaCountFilter in JsState.
 function setBonusAreaCountFilter(mode) {
   bonusAreaCountFilter = mode;
+  renderBonusAreaCountSelect_();
   refreshBonusTables();
+}
+
+// Writes the dropdown's options and selects the live one. Called on every
+// bonus render as well as on change, because the tour sets
+// bonusAreaCountFilter directly and a select left showing the old choice while
+// the tables are filtered by the new one is the worst of both.
+function renderBonusAreaCountSelect_() {
+  var sel = $('bonusAreaCount');
+  if (!sel) return;
+  sel.innerHTML = areaCountFilterOptionsHtmlPak_(bonusAreaCountFilter);
+  sel.value = bonusAreaCountFilter;
 }
 
 function toggleBonusArea(key) {
@@ -741,9 +753,12 @@ function renderBonusAreaToggles_(mode) {
     hiddenKeys: hiddenBonusAreas,
     orderKeys: (typeof areaKeyOrderForZone_ === 'function') ? areaKeyOrderForZone_('bonus') : null,
     onToggle: 'toggleBonusArea',
-    onSetAll: 'setAllBonusAreas',
-    countFilter: { mode: bonusAreaCountFilter, onSet: 'setBonusAreaCountFilter' }
+    onSetAll: 'setAllBonusAreas'
+    // No countFilter here any more: it is a dropdown up in bonus-page-controls,
+    // beside Display Mode and Rows. The breakdown still passes one, and still
+    // gets the chip.
   });
+  renderBonusAreaCountSelect_();
 }
 
 function renderSideTablesPak(rowsLimit) {

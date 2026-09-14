@@ -642,6 +642,26 @@ function bonusOsMapPak_(entries) {
   return out;
 }
 
+// One band carries one label, so a bucket spanning two different verdicts must
+// not claim either of them. "OS (Approved)" over half an hour that was half
+// rejected is worse than saying nothing at all, because the reader has no way
+// to see that it is only half true - a plain "OS" is the honest answer there.
+//
+// A flagged block with no status recorded is not a vote. It says the spell
+// happened without saying what was decided about it, so it neither supplies a
+// label nor contradicts one; counted as a disagreement, one not-yet-decided
+// block at the edge of an hour would strip the status off the whole bucket.
+function osStatusOfPak_(statuses) {
+  var seen = '';
+  for (var i = 0; i < statuses.length; i++) {
+    var s = statuses[i];
+    if (!s) continue;
+    if (!seen) seen = s;
+    else if (seen !== s) return '';
+  }
+  return seen;
+}
+
 // The tag itself. Returns nothing when they were not on OS, so callers can
 // concatenate it unconditionally - same contract as multiAreaIconHtmlPak.
 function osTagHtmlPak_(isOs) {
@@ -684,6 +704,22 @@ var AREA_COUNT_FILTER_LABELS_ = {
 function nextAreaCountFilterPak_(mode) {
   var i = AREA_COUNT_FILTER_MODES_.indexOf(mode);
   return AREA_COUNT_FILTER_MODES_[(i + 1) % AREA_COUNT_FILTER_MODES_.length];
+}
+
+// The same three states as a list of <option>s, for the Bonus page's select.
+// Built from the arrays above rather than typed into the markup so the chip in
+// the breakdown and the dropdown here cannot end up offering different things
+// or calling them different names - which is the whole reason those arrays are
+// module-level in the first place.
+function areaCountFilterOptionsHtmlPak_(mode) {
+  var m = AREA_COUNT_FILTER_MODES_.indexOf(mode) === -1 ? 'all' : mode;
+  var out = '';
+  for (var i = 0; i < AREA_COUNT_FILTER_MODES_.length; i++) {
+    var k = AREA_COUNT_FILTER_MODES_[i];
+    out += '<option value="' + k + '"' + (k === m ? ' selected' : '') + '>' +
+           safeTextPak(AREA_COUNT_FILTER_LABELS_[k]) + '</option>';
+  }
+  return out;
 }
 
 function areaCountFilterChipHtmlPak_(mode, handler) {

@@ -393,13 +393,37 @@ function readProcRows_(sheet, lastRow) {
   };
 }
 
+// The OS column held YES or NO until the approval status moved into it. It now
+// carries the status itself - "Approved", "Awaiting Approval", "Rejected", and
+// whatever the approval form grows next - with YES still written for a spell
+// logged without a verdict against it.
+//
+// So the test is "anything that is not NO", and deliberately not a match on a
+// list of known statuses. Read the other way round, every status nobody
+// thought to enumerate here would silently read as "not on OS" and lose the
+// band that exists to explain the zero underneath it - which is exactly how
+// this column behaved for "Rejected" before today.
+//
+// Returns the status, or '' for a block that was not on OS at all.
+function procOsStatus_(raw) {
+  var v = String(raw == null ? '' : raw).trim();
+  return (!v || v.toUpperCase() === 'NO') ? '' : v;
+}
+
 function buildSideEntry_(valsRow, dispsRow, map) {
+  var osStatus = map.os >= 0 ? procOsStatus_(valsRow[map.os]) : '';
   var entry = {
     timeRange: String(dispsRow[0]).trim(),
     bonus: String(dispsRow[2]).trim(),
     value: map.total >= 0 ? toNumber_(valsRow[map.total]) : 0,
-    os: map.os >= 0 && String(valsRow[map.os]).trim().toUpperCase() === 'YES'
+    os: osStatus !== ''
   };
+  // Set only on the rows that have one. This object is JSON-stringified for
+  // every row of a full day, so a field on the 99% of rows that are not OS is
+  // payload paid for on every poll. YES says nothing that os:true has not
+  // already said, so it is not repeated either - and a band with no status to
+  // show then renders exactly as it did before statuses existed.
+  if (osStatus && osStatus.toUpperCase() !== 'YES') entry.osStatus = osStatus;
   for (var i = 0; i < map.areas.length; i++) {
     var a = map.areas[i];
     entry[a.key + 'Std'] = a.std >= 0 ? toNumber_(valsRow[a.std]) : 0;
@@ -543,7 +567,11 @@ function getDashboardData(archiveUrl) {
         // v4: entries gained an `os` field. The area count in the key does not
         // move when a FIELD is added, so without the bump yesterday's cached
         // rows would come back missing it for up to fifteen minutes.
-        yCacheKey = 'ydayArch_v4_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
+        // v5: and an `osStatus` field, for the same reason. Cached v4 rows
+        // carry the flag but no status, so the band would draw unlabelled on
+        // yesterday's half of the window and labelled on today's - which reads
+        // as the status having changed at midnight.
+        yCacheKey = 'ydayArch_v5_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
                     '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {

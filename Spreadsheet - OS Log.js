@@ -19,29 +19,40 @@ function updateOSLog() {
     return;
   }
   
-  // Output row layout (25 columns, A:Y):
-  //   A–M   (idx 0–12) : base mapped columns
-  //   N, O  (idx 13–14): left empty
-  //   P     (idx 15)   : =IF(B, IF(L>=6.5, L-0.5, L), "")
-  //   Q     (idx 16)   : =IF(P, P*60, "")
-  //   R     (idx 17)   : left empty
-  //   S–Y   (idx 18–24): extra mapped columns
+  // Sheets date epoch: serial 0 = 1899-12-30
+  const EPOCH_MS = Date.UTC(1899, 11, 30);
+  
+  // Convert a Date object back to its underlying numeric serial.
+  // e.g. Date(1900-01-05) -> 6 ; Date(1900-01-05 12:00) -> 6.5
+  function dateToSerial(v) {
+    const ms = Date.UTC(v.getFullYear(), v.getMonth(), v.getDate(),
+                        v.getHours(), v.getMinutes(), v.getSeconds());
+    return Math.round((ms - EPOCH_MS) / 86400000 * 1e6) / 1e6; // round to avoid float drift
+  }
+  
+  // Output row layout (20 columns, A:T):
+  //   A–K (idx 0–10) : base mapped columns
+  //   L   (idx 11)   : =IF(B, IF(J>=6.5, J-0.5, J), "")
+  //   M   (idx 12)   : =IF(L, L*60, "")
+  //   N–T (idx 13–19): extra mapped columns
   const SHEET_CONFIGS = [
     {
       sheetName: 'OS Form',
       startRow: 8,
       firstCol: 4,
       numCols: 27,   // D:AD
-      baseSelect: [0, 1, 2, 3, 11, 'Indirect', 4, 5, ' ', 7, 9, 20, 25],
-      extraSelect: [13, 14, 26, 15, 11, 12, 19]  // Q, R, AD, S, O, P, W
+      baseSelect: [0, 3, 11, 'Indirect', 4, 5, ' ', 7, 9, 20, 25],
+      extraSelect: [13, 14, 26, 15, 11, 12, 19],  // Q, R, AD, S, O, P, W
+      hourIdx: 20   // source col X -> output J (may arrive Date-formatted)
     },
     {
       sheetName: 'Manual Log',
       startRow: 6,
       firstCol: 4,
       numCols: 23,   // D:Z
-      baseSelect: [0, 1, 2, 3, 11, 'Indirect', 4, 5, ' ', 6, 7, 15, 9],
-      extraSelect: [9, 10, 22, 13, 11, 12, 14]   // M, N, Z, Q, O, P, R
+      baseSelect: [0, 3, 11, 'Indirect', 4, 5, ' ', 6, 7, 15, 9],
+      extraSelect: [9, 10, 22, 13, 11, 12, 14],   // M, N, Z, Q, O, P, R
+      hourIdx: 15    // source col S -> output J
     }
   ];
 
@@ -67,24 +78,30 @@ function updateOSLog() {
         
         const mapped = data
           .filter(row => row[0] !== "" && row[0] !== null && row[0] !== undefined)
-          .map(row => {
-            const base = cfg.baseSelect.map(spec => typeof spec === 'number' ? row[spec] : spec); // A:M
-            const extra = cfg.extraSelect.map(i => row[i]);                                       // S:Y
+          .map(rawRow => {
+            // Normalize the hours column: Date -> numeric serial (fixes 05/01/1900)
+            const row = rawRow.slice();
+            if (row[cfg.hourIdx] instanceof Date) {
+              row[cfg.hourIdx] = dateToSerial(row[cfg.hourIdx]);
+            }
             
-            // P = IFERROR(IF(B<>, IF(L>=6.5, L-0.5, L), ""), "")
-            let p = "";
+            const base = cfg.baseSelect.map(spec => typeof spec === 'number' ? row[spec] : spec); // A:K
+            const extra = cfg.extraSelect.map(i => row[i]);                                       // N:T
+            
+            // L = IFERROR(IF(B<>, IF(J>=6.5, J-0.5, J), ""), "")
+            let l = "";
             if (base[1]) {                    // output column B
-              const rawL = base[11];          // output column L  <-- was base[12] (M)
-              if (rawL !== "" && rawL !== null && rawL !== undefined) {
-                const l = Number(rawL);
-                if (!isNaN(l)) p = (l >= 6.5) ? l - 0.5 : l;
+              const rawJ = base[9];           // output column J (now numeric)
+              if (rawJ !== "" && rawJ !== null && rawJ !== undefined) {
+                const j = Number(rawJ);
+                if (!isNaN(j)) l = (j >= 6.5) ? j - 0.5 : j;
               }
             }
             
-            // Q = IF(P<>, P*60, "")
-            const q = p ? p * 60 : "";
+            // M = IF(L<>, L*60, "")
+            const m = l ? l * 60 : "";
             
-            return base.concat(["", "", p, q, ""], extra);
+            return base.concat([l, m], extra);
           });
         
         combinedResults = combinedResults.concat(mapped);
@@ -94,13 +111,13 @@ function updateOSLog() {
     }
   });
 
-  // Clear existing output starting at 'OS log'!A7 (25 columns)
+  // Clear existing output starting at 'OS log'!A7 (25 cols wide to wipe legacy layout)
   const lastTargetRow = osLogSheet.getLastRow();
   if (lastTargetRow >= 7) {
     osLogSheet.getRange(7, 1, lastTargetRow - 6, 25).clearContent();
   }
   
   if (combinedResults.length > 0) {
-    osLogSheet.getRange(7, 1, combinedResults.length, 25).setValues(combinedResults);
+    osLogSheet.getRange(7, 1, combinedResults.length, 20).setValues(combinedResults);
   }
 }

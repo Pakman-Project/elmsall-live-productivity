@@ -6469,9 +6469,11 @@ select.hc-control {
 .cal-selected { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
 .cal-selected:hover { background: var(--accent); }
 
+/* One action now, not two, so it centres rather than spreading to the edges -
+   see the comment on the footer in Web - Header.html. */
 .cal-foot {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
