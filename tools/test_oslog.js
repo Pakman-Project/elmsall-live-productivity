@@ -397,6 +397,43 @@ check('nothing at all', ctx.osStatusOfPak_([]) === '' && ctx.osStatusOfPak_(['',
   check('the flag itself is unaffected either way', r60[0].os === true && same60[0].os === true);
 }
 
+head('[12b] three states, and Rejected is the catch-all');
+// The approval form has more wordings than three and will grow more, but a
+// chart reader has exactly three questions: was it approved, is it still being
+// decided, or was it not approved. Anything outside the first two is the third.
+check('approved', ctx.osStatusBandPak_('Approved') === 'Approved');
+check('awaiting', ctx.osStatusBandPak_('Awaiting Approval') === 'Awaiting Approval');
+check('rejected', ctx.osStatusBandPak_('Rejected') === 'Rejected');
+check('and anything else is rejected too',
+      ctx.osStatusBandPak_('Cancelled') === 'Rejected' &&
+      ctx.osStatusBandPak_('Withdrawn') === 'Rejected' &&
+      ctx.osStatusBandPak_('Escalated to Ops') === 'Rejected',
+      'everything apart from OK and "authorise or reject" is a rejection here');
+check('case and space do not matter',
+      ctx.osStatusBandPak_('  approved  ') === 'Approved' &&
+      ctx.osStatusBandPak_('AWAITING APPROVAL') === 'Awaiting Approval');
+// YES is what the column holds for a spell logged with the status cell empty.
+check('an undecided spell is NOT rejected',
+      ctx.osStatusBandPak_('YES') === '' && ctx.osStatusBandPak_('yes') === '',
+      'calling it rejected would be an accusation the data does not support');
+check('nor is a blank one',
+      ctx.osStatusBandPak_('') === '' && ctx.osStatusBandPak_(null) === '' &&
+      ctx.osStatusBandPak_(undefined) === '');
+check('every state has a short form',
+      ['Approved', 'Awaiting Approval', 'Rejected']
+        .every(s => /^[A-Z][a-z]{2}\.$/.test(ctx.OS_STATUS_SHORT_PAK_[s])),
+      JSON.stringify(ctx.OS_STATUS_SHORT_PAK_));
+// The raw wording is still upstream, so a specific record stays auditable.
+{
+  const nb = require('path').resolve(APPS, '..', 'Databricks-Live-Productivity-Output',
+                                     'Elmsall Live Productivity.ipynb');
+  const cells = JSON.parse(fs.readFileSync(nb, 'utf8')).cells
+    .map(c => c.source.join(''));
+  check('the notebook still writes the form\'s own wording',
+        cells.some(c => /return OS_STATUS_LABELS\.get\(v\.lower\(\), v\)/.test(c)),
+        'collapsing it upstream would lose which rejection it was, irreversibly');
+}
+
 head('[13] a change of status cuts the band');
 // Merged straight through it, one label speaks for two verdicts and is wrong
 // about half its own width.
@@ -416,6 +453,12 @@ head('[13] a change of status cuts the band');
         b(['Approved', null, 'Rejected']).map(x => x.status).join() === 'Approved,Rejected');
   check('an unlabelled run is still one band',
         b(['', '', '']).length === 1 && b(['', '', ''])[0].status === '');
+  // Two wordings of the same answer are not a distinction worth a cut: the
+  // band would be split in two and draw "(Rejected)" twice in a row.
+  check('two wordings of one verdict stay one band',
+        b(['Rejected', 'Cancelled', 'Withdrawn']).length === 1 &&
+        b(['Rejected', 'Cancelled'])[0].status === 'Rejected',
+        JSON.stringify(b(['Rejected', 'Cancelled', 'Withdrawn'])));
   check('labelled then unlabelled is a cut, not a merge',
         b(['Approved', '']).length === 2,
         'or the label would run on over windows it says nothing about');
@@ -464,14 +507,34 @@ head('[14] the band says the status under the word OS');
   out = draw({ from: 0, to: 1, status: 'Escalated to Ops' }, 400);
   check('and red for anything unrecognised', out[1] && out[1].fill === ctx.APP_CONFIG.colors.bad,
         'an unknown verdict is not an excused one');
+  check('which is also LABELLED Rejected, not by its own wording',
+        out[1] && out[1].text === '(Rejected)', JSON.stringify(out[1] && out[1].text));
 
   out = draw({ from: 0, to: 1, status: '' }, 300);
   check('no status, no second line', out.length === 1,
         'a spell logged without a verdict renders exactly as it did before');
 
-  // Clipped to "(Appro" it reads as a different status rather than a truncation.
+  // A phone is the normal case for this, not the exception: the same shift
+  // that gets 600px of chart on a desktop gets half of it, and every band was
+  // then too narrow for the word, so the status was invisible there.
   out = draw({ from: 0, to: 1, status: 'Awaiting Approval' }, 40);
-  check('a band too narrow for the whole word drops it',
+  check('a band too narrow for the word falls back to the short form',
+        out.length === 2 && out[1].text === 'Pnd.', JSON.stringify(out.map(o => o.text)));
+  check('and the short form keeps its colour',
+        out[1] && out[1].fill === ctx.APP_CONFIG.colors.warn, String(out[1] && out[1].fill));
+  out = draw({ from: 0, to: 1, status: 'Approved' }, 44);
+  check('App. for approved', out.length === 2 && out[1].text === 'App.',
+        JSON.stringify(out.map(o => o.text)));
+  out = draw({ from: 0, to: 1, status: 'Cancelled' }, 44);
+  check('Rej. for everything else', out.length === 2 && out[1].text === 'Rej.',
+        JSON.stringify(out.map(o => o.text)));
+  // Clipped to "(Appro" it would read as a different status rather than as a
+  // word that did not fit, which is why it steps down rather than truncating.
+  check('nothing is ever truncated mid-word',
+        ['(Approved)', '(Awaiting Approval)', '(Rejected)', 'App.', 'Pnd.', 'Rej.']
+          .indexOf(out[1].text) !== -1, out[1].text);
+  out = draw({ from: 0, to: 1, status: 'Approved' }, 23);
+  check('a band too narrow even for the short form drops it',
         out.length === 1 && out[0].text === 'OS', JSON.stringify(out.map(o => o.text)));
   out = draw({ from: 0, to: 1, status: 'Approved' }, 15);
   check('and one too narrow for OS itself draws neither', out.length === 0,

@@ -32,10 +32,12 @@
   // Anything unrecognised reads as red rather than as neutral: a status this
   // function has never heard of is a decision made outside it, and the safe
   // reading of an unknown verdict is that the absence is not yet excused.
+  // Keyed on the three display states from osStatusBandPak_, so the colour and
+  // the word can never disagree about which bucket a status fell into.
   function CHART_OS_STATUS(status) {
-    var s = String(status || '').toLowerCase();
-    if (s === 'approved') return APP_CONFIG.colors.good;
-    if (s === 'awaiting approval') return APP_CONFIG.colors.warn;
+    var s = osStatusBandPak_(status);
+    if (s === OS_STATUS_APPROVED_PAK_) return APP_CONFIG.colors.good;
+    if (s === OS_STATUS_AWAITING_PAK_) return APP_CONFIG.colors.warn;
     return APP_CONFIG.colors.bad;
   }
 
@@ -59,7 +61,11 @@
     var status = '';
     for (var i = 0; i < agg.length; i++) {
       var on = !!(agg[i] && agg[i].os);
-      var st = on ? (agg[i].osStatus || '') : '';
+      // Folded to the three display states before comparing, or two adjacent
+      // blocks reading "Rejected" and "Cancelled" would cut the band in two
+      // and draw the same label twice in a row, which looks like a glitch
+      // rather than a distinction.
+      var st = on ? osStatusBandPak_(agg[i].osStatus) : '';
       if (on && start !== -1 && st !== status) {
         bands.push({ from: start, to: i - 1, status: status });
         start = i;
@@ -144,11 +150,23 @@
         // fits inside the band: clipped to "(Appro" it reads as some other
         // status rather than as a truncation, and the band already says the
         // thing it has to say without it.
-        var label = (band && band.status) ? '(' + band.status + ')' : '';
-        if (!label) return;
+        // Folded again here rather than trusting the band: the plugin is also
+        // reachable with a band built elsewhere, and the fold is idempotent.
+        var status = osStatusBandPak_(band && band.status);
+        if (!status) return;
         ctx.font = '600 9px ' + fam;
-        if (ctx.measureText(label).width > x1 - x0 - 4) return;
-        ctx.fillStyle = CHART_OS_STATUS(band.status);
+        var room = x1 - x0 - 4;
+        // The word, then the short form, then nothing. Truncating would draw
+        // "(Appro", which reads as some other status rather than as a word
+        // that did not fit - and on a phone almost every band is narrower
+        // than the full word, which is why the status was invisible there.
+        var label = '(' + status + ')';
+        if (ctx.measureText(label).width > room) {
+          // Unbracketed: the brackets are most of what does not fit.
+          label = OS_STATUS_SHORT_PAK_[status];
+          if (ctx.measureText(label).width > room) return;
+        }
+        ctx.fillStyle = CHART_OS_STATUS(status);
         ctx.fillText(label, mid, area.top + 19);
       });
     }

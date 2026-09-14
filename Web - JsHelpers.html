@@ -642,10 +642,50 @@ function bonusOsMapPak_(entries) {
   return out;
 }
 
+// The three states the dashboard speaks. The approval form's Record Status has
+// more wordings than that and will grow more, but as far as anybody reading a
+// chart is concerned there are exactly three: it was approved, it is still
+// being decided, or it was not approved. So anything that is neither of the
+// first two is a rejection here - "Cancelled", "Withdrawn", whatever comes
+// next - and says Rejected rather than passing its own wording through.
+//
+// The raw value is untouched upstream: the OS log and Processed Data both
+// still hold exactly what the form said, so nothing is lost to anybody
+// auditing a specific record. This is the vocabulary of the display only.
+//
+// YES is not a verdict - it is what the column holds for a spell logged with
+// the status cell left empty - so it maps to nothing rather than to Rejected.
+// Calling an undecided spell rejected would be an accusation the data does not
+// support.
+var OS_STATUS_APPROVED_PAK_ = 'Approved';
+var OS_STATUS_AWAITING_PAK_ = 'Awaiting Approval';
+var OS_STATUS_REJECTED_PAK_ = 'Rejected';
+
+function osStatusBandPak_(status) {
+  var s = String(status == null ? '' : status).trim().toLowerCase();
+  if (!s || s === 'yes') return '';
+  if (s === 'approved') return OS_STATUS_APPROVED_PAK_;
+  if (s === 'awaiting approval') return OS_STATUS_AWAITING_PAK_;
+  return OS_STATUS_REJECTED_PAK_;
+}
+
+// Short forms, for a band too narrow to fit the word. On a phone that is the
+// normal case rather than the exception - the same twelve-hour shift that gets
+// 600px of chart on a desktop gets half of it - and the status was simply not
+// drawn at all there.
+var OS_STATUS_SHORT_PAK_ = {};
+OS_STATUS_SHORT_PAK_[OS_STATUS_APPROVED_PAK_] = 'App.';
+OS_STATUS_SHORT_PAK_[OS_STATUS_AWAITING_PAK_] = 'Pnd.';
+OS_STATUS_SHORT_PAK_[OS_STATUS_REJECTED_PAK_] = 'Rej.';
+
 // One band carries one label, so a bucket spanning two different verdicts must
 // not claim either of them. "OS (Approved)" over half an hour that was half
 // rejected is worse than saying nothing at all, because the reader has no way
 // to see that it is only half true - a plain "OS" is the honest answer there.
+//
+// Compared as the three display states, not as raw wordings: two blocks
+// reading "Rejected" and "Cancelled" are the same answer to the reader, and
+// treating them as a disagreement would blank a label that is perfectly true.
 //
 // A flagged block with no status recorded is not a vote. It says the spell
 // happened without saying what was decided about it, so it neither supplies a
@@ -654,7 +694,7 @@ function bonusOsMapPak_(entries) {
 function osStatusOfPak_(statuses) {
   var seen = '';
   for (var i = 0; i < statuses.length; i++) {
-    var s = statuses[i];
+    var s = osStatusBandPak_(statuses[i]);
     if (!s) continue;
     if (!seen) seen = s;
     else if (seen !== s) return '';
