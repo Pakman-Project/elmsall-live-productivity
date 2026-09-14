@@ -47,7 +47,7 @@ head('[2] the damage this file was written for');
 check('a rendered time', fix('01:00') === '1AM', fix('01:00'));
 check('an afternoon one', fix('18:00') === '6PM', fix('18:00'));
 check('rendered scientific notation', fix('3.00E+03') === '3E3', fix('3.00E+03'));
-check('an all-zero code', fix('0') === '000', fix('0'));
+// "0" is NOT in this list. See section [4b].
 
 head('[3] the damage this file CAUSED, and now has to undo');
 // A time serial frozen as text. This is what the reported cells held, and no
@@ -88,15 +88,33 @@ check('so is a four-digit one that is not a power of ten',
       fix('1234') === '1234' && fix('1500') === '1500', fix('1500'));
 check('and anything with a letter in it is untouched',
       fix('1A8') === '1A8' && fix('0X5') === '0X5');
-// Both "000" and "0AM" collapse to "0" and nothing separates them, so the
-// existing choice stands rather than the recovery guessing differently.
-check('"0" keeps the existing answer, not a time',
-      fix('0') === '000', 'both 000 and 0AM land here; 000 was already chosen');
+check('midnight is not recovered either',
+      fix('0') === '0' && fix('0.0') === '0.0',
+      'its serial is 0, and 0AM cannot be told from 000 there');
+
+head('[4b] "0" is left alone, because two real codes collapse to it');
+// This was a map turning "0" into "000", on the assumption that an all-zero
+// code was the only thing that could land there. "0AM" is a real code at this
+// site and Sheets parses it as midnight, whose serial is also 0 - so the guess
+// was attributing one real operator's hours to another real operator, about
+// half the time, with nothing on screen to show it had happened.
+check('"0" stays "0"', fix('0') === '0',
+      'visibly wrong beats invisibly wrong: somebody can fix it by hand');
+check('the zero map is gone', SRC.indexOf('NAME_ZERO_MAP_') === -1,
+      'a lookup table here can only ever be a coin flip');
+// Both codes have to survive intact now that nothing collapses them.
+check('"0AM" survives untouched', fix('0AM') === '0AM', fix('0AM'));
+check('and so does "000"', fix('000') === '000', fix('000'));
+check('lower case still folds up', fix('0am') === '0AM', fix('0am'));
+// The one thing that makes leaving it alone acceptable: nothing new collapses.
+check('the write formats before it writes, so neither collapses again',
+      SRC.split('function correctNameColumn_')[1].indexOf('setNumberFormat') <
+      SRC.split('function correctNameColumn_')[1].indexOf('setValues(corrected)'));
 
 head('[5] every step is idempotent');
 // correctDataRows_ promises this, and a second pass over a repaired tab is the
 // normal case rather than the exception.
-['PIT', '1AM', '6PM', '1E8', '000', '3E3'].forEach(c =>
+['PIT', '1AM', '6PM', '1E8', '000', '0AM', '3E3', '0'].forEach(c =>
   check(c + ' is stable', fix(fix(c)) === fix(c), fix(c) + ' -> ' + fix(fix(c))));
 
 head('[6] the format is set BEFORE the write');

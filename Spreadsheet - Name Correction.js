@@ -91,18 +91,26 @@ var NAME_TIME_MAP_ = {
 };
 
 /**
- * Bonus codes made only of zeros lose their width on the way in: Sheets stores
- * "000" as the number 0 and reads it back as "0". Same damage as the "3E3"
- * case, different shape, so it gets the same treatment — an exact lookup back
- * to the intended code.
+ * "0" IS NOT REPAIRED, deliberately, and this is the reason.
  *
- * Only one width can be recovered, because every all-zero code arrives as the
- * same "0". If genuine "00" or "0000" codes ever appear, fix it at the source
- * (write the cell as text) rather than here.
+ * There used to be a map here turning "0" back into "000", on the assumption
+ * that an all-zero code was the only thing that could collapse to it. It is
+ * not: "0AM" is a real bonus code at this site, and Sheets parses it as
+ * midnight, whose time serial is also 0. Both codes arrive as the same "0"
+ * and nothing in the cell distinguishes them — the number format would have,
+ * but the old write order overwrote that with plain text on every pass, so
+ * that evidence is gone from any row already touched.
+ *
+ * Guessing therefore means attributing one real operator's hours to another
+ * real operator, roughly half the time, with nothing on screen to show it
+ * happened. Leaving "0" alone is worse-looking and better: it shows up as an
+ * operator called "0", which is visibly wrong and can be fixed by hand by
+ * somebody who knows which shift it was.
+ *
+ * Nothing NEW collapses any more. Databricks writes with RAW and
+ * correctNameColumn_ formats before it writes, so "0AM" and "000" both survive
+ * intact from here on. This only concerns rows damaged before that.
  */
-var NAME_ZERO_MAP_ = {
-  '0': '000'
-};
 
 /**
  * One displayed column C cell -> its corrected value.
@@ -111,9 +119,6 @@ function correctNameValue_(display) {
   // Trim whitespace AND convert to ALL CAPS.
   var v = String(display === null || display === undefined ? '' : display).trim().toUpperCase();
   if (!v) return '';
-
-  // Restore all-zero codes collapsed to "0" by Sheets.
-  if (NAME_ZERO_MAP_[v]) return NAME_ZERO_MAP_[v];
 
   // Fix scientific notation (e.g. 3.00E+03 -> 3E3). Sheets renders a bonus
   // number that looks like a number in whatever notation it prefers, and the
@@ -156,7 +161,9 @@ function pad2Name_(n) { return (n < 10 ? '0' : '') + n; }
  *                            decimal point, so nothing legitimate looks like
  *                            this. Whole hours only, and only the hours that
  *                            HAVE a code - 10:00 and 11:00 do not, so they are
- *                            left alone rather than guessed at.
+ *                            left alone rather than guessed at. Midnight is
+ *                            excluded by the n > 0 test: its serial is 0, and
+ *                            "0AM" cannot be told from "000" there.
  *
  *   a power of ten >= 1000   100000000 -> "1E8", 3000 -> "3E3" - the same
  *                            notation correctNameValue_ already normalises
@@ -164,9 +171,9 @@ function pad2Name_(n) { return (n < 10 ? '0' : '') + n; }
  *                            three-digit numeric codes safe, which costs the
  *                            recovery of "1E2"; that is the right way round.
  *
- * NOT recovered: "0". Both "000" and "0AM" collapse to it and nothing
- * distinguishes them, so NAME_ZERO_MAP_'s existing choice of "000" stands
- * rather than this guessing differently.
+ * NOT recovered: "0". Both "000" and "0AM" collapse to it and nothing tells
+ * them apart, so neither this nor anything else may guess — see the note where
+ * the zero map used to be.
  */
 function recoverMangledNameValue_(v) {
   // Digits and at most one decimal point. Anything else is either a real code
