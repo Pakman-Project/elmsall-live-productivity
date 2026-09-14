@@ -514,6 +514,44 @@ function refreshBonusTables() {
   saveUserPreferences();
 }
 
+// The blocks in which this area was the ONLY thing the operator worked on.
+//
+// A block split between E3 Packing and OSR PiE cannot be divided honestly
+// after the fact: the operator was deployed for one quarter-hour, and the area
+// pill was charging that whole quarter to BOTH areas while counting only each
+// area's own standard hours in the numerator. Every area that shares its
+// people with another therefore read low, and the more the areas mixed the
+// worse it got.
+//
+// So rather than apportion by guesswork, the area's figure is computed from
+// the blocks that are unambiguously its own - both halves of the fraction
+// describe the same time, and the percentage means what it says.
+//
+// "Only" means across every entry in VOLUME_TYPES, both buildings.
+// scopeRowsToSite_ copies each area field across and only rewrites `value`,
+// so a row still carries its out-of-building standard hours - and an hour
+// spent in E3 dilutes an E1/E2 percentage exactly as much as an hour spent in
+// the next aisle. Same rule, and the same reasoning, as the `pureOnly` pass in
+// generatePerfSplitRows_ for the Overall page's work-area groups.
+//
+// The cost, which is real: an area whose people ALWAYS work it alongside
+// something else has no pure blocks, so it has no figure at all rather than a
+// misleading one. areaTotalPerformance_ returns null there and the pill is
+// simply absent.
+function pureAreaRows_(data, stdKey) {
+  var others = [];
+  for (var i = 0; i < VOLUME_TYPES.length; i++) {
+    if (VOLUME_TYPES[i].stdKey !== stdKey) others.push(VOLUME_TYPES[i].stdKey);
+  }
+  return data.filter(function (r) {
+    if ((Number(r[stdKey]) || 0) <= 0) return false;
+    for (var o = 0; o < others.length; o++) {
+      if ((Number(r[others[o]]) || 0) > 0) return false;
+    }
+    return true;
+  });
+}
+
 function computeBonusRows_(data, stdKey) {
   var bonusBlockMap = {};
   data.forEach(function (r) {
@@ -676,8 +714,15 @@ function buildBonusPanel_(title, allRows, rowsLimit, reorderKey, areaPerfOverrid
   var areaPerf = (areaPerfOverride !== undefined)
     ? areaPerfOverride
     : areaTotalPerformance_(allRows);
+  // Titled, because this figure now equals neither the column beneath it nor
+  // what the pill used to read: it is the area's own productivity over the
+  // blocks that were only ever the area's, while the rows are each person's
+  // total across everywhere they worked. Two different questions, and without
+  // a word of explanation the gap between them reads as an error.
   var areaPerfHtml = (areaPerf === null) ? '' :
-    '<span class="pill ' + perfClassPak(areaPerf) + '">' +
+    '<span class="pill ' + perfClassPak(areaPerf) + '"' +
+    ' title="Standard hours over time deployed, counting only blocks worked' +
+    ' solely in this area">' +
     Math.round(normalizePerfPak(areaPerf)) + '%</span>';
   html += '<div class="mini-table-title' + (areaPerfHtml ? ' has-area-perf' : '') +
           '"><h2>' + safeTextPak(title) + '</h2>' +
@@ -859,7 +904,14 @@ function renderSideTablesPak(rowsLimit) {
       // describes the AREA rather than the people in it. It will not equal the
       // sum of the column beneath it, which is why that column is headed
       // "Total Std Hrs".
-      var areaPerf = areaTotalPerformance_(computeBonusRows_(windowData, t.stdKey));
+      //
+      // Computed over this area's PURE blocks only - see pureAreaRows_. The
+      // rows beneath are still everybody who worked here, so the head count
+      // and the pill answer two different questions on purpose: who was in
+      // this area, and how the area performed in the time that was only ever
+      // its own.
+      var areaPerf = areaTotalPerformance_(
+        computeBonusRows_(pureAreaRows_(windowData, t.stdKey), t.stdKey));
       html += buildBonusPanel_(t.label, rows, rowsLimit, t.key, areaPerf);
     }
     if (!html) {

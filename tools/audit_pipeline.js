@@ -577,6 +577,14 @@ head('[the multi-area filter has a control wherever it applies]');
         /function setBonusAreaCountFilter/.test(tables) &&
         /function setBreakdownAreaCountFilter/.test(ui));
   check('the chip is styled', /\.area-count-chip \{/.test(R('Web - Styles.html')));
+  // The three states are named for the job, not the column: an operator on two
+  // areas is on two TASKS, which is the word the floor uses.
+  const helpers = R('Web - JsHelpers.html');
+  check('the states are named for tasks',
+        /all: 'All bonus numbers'/.test(helpers) &&
+        /single: 'Single Task'/.test(helpers) &&
+        /multi: 'Multi Tasks'/.test(helpers),
+        'and because the arrays are shared, the breakdown chip renames with it');
 }
 
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));

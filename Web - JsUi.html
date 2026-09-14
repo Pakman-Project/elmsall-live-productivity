@@ -1632,7 +1632,10 @@
         // not recognise, and a title attribute gives them nothing to copy and
         // nothing at all on a phone.
         var osTag = osTagHtmlPak_(bonusOs[bonusName]);
-        html += '<span class="breakdown-bonus-chip bonus-tip-host ' + bClass + multiClass + '"' + ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + safeTextPak(bonusName) + osTag + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span>' + bonusTipHtmlPak_(bonusName, selectedBonuses.indexOf(bonusName) !== -1) + '</span>';
+        // The name in its own element so it, and not the OS tag beside it, is
+        // what truncates when the chip runs out of room. See .chip-name.
+        var chipName = '<span class="chip-name">' + safeTextPak(bonusName) + '</span>';
+        html += '<span class="breakdown-bonus-chip bonus-tip-host ' + bClass + multiClass + '"' + ' onclick="event.stopPropagation();toggleBonusFilter(\'' + escapedB + '\');"><span class="chip-left">' + multiIcon + chipName + osTag + '</span><span class="chip-right"><span class="breakdown-chip-pct">' + Math.round(bPerfDisplay) + '%</span><i class="fa-solid fa-filter chip-filter-icon"></i></span>' + bonusTipHtmlPak_(bonusName, selectedBonuses.indexOf(bonusName) !== -1) + '</span>';
       }
       html += '</div>';
       html += '<div class="breakdown-detail-hint">Click a bonus number to filter the main view' + (sumOfAreas > totalUniqueHeads ? ' · <i class="fa-solid fa-layer-group" style="font-size:9px;margin:0 2px;"></i> = works across multiple areas' : '') + '</div>';

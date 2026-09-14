@@ -3288,7 +3288,12 @@ body.page-scrolled-far .back-to-top {
 
 .breakdown-detail-inner {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  /* 150, not 110. A chip has to hold the multi-task icon, the bonus number,
+     the OS tag, the percentage and the filter icon - and at 110px the last
+     thing in the row was being clipped off, which meant the OS tag vanished
+     on exactly the operators carrying both markers. Fewer chips per row is
+     the right trade against a marker that is silently not there. */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 6px;
   width: 100%;
 }
@@ -3315,6 +3320,16 @@ body.page-scrolled-far .back-to-top {
   display: flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The name is the only part of the chip allowed to give way. text-overflow
+   needs a real element to act on - it does nothing for a bare text node in a
+   flex row - so an unusually long bonus number used to push the OS tag past
+   the chip's clipped edge instead of shortening itself. The icons and the tag
+   are flex-shrink: 0; this is what yields. */
+.breakdown-bonus-chip .chip-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

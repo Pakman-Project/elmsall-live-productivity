@@ -203,11 +203,16 @@ const render = rsrc.split('function renderSideTablesPak')[1].split('function set
 // Not "does the totals call appear" - it does, for the lookup map, so a panel
 // handed the per-area rows again would still satisfy that. What matters is
 // where the PER-AREA call may appear: inside the pill, and nowhere else.
-const perAreaCalls = (render.match(/computeBonusRows_\(\s*windowData\s*,\s*t\.stdKey\s*\)/g) || []);
+const perAreaCalls = (render.match(
+  /computeBonusRows_\(pureAreaRows_\(windowData, t\.stdKey\), t\.stdKey\)/g) || []);
 check('the per-area calculation survives in exactly one place',
       perAreaCalls.length === 1, perAreaCalls.length + ' call sites');
 check('and that place is the pill',
-      /areaTotalPerformance_\(\s*computeBonusRows_\(\s*windowData\s*,\s*t\.stdKey\s*\)\s*\)/.test(render));
+      /areaTotalPerformance_\(\s*computeBonusRows_\(pureAreaRows_\(windowData, t\.stdKey\), t\.stdKey\)\s*\)/
+        .test(render));
+check('and it no longer counts blocks shared with another area',
+      !/computeBonusRows_\(\s*windowData\s*,\s*t\.stdKey\s*\)/.test(render),
+      'charging one quarter-hour to two areas is what made every mixed area read low');
 check('the panel rows are assembled from the totals lookup',
       /var rows = \[\];/.test(render) && /totalsByBonus\[/.test(render));
 check('built once, outside the per-area loop',
@@ -220,6 +225,78 @@ check('and it is passed in, not recomputed from the rows',
 check('the multi-area filter is applied in both view modes',
       (render.match(/filterByAreaCountPak_/g) || []).length === 2,
       (render.match(/filterByAreaCountPak_/g) || []).length + ' call sites');
+
+head('[10b] the area pill counts only blocks that were purely its own');
+// The pill's denominator used to be every block in which the area had any
+// hours at all - so a block split between OSR PiE and OSR Top Up charged a
+// full quarter-hour to BOTH areas while each numerator held only its own half.
+// Both areas read low, and the more the areas shared their people the worse it
+// got. Now the figure is computed over the blocks that were unambiguously the
+// area's own, so the two halves of the fraction describe the same time.
+{
+  // PURE works nothing but OSR PiE: two blocks at 0.20, so 0.40 std over 0.50 h
+  // deployed = 80%. SPLIT's single block is half OSR PiE and half Top Up, and
+  // belongs to neither area's own figure.
+  const P = [
+    rowMulti(TR[0], 'PURE', 0.20, 0),
+    rowMulti(TR[1], 'PURE', 0.20, 0),
+    rowMulti(TR[2], 'SPLIT', 0.10, 0.10)
+  ];
+  const pureRows = ctx.pureAreaRows_(P, 'pieStd');
+  check('the shared block is left out', pureRows.length === 2,
+        pureRows.map(r => r.bonus).join(','));
+  check('and the pure ones are kept', pureRows.every(r => r.bonus === 'PURE'));
+
+  const pill = ctx.areaTotalPerformance_(ctx.computeBonusRows_(pureRows, 'pieStd'));
+  check('the pill reads 80% - 0.40 std over 0.50 h', near(pill, 80), pill.toFixed(1) + '%');
+
+  // What it used to read, kept here as the thing it must NOT be.
+  const old = ctx.areaTotalPerformance_(ctx.computeBonusRows_(P, 'pieStd'));
+  check('where it used to read 66.7%', near(old, (0.5 / 0.75) * 100), old.toFixed(1) + '%');
+  check('so the dilution really is gone', !near(old, pill),
+        'the old figure was paying for a quarter-hour the area never had');
+
+  // Both sides of the fraction, checked directly - a pill can be right by
+  // accident if numerator and denominator are both wrong.
+  const pr = ctx.computeBonusRows_(pureRows, 'pieStd');
+  check('the numerator is the pure hours only',
+        near(pr.reduce((a, r) => a + r.standardHour, 0), 0.40),
+        pr.reduce((a, r) => a + r.standardHour, 0) + ' hrs');
+  check('and the denominator is a quarter-hour per pure block',
+        near(pr.reduce((a, r) => a + r.deployedHour, 0), 0.50),
+        pr.reduce((a, r) => a + r.deployedHour, 0) + ' h');
+
+  // An area worked only ever alongside something else has no figure rather
+  // than a misleading one. That is a real cost of the rule, so it is pinned.
+  check('an area with no pure blocks has no pill',
+        ctx.areaTotalPerformance_(ctx.computeBonusRows_(
+          ctx.pureAreaRows_([rowMulti(TR[0], 'SPLIT', 0.10, 0.10)], 'topUpStd'),
+          'topUpStd')) === null,
+        'null, so buildBonusPanel_ renders no pill at all');
+
+  // "Pure" spans every area in VOLUME_TYPES, both buildings. A row carries its
+  // out-of-building standard hours through scopeRowsToSite_, and an hour spent
+  // in E3 dilutes an E1/E2 percentage exactly as much as one spent next door.
+  const e3Key = ctx.VOLUME_TYPES.find(
+    t => ctx.AREA_SITE[ctx.areaBaseKey_(t.key)] === 'e3' &&
+         t.stdKey !== 'pieStd' && t.stdKey !== 'topUpStd');
+  check('there is an area in the other building to test with', !!e3Key,
+        e3Key ? e3Key.label : 'none found');
+  if (e3Key) {
+    const cross = rowMulti(TR[0], 'CROSS', 0.10, 0);
+    cross[e3Key.stdKey] = 0.10;
+    cross.value += 0.10;
+    check('work in the other building breaks purity too',
+          ctx.pureAreaRows_([cross], 'pieStd').length === 0,
+          'a building-scoped test would quietly let this through');
+  }
+
+  // The rule is the pill's alone: the rows underneath still list everybody who
+  // worked the area, so the head count does not move.
+  check('the rows are untouched by it',
+        ctx.computeBonusRows_(P, null).length === 2,
+        'PURE and SPLIT both still appear');
+}
 
 head('[11] the column headers say whose total this is');
 // A multi-area operator shows the same pair of numbers in several panels, so a
