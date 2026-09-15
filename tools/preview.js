@@ -125,9 +125,20 @@ const STUB = `
     Object.keys(d.rawSideData[0] || {}).forEach(function (k) {
       if (k !== 'timeRange' && k !== 'bonus') blank[k] = 0;
     });
-    Object.keys(want).forEach(function (tr) {
-      var row = Object.assign({}, blank, { timeRange: tr, bonus: bonus, value: 0, os: true });
-      d.rawSideData.push(row);
+    // A status, and the clipped times the notebook now writes alongside it.
+    // "Awaiting Approval" on purpose: it is the longest of the three, so it is
+    // the one that shows whether the band wraps the real wording or falls back
+    // to a code. And the spell starts seven minutes into its first block and
+    // stops eight into its last, so the hover tooltip reports a range the
+    // band's own edges cannot.
+    var trKeys = Object.keys(want);
+    trKeys.forEach(function (tr, n) {
+      d.rawSideData.push(Object.assign({}, blank, {
+        timeRange: tr, bonus: bonus, value: 0, os: true,
+        osStatus: 'Awaiting Approval',
+        osFrom: osClipAtPak_(tr, n === 0 ? 7 : 0),
+        osTo: osClipAtPak_(tr, n === trKeys.length - 1 ? 8 : 15)
+      }));
     });
     // Bands only draw under a bonus filter, so apply one.
     window.DEEP_BONUS = bonus;

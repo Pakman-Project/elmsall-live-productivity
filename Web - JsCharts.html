@@ -55,6 +55,25 @@
   // approved until 10:00 and awaiting a decision after it draws as two
   // adjacent bands with a label each, not as one band making a claim about
   // both.
+  // One band, plus the clipped times behind it: the FIRST start and the LAST
+  // end inside its own range. agg is in axis order, so those two are the ends
+  // of the spell the band draws - 07:26 and 08:06 for a band covering 07:15 to
+  // 08:15 - which is what the tooltip reports.
+  //
+  // The two fields are set only when both are there, so a band built from a day
+  // with no clip columns keeps exactly the shape it had before they existed.
+  function pushOsBand_(bands, agg, from, to, status) {
+    var band = { from: from, to: to, status: status };
+    var t0 = '', t1 = '';
+    for (var i = from; i <= to; i++) {
+      if (!agg[i]) continue;
+      if (!t0 && agg[i].osFrom) t0 = agg[i].osFrom;
+      if (agg[i].osTo) t1 = agg[i].osTo;
+    }
+    if (t0 && t1) { band.t0 = t0; band.t1 = t1; }
+    bands.push(band);
+  }
+
   function mergeOsBands_(agg) {
     var bands = [];
     var start = -1;
@@ -67,20 +86,51 @@
       // rather than a distinction.
       var st = on ? osStatusBandPak_(agg[i].osStatus) : '';
       if (on && start !== -1 && st !== status) {
-        bands.push({ from: start, to: i - 1, status: status });
+        pushOsBand_(bands, agg, start, i - 1, status);
         start = i;
         status = st;
       } else if (on && start === -1) {
         start = i;
         status = st;
       } else if (!on && start !== -1) {
-        bands.push({ from: start, to: i - 1, status: status });
+        pushOsBand_(bands, agg, start, i - 1, status);
         start = -1;
         status = '';
       }
     }
-    if (start !== -1) bands.push({ from: start, to: agg.length - 1, status: status });
+    if (start !== -1) pushOsBand_(bands, agg, start, agg.length - 1, status);
     return bands;
+  }
+
+  // The band covering an index, or null. Linear because a chart carries
+  // single-figure numbers of bands and they are already in index order.
+  function osBandAtPak_(bands, index) {
+    for (var b = 0; b < bands.length; b++) {
+      if (index >= bands[b].from && index <= bands[b].to) return bands[b];
+    }
+    return null;
+  }
+
+  // The band's own line in a chart tooltip, hung off afterBody on every chart
+  // that carries the plugin. A band is the full height of the plot area, so
+  // pointing anywhere in the grey is pointing at the band - no separate hover
+  // target, and no second floating box fighting the tooltip for the same few
+  // pixels next to the cursor.
+  //
+  // It says something the band cannot: the edges are quarter-hour blocks, and
+  // a 07:26-08:06 spell fills neither the first of them nor the last.
+  //
+  // An empty ARRAY rather than an empty string when there is nothing to add -
+  // a string would draw a blank line into every tooltip on the chart.
+  function osBandTooltipPak_(items) {
+    if (!items || !items.length) return [];
+    var chart = items[0].chart;
+    var opts = (chart && chart.options && chart.options.plugins)
+               ? chart.options.plugins.osBand : null;
+    if (!opts || !opts.bands || !opts.bands.length) return [];
+    var band = osBandAtPak_(opts.bands, items[0].dataIndex);
+    var line = band ? osBandTimeLabelPak_(band.t0, band.t1) : '';
+    return line ? [line] : [];
   }
 
   // Walks each band and hands the caller its pixel span.
@@ -102,11 +152,18 @@
     var area = chart.chartArea;
     if (!x || !area) return;
     var ctx = chart.ctx;
+
+    // Every span is measured first, so each band can be told how much CLEAR
+    // chart it has either side of it. The label needs that: a status wider
+    // than its own band is still perfectly readable centred over it when the
+    // chart beside it is empty, and on a desktop that is the normal case -
+    // the bands are narrow because the blocks are, not because the chart is
+    // crowded. Without it the only options were an abbreviation or nothing.
+    var spans = [];
     for (var b = 0; b < opts.bands.length; b++) {
-      var band = opts.bands[b];
-      var p0 = x.getPixelForValue(band.from);
-      var p1 = x.getPixelForValue(band.to);
-      if (!isFinite(p0) || !isFinite(p1)) continue;
+      var p0 = x.getPixelForValue(opts.bands[b].from);
+      var p1 = x.getPixelForValue(opts.bands[b].to);
+      if (!isFinite(p0) || !isFinite(p1)) { spans.push(null); continue; }
       if (p1 - p0 < OS_BAND_MIN_W) {
         var mid = (p0 + p1) / 2;
         p0 = mid - OS_BAND_MIN_W / 2;
@@ -114,11 +171,57 @@
       }
       var x0 = Math.max(x.left, p0);
       var x1 = Math.min(x.right, p1);
-      if (!(x1 > x0)) continue;
+      spans.push(x1 > x0 ? { x0: x0, x1: x1 } : null);
+    }
+
+    for (var i = 0; i < spans.length; i++) {
+      if (!spans[i]) continue;
+      // The nearest DRAWN neighbour each side, skipping any band that fell off
+      // the chart, and the plot edge when there is none.
+      var left = x.left, right = x.right;
+      for (var j = i - 1; j >= 0; j--) { if (spans[j]) { left = spans[j].x1; break; } }
+      for (var k = i + 1; k < spans.length; k++) { if (spans[k]) { right = spans[k].x0; break; } }
       ctx.save();
-      fn(ctx, x0, x1, area, band);
+      fn(ctx, spans[i].x0, spans[i].x1, area, opts.bands[i],
+         { left: spans[i].x0 - left, right: right - spans[i].x1 });
       ctx.restore();
     }
+  }
+
+  // How far the label may run past its own band, per side. The longest status
+  // is "Awaiting Approval", which splits onto two lines of about fifty pixels,
+  // so a band of any usable width needs only a few - this is a leash rather
+  // than an allowance, there to keep the words visibly attached to the band
+  // they describe instead of floating across an empty chart.
+  var OS_LABEL_OVERRUN = 24;
+  // Clear of the next band, not touching it.
+  var OS_LABEL_GUTTER = 3;
+
+  // The status as the lines to draw and the size to draw them at, or null when
+  // not even the short form fits.
+  //
+  // In order of preference: the whole status on one line, then split at its
+  // spaces onto one line per word, then the short form, then nothing. The
+  // brackets it used to wear are gone - they cost two characters of exactly
+  // the width that decides which of those four happens, and a second line
+  // under "OS" reads as a caption without them.
+  function osBandLabel_(ctx, status, room, fam) {
+    ctx.font = '700 11px ' + fam;
+    if (ctx.measureText(status).width <= room) return { lines: [status], size: 11 };
+    var words = status.split(' ');
+    if (words.length > 1) {
+      var widest = 0;
+      for (var w = 0; w < words.length; w++) {
+        widest = Math.max(widest, ctx.measureText(words[w]).width);
+      }
+      if (widest <= room) return { lines: words, size: 11 };
+    }
+    // Last resort. On a phone it is still the usual one: a band there can be
+    // narrower than the shortest real word, and "Pnd." beats nothing at all.
+    var short = OS_STATUS_SHORT_PAK_[status];
+    if (!short) return null;
+    ctx.font = '700 9px ' + fam;
+    return ctx.measureText(short).width <= room ? { lines: [short], size: 9 } : null;
   }
 
   // Attached per-chart, never Chart.register'd. It goes on the four time-series
@@ -134,7 +237,7 @@
       });
     },
     afterDatasetsDraw: function(chart, args, opts) {
-      eachOsBand_(chart, opts, function(ctx, x0, x1, area, band) {
+      eachOsBand_(chart, opts, function(ctx, x0, x1, area, band, clear) {
         // Below this the word overflows its own band and collides with the
         // neighbouring one. The shading still reads without it.
         if (x1 - x0 < 22) return;
@@ -146,28 +249,26 @@
         ctx.font = '600 11px ' + fam;
         ctx.fillText('OS', mid, area.top + 6);
 
-        // The status on a second line under it, and only when the whole word
-        // fits inside the band: clipped to "(Appro" it reads as some other
-        // status rather than as a truncation, and the band already says the
-        // thing it has to say without it.
+        // The status on a second line under it.
         // Folded again here rather than trusting the band: the plugin is also
         // reachable with a band built elsewhere, and the fold is idempotent.
         var status = osStatusBandPak_(band && band.status);
         if (!status) return;
-        ctx.font = '600 9px ' + fam;
-        var room = x1 - x0 - 4;
-        // The word, then the short form, then nothing. Truncating would draw
-        // "(Appro", which reads as some other status rather than as a word
-        // that did not fit - and on a phone almost every band is narrower
-        // than the full word, which is why the status was invisible there.
-        var label = '(' + status + ')';
-        if (ctx.measureText(label).width > room) {
-          // Unbracketed: the brackets are most of what does not fit.
-          label = OS_STATUS_SHORT_PAK_[status];
-          if (ctx.measureText(label).width > room) return;
-        }
+
+        // The band PLUS the clear chart either side, taken symmetrically
+        // because the text is centred - overrunning one edge and not the other
+        // would sit the word off-centre from the thing it describes.
+        var spare = Math.max(0, Math.min(
+          Math.min(clear.left, clear.right) - OS_LABEL_GUTTER, OS_LABEL_OVERRUN));
+        // Inset inside the band's own edges, as it always was: text touching
+        // the boundary reads as belonging to whichever side it is nearer.
+        var lab = osBandLabel_(ctx, status, (x1 - x0 - 4) + 2 * spare, fam);
+        if (!lab) return;
+        ctx.font = '700 ' + lab.size + 'px ' + fam;
         ctx.fillStyle = CHART_OS_STATUS(status);
-        ctx.fillText(label, mid, area.top + 19);
+        for (var li = 0; li < lab.lines.length; li++) {
+          ctx.fillText(lab.lines[li], mid, area.top + 19 + li * (lab.size + 1));
+        }
       });
     }
   };
@@ -776,8 +877,21 @@
     var yMax = Math.ceil((agg.map(function(r){return r.performance;}).length ? Math.max.apply(null, agg.map(function(r){return r.performance;})) : 100) / 10) * 10 + 10;
     var xTicksConfig = { color: CHART_MUTED(), maxRotation: 45, minRotation: 45, autoSkip: true, callback: function(value) { return trimTimeLabelPak(this.getLabelForValue(value)); } };
     if (hRange >= 24) { xTicksConfig.maxTicksLimit = 24; } else if (hRange >= 12) { xTicksConfig.maxTicksLimit = 12; } else if (hRange >= 6) { xTicksConfig.maxTicksLimit = 8; }
-    var xOpt = { ticks: xTicksConfig, grid: { color: CHART_GRID() }, title: { display: true, text: 'Date & Time', color: CHART_MUTED(), font: { size: 12 } } };
-    var tOpt = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) : ''); } } };
+    // offset and grid.offset, both spelled out, because Chart.js sets them
+    // PER CHART TYPE and this one object configures a bar chart and five line
+    // charts. Left to the defaults, the bar chart alone got offset: true - so
+    // its blocks sat half a slot along from where every line chart put the
+    // same block, and an OS band, a crosshair and a bar all disagreed about
+    // where 07:15 was. Charts stacked one above another for exactly that
+    // comparison.
+    //
+    // offset: true everywhere rather than false everywhere: false centres the
+    // first and last bar ON the plot edges, so half of each is clipped away.
+    // grid.offset: false then draws the gridlines THROUGH the middle of each
+    // bar and each point instead of between them, which is what makes a band
+    // start and stop on a line the eye can follow.
+    var xOpt = { ticks: xTicksConfig, offset: true, grid: { color: CHART_GRID(), offset: false }, title: { display: true, text: 'Date & Time', color: CHART_MUTED(), font: { size: 12 } } };
+    var tOpt = { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) : ''); }, afterBody: osBandTooltipPak_ } };
 
     // Empty unless a bonus filter is active, and that is the whole of the
     // "filtered view only" rule - the plugin never has to know about filters.
@@ -853,10 +967,10 @@
       });
     }
     syncOverviewVolBtn_();
-    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); } } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
+    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 2. OVERALL PRODUCTIVITY ---
-    perfChart = new Chart($('perfChart'), { type: 'bar', plugins: [osBandPlugin_], data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); } } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
+    perfChart = new Chart($('perfChart'), { type: 'bar', plugins: [osBandPlugin_], data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 3. AREA GROUP (1 to MAX_AREA_GROUP_CHARTS charts) ---
     var areaGroupBuckets = [];
@@ -1002,7 +1116,7 @@
           agWrap.appendChild(panelEl);
           ensureChartBoxesPak_(panelEl);
 
-          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y === null ? '' : agStdMode ? Number(c.parsed.y).toFixed(2) + ' hrs' : Number(c.parsed.y).toFixed(1) + '%'); } } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: agStdMode ? 'Standard Hours' : 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
+          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y === null ? '' : agStdMode ? Number(c.parsed.y).toFixed(2) + ' hrs' : Number(c.parsed.y).toFixed(1) + '%'); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: agStdMode ? 'Standard Hours' : 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
             var others = [perfChart, overviewVolChart].concat(trendCharts);
             for (var oc = 0; oc < areaGroupCharts.length; oc++) { if (oc !== agIdx) others.push(areaGroupCharts[oc]); }
             syncToTargets(areaGroupCharts[agIdx], others, event, elements);

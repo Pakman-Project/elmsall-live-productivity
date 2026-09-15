@@ -360,10 +360,10 @@ head('[11] the approval status travels with the flag');
   check('YES is not repeated into the payload',
         /osStatus\.toUpperCase\(\) !== 'YES'/.test(csrc),
         'it says nothing os:true has not already said, on every row of a full day');
-  check('the yesterday cache is bumped for the new field',
-        csrc.indexOf("'ydayArch_v5_'") !== -1 && csrc.indexOf("'ydayArch_v4_'") === -1,
-        'cached v4 rows carry the flag and no status, so the band would draw ' +
-        'unlabelled on yesterday and labelled on today');
+  check('the yesterday cache is bumped for the new fields',
+        csrc.indexOf("'ydayArch_v6_'") !== -1 && csrc.indexOf("'ydayArch_v5_'") === -1,
+        'cached v5 rows carry the status and no times, so a band spanning ' +
+        'midnight would report a range for its second half only');
 }
 
 head('[12] one bucket, one verdict - or none');
@@ -476,7 +476,7 @@ head('[14] the band says the status under the word OS');
     ctx: {
       save() {}, restore() {},
       fillRect() {}, measureText: t => ({ width: t.length * 5 }),
-      fillText(t, x, y) { painted.push({ text: t, y: y, fill: fill }); },
+      fillText(t, x, y) { painted.push({ text: t, x: x, y: y, fill: fill }); },
       set fillStyle(v) { fill = v; }, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}
     },
     canvas: {},
@@ -491,8 +491,8 @@ head('[14] the band says the status under the word OS');
 
   let out = draw({ from: 0, to: 1, status: 'Approved' }, 300);
   check('the word OS is still drawn', out[0] && out[0].text === 'OS', JSON.stringify(out));
-  check('with the status beneath it in brackets',
-        out[1] && out[1].text === '(Approved)', JSON.stringify(out.map(o => o.text)));
+  check('with the status beneath it, in full and unbracketed',
+        out[1] && out[1].text === 'Approved', JSON.stringify(out.map(o => o.text)));
   check('on a second line, not alongside', out[1] && out[1].y > out[0].y,
         out[0].y + ' then ' + out[1].y);
   check('tinted green for approved', out[1] && out[1].fill === ctx.APP_CONFIG.colors.good,
@@ -508,7 +508,7 @@ head('[14] the band says the status under the word OS');
   check('and red for anything unrecognised', out[1] && out[1].fill === ctx.APP_CONFIG.colors.bad,
         'an unknown verdict is not an excused one');
   check('which is also LABELLED Rejected, not by its own wording',
-        out[1] && out[1].text === '(Rejected)', JSON.stringify(out[1] && out[1].text));
+        out[1] && out[1].text === 'Rejected', JSON.stringify(out[1] && out[1].text));
 
   out = draw({ from: 0, to: 1, status: '' }, 300);
   check('no status, no second line', out.length === 1,
@@ -517,21 +517,36 @@ head('[14] the band says the status under the word OS');
   // A phone is the normal case for this, not the exception: the same shift
   // that gets 600px of chart on a desktop gets half of it, and every band was
   // then too narrow for the word, so the status was invisible there.
-  out = draw({ from: 0, to: 1, status: 'Awaiting Approval' }, 40);
-  check('a band too narrow for the word falls back to the short form',
+  // WRAPPED before it is abbreviated, which is the whole point of the change:
+  // a desktop band was showing "Pnd." beside two hundred clear pixels, making
+  // the reader learn a code for no reason. Two words, two lines, full wording.
+  out = draw({ from: 0, to: 1, status: 'Awaiting Approval' }, 50);
+  check('a band too narrow for one line splits the status over two',
+        out.length === 3 && out[1].text === 'Awaiting' && out[2].text === 'Approval',
+        JSON.stringify(out.map(o => o.text)));
+  check('each on its own line, in order',
+        out.length === 3 && out[2].y > out[1].y && out[1].y > out[0].y,
+        out.map(o => o.y).join(' / '));
+  check('and both lines keep the status colour',
+        out.length === 3 && out[1].fill === ctx.APP_CONFIG.colors.warn &&
+        out[2].fill === ctx.APP_CONFIG.colors.warn);
+
+  out = draw({ from: 0, to: 1, status: 'Awaiting Approval' }, 39);
+  check('a band too narrow even for the longest word falls back to the short form',
         out.length === 2 && out[1].text === 'Pnd.', JSON.stringify(out.map(o => o.text)));
   check('and the short form keeps its colour',
         out[1] && out[1].fill === ctx.APP_CONFIG.colors.warn, String(out[1] && out[1].fill));
-  out = draw({ from: 0, to: 1, status: 'Approved' }, 44);
+  out = draw({ from: 0, to: 1, status: 'Approved' }, 30);
   check('App. for approved', out.length === 2 && out[1].text === 'App.',
         JSON.stringify(out.map(o => o.text)));
-  out = draw({ from: 0, to: 1, status: 'Cancelled' }, 44);
+  out = draw({ from: 0, to: 1, status: 'Cancelled' }, 30);
   check('Rej. for everything else', out.length === 2 && out[1].text === 'Rej.',
         JSON.stringify(out.map(o => o.text)));
-  // Clipped to "(Appro" it would read as a different status rather than as a
-  // word that did not fit, which is why it steps down rather than truncating.
+  // Clipped to "Appro" it would read as a different status rather than as a
+  // word that did not fit, which is why it wraps and then steps down rather
+  // than truncating.
   check('nothing is ever truncated mid-word',
-        ['(Approved)', '(Awaiting Approval)', '(Rejected)', 'App.', 'Pnd.', 'Rej.']
+        ['Approved', 'Awaiting', 'Approval', 'Rejected', 'App.', 'Pnd.', 'Rej.']
           .indexOf(out[1].text) !== -1, out[1].text);
   out = draw({ from: 0, to: 1, status: 'Approved' }, 23);
   check('a band too narrow even for the short form drops it',
@@ -540,12 +555,260 @@ head('[14] the band says the status under the word OS');
   check('and one too narrow for OS itself draws neither', out.length === 0,
         JSON.stringify(out.map(o => o.text)));
 
+  // ── the label leans into clear chart either side of its band ────────────
+  // A desktop band is narrow because a 15-minute block is narrow, not because
+  // the chart is crowded. So the room that decides between the real wording
+  // and a four-letter code is the band PLUS whatever is clear beside it - and
+  // showing "Pnd." next to two hundred empty pixels was making the reader
+  // learn a code for no reason.
+  {
+    // Ten blocks across 300px: one block is a 30px band, which on its own has
+    // 26px of room for a word this stub measures at 40.
+    const wide = () => ({
+      ctx: stub(300).ctx, canvas: {},
+      chartArea: { top: 10, bottom: 210, left: 0, right: 300 },
+      scales: { x: { left: 0, right: 300, getPixelForValue: i => i * 30 } }
+    });
+    const drawBands = bands => {
+      painted.length = 0;
+      ctx.osBandPlugin_.afterDatasetsDraw(wide(), null, { bands: bands });
+      return painted;
+    };
+
+    let lean = drawBands([{ from: 3, to: 4, status: 'Approved' }]);
+    check('a band with clear chart either side says the whole word',
+          lean.length === 2 && lean[1].text === 'Approved',
+          JSON.stringify(lean.map(o => o.text)) + '   30px band, 40px word');
+    check('and it stays centred on the band, not on the room it borrowed',
+          lean.length === 2 && lean[1].x === lean[0].x,
+          lean.map(o => o.x).join(' / '));
+
+    // Hard against the plot edge there is nothing clear on one side, and the
+    // lean is symmetric - overrunning one edge and not the other would sit the
+    // word off-centre from the thing it labels - so this one steps down.
+    lean = drawBands([{ from: 0, to: 1, status: 'Approved' }]);
+    check('with nothing clear on one side it steps down instead',
+          lean.length === 2 && lean[1].text === 'App.',
+          JSON.stringify(lean.map(o => o.text)));
+
+    // Two bands a block apart: each has its own clear block, so both print in
+    // full and neither label reaches the other.
+    lean = drawBands([{ from: 3, to: 4, status: 'Approved' },
+                      { from: 6, to: 7, status: 'Rejected' }]);
+    check('two bands a block apart both print in full',
+          lean.length === 4 && lean[1].text === 'Approved' && lean[3].text === 'Rejected',
+          JSON.stringify(lean.map(o => o.text)));
+    check('and the lean is capped, so a lone band cannot print across the chart',
+          /OS_LABEL_OVERRUN = 24/.test(chartsSrc));
+  }
+
   check('the wash itself is still neutral',
         /function CHART_OS_BAND\(\) \{ return _isLightTheme_\(\) \? "rgba\(0,0,0/.test(
           fs.readFileSync(APPS + 'Web - JsCharts.html', 'utf8')),
         'RAG on the fill would sit a green wash behind the red 0% bar it explains');
 
   ctx.document = savedDoc;
+}
+
+head('[15] the clipped OS times - when the spell really started and stopped');
+// The band's own edges are quarter-hour blocks: a 07:26-08:06 spell fills
+// neither the first of them nor the last, so the grey can only ever say when
+// the absence began to within fifteen minutes. Processed Data carries the spell
+// clipped to each block - 07:26-07:30, then two whole blocks, then 08:00-08:06
+// - and the band reports the two ends of that.
+{
+  // A block's OS row as the notebook now writes it.
+  const osAt = (tr, bonus, from, to) =>
+    Object.assign(osRow(tr, bonus), { osFrom: from, osTo: to, osStatus: 'Approved' });
+
+  check('a clip time is minutes past midnight', ctx.osClipMinsPak_('07:26') === 446,
+        String(ctx.osClipMinsPak_('07:26')));
+  check('and anything that is not one reads as -1',
+        ctx.osClipMinsPak_('') === -1 && ctx.osClipMinsPak_('NO') === -1 &&
+        ctx.osClipMinsPak_(null) === -1 && ctx.osClipMinsPak_('7:26:30x') === -1);
+  // The one value that wraps. A block ending at midnight ends "00:00", which
+  // is the end of the 23:45 block and not the start of a day - it sorts lowest
+  // when it is in fact the highest, and a bucket holding both 23:50 and 00:00
+  // would report a finish earlier than its own start.
+  check('an END of 00:00 is the latest time there is, not the earliest',
+        ctx.osClipMinsPak_('00:00', true) === 1440 &&
+        ctx.osClipMinsPak_('00:00', false) === 0,
+        'as a start it is midnight; as an end it is the end of the 23:45 block');
+
+  check('one OS row in a block gives that block its span',
+        JSON.stringify(ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '06:07', '06:15')])) ===
+        '{"from":"06:07","to":"06:15"}',
+        JSON.stringify(ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '06:07', '06:15')])));
+  // Two people on OS in one block: the band means "one or more of these was
+  // indirect", so the honest range is the whole of the time any of them was.
+  check('two rows union rather than one winning',
+        JSON.stringify(ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '06:07', '06:12'),
+                                         osAt(TR[0], 'BBB', '06:03', '06:15')])) ===
+        '{"from":"06:03","to":"06:15"}');
+  check('and it wraps correctly at midnight',
+        JSON.stringify(ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '23:50', '23:55'),
+                                         osAt(TR[0], 'BBB', '23:52', '00:00')])) ===
+        '{"from":"23:50","to":"00:00"}',
+        JSON.stringify(ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '23:50', '23:55'),
+                                         osAt(TR[0], 'BBB', '23:52', '00:00')])));
+  check('a productive row contributes nothing, even if it carries times',
+        ctx.osSpanOfPak_([Object.assign(work(TR[0], 'AAA', 0.2, 10),
+                                        { osFrom: '06:00', osTo: '06:15' })]).from === '',
+        'a clip on a row reading NO is a leftover, not a fact about the block');
+  check('half a range is no range',
+        ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '06:07', '')]).from === '' &&
+        ctx.osSpanOfPak_([osAt(TR[0], 'AAA', '', '06:15')]).to === '',
+        'a tooltip reading "07:26 - " is worse than no tooltip');
+  check('and a day with no clip columns at all has none',
+        ctx.osSpanOfPak_([osRow(TR[0], 'AAA')]).from === '',
+        'every archive cut before those columns existed');
+
+  // The brief's own example, end to end: a 07:26-08:06 spell across four
+  // blocks, through the row builder and both aggregators, onto the band.
+  const KLP = [
+    osAt(TR[0], 'KLP', '06:07', '06:15'), osAt(TR[1], 'KLP', '06:15', '06:30'),
+    osAt(TR[2], 'KLP', '06:30', '06:45'), osAt(TR[3], 'KLP', '06:45', '06:52')
+  ];
+  const mainRows = rows(BASE.concat(KLP), true);
+  check('the row builder carries each block its own clip',
+        mainRows.map(r => r.osFrom + '-' + r.osTo).join(' ') ===
+        '06:07-06:15 06:15-06:30 06:30-06:45 06:45-06:52',
+        mainRows.map(r => r.osFrom + '-' + r.osTo).join(' '));
+  // A 60-minute bucket holds all four, and the bucket's span is the spell.
+  const hour = ctx.getAggregatedDataPak(mainRows, 60);
+  check('an hour bucket reports the spell, not the bucket',
+        hour.length === 1 && hour[0].osFrom === '06:07' && hour[0].osTo === '06:52',
+        JSON.stringify(hour.map(r => r.osFrom + '-' + r.osTo)));
+  const half = ctx.getAggregatedDataPak(mainRows, 30);
+  check('and each half hour reports its own half',
+        half.map(r => r.osFrom + '-' + r.osTo).join(' ') === '06:07-06:30 06:30-06:52',
+        half.map(r => r.osFrom + '-' + r.osTo).join(' '));
+  // The trend charts are built by a different pair of functions, so the times
+  // have to be plumbed through both or three charts get a tooltip and the
+  // fourth silently does not.
+  const tRows = ctx.generateTrendRowsForAreas_(BASE.concat(KLP), TR, ['pieVol']);
+  check('the trend builder carries them too',
+        tRows.map(r => r.osFrom).join() === '06:07,06:15,06:30,06:45',
+        tRows.map(r => r.osFrom).join());
+  check('and its aggregator folds them the same way',
+        (() => { const a = ctx.aggregateTrendRows(tRows, 60);
+                 return a.length === 1 && a[0].osFrom === '06:07' && a[0].osTo === '06:52'; })(),
+        JSON.stringify(ctx.aggregateTrendRows(tRows, 60).map(r => r.osFrom + '-' + r.osTo)));
+
+  // Ordered by the BLOCK's clock, not by comparing the strings: a 60-minute
+  // bucket can hold both 23:45 and 00:00, and there the strings say the
+  // opposite of the truth.
+  {
+    // All four blocks of the 23:00 hour, or dropPartialEdgeGroupKeys_ discards
+    // the bucket as a partial edge before any of this is reached.
+    const NT = ['09/09/2026 23:00 - 09/09/2026 23:15',
+                '09/09/2026 23:15 - 09/09/2026 23:30',
+                '09/09/2026 23:30 - 09/09/2026 23:45',
+                '09/09/2026 23:45 - 10/09/2026 00:00'];
+    const night = ctx.getAggregatedDataPak(
+      ctx.generateMainRows_(
+        [work(NT[0], 'AAA', 0.2, 10), work(NT[1], 'AAA', 0.2, 10),
+         osAt(NT[2], 'NIT', '23:38', '23:45'), osAt(NT[3], 'NIT', '23:45', '00:00')],
+        NT, { applyThreshold: true }), 60);
+    // A string comparison would answer 00:00 - 23:45 here: the widest possible
+    // range, backwards, reported as the spell.
+    check('a bucket running into midnight is still in order',
+          night.length === 1 && night[0].osFrom === '23:38' && night[0].osTo === '00:00',
+          JSON.stringify(night.map(r => r.osFrom + '-' + r.osTo)));
+  }
+
+  // The band takes the first start and the last end inside its own range.
+  const band = ctx.mergeOsBands_(ctx.getAggregatedDataPak(mainRows, 15));
+  check('the band spans the whole spell',
+        band.length === 1 && band[0].t0 === '06:07' && band[0].t1 === '06:52',
+        JSON.stringify(band));
+  check('and a band with no times behind it keeps its old shape exactly',
+        JSON.stringify(ctx.mergeOsBands_([{ os: true }, { os: true }])) ===
+        '[{"from":0,"to":1,"status":""}]',
+        'so nothing about an archived day changes');
+
+  check('the label reads [ Time: 07:26 - 08:06 ]',
+        ctx.osBandTimeLabelPak_('07:26', '08:06') === '[ Time: 07:26 - 08:06 ]',
+        ctx.osBandTimeLabelPak_('07:26', '08:06'));
+  check('and nothing at all when either end is missing',
+        ctx.osBandTimeLabelPak_('07:26', '') === '' &&
+        ctx.osBandTimeLabelPak_('', '08:06') === '');
+
+  // Hung off the tooltip rather than drawn as a second floating box: the band
+  // is the full height of the plot, so pointing anywhere in the grey already
+  // means pointing at the band, and a box of its own would fight the chart's
+  // own tooltip for the same few pixels beside the cursor.
+  {
+    const chart = { options: { plugins: { osBand: { bands: band } } } };
+    const tip = i => ctx.osBandTooltipPak_([{ chart: chart, dataIndex: i }]);
+    check('hovering a block inside the band shows the spell',
+          tip(0).join() === '[ Time: 06:07 - 06:52 ]', JSON.stringify(tip(0)));
+    check('any block of it, not just the first',
+          tip(3).join() === '[ Time: 06:07 - 06:52 ]', JSON.stringify(tip(3)));
+    check('an EMPTY ARRAY outside it, not an empty string',
+          Array.isArray(tip(9)) && tip(9).length === 0,
+          'a string would draw a blank line into every tooltip on the chart');
+    check('and a chart with no bands at all is untouched',
+          ctx.osBandTooltipPak_([{ chart: { options: { plugins: {} } }, dataIndex: 0 }])
+            .length === 0);
+  }
+
+  // Attached to the same four chart families the plugin is, or three charts
+  // report the times and the fourth quietly does not.
+  check('every banded chart carries the tooltip line',
+        (chartsSrc.match(/afterBody: osBandTooltipPak_/g) || []).length === 4,
+        (chartsSrc.match(/afterBody: osBandTooltipPak_/g) || []).length + ' of 4');
+}
+
+head('[15b] one x axis, so the bands land in the same place on every chart');
+// Chart.js sets `offset` per CHART TYPE, and one xOpt configures a bar chart
+// and five line charts - so the bar chart alone had offset: true and put the
+// same block half a slot along from where every line chart put it. The bands
+// and the hover crosshair then disagreed across charts stacked one above the
+// other for exactly that comparison.
+{
+  const xo = /var xOpt = \{([^;]*)\};/.exec(chartsSrc);
+  check('xOpt spells offset out rather than inheriting it',
+        !!xo && /\boffset: true\b/.test(xo[1]), xo ? xo[1].slice(0, 90) : 'not found');
+  check('and the gridlines run THROUGH the bars, not between them',
+        !!xo && /grid: \{[^}]*offset: false/.test(xo[1]),
+        'grid.offset is a separate option from the scale one, and also per-type');
+  // true, not false: offset false centres the first and last bar ON the plot
+  // edges, so half of each is clipped away.
+  check('nothing is clipped at the edges',
+        !!xo && !/\boffset: false,\s*grid/.test(xo[1]),
+        'the scale offset stays true; only the GRID offset is false');
+}
+
+head('[15c] the two clip columns, both halves of the contract');
+{
+  const csrc = fs.readFileSync(APPS + 'Web - Code.js', 'utf8')
+    .replace(/\/\/[^\n]*/g, '');
+  const nb = JSON.parse(fs.readFileSync(
+    path.resolve(APPS, '..', 'Databricks-Live-Productivity-Output',
+                 'Elmsall Live Productivity.ipynb'), 'utf8'))
+    .cells.map(c => c.source.join('')).join('\n');
+  // Joined by header NAME, so the two repos agree on one literal or on nothing.
+  ['OS Start Time', 'OS End Time'].forEach(h => {
+    check('the notebook writes "' + h + '"', nb.indexOf('"' + h + '"') !== -1);
+    check('and Code.js looks for it', csrc.indexOf("'" + h + "'") !== -1);
+  });
+  check('they go AFTER OS/ Indirect, which stays the end of the area blocks',
+        /\+ \["OS\/ Indirect", "OS Start Time", "OS End Time"\]/.test(nb),
+        'legacyProcColumnMap_ addresses the hours and volume blocks by position');
+  check('the read is widened to reach them',
+        /map\.osFrom \+ 1, map\.osTo \+ 1/.test(csrc),
+        'a column past the read width comes back undefined, not short');
+  check('and a file without them resolves to -1 rather than to column A',
+        /os: -1, osFrom: -1, osTo: -1/.test(csrc),
+        'index 0 would read the Date column as a time');
+  // A time-formatted cell hands getValues() a Date, whose toString is neither
+  // a time nor empty - "Mon Dec 30 1899..." inside the band's tooltip.
+  check('a Date in the cell is formatted, not stringified',
+        /raw instanceof Date/.test(csrc), 'the column looks like a time column');
+  check('and the times are only carried on rows actually on OS',
+        /if \(entry\.os\) \{/.test(csrc),
+        'a clip on a NO row is last run\'s leftover');
 }
 
 head('[10] the CSS exists for the class the JS emits');

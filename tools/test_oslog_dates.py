@@ -52,13 +52,22 @@ status_of = ns["_os_status"]
 
 
 def span(day, a, b):
-    """First and last window of a spell, as (start, end) strings, or the reason."""
+    """First and last window of a spell, as (start, end) strings, or the reason.
+
+    _os_windows yields (window, from, to) triples; this reads the window, which
+    is the join key. The two clipped times are section [4b].
+    """
     out, why = win(day, a, b)
     if why:
         return why
     if not out:
         return "empty"
-    return out[0].split(" - ")[0], out[-1].split(" - ")[1]
+    return out[0][0].split(" - ")[0], out[-1][0].split(" - ")[1]
+
+
+def clips(day, a, b):
+    """Just the clipped (from, to) pairs, in window order."""
+    return [(x[1], x[2]) for x in win(day, a, b)[0]]
 
 
 head("[1] the production day starts at 06:00, so an early spell is the NEXT date")
@@ -82,7 +91,7 @@ check("22:00-02:00 crosses midnight",
       span("09/09/2026", "22:00", "02:00") == ("09/09/2026 22:00", "10/09/2026 02:00"),
       str(span("09/09/2026", "22:00", "02:00")))
 check("and it is not also shifted forward",
-      win("09/09/2026", "22:00", "02:00")[0][0].startswith("09/09/2026 22:00"),
+      win("09/09/2026", "22:00", "02:00")[0][0][0].startswith("09/09/2026 22:00"),
       "the 06:00 rule reads the START, not the finish")
 
 head("[3] month and year boundaries")
@@ -100,21 +109,63 @@ head("[4] windows land on the 15-minute grid, and cover the whole spell")
 w, _ = win("09/09/2026", "06:07", "06:20")
 # 06:07 belongs to the 06:00 block: that is the one that would otherwise show
 # an unexplained zero.
-check("a ragged start floors onto the grid", w[0] == "09/09/2026 06:00 - 09/09/2026 06:15", str(w))
-check("and a ragged finish covers its own block", w[-1] == "09/09/2026 06:15 - 09/09/2026 06:30", str(w))
+check("a ragged start floors onto the grid", w[0][0] == "09/09/2026 06:00 - 09/09/2026 06:15", str(w))
+check("and a ragged finish covers its own block", w[-1][0] == "09/09/2026 06:15 - 09/09/2026 06:30", str(w))
 check("06:00-07:00 is exactly four blocks", len(win("09/09/2026", "06:00", "07:00")[0]) == 4)
 check("a 12-hour shift is 48", len(win("09/09/2026", "06:00", "18:00")[0]) == 48)
 check("no window is repeated", len(set(win("09/09/2026", "06:00", "18:00")[0])) == 48)
 check("they are contiguous",
-      all(a.split(" - ")[1] == b.split(" - ")[0]
+      all(a[0].split(" - ")[1] == b[0].split(" - ")[0]
           for a, b in zip(w, w[1:])), str(w))
+
+head("[4b] each window carries the spell clipped to ITSELF")
+# What the two new columns are for. A spell is not a whole block at either end
+# of itself: 07:26-08:06 is forty minutes, and four blocks each claiming their
+# whole fifteen would report it as an hour. The example is the brief's own.
+k = win("09/09/2026", "07:26", "08:06")[0]
+check("07:26-08:06 touches four blocks", len(k) == 4, str(len(k)))
+check("the first starts at the real start, and ends with its block",
+      (k[0][1], k[0][2]) == ("07:26", "07:30"), str((k[0][1], k[0][2])))
+check("the two in the middle are whole",
+      [(x[1], x[2]) for x in k[1:3]] == [("07:30", "07:45"), ("07:45", "08:00")],
+      str([(x[1], x[2]) for x in k[1:3]]))
+check("and the last ends at the real finish",
+      (k[3][1], k[3][2]) == ("08:00", "08:06"), str((k[3][1], k[3][2])))
+# The first start and the last end are the spell itself - which is what the
+# chart's band tooltip reports for the whole merged band.
+check("so the spell still reads 07:26 - 08:06",
+      (k[0][1], k[-1][2]) == ("07:26", "08:06"))
+_mins = sum((datetime.strptime(x[2], "%H:%M") - datetime.strptime(x[1], "%H:%M")).seconds // 60
+            for x in k)
+check("and the clips total the 40 minutes worked, not 60", _mins == 40, str(_mins) + " min")
+
+check("a spell inside one block does not grow to fill it",
+      clips("09/09/2026", "09:03", "09:08") == [("09:03", "09:08")],
+      str(clips("09/09/2026", "09:03", "09:08")))
+check("a block-aligned spell is not clipped at all",
+      clips("09/09/2026", "10:00", "10:30") == [("10:00", "10:15"), ("10:15", "10:30")],
+      str(clips("09/09/2026", "10:00", "10:30")))
+# The 23:45 block ends at 00:00, and that is the END of that block rather than
+# the start of a day. The union in OS_SPAN compares these as strings and has a
+# special case for exactly this value; without it the block would report a
+# finish earlier than its own start.
+check("the block ending at midnight says 00:00",
+      clips("09/09/2026", "23:50", "00:10") == [("23:50", "00:00"), ("00:00", "00:10")],
+      str(clips("09/09/2026", "23:50", "00:10")))
+check("every clip sits inside its own window",
+      all(x[1] >= x[0][11:16] and (x[2] == "00:00" or x[2] <= x[0][-5:])
+          for x in win("09/09/2026", "06:07", "18:53")[0]),
+      "a clip outside its block would carve time out of the wrong quarter-hour")
 
 head("[5] the string is the join key, so it must match the pivot exactly")
 # Anything else silently matches no row rather than failing.
 check("dd/mm/yyyy HH:MM - dd/mm/yyyy HH:MM",
       re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2} - \d{2}/\d{2}/\d{4} \d{2}:\d{2}",
-                   win("09/09/2026", "06:00", "06:15")[0][0]) is not None,
-      win("09/09/2026", "06:00", "06:15")[0][0])
+                   win("09/09/2026", "06:00", "06:15")[0][0][0]) is not None,
+      win("09/09/2026", "06:00", "06:15")[0][0][0])
+check("and the clipped times are plain HH:MM",
+      all(re.fullmatch(r"\d{2}:\d{2}", t) for t in clips("09/09/2026", "06:07", "07:03")[0]),
+      str(clips("09/09/2026", "06:07", "07:03")[0]))
 
 head("[6] bad input is rejected, not guessed at")
 check("an unparseable date", win("not a date", "06:00", "07:00")[1] == "unparsed")
@@ -163,6 +214,16 @@ check("and anything known beats a status with no rank",
       rank.get("Rejected", 0) < rank["YES"],
       "rejected does not out-rank a spell that is still being decided")
 
+# The times do NOT rank, they union: a block claimed by two records was spent
+# indirect for every minute either of them claims, and unlike the status there
+# is no single-answer problem forcing a choice.
+check("the span unions rather than ranking",
+      "OS_SPAN = {}" in os_src and "if _w_from < _span[0]:" in os_src,
+      "ranking the times would throw away half of a re-submitted spell")
+check("and it knows 00:00 is the latest finish, not the earliest",
+      'if _w_to == "00:00" or _span[1] == "00:00":' in os_src,
+      "strings compare fine inside one block except for this one value")
+
 head("[9] the columns it reads, which are the fragile part")
 # The Apps Script picks source columns by index into a list, so dropping one
 # shifts every output column after it - which is exactly what happened when the
@@ -188,6 +249,14 @@ check("and it is no longer a gate",
 # The Apps Script is the other half of this contract: these indices are only
 # right for as long as it writes that layout.
 script = open(os.path.join(HERE, "..", "Spreadsheet - OS Log.js"), encoding="utf-8").read()
+check("the pivot writes both clipped times",
+      "_span[0], _span[1]" in "".join(cells) and
+      '"OS/ Indirect", "OS Start Time", "OS End Time"' in "".join(cells),
+      "BB and BC on Processed Data (15mins)")
+check("and blanks them on a row that was never on OS",
+      'OS_SPAN.get((dtr, bonus)) or ["", ""]' in "".join(cells),
+      "a short row would leave the previous run's cells under the new figures")
+
 check("the script still writes 20 columns",
       "combinedResults.length, 20)" in script,
       "if this widens again, every index above moves")

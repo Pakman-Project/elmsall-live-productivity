@@ -264,6 +264,18 @@ var PROC_TOTAL_HEADER_ = 'Sum of Std hrs';
 // reads os:false, and the feature disappears with no error anywhere.
 var PROC_OS_HEADER_ = 'OS/ Indirect';
 
+// The same spell, clipped to the 15-minute block the row is about: a
+// 07:26-08:06 spell reads 07:26-07:30 on the 07:15 row and 08:00-08:06 on the
+// 08:00 one. The band can then report when the indirect work actually started
+// and stopped, instead of the reader inferring it from where the grey begins
+// and ends - which is only ever accurate to a quarter of an hour.
+//
+// Optional, unlike the two above: every archive cut before these columns
+// existed has no header to match, both resolve to -1, and a band from such a
+// day simply carries no times. Nothing else changes.
+var PROC_OS_START_HEADER_ = 'OS Start Time';
+var PROC_OS_END_HEADER_ = 'OS End Time';
+
 var PROC_AREA_COLUMNS_ = [
   { key: 'pie',              stdHeader: 'D.Analysis - OSR PiE',            volHeader: 'Volume - PiE' },
   { key: 'topUp',            stdHeader: 'D.Analysis - OSR Topup',          volHeader: 'Volume - Top Up' },
@@ -317,9 +329,13 @@ function buildProcColumnMap_(headerRow) {
 
   var totalIdx = idx[normaliseProcHeader_(PROC_TOTAL_HEADER_)];
   var osIdx = idx[normaliseProcHeader_(PROC_OS_HEADER_)];
+  var osFromIdx = idx[normaliseProcHeader_(PROC_OS_START_HEADER_)];
+  var osToIdx = idx[normaliseProcHeader_(PROC_OS_END_HEADER_)];
   var map = {
     total: (totalIdx === undefined) ? -1 : totalIdx,
     os: (osIdx === undefined) ? -1 : osIdx,
+    osFrom: (osFromIdx === undefined) ? -1 : osFromIdx,
+    osTo: (osToIdx === undefined) ? -1 : osToIdx,
     areas: []
   };
 
@@ -356,8 +372,8 @@ function legacyProcColumnMap_(isV2) {
                     'inboundDecanting', 'osrDecanting', 'bcrInducting', 'e1e2Inducting'];
   var n = isV2 ? 9 : 7;
   var total = 3 + n;
-  // No OS column on a file old enough to need this fallback.
-  var map = { total: total, os: -1, areas: [] };
+  // No OS columns at all on a file old enough to need this fallback.
+  var map = { total: total, os: -1, osFrom: -1, osTo: -1, areas: [] };
 
   for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
     var key = PROC_AREA_COLUMNS_[i].key;
@@ -383,7 +399,9 @@ function readProcRows_(sheet, lastRow) {
   }
 
   return {
-    vals: sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, map.total + 1, map.os + 1)).getValues(),
+    vals: sheet.getRange(2, 1, lastRow - 1,
+                         Math.max(lastCol, map.total + 1, map.os + 1,
+                                  map.osFrom + 1, map.osTo + 1)).getValues(),
     // Only columns A:C are ever needed as display values — buildSideEntry_ reads
     // dispsRow[0] (time range) and dispsRow[2] (bonus) and takes every other
     // field from vals. Reading 3 columns instead of the full width removes most
@@ -410,6 +428,23 @@ function procOsStatus_(raw) {
   return (!v || v.toUpperCase() === 'NO') ? '' : v;
 }
 
+// A clip time -> "HH:MM", or '' if the cell holds nothing usable.
+//
+// The notebook writes these with RAW, so they arrive as the strings it wrote.
+// A Date is handled anyway because the column is a TIME column to look at and
+// somebody formatting it as one - or retyping a cell by hand - is the obvious
+// thing to happen to it, and getValues() then hands back a Date object whose
+// toString is neither a time nor empty. Left unhandled that renders as
+// "Mon Dec 30 1899..." inside the band's tooltip.
+function procOsTime_(raw) {
+  if (raw == null || raw === '') return '';
+  if (raw instanceof Date) {
+    return ('0' + raw.getHours()).slice(-2) + ':' + ('0' + raw.getMinutes()).slice(-2);
+  }
+  var m = /^(\d{1,2}):(\d{2})/.exec(String(raw).trim());
+  return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : '';
+}
+
 function buildSideEntry_(valsRow, dispsRow, map) {
   var osStatus = map.os >= 0 ? procOsStatus_(valsRow[map.os]) : '';
   var entry = {
@@ -424,6 +459,16 @@ function buildSideEntry_(valsRow, dispsRow, map) {
   // already said, so it is not repeated either - and a band with no status to
   // show then renders exactly as it did before statuses existed.
   if (osStatus && osStatus.toUpperCase() !== 'YES') entry.osStatus = osStatus;
+  // Same bargain as the status: carried only on the rows that have one, and
+  // only when the row is actually on OS. A clip time on a row reading NO would
+  // be a leftover from a previous run rather than a fact about this block.
+  if (entry.os) {
+    var osFrom = map.osFrom >= 0 ? procOsTime_(valsRow[map.osFrom]) : '';
+    var osTo = map.osTo >= 0 ? procOsTime_(valsRow[map.osTo]) : '';
+    // Both or neither. Half a range cannot be drawn as one, and a tooltip
+    // reading "07:26 - " is worse than no tooltip.
+    if (osFrom && osTo) { entry.osFrom = osFrom; entry.osTo = osTo; }
+  }
   for (var i = 0; i < map.areas.length; i++) {
     var a = map.areas[i];
     entry[a.key + 'Std'] = a.std >= 0 ? toNumber_(valsRow[a.std]) : 0;
@@ -571,7 +616,9 @@ function getDashboardData(archiveUrl) {
         // carry the flag but no status, so the band would draw unlabelled on
         // yesterday's half of the window and labelled on today's - which reads
         // as the status having changed at midnight.
-        yCacheKey = 'ydayArch_v5_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
+        // v6: and the two clip times. Same failure shape: a band spanning
+        // midnight would report a start and end for its second half only.
+        yCacheKey = 'ydayArch_v6_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
                     '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {

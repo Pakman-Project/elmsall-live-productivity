@@ -312,10 +312,14 @@ head('[7] notebook internals');
   // No error is raised anywhere along that path, which is why this is a check
   // rather than a comment.
   check(tag + 'OS column in PROC_HEADER', src.indexOf('"OS/ Indirect"') !== -1);
-  // It has to stay LAST. legacyProcColumnMap_ addresses the standard-hours and
-  // volume blocks positionally for files too old to have a usable header row,
-  // and those offsets only hold while nothing is inserted ahead of them.
-  check(tag + 'OS column is last', /\+\s*\[\s*"OS\/ Indirect"\s*\]\s*\)/.test(src.replace(/\s*\n\s*/g, ' ')));
+  // The three OS columns have to stay LAST, and in this order.
+  // legacyProcColumnMap_ addresses the standard-hours and volume blocks
+  // positionally for files too old to have a usable header row, and those
+  // offsets only hold while nothing is inserted AHEAD of them. Appending past
+  // them - which is all the two clip times do - costs nothing.
+  check(tag + 'the OS columns are last, in order',
+        /\+\s*\[\s*"OS\/ Indirect",\s*"OS Start Time",\s*"OS End Time"\s*\]\s*\)/
+          .test(src.replace(/\s*\n\s*/g, ' ')));
 });
 
 head('[7c] OS column agrees across repos');
@@ -585,6 +589,47 @@ head('[the multi-area filter has a control wherever it applies]');
         /single: 'Single Task'/.test(helpers) &&
         /multi: 'Multi Tasks'/.test(helpers),
         'and because the arrays are shared, the breakdown chip renames with it');
+}
+
+head('[the control panel: five narrow pickers left, the bonus filter right]');
+// Requested that way, and the grid only holds while the count of fields and
+// the count of tracks agree. A sixth picker added to the markup would land in
+// the SPACER track - silently, on top of nothing, with the bonus filter still
+// pinned past it - so the two are checked against each other rather than
+// separately.
+{
+  const hdr = R('Web - Header.html');
+  const css = R('Web - Styles.html');
+  const fields = (hdr.match(/class="hc-field[ "]/g) || []).length;
+  const grow = (hdr.match(/class="hc-field hc-field-grow"/g) || []).length;
+  check('six fields in the markup', fields === 6, fields + ' found');
+  check('exactly one of them grows, and it is Filter by Bonus',
+        grow === 1 && /hc-field-grow[\s\S]{0,200}for="bonusSearch"/.test(hdr),
+        grow + ' found');
+
+  // Seven tracks: five halves, the slack, then the bonus filter's full share.
+  const desktop = /@media \(min-width: 701px\) \{\s*\.hc-filters \{([\s\S]*?)\}/.exec(css);
+  check('five half-width tracks at desktop width',
+        !!desktop && /repeat\(5, minmax\(0, calc\(\(100% - 72px\) \/ 12\)\)\)/.test(desktop[1]),
+        desktop ? desktop[1].replace(/\s+/g, ' ').trim().slice(0, 80) : 'not found');
+  check('then the slack, then a full share for the bonus filter',
+        !!desktop && /minmax\(0, 1fr\)\s*minmax\(0, calc\(\(100% - 72px\) \/ 6\)\)/.test(desktop[1]),
+        'the slack collects between the two groups, not through them');
+  check('and the gap arithmetic matches seven tracks',
+        !!desktop && desktop[1].indexOf('100% - 72px') !== -1,
+        'six gaps of 12px; five tracks and one gap fewer would not divide right');
+  check('the bonus filter is placed past the spacer, not auto-placed into it',
+        /\.hc-field-grow \{ grid-column: 7; \}/.test(css),
+        'auto-placement fills tracks in order and would drop it in track 6');
+  check('and the selects lose the 140px floor a half-share cannot honour',
+        /\.hc-field \.row-select \{ min-width: 0; \}/.test(css),
+        'a grid item wider than its track overruns the one beside it');
+  // Date and Warehouse hold a text span rather than being a control with its
+  // own text, so nothing shrinks it for them.
+  check('the two button labels can shorten rather than spill',
+        /\.hc-field \.warehouse-label \{[^}]*text-overflow: ellipsis/
+          .test(css.replace(/\.hc-field \.date-picker-label,\s*/g, '')),
+        '"E1/E2, E3" is wider than a half-share of a 900px card');
 }
 
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));

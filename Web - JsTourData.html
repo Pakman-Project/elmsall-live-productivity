@@ -171,6 +171,11 @@ function buildTourDummyData_() {
         row.value = 0;
         row.os = true;
         row.osStatus = bonusOsStatus[bn] || 'Approved';
+        // Clipped the way the notebook clips it: the spell begins seven minutes
+        // into its first block and stops eight into its last, so the band's
+        // tooltip reports a time its own edges cannot.
+        row.osFrom = osClipAtPak_(timeRanges[i], i === bonusOsFrom[bn] ? 7 : 0);
+        row.osTo = osClipAtPak_(timeRanges[i], i === bonusOsTo[bn] - 1 ? 8 : 15);
       }
       rawSideData.push(row);
     }

@@ -702,6 +702,73 @@ function osStatusOfPak_(statuses) {
   return seen;
 }
 
+// ── the clipped OS times ───────────────────────────────────────────────────
+// Processed Data carries the logged spell clipped to each 15-minute block:
+// 07:26-07:30 on the 07:15 row, then two whole blocks, then 08:00-08:06 on the
+// 08:00 one. That is what lets a band report when the indirect work really
+// started and stopped - its own edges are quarter-hour blocks and can only ever
+// be right to fifteen minutes.
+//
+// Kept as the "HH:MM" strings the notebook wrote rather than parsed into Dates.
+// Nothing does arithmetic on them, and building a Date would need the row's
+// calendar date, which the aggregated rows no longer carry.
+
+// Minutes past midnight, for comparing two clips that lie INSIDE ONE BLOCK.
+// -1 when the value is not a clip time at all.
+//
+// isEnd exists for exactly one value. A block ending at midnight ends "00:00",
+// which is the end of the 23:45 block and not the start of a day: it sorts
+// lowest, as a string and as a number, when it is in fact the highest. No other
+// wrap is possible, because both clips of a block sit inside the same fifteen
+// minutes and so share their hour.
+function osClipMinsPak_(hhmm, isEnd) {
+  var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm == null ? '' : hhmm).trim());
+  if (!m) return -1;
+  var mins = Number(m[1]) * 60 + Number(m[2]);
+  return (isEnd && mins === 0) ? 1440 : mins;
+}
+
+// The union of the clips on the OS rows of ONE time block: earliest start,
+// latest end, both '' when no row carries a usable pair.
+//
+// Union rather than first-wins, because with several bonuses selected the band
+// means "one or more of these was indirect", and the honest range for that
+// claim is the whole of the time any of them was.
+function osSpanOfPak_(rows) {
+  var from = '', to = '', fromM = -1, toM = -1;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.os !== true || !r.osFrom || !r.osTo) continue;
+    var a = osClipMinsPak_(r.osFrom, false);
+    var b = osClipMinsPak_(r.osTo, true);
+    if (a < 0 || b < 0) continue;
+    if (fromM < 0 || a < fromM) { fromM = a; from = r.osFrom; }
+    if (toM < 0 || b > toM) { toM = b; to = r.osTo; }
+  }
+  return { from: from, to: to };
+}
+
+// The clock time a given number of minutes into a block, as "HH:MM" - the
+// shape of a clip time, derived from the block the row is about.
+//
+// Demo data only: Processed Data supplies the real ones. Both the tour and
+// tools/preview.js need a spell that starts and stops MID-block, because a
+// band whose times are exactly its own edges demonstrates nothing.
+function osClipAtPak_(timeRange, minsIn) {
+  var t = String(timeRange || '').split(' - ')[0].split(' ')[1] || '';
+  var m = /^(\d{1,2}):(\d{2})$/.exec(t);
+  if (!m) return '';
+  var mins = (Number(m[1]) * 60 + Number(m[2]) + minsIn + 1440) % 1440;
+  return ('0' + Math.floor(mins / 60)).slice(-2) + ':' + ('0' + (mins % 60)).slice(-2);
+}
+
+// The line the band adds to a chart tooltip. Empty when the band has no times
+// behind it, which is every archive cut from before those columns existed - so
+// an old day keeps exactly the tooltip it had rather than growing a blank row.
+function osBandTimeLabelPak_(from, to) {
+  return (from && to) ? ('[ Time: ' + from + ' - ' + to + ' ]') : '';
+}
+
 // The tag itself. Returns nothing when they were not on OS, so callers can
 // concatenate it unconditionally - same contract as multiAreaIconHtmlPak.
 function osTagHtmlPak_(isOs) {

@@ -6894,11 +6894,52 @@ body.page-scrolled .hc-field select.hc-control { font-size: 0.64rem; }
    Control panel: one row on desktop, square corners
    ============================================================ */
 
-/* All six across at desktop width. They are equal columns rather than sized to
-   content, because a row whose fields jump width as their values change reads
-   as unstable. */
+/* All six across at desktop width, but no longer six EQUAL columns.
+
+   A sixth of a wide monitor is a 250px box, and five of the six controls were
+   using a fraction of it: "60 Minutes", "E1/E2, E3", a threshold of 0.05. The
+   one control that can genuinely use the room is Filter by Bonus, which holds
+   typed text and hangs a list of matches under itself, and it had the same 250
+   as the rest.
+
+   So the five pickers take half a share each and pack to the left, the bonus
+   filter keeps its full share hard right, and the slack collects BETWEEN the
+   two groups instead of being spread through them - which reads as one group
+   of settings and one place to search, rather than six things spaced out.
+
+   Seven tracks, so six gaps: (100% - 6 * 12px) is the width to divide. Still
+   fixed shares rather than sized to content, because a row whose fields jump
+   width as their values change reads as unstable. */
 @media (min-width: 701px) {
-  .hc-filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .hc-filters {
+    grid-template-columns:
+      repeat(5, minmax(0, calc((100% - 72px) / 12)))
+      minmax(0, 1fr)
+      minmax(0, calc((100% - 72px) / 6));
+  }
+  /* Placed explicitly, past the spacer. Auto-placement would drop it INTO the
+     spacer - the one track that has to stay empty for any of this to hold. */
+  .hc-field-grow { grid-column: 7; }
+  /* The selects carry a 140px floor from the days of a content-sized flex row.
+     A half-width track cannot honour it, and a grid item wider than its track
+     does not shrink - it overruns the one beside it. */
+  .hc-field .row-select { min-width: 0; }
+
+  /* Date and Warehouse are buttons holding a text SPAN, not controls with
+     their own text, so neither shrinks it on its own: "E1/E2, E3" is wider
+     than a half-share of a 900px card and would spill over the neighbour
+     rather than shorten. Native selects already truncate their own label, and
+     the icons must not be what gives way. */
+  .hc-field .date-picker-label,
+  .hc-field .warehouse-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hc-field .date-picker-icon,
+  .hc-field .date-picker-caret,
+  .hc-field .warehouse-caret { flex-shrink: 0; }
 }
 
 /* Square. The card's rounded corners left a visible wedge of page showing
