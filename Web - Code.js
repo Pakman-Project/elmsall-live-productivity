@@ -131,9 +131,62 @@ function readTmDirectory_(ss) {
 var CACHE_CHUNK_SIZE_ = 90000;
 var CACHE_MAX_TOTAL_ = 1800000;  // don't attempt to cache absurdly large payloads
 
+// ── Load timing ─────────────────────────────────────────────────────────────
+// There was no instrumentation of any kind in here, which made "the dashboard
+// feels slow - what is it doing?" a question nobody could answer, so every
+// answer was a guess. One line per read into Logger.log: visible in Apps
+// Script > Executions, invisible to anybody using the dashboard, and the same
+// mechanism this file already uses for its error logs.
+//
+// CELLS are reported alongside the milliseconds on purpose. getValues() costs
+// roughly in proportion to the cells it marshals across the Sheets boundary
+// rather than to the rows, so rows alone cannot tell a wide tab from a slow
+// one - and "is it worth reading one column instead of fifty-four" is exactly
+// the question this has to answer.
+function loadTimer_() {
+  var t0 = Date.now();
+  var last = t0;
+  var parts = [];
+  return {
+    // A read that just finished. `cells` optional - omit it for anything that
+    // is not a range read.
+    mark: function (label, cells) {
+      var now = Date.now();
+      parts.push(label + '=' + (now - last) + 'ms' +
+                 (cells ? '/' + cells + 'c' : ''));
+      last = now;
+      return now;
+    },
+    // Something worth recording that is not a duration: a cache verdict, a
+    // row count, a branch not taken.
+    note: function (text) { parts.push(text); },
+    // Swallowed on purpose. Instrumentation that can break the thing it
+    // measures is worse than no instrumentation, and there is nothing a
+    // logging failure could tell the caller that is worth failing a load for.
+    done: function (label) {
+      try {
+        Logger.log('TIMING ' + label + ' TOTAL=' + (Date.now() - t0) + 'ms  ' +
+                   parts.join('  '));
+      } catch (e) {}
+    }
+  };
+}
+
 function cachePutLarge_(key, str, ttlSeconds) {
   try {
-    if (!str || str.length > CACHE_MAX_TOTAL_) return false;
+    if (!str) return false;
+    // The refusal above this limit used to be silent, which is how a cache
+    // that has never once populated looks exactly like a cache that is
+    // working: the caller gets `false`, ignores it, and does the expensive
+    // thing again on every single load. Logged with BOTH numbers so the size
+    // of the gap is visible rather than inferred.
+    if (str.length > CACHE_MAX_TOTAL_) {
+      Logger.log('CACHE REFUSED ' + key + ': ' + str.length + ' chars, limit ' +
+                 CACHE_MAX_TOTAL_ + ' (over by ' + (str.length - CACHE_MAX_TOTAL_) + ')');
+      return false;
+    }
+    Logger.log('CACHE PUT ' + key + ': ' + str.length + ' chars (' +
+               Math.round(str.length / CACHE_MAX_TOTAL_ * 100) + '% of limit)');
     var cache = CacheService.getScriptCache();
     var n = Math.ceil(str.length / CACHE_CHUNK_SIZE_);
     var map = {};
@@ -475,6 +528,11 @@ var OS_LOG_COLS_ = {
   auth: 10, deployedBy: 13, reportsTo: 14, status: 16, site: 17, zone: 18
 };
 
+// Cells the last readOsLogRows_ call marshalled. A module-level count rather
+// than a return value, because the function's contract is rows and skips and
+// this is only here to be measured - see loadTimer_.
+var osLogCellsRead_ = 0;
+
 function pad2Os_(n) { return ('0' + n).slice(-2); }
 
 // The Date cell -> "dd/mm/yyyy", or '' when it is not a date this understands.
@@ -528,10 +586,10 @@ function readOsLogRows_(ss, timeRanges) {
         break;
       }
     }
-    if (!sheet) return { rows: [], skipped: 0 };
+    if (!sheet) { osLogCellsRead_ = 0; return { rows: [], skipped: 0 }; }
 
     var lastRow = sheet.getLastRow();
-    if (lastRow < OS_LOG_FIRST_ROW_) return { rows: [], skipped: 0 };
+    if (lastRow < OS_LOG_FIRST_ROW_) { osLogCellsRead_ = 0; return { rows: [], skipped: 0 }; }
 
     var want = {};
     for (var t = 0; t < timeRanges.length; t++) {
@@ -544,6 +602,9 @@ function readOsLogRows_(ss, timeRanges) {
     var vals = sheet.getRange(OS_LOG_FIRST_ROW_, 1,
                               lastRow - OS_LOG_FIRST_ROW_ + 1,
                               OS_LOG_WIDTH_).getDisplayValues();
+    // The whole log, every load: this is the number that says how much of it
+    // is history nobody asked for.
+    osLogCellsRead_ = vals.length * OS_LOG_WIDTH_;
     var rows = [];
     var skipped = 0;
     for (var i = 0; i < vals.length; i++) {
@@ -579,6 +640,8 @@ function readOsLogRows_(ss, timeRanges) {
   } catch (e) {
     // Degrade, never fail the load: an unreadable OS log costs the OS page,
     // not the dashboard.
+    Logger.log('OS log unreadable: ' + e.message);
+    osLogCellsRead_ = 0;
     return { rows: [], skipped: 0 };
   }
 }
@@ -635,6 +698,7 @@ function parseTimeRangeStart_(tr) {
 function getDashboardData(archiveUrl) {
   var ss;
   var isLiveMode = !archiveUrl;
+  var tm = loadTimer_();
 
   if (archiveUrl) {
     try {
@@ -651,9 +715,11 @@ function getDashboardData(archiveUrl) {
 
   var sourceSheet = ss.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
   if (!sourceSheet) throw new Error('Source sheet not found');
+  tm.mark('open');
 
   var threshold = sheet.getRange(CONFIG.THRESHOLD_CELL).getValue();
   var lastRefresh = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
+  tm.mark('front');
 
   if (archiveUrl) {
     // An attempt to derive lastRefresh from the last data row used to sit here,
@@ -713,6 +779,8 @@ function getDashboardData(archiveUrl) {
     var yesterdayStr = Utilities.formatDate(yesterdayDate, tz, "dd/MM/yyyy");
 
     var archiveLinks = getArchiveLinks();
+    // Cached 300s, so a slow mark here means the cache missed.
+    tm.mark('links');
     var yesterdayArchiveUrl = null;
     for (var a = 0; a < archiveLinks.length; a++) {
       if (archiveLinks[a].name === yesterdayStr) {
@@ -765,6 +833,8 @@ function getDashboardData(archiveUrl) {
             yEntries = JSON.parse(yCached);
           } catch (e) { yEntries = null; }
         }
+        tm.mark('ydayCacheGet');
+        tm.note('ydayCache=' + (yEntries ? 'HIT/' + yCached.length + 'chars' : 'MISS'));
       }
 
       if (!yEntries) {
@@ -772,8 +842,12 @@ function getDashboardData(archiveUrl) {
         try {
           var archiveSS = SpreadsheetApp.openByUrl(yesterdayArchiveUrl);
           var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
+          // The single most expensive call in this function, measured on its
+          // own so it is not hidden inside the read that follows it.
+          tm.mark('ydayOpen');
           if (archiveSource && archiveSource.getLastRow() >= 2) {
             var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
+            tm.mark('ydayRead', procCells_(aRead));
 
             for (var i = 0; i < aRead.vals.length; i++) {
               var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
@@ -800,6 +874,7 @@ function getDashboardData(archiveUrl) {
     // ── Step 2: Read from live file ──
     if (sourceSheet.getLastRow() >= 2) {
       var lRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
+      tm.mark('liveRead', procCells_(lRead));
 
       for (var i = 0; i < lRead.vals.length; i++) {
         var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.map);
@@ -834,6 +909,7 @@ function getDashboardData(archiveUrl) {
     // ═══════════════════════════════════════════════
     if (sourceSheet.getLastRow() >= 2) {
       var sRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
+      tm.mark('archiveRead', procCells_(sRead));
       var timeSet = {};
 
       for (var t = 0; t < timeRanges.length; t++) {
@@ -889,11 +965,15 @@ function getDashboardData(archiveUrl) {
   var b2Val = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
   var noteVal = sheet.getRange('G3').getValue();
 
+  tm.mark('build');
+
   // Read AFTER the timeline trim above, so the dates it filters on are the
   // ones the dashboard ends up drawing rather than the ones it started with.
   var osLog = readOsLogRows_(ss, timeRanges);
+  tm.mark('osLog', osLogCellsRead_);
+  tm.note('osLogRows=' + osLog.rows.length + (osLog.skipped ? '/' + osLog.skipped + 'skipped' : ''));
 
-  return {
+  var payload = {
     threshold: threshold,
     lastRefresh: displayTime || Utilities.formatDate(lastRefresh, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),
     archiveBaseTime: lastRefresh.getTime(),
@@ -906,6 +986,37 @@ function getDashboardData(archiveUrl) {
     osLog: osLog.rows,
     osLogSkipped: osLog.skipped
   };
+  tm.mark('tmList');
+
+  // The payload's own size, against the ceiling the CLIENT will measure it
+  // against: savePayloadCache_ in JsInit refuses anything over 3,000,000
+  // chars and skips the write silently, which costs the instant repaint on
+  // every reopen. Stringified once here purely to find out - if this turns
+  // out to be well under the limit, the whole compact-payload idea is not
+  // worth its cost and this line comes out again.
+  try {
+    var payloadChars = JSON.stringify(payload).length;
+    tm.note('payloadChars=' + payloadChars + '/3000000');
+    tm.mark('sizeProbe');
+  } catch (e) {
+    tm.note('payloadChars=unmeasurable');
+  }
+
+  tm.note('rows=' + rawSideData.length + ' bonuses=' + payload.bonusList.length +
+          ' blocks=' + timeRanges.length);
+  tm.done(isLiveMode ? 'LIVE' : 'ARCHIVE');
+  return payload;
+}
+
+// Cells actually marshalled by one readProcRows_ call: the full-width body
+// plus the A:C display read beside it. Both cross the Sheets boundary, and
+// the second one exists only because column A and C are needed as DISPLAY
+// values - which is the read a single-column tab would remove outright.
+function procCells_(read) {
+  if (!read || !read.vals) return 0;
+  var rows = read.vals.length;
+  var cols = rows ? read.vals[0].length : 0;
+  return rows * cols + rows * 3;
 }
 
 function generateTimeRanges_(baseDateTime, count) {

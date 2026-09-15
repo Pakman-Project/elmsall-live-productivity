@@ -68,10 +68,23 @@
     if (archiveUrl) return;
     try {
       var json = JSON.stringify({ savedAt: Date.now(), payload: data });
-      if (json.length > PAYLOAD_CACHE_MAX_CHARS) return;
+      // Logged, not silent. Declining the write costs the instant repaint on
+      // every reopen, and a cache that has never once populated looks exactly
+      // like one that is working - nothing on screen says otherwise. If this
+      // line is the one that fires in production, the payload shape is worth
+      // changing; if the percentage is comfortably under, it is not.
+      if (json.length > PAYLOAD_CACHE_MAX_CHARS) {
+        console.warn('payload cache DECLINED: ' + json.length + ' chars, limit ' +
+                     PAYLOAD_CACHE_MAX_CHARS + ' (over by ' +
+                     (json.length - PAYLOAD_CACHE_MAX_CHARS) + ') - no instant repaint');
+        return;
+      }
+      console.info('payload cache saved: ' + json.length + ' chars (' +
+                   Math.round(json.length / PAYLOAD_CACHE_MAX_CHARS * 100) + '% of limit)');
       localStorage.setItem(PAYLOAD_CACHE_KEY, json);
     } catch (e) {
       // Quota exceeded or storage unavailable — drop the stale copy and move on.
+      console.warn('payload cache write failed: ' + e.message);
       try { localStorage.removeItem(PAYLOAD_CACHE_KEY); } catch (e2) {}
     }
   }

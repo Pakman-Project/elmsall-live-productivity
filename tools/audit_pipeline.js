@@ -632,5 +632,67 @@ head('[the control panel: five narrow pickers left, the bonus filter right]');
         '"E1/E2, E3" is wider than a half-share of a 900px card');
 }
 
+head('[the load is measurable, and measuring it cannot break it]');
+// There was no instrumentation of any kind in getDashboardData, which made
+// "the dashboard feels slow - what is it doing?" unanswerable, so every answer
+// was a guess. These pin the two properties that make the logging worth
+// having: that it covers every expensive read, and that it can never be the
+// reason a load fails.
+{
+  // Code.js run for real, with the two Apps Script globals it touches stubbed.
+  const logs = [];
+  const cctx = {
+    console, JSON, Date, Math, String, Number, Object, isNaN, parseInt, parseFloat,
+    Logger: { log: s => logs.push(String(s)) },
+    CacheService: { getScriptCache: () => ({ putAll() {}, getAll() { return {}; }, get() { return null; } }) }
+  };
+  vm.createContext(cctx);
+  vm.runInContext(code, cctx);
+
+  // Every read that can be slow has a mark of its own. Rolled into one
+  // another, a log line cannot tell which of two reads was the expensive one -
+  // which is the entire question.
+  ['open', 'front', 'links', 'ydayCacheGet', 'ydayOpen', 'ydayRead',
+   'liveRead', 'archiveRead', 'osLog', 'tmList'].forEach(label => {
+    check("'" + label + "' is timed separately",
+          code.indexOf("tm.mark('" + label + "'") !== -1);
+  });
+
+  check('cells are counted, not just rows',
+        typeof cctx.procCells_ === 'function' &&
+        cctx.procCells_({ vals: [new Array(55).fill(0), new Array(55).fill(0)] }) === 116,
+        'getValues() costs by the cell, so rows alone cannot tell a wide tab ' +
+        'from a slow one - and 2 rows x 55 cols + the A:C read is 116');
+  check('and a missing read counts zero rather than throwing',
+        cctx.procCells_(null) === 0 && cctx.procCells_({ vals: [] }) === 0);
+
+  // The two silent ceilings. A cache that has never once populated looks
+  // exactly like one that is working, unless it says so.
+  logs.length = 0;
+  cctx.cachePutLarge_('probe', 'x'.repeat(2000000), 900);
+  check('a cache write over the limit says so',
+        logs.some(l => /CACHE REFUSED probe: 2000000 chars, limit 1800000/.test(l)),
+        logs.join(' | ') || 'nothing logged');
+  logs.length = 0;
+  cctx.cachePutLarge_('probe', 'x'.repeat(1000), 900);
+  check('and one under it reports how close it came',
+        logs.some(l => /CACHE PUT probe: 1000 chars/.test(l)), logs.join(' | '));
+  check('the client half of that reports too',
+        /payload cache DECLINED/.test(R('Web - JsInit.html')),
+        'declining the write costs the instant repaint on every reopen');
+
+  // Instrumentation that can break the thing it measures is worse than none.
+  cctx.Logger = { log() { throw new Error('quota'); } };
+  let escaped = null;
+  try {
+    const t = cctx.loadTimer_();
+    t.mark('x');
+    t.note('y');
+    t.done('LIVE');
+  } catch (e) { escaped = e.message; }
+  check('a logging failure cannot fail a load', escaped === null,
+        escaped || 'swallowed');
+}
+
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
 process.exit(fail ? 1 : 0);
