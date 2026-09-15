@@ -25,6 +25,14 @@ const ARCHIVE_CFG = {
   // which would shear those two columns away from the rows they belong to.
   // Read from the tab instead; see processedSheetCols_.
   PROCESSED_SHEET_COLS_FALLBACK: 22,
+  // The same rows as 'Processed Data (15mins)', joined into one column, which
+  // is what the dashboard actually reads - 57x fewer cells, and it turned a
+  // 43-second load into a few seconds. A whole-file copy brings it along with
+  // every other tab, holding every date the live tab held, so it needs the
+  // same trim. One column wide, and its column A starts with the same window
+  // string, so processedWindowDateKey_ parses a joined row unchanged.
+  BACKEND_SHEET_NAME: 'Backend',
+  BACKEND_SHEET_COLS: 1,
   FRONT_SHEET_NAME: 'Front',
   // 'Date Time Range' on the Data tab, the time-block key everything downstream
   // orders by. Column J since the Attribute column was inserted after Event
@@ -216,6 +224,14 @@ function createArchivesClearRows_(
     const procCleared = trimArchiveProcessedData_(archiveSS, dateKey);
     logDebug_(`Processed Data rows cleared: ${procCleared}`);
 
+    // Both tabs or neither. Trimming one and not the other leaves an archive
+    // whose two copies of the same day disagree about which days they hold -
+    // and since the dashboard prefers Backend, it would be the UNTRIMMED one
+    // being read.
+    const backendCleared = trimArchiveProcessedData_(
+      archiveSS, dateKey, ARCHIVE_CFG.BACKEND_SHEET_NAME, ARCHIVE_CFG.BACKEND_SHEET_COLS);
+    logDebug_(`Backend rows cleared: ${backendCleared}`);
+
     setArchiveB2_(archiveSS, dateObj);
 
     log_(`Done: ${archiveName}`);
@@ -235,10 +251,11 @@ function createArchivesClearRows_(
  * cleared there would simply come back — and clearing it would be a second
  * writer on a tab that deliberately has one.
  ************************************************************/
-function trimArchiveProcessedData_(archiveSS, dateKey) {
-  const sheet = archiveSS.getSheetByName(ARCHIVE_CFG.PROCESSED_SHEET_NAME);
+function trimArchiveProcessedData_(archiveSS, dateKey, sheetName, forcedCols) {
+  const name = sheetName || ARCHIVE_CFG.PROCESSED_SHEET_NAME;
+  const sheet = archiveSS.getSheetByName(name);
   if (!sheet) {
-    log_(`No '${ARCHIVE_CFG.PROCESSED_SHEET_NAME}' tab in the archive; nothing to trim.`);
+    log_(`No '${name}' tab in the archive; nothing to trim.`);
     return 0;
   }
 
@@ -264,7 +281,7 @@ function trimArchiveProcessedData_(archiveSS, dateKey) {
   // row parses but none matches this date is a different thing entirely and is
   // allowed through — that is simply a day with no processed rows left.
   if (readable === 0) {
-    log_(`WARNING: no readable window in column A of '${ARCHIVE_CFG.PROCESSED_SHEET_NAME}' ` +
+    log_(`WARNING: no readable window in column A of '${name}' ` +
          `(checked ${numRows} rows). Format may have changed. Left untouched.`);
     return 0;
   }
@@ -274,7 +291,9 @@ function trimArchiveProcessedData_(archiveSS, dateKey) {
   let cleared = 0;
   for (let i = 0; i < clearBlocks.length; i++) cleared += clearBlocks[i][1];
 
-  const procCols = processedSheetCols_(sheet);
+  // One column for Backend; the wide tab asks the tab itself, since an old
+  // archive is genuinely narrower than today's live one.
+  const procCols = forcedCols || processedSheetCols_(sheet);
 
   applyClearBlocks_(sheet, clearBlocks, procCols);
 

@@ -213,12 +213,16 @@ const STUB = `
     return out;
   }
 
+  // The OS log no longer travels in the payload - the OS page asks for it on
+  // first open, through its own entry point. Stashed here so the stub's
+  // getOsLogRows can answer, and built from the payload because that is where
+  // the demo bonus numbers and time ranges live.
+  var OS_LOG_STASH = null;
   function withOsLog_(d) {
     if (d) {
-      d.osLog = osDemoLog_(d);
       // One unreadable row, so the page's own warning is on screen rather than
       // only ever exercised by a test.
-      d.osLogSkipped = 1;
+      OS_LOG_STASH = { rows: osDemoLog_(d), skipped: 1 };
     }
     return d;
   }
@@ -249,6 +253,13 @@ const STUB = `
       withFailureHandler: function (f) { return runner(ok, f); },
       getDashboardData: function () { reply(function () { return withOsLog_(withNote_(withOsSpell_(buildTourDummyData_()))); }); },
       getArchiveLinks: function () { reply(archiveLinks); },
+      // Answered from the stash the payload filled. Still asynchronous, so the
+      // OS page's loading state is exercised rather than skipped.
+      getOsLogRows: function () {
+        reply(function () {
+          return OS_LOG_STASH || { rows: [], skipped: 0 };
+        });
+      },
       getLastRefreshTimestamp: function () { reply(function () { return null; }); }
     };
   }

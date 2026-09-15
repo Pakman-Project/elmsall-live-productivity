@@ -685,10 +685,17 @@ var tmDirectory = {};
 // Not narrowed by the warehouse picker: Site is a column of the log and a
 // grouping level ON the page, so filtering by building here would hide the
 // heading it is meant to be read under.
+// Filled by the OS page itself on first open, NOT by the dashboard payload.
+// Reading it eagerly cost 431ms of every load for a page most viewers never
+// open - see getOsLogRows in Code.js.
 var osLogRows = [];
 // Records dropped for an unreadable date or time. Shown on the page rather
 // than swallowed - a page quietly one row short is the worst of the options.
 var osLogSkipped = 0;
+// null = never fetched, 'loading', 'ready', or an error message. The page
+// needs to tell "nobody was on OS" apart from "this has not arrived yet",
+// which are the same empty array.
+var osLogState = null;
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];

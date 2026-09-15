@@ -380,9 +380,57 @@ head('[10] the page is wired in at index 3, and the Data Table moved to 4');
 
   check('the page include is in the document',
         /include\('Web - JsPageOs'\)/.test(index));
-  check('and the payload reaches it',
-        /osLogRows = data\.osLog \|\| \[\]/.test(init) &&
-        /osLog: osLog\.rows/.test(CODE));
+}
+
+head('[12] the log is fetched by the page, not by every dashboard load');
+// Measured at 431ms of a load, paid by everyone including the majority who
+// never open this page - and it was the only read on that path that nothing
+// on screen needed.
+{
+  const init = R('Web - JsInit.html');
+  check('getDashboardData no longer reads it',
+        CODE.indexOf('osLog: osLog.rows') === -1 &&
+        !/var osLog = readOsLogRows_\(ss, timeRanges\)/.test(CODE),
+        'it cost every viewer a read for a page most never open');
+  check('and the payload no longer carries it',
+        !/osLogRows = data\.osLog/.test(init) && /osLogRows = \[\];/.test(init));
+  check('there is an entry point of its own',
+        /function getOsLogRows\(dateKeys, archiveUrl\)/.test(CODE));
+  check('the page calls it on first open',
+        /\.getOsLogRows\(osLogWantDates_\(\), currentArchiveUrl \|\| null\)/.test(PAGE));
+  check('once only - a second open is served from memory',
+        /if \(osLogState !== null\) return;/.test(PAGE),
+        'osLogState guards the fetch, not the render');
+
+  // The three states have to be distinguishable. An empty array means both
+  // "nobody was on OS" and "this has not arrived yet".
+  ['loading', 'ready'].forEach(s =>
+    check("'" + s + "' is a state the page renders", PAGE.indexOf("'" + s + "'") !== -1));
+  // Matched on the whole call, not on the method name: "withFailureHandler" is
+  // a substring of any typo'd longer name, so the looser check passed against
+  // a handler that was never wired up.
+  check('a failure is NAMED rather than left as an empty page',
+        PAGE.indexOf('.withFailureHandler(function (err) {') !== -1 &&
+        /The OS log could not be read/.test(PAGE),
+        '"nobody on OS" and "the log broke" look identical otherwise');
+  check('and the loading state is shown, not just set',
+        /fa-circle-notch fa-spin/.test(PAGE));
+
+  // The client works out the window, so the server needs no read to do it.
+  check('the client sends the dates it wants',
+        /function osLogWantDates_\(\)/.test(PAGE));
+  check('including the production day BEFORE each',
+        /new Date\(d\.getTime\(\) - 86400000\)/.test(PAGE),
+        'a 02:00 spell on the 9th is logged against the 8th');
+  check('and the server takes them as a set rather than re-deriving them',
+        /function readOsLogRows_\(ss, want\)/.test(CODE) &&
+        !/for \(var t = 0; t < timeRanges\.length; t\+\+\)[\s\S]{0,200}osLogDateKey_/.test(CODE));
+  check('the answer is cached, keyed on those dates',
+        /'osLog_v1_' \+ \(archiveUrl \? 'a' : 'l'\) \+ '_' \+ keys\.join/.test(CODE),
+        'a different window cannot be served a stale answer');
+  check('and the preview stub answers it too',
+        /getOsLogRows: function \(\)/.test(R('tools/preview.js')),
+        'or the OS page is permanently empty in the preview');
 }
 
 head('[11] Hours Range and Time Window are inert where they do nothing');

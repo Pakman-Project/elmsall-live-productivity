@@ -360,10 +360,18 @@ head('[11] the approval status travels with the flag');
   check('YES is not repeated into the payload',
         /osStatus\.toUpperCase\(\) !== 'YES'/.test(csrc),
         'it says nothing os:true has not already said, on every row of a full day');
-  check('the yesterday cache is bumped for the new fields',
-        csrc.indexOf("'ydayArch_v6_'") !== -1 && csrc.indexOf("'ydayArch_v5_'") === -1,
-        'cached v5 rows carry the status and no times, so a band spanning ' +
-        'midnight would report a range for its second half only');
+  // The version is read out rather than pinned to a literal, which has now
+  // drifted twice: the point is that it MOVED when the entry shape changed,
+  // not what number it landed on. v5 rows carry the status and no times, so a
+  // band spanning midnight would report a range for its second half only.
+  {
+    const keys = csrc.match(/'ydayArch_v(\d+)_'/g) || [];
+    const vers = keys.map(k => Number(k.replace(/\D/g, '')));
+    check('the yesterday cache key has exactly one version',
+          keys.length === 1, keys.join(', ') || 'none found');
+    check('and it is past the one that predates the clip times',
+          vers.length === 1 && vers[0] >= 6, String(vers[0]));
+  }
 }
 
 head('[12] one bucket, one verdict - or none');

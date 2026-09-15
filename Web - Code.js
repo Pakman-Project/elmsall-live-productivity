@@ -89,7 +89,33 @@ var TM_NUM_COLS_ = 3;    // B:D
  * Returns {} rather than throwing if the tab is absent - the tooltip is a nice
  * thing to have, not a reason for the whole dashboard to fail to load.
  */
+// Cached for six hours. Measured at 1,031ms on the live file - 23% of what a
+// load costs once the wide-tab reads are gone - for a bonus-to-manager
+// directory that is edited by hand and changes daily at most. There is no
+// window to pin in the key, unlike the archive slice, so a plain version is
+// enough; bump it if the shape of an entry ever changes.
+var TM_CACHE_KEY_ = 'tmDirectory_v1';
+var TM_CACHE_TTL_ = 6 * 60 * 60;
+
 function readTmDirectory_(ss) {
+  var cached = cacheGetLarge_(TM_CACHE_KEY_);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) {}
+  }
+  var built = readTmDirectoryUncached_(ss);
+  // Only cache a directory that actually has something in it. An empty {} is
+  // what a missing tab returns, and pinning that for six hours would turn a
+  // transient read failure into an afternoon with no manager names.
+  for (var probe in built) {
+    if (built.hasOwnProperty(probe)) {
+      cachePutLarge_(TM_CACHE_KEY_, JSON.stringify(built), TM_CACHE_TTL_);
+      break;
+    }
+  }
+  return built;
+}
+
+function readTmDirectoryUncached_(ss) {
   try {
     var sheet = ss.getSheetByName(CONFIG.TM_SHEET_NAME);
     if (!sheet) return {};
@@ -129,7 +155,12 @@ function readTmDirectory_(ss) {
 // can never break a load — worst case it's as slow as before.
 // ─────────────────────────────────────────────
 var CACHE_CHUNK_SIZE_ = 90000;
-var CACHE_MAX_TOTAL_ = 1800000;  // don't attempt to cache absurdly large payloads
+// Raised from 1,800,000, which was refusing every write it was ever asked to
+// make. Yesterday's slice of a 24h window on this site is ~20,000 rows, and
+// even joined by '|' that is 2.16MB - so the archive cache had never once
+// populated, and every load paid to re-open and re-read yesterday's whole
+// archive file. 3,000,000 is 34 chunks, which putAll handles in one call.
+var CACHE_MAX_TOTAL_ = 3000000;
 
 // ── Load timing ─────────────────────────────────────────────────────────────
 // There was no instrumentation of any kind in here, which made "the dashboard
@@ -250,8 +281,11 @@ function getArchiveLinks() {
   var lastRow = linksSheet.getLastRow();
   if (lastRow < 2) return [];
 
-  var kValues = linksSheet.getRange(2, 11, lastRow - 1, 1).getValues().flat();
-  var bValues = linksSheet.getRange(2, 2, lastRow - 1, 1).getValues().flat();
+  // B and K in one round trip rather than two. The columns between them are
+  // read and discarded, which costs far less than a second call.
+  var bk = linksSheet.getRange(2, 2, lastRow - 1, 10).getValues();
+  var kValues = bk.map(function (r) { return r[9]; });   // K
+  var bValues = bk.map(function (r) { return r[0]; });   // B
 
   var uniqueLinks = [];
   var seenNames = {};
@@ -447,6 +481,103 @@ function legacyProcColumnMap_(isV2) {
   return map;
 }
 
+// ─────────────────────────────────────────────
+// The 'Backend' tab — the same rows, one column
+//
+// Every dashboard read used to come off 'Processed Data (15mins)', 54 columns
+// wide. Measured on the live file, that cost FORTY SECONDS of a forty-three
+// second load: 2.9 million cells across two spreadsheets, because live mode
+// reads yesterday's archive as well. Apps Script's Sheets bridge costs per
+// CELL rather than per byte, and 23 of every 24 area columns on a row are
+// zero, so nearly all of it was marshalling noughts.
+//
+// The notebook now writes the identical rows joined by '|' into one column.
+// 57× fewer cells for the same information — and the separate A:C
+// getDisplayValues read disappears too, because a joined row is already text,
+// so what is displayed IS the value.
+//
+// Row 1 is the header, joined the same way, so this feeds the SAME
+// buildProcColumnMap_ as the wide tab. Mapping by header name is what makes
+// inserting a work area safe; a positional reader here would have thrown that
+// away for no extra gain.
+// ─────────────────────────────────────────────
+var BACKEND_SHEET_NAME_ = 'backend';   // matched lower-cased
+var BACKEND_DELIM_ = '|';
+
+// Reads the Backend tab, or returns null if it cannot be used — in which case
+// the caller reads the wide tab exactly as before.
+//
+// null rather than an exception for three real cases: an archive cut before
+// this tab existed, a live file whose notebook has not run since the change,
+// and a tab whose header no longer maps. All three have to degrade to the old
+// path rather than to an empty dashboard.
+function readBackendRows_(ss) {
+  var sheets = ss.getSheets();
+  var sheet = null;
+  for (var s = 0; s < sheets.length; s++) {
+    if (sheets[s].getName().trim().toLowerCase() === BACKEND_SHEET_NAME_) {
+      sheet = sheets[s];
+      break;
+    }
+  }
+  if (!sheet) return null;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  // One range, one column, header included. Everything after this is string
+  // work in V8, which is orders of magnitude cheaper than a round trip.
+  var col = sheet.getRange(1, 1, lastRow, 1).getDisplayValues();
+  var map = buildProcColumnMap_(String(col[0][0] || '').split(BACKEND_DELIM_));
+  // No recognisable total column means the header is not what this expects.
+  // Deliberately NOT falling through to legacyProcColumnMap_: that reader is
+  // positional, and guessing positions from a tab we have just failed to
+  // understand is how you get a plausible-looking wrong dashboard.
+  if (map.total < 0) return null;
+
+  var vals = [];
+  for (var r = 1; r < col.length; r++) {
+    var line = col[r][0];
+    if (!line) continue;
+    vals.push(String(line).split(BACKEND_DELIM_));
+  }
+  return {
+    vals: vals,
+    // The same array serves as both: a joined row is text throughout, so the
+    // display value and the value are the same thing. This is the second
+    // full-height read the wide tab needed and this one does not.
+    disps: vals,
+    map: map,
+    header: String(col[0][0] || '').split(BACKEND_DELIM_),
+    cells: lastRow
+  };
+}
+
+// One row -> one delimited line, for the archive cache. Sanitised the same way
+// the notebook sanitises: a stray delimiter would shift every field after it
+// when the line is split back, and a cache that returns subtly wrong rows is
+// far worse than one that misses.
+function backendJoin_(row) {
+  var out = [];
+  for (var i = 0; i < row.length; i++) {
+    var s = (row[i] === null || row[i] === undefined) ? '' : String(row[i]);
+    out.push(s.indexOf(BACKEND_DELIM_) === -1 ? s : s.split(BACKEND_DELIM_).join('/'));
+  }
+  return out.join(BACKEND_DELIM_);
+}
+
+// Whichever source is available, with the fast one preferred. Every caller of
+// readProcRows_ goes through this so the fallback cannot be forgotten at one
+// of the three call sites.
+function readSourceRows_(ss, sheet, lastRow) {
+  var fast = readBackendRows_(ss);
+  if (fast) return fast;
+  var slow = readProcRows_(sheet, lastRow);
+  slow.cells = procCells_(slow);
+  slow.fallback = true;
+  return slow;
+}
+
 function readProcRows_(sheet, lastRow) {
   var lastCol = sheet.getLastColumn();
   var header = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0] : [];
@@ -454,10 +585,12 @@ function readProcRows_(sheet, lastRow) {
 
   if (map.total < 0) {
     // No recognisable total column: fall back to the old L1 sniff.
+    // (header is returned below either way, for the archive cache.)
     map = legacyProcColumnMap_(String(header[11] || '').indexOf('D.Analysis') === 0);
   }
 
   return {
+    header: header,
     vals: sheet.getRange(2, 1, lastRow - 1,
                          Math.max(lastCol, map.total + 1, map.os + 1,
                                   map.osTime + 1)).getValues(),
@@ -578,7 +711,59 @@ function osLogCell_(row, i) {
 // Returns { rows, skipped }. The count is shown on the page rather than
 // swallowed: a spell with an unreadable date or time cannot be placed on a
 // clock, and a page quietly one row short is the worst of the options.
-function readOsLogRows_(ss, timeRanges) {
+// The OS page's own entry point, called the first time that page is opened
+// rather than on every dashboard load.
+//
+// Measured at 431ms - about 1% of the old load and 10% of the new one - and
+// paid by everyone, including the majority who never open the page. Small, but
+// it is the only read on the critical path that nothing on screen needs.
+//
+// The client passes the dd/mm/yyyy keys it wants, taken from its own
+// timeRanges, so this needs no read of its own to work out the window.
+function getOsLogRows(dateKeys, archiveUrl) {
+  var tm = loadTimer_();
+  var want = {};
+  var keys = [];
+  for (var i = 0; dateKeys && i < dateKeys.length; i++) {
+    var k = osLogDateKey_(dateKeys[i]);
+    if (k && !want[k]) { want[k] = true; keys.push(k); }
+  }
+  keys.sort();
+
+  // Keyed on the dates asked for, so a different window cannot be served a
+  // stale answer. Short TTL: the log is edited by hand all shift, and somebody
+  // checking whether their own spell has been approved yet is exactly who
+  // opens this page.
+  var cacheKey = 'osLog_v1_' + (archiveUrl ? 'a' : 'l') + '_' + keys.join(',');
+  var cached = cacheGetLarge_(cacheKey);
+  if (cached) {
+    try {
+      tm.note('osLogCache=HIT');
+      tm.done('OSLOG');
+      return JSON.parse(cached);
+    } catch (e) {}
+  }
+
+  var ss;
+  try {
+    ss = archiveUrl ? SpreadsheetApp.openByUrl(archiveUrl)
+                    : SpreadsheetApp.getActiveSpreadsheet();
+  } catch (e) {
+    return { rows: [], skipped: 0, error: 'Could not open the spreadsheet' };
+  }
+  tm.mark('open');
+
+  var out = readOsLogRows_(ss, want);
+  tm.mark('osLog', osLogCellsRead_);
+  tm.note('rows=' + out.rows.length);
+  out.timing = tm.done('OSLOG');
+  cachePutLarge_(cacheKey, JSON.stringify(out), 300);
+  return out;
+}
+
+// `want` is a set of dd/mm/yyyy keys, already including the production day
+// before each - see osLogWantDates_ on the client, which builds it.
+function readOsLogRows_(ss, want) {
   try {
     // "OS log" in the script and "OS Log" in conversation, and getSheetByName
     // matches exactly. Resolved case-insensitively so a capital L one way or
@@ -595,14 +780,6 @@ function readOsLogRows_(ss, timeRanges) {
 
     var lastRow = sheet.getLastRow();
     if (lastRow < OS_LOG_FIRST_ROW_) { osLogCellsRead_ = 0; return { rows: [], skipped: 0 }; }
-
-    var want = {};
-    for (var t = 0; t < timeRanges.length; t++) {
-      var d = parseTimeRangeStart_(timeRanges[t]);
-      if (!d) continue;
-      want[osLogDateKey_(d)] = true;
-      want[osLogDateKey_(new Date(d.getTime() - 86400000))] = true;
-    }
 
     var vals = sheet.getRange(OS_LOG_FIRST_ROW_, 1,
                               lastRow - OS_LOG_FIRST_ROW_ + 1,
@@ -811,6 +988,9 @@ function getDashboardData(archiveUrl) {
       var yKeys = Object.keys(yesterdayTRSet);
       var yEntries = null;
       var yCacheKey = null;
+      // The lines to cache, collected as the rows are filtered. Null until a
+      // read actually happens, so a cache hit never rewrites what it just read.
+      var yLines_ = null;
 
       if (yKeys.length) {
         yKeys.sort();
@@ -830,12 +1010,34 @@ function getDashboardData(archiveUrl) {
         // as the status having changed at midnight.
         // v6: and the two clip times. Same failure shape: a band spanning
         // midnight would report a start and end for its second half only.
-        yCacheKey = 'ydayArch_v6_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
+        // v7: the FORMAT changed, not a field - this now holds delimited
+        // lines rather than entry objects, because the objects ran to ~19MB
+        // and the write was refused every time. A v6 entry fed to the line
+        // splitter would come back as garbage rather than as a miss.
+        yCacheKey = 'ydayArch_v7_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
                     '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {
           try {
-            yEntries = JSON.parse(yCached);
+            // Stored as delimited LINES, not as the expanded entry objects it
+            // used to hold. Those ran to ~19MB for this site's yesterday
+            // slice, so the write was refused every single time and the cache
+            // had never once populated - see CACHE_MAX_TOTAL_. The same rows
+            // as text are about a tenth of that.
+            //
+            // The header travels with them and is re-mapped by NAME on the
+            // way out, so a cache entry written before an area was added
+            // cannot silently read one column short.
+            var yLines = yCached.split('\n');
+            var yMap = buildProcColumnMap_(yLines[0].split(BACKEND_DELIM_));
+            if (yMap.total >= 0) {
+              yEntries = [];
+              for (var yl = 1; yl < yLines.length; yl++) {
+                if (!yLines[yl]) continue;
+                var yCols = yLines[yl].split(BACKEND_DELIM_);
+                yEntries.push(buildSideEntry_(yCols, yCols, yMap));
+              }
+            }
           } catch (e) { yEntries = null; }
         }
         tm.mark('ydayCacheGet');
@@ -850,10 +1052,16 @@ function getDashboardData(archiveUrl) {
           // The single most expensive call in this function, measured on its
           // own so it is not hidden inside the read that follows it.
           tm.mark('ydayOpen');
-          if (archiveSource && archiveSource.getLastRow() >= 2) {
-            var aRead = readProcRows_(archiveSource, archiveSource.getLastRow());
-            tm.mark('ydayRead', procCells_(aRead));
+          // Once, not twice: getLastRow() is its own round trip.
+          var aLastRow = archiveSource ? archiveSource.getLastRow() : 0;
+          if (archiveSource && aLastRow >= 2) {
+            var aRead = readSourceRows_(archiveSS, archiveSource, aLastRow);
+            tm.mark('ydayRead', aRead.cells);
+            if (aRead.fallback) tm.note('ydayFELLBACK');
 
+            // The header first, so a cache entry can be re-mapped by NAME on
+            // the way out rather than trusting its positions.
+            yLines_ = [backendJoin_(aRead.header)];
             for (var i = 0; i < aRead.vals.length; i++) {
               var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
               if (!yesterdayTRSet[aEntry.timeRange]) continue;
@@ -861,9 +1069,15 @@ function getDashboardData(archiveUrl) {
               // test alone would drop exactly the rows the OS band needs.
               if (!aEntry.bonus || (aEntry.value <= 0 && !aEntry.os)) continue;
               yEntries.push(aEntry);
+              yLines_.push(backendJoin_(aRead.vals[i]));
             }
           }
-          if (yCacheKey) { cachePutLarge_(yCacheKey, JSON.stringify(yEntries), 900); }
+          // Cached as the lines themselves rather than as the objects built
+          // from them. Only the rows that survived the window filter are
+          // kept, which is most of the saving.
+          if (yCacheKey && yLines_) {
+            cachePutLarge_(yCacheKey, yLines_.join('\n'), 900);
+          }
         } catch (e) {
           Logger.log('Yesterday archive read failed (' + yesterdayStr + '): ' + e.message);
         }
@@ -877,9 +1091,11 @@ function getDashboardData(archiveUrl) {
     }
 
     // ── Step 2: Read from live file ──
-    if (sourceSheet.getLastRow() >= 2) {
-      var lRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
-      tm.mark('liveRead', procCells_(lRead));
+    var lLastRow = sourceSheet.getLastRow();
+    if (lLastRow >= 2) {
+      var lRead = readSourceRows_(ss, sourceSheet, lLastRow);
+      tm.mark('liveRead', lRead.cells);
+      if (lRead.fallback) tm.note('liveFELLBACK');
 
       for (var i = 0; i < lRead.vals.length; i++) {
         var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.map);
@@ -912,9 +1128,11 @@ function getDashboardData(archiveUrl) {
     // ═══════════════════════════════════════════════
     // ARCHIVE MODE — Single source (unchanged)
     // ═══════════════════════════════════════════════
-    if (sourceSheet.getLastRow() >= 2) {
-      var sRead = readProcRows_(sourceSheet, sourceSheet.getLastRow());
-      tm.mark('archiveRead', procCells_(sRead));
+    var sLastRow = sourceSheet.getLastRow();
+    if (sLastRow >= 2) {
+      var sRead = readSourceRows_(ss, sourceSheet, sLastRow);
+      tm.mark('archiveRead', sRead.cells);
+      if (sRead.fallback) tm.note('archiveFELLBACK');
       var timeSet = {};
 
       for (var t = 0; t < timeRanges.length; t++) {
@@ -972,11 +1190,10 @@ function getDashboardData(archiveUrl) {
 
   tm.mark('build');
 
-  // Read AFTER the timeline trim above, so the dates it filters on are the
-  // ones the dashboard ends up drawing rather than the ones it started with.
-  var osLog = readOsLogRows_(ss, timeRanges);
-  tm.mark('osLog', osLogCellsRead_);
-  tm.note('osLogRows=' + osLog.rows.length + (osLog.skipped ? '/' + osLog.skipped + 'skipped' : ''));
+  // The OS log is NOT read here any more. It cost 431ms of every load for a
+  // page most viewers never open, and it is the only read on this path that
+  // nothing on screen needs - so the OS page fetches it itself, once, on
+  // first open. See getOsLogRows.
 
   var payload = {
     threshold: threshold,
@@ -987,25 +1204,16 @@ function getDashboardData(archiveUrl) {
     bonusList: Object.keys(bonusSet).sort(),
     currentTimestamp: (b2Val instanceof Date) ? b2Val.getTime() : null,
     note: noteVal,
-    tmDirectory: readTmDirectory_(ss),
-    osLog: osLog.rows,
-    osLogSkipped: osLog.skipped
+    tmDirectory: readTmDirectory_(ss)
   };
   tm.mark('tmList');
 
-  // The payload's own size, against the ceiling the CLIENT will measure it
-  // against: savePayloadCache_ in JsInit refuses anything over 3,000,000
-  // chars and skips the write silently, which costs the instant repaint on
-  // every reopen. Stringified once here purely to find out - if this turns
-  // out to be well under the limit, the whole compact-payload idea is not
-  // worth its cost and this line comes out again.
-  try {
-    var payloadChars = JSON.stringify(payload).length;
-    tm.note('payloadChars=' + payloadChars + '/3000000');
-    tm.mark('sizeProbe');
-  } catch (e) {
-    tm.note('payloadChars=unmeasurable');
-  }
+  // The payload size probe that used to sit here has been removed. It cost
+  // 468ms of every load to stringify 31MB twice, and it has answered the
+  // question it was added for: 33,742,320 chars against a 3,000,000 ceiling,
+  // so the client's localStorage cache has certainly never once populated.
+  // The client logs its own size on every load anyway - see
+  // savePayloadCache_ - so nothing was lost by dropping it.
 
   tm.note('rows=' + rawSideData.length + ' bonuses=' + payload.bonusList.length +
           ' blocks=' + timeRanges.length);

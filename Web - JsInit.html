@@ -229,11 +229,12 @@
     allSideData = data.rawSideData || [];
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
-    // Not passed through scopeRowsToSite_: Site is a column of the OS log and
-    // a heading ON the OS page, so narrowing by building here would hide the
-    // heading the rows are meant to be read under.
-    osLogRows = data.osLog || [];
-    osLogSkipped = Number(data.osLogSkipped) || 0;
+    // The OS log no longer travels in the payload - the OS page fetches it
+    // itself on first open. Cleared here so a refresh re-fetches against the
+    // new window rather than showing the previous one's spells.
+    osLogRows = [];
+    osLogSkipped = 0;
+    osLogState = null;
     // The server's list is already every operator on site, which is what the
     // search wants regardless of the building in view.
     allBonusList = data.bonusList || [];

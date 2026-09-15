@@ -668,10 +668,18 @@ head('[the load is measurable, and measuring it cannot break it]');
 
   // The two silent ceilings. A cache that has never once populated looks
   // exactly like one that is working, unless it says so.
+  // Sized off the constant rather than a literal, so raising the ceiling
+  // cannot quietly stop this from testing the over-limit path — which is
+  // exactly what happened when it went from 1.8M to 3M.
+  const ceiling = cctx.CACHE_MAX_TOTAL_;
+  check('the ceiling is high enough for a compacted yesterday slice',
+        ceiling >= 3000000,
+        ceiling + ' chars; ~20k rows joined by "|" is about 2.16M');
   logs.length = 0;
-  cctx.cachePutLarge_('probe', 'x'.repeat(2000000), 900);
+  cctx.cachePutLarge_('probe', 'x'.repeat(ceiling + 1), 900);
   check('a cache write over the limit says so',
-        logs.some(l => /CACHE REFUSED probe: 2000000 chars, limit 1800000/.test(l)),
+        logs.some(l => l.indexOf('CACHE REFUSED probe: ' + (ceiling + 1) +
+                                ' chars, limit ' + ceiling) !== -1),
         logs.join(' | ') || 'nothing logged');
   logs.length = 0;
   cctx.cachePutLarge_('probe', 'x'.repeat(1000), 900);

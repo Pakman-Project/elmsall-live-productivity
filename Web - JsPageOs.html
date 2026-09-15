@@ -258,10 +258,70 @@
     return html;
   }
 
+  // The dd/mm/yyyy keys the log has to cover for the window on screen, plus
+  // the day BEFORE each: the Date column is the production day, which runs
+  // 06:00 to 06:00, so a spell starting at 02:00 on the 9th is logged against
+  // the 8th. Sent to the server so it needs no read of its own to work this
+  // out.
+  function osLogWantDates_() {
+    var out = {}, keys = [];
+    for (var i = 0; i < timeRanges.length; i++) {
+      var d = parseDateTimePartPak(extractRangePartsPak(timeRanges[i]).start);
+      if (!d) continue;
+      [d, new Date(d.getTime() - 86400000)].forEach(function (x) {
+        var k = ('0' + x.getDate()).slice(-2) + '/' +
+                ('0' + (x.getMonth() + 1)).slice(-2) + '/' + x.getFullYear();
+        if (!out[k]) { out[k] = true; keys.push(k); }
+      });
+    }
+    return keys;
+  }
+
+  // Fetched once, on first open, rather than with every dashboard load: it
+  // cost 431ms of a load for a page most viewers never look at. A second open
+  // is served from osLogRows without a round trip.
+  function ensureOsLogPak_() {
+    if (osLogState !== null) return;
+    osLogState = 'loading';
+    renderOsPagePak();
+    google.script.run
+      .withSuccessHandler(function (res) {
+        osLogRows = (res && res.rows) || [];
+        osLogSkipped = (res && Number(res.skipped)) || 0;
+        osLogState = (res && res.error) ? res.error : 'ready';
+        if (res && res.timing) { console.info(res.timing); }
+        renderOsPagePak();
+      })
+      .withFailureHandler(function (err) {
+        // Named rather than left as an empty page: "nobody was on OS" and
+        // "the log could not be read" look identical otherwise.
+        osLogState = (err && err.message) || 'The OS log could not be read';
+        renderOsPagePak();
+      })
+      .getOsLogRows(osLogWantDates_(), currentArchiveUrl || null);
+  }
+
   function renderOsPagePak() {
     var body = document.getElementById('osBody');
     if (!body) return;
     ensureOsTimeSelects_();
+
+    // Kick the fetch on first render, and show where it is up to. Called
+    // AFTER the selects are built so the range picker is usable while the
+    // rows are still in flight.
+    if (osLogState === null) { ensureOsLogPak_(); return; }
+    if (osLogState === 'loading') {
+      body.innerHTML = '<div class="breakdown-empty">' +
+        '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>' +
+        'Reading the OS log&hellip;</div>';
+      return;
+    }
+    if (osLogState !== 'ready') {
+      body.innerHTML = '<div class="breakdown-empty">' +
+        '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
+        escapeTextPak_(osLogState) + '</div>';
+      return;
+    }
 
     var win = osSelectedWindowPak_();
     var badge = document.getElementById('osRangeBadge');
