@@ -377,15 +377,36 @@ head('[9] records that could not be read are NAMED, not just counted');
         PAGE.indexOf('os-dropped-row') !== -1 &&
         PAGE.indexOf("osNodeKeyPak_('__bad')") !== -1 &&
         R('Web - Styles.html').indexOf('.os-dropped-row .breakdown-label') !== -1);
-  check('with the OS log row number as the first column',
-        /OS_BAD_COLUMNS_ = \['OS log row',/.test(PAGE));
   // Not a warning to be tidied away. An impossible date is a real form filled
   // in wrongly, and the page exists to make the abnormal visible - so the
-  // section says who there is to ask.
-  check('and enough to chase it with',
-        /'TM Authorising', 'Deployed by', 'Problem'\]/.test(PAGE) &&
-        /'Site \/ Zone'/.test(PAGE),
-        'the row to open, the code, the three bad cells, and who signed it off');
+  // section says what the record was and who there is to ask about it.
+  check('the columns are the record, not the fault',
+        /OS_BAD_COLUMNS_ = \['Bonus', 'Date', 'Start', 'Finish', 'Site \/ Zone',\s*\n?\s*'Task', 'TM Authorising', 'Deployed by', 'Record Status'\]/
+          .test(PAGE),
+        'the code, the three bad cells, the task, the verdict, and who signed it off');
+  // The sheet row named a place most readers of this page cannot open, and the
+  // reason was the widest column in a table already too wide for a phone. Both
+  // went; the reason stayed, on the row, where hovering still finds it.
+  check('the row number and the Problem column are gone',
+        PAGE.indexOf("'OS log row'") === -1 && !/'Problem'\]/.test(PAGE) &&
+        PAGE.indexOf('os-bad-row-num') === -1 && PAGE.indexOf('os-bad-why') === -1 &&
+        R('Web - Styles.html').indexOf('.os-bad-row-num') === -1,
+        'a dead column and its stylesheet rule both go, or the next reader finds half of it');
+  check('but the reason still rides on the row',
+        /title="' \+ escapeAttrPak\(b\.why\)/.test(PAGE) &&
+        R('Web - Styles.html').indexOf('.os-bad-row { cursor: help; }') !== -1,
+        'it is the most useful thing here, just not the widest column');
+  // Both halves have to carry the new cells or the table is a column of
+  // dashes: the server's own rejects, and the ones the client could not place.
+  check('the server fills the new columns too',
+        /job: osLogCell_\(r, OS_LOG_COLS_\.job\),[\s\S]{0,300}status: osLogCell_\(r, OS_LOG_COLS_\.status\),[\s\S]{0,200}zone: osLogCell_\(r, OS_LOG_COLS_\.zone\),[\s\S]{0,40}why: why/
+          .test(CODE),
+        'a server reject with half the row blank looks like a worse kind of fault');
+  check('and so does the client-side drop',
+        /unplaceable\.push\(\{[\s\S]{0,400}job: rec\.job,[\s\S]{0,200}status: rec\.status,/.test(PAGE));
+  check('the verdict there is the same chip as everywhere else',
+        /osStatusChipPak_\(b\.status\)/.test(PAGE),
+        'a second way of writing Approved would eventually disagree with the first');
   check('the reason is per-record, from the same walk that rejects it',
         /function osSpellProblemPak_\(row\)/.test(PAGE) &&
         /function osSpellWalkPak_\(row, why\)/.test(PAGE),
@@ -557,6 +578,78 @@ head('[15b] four filters left, the range right, one row');
         vals.join(' | '));
 }
 
+head('[15e] the OS page on a phone');
+// Two separate reports, both about this page at phone width: it would not
+// scroll at all, and the four filters were stacked down one half of the row.
+{
+  const css = R('Web - Styles.html');
+  const mob = (css.split('@media (max-width: 700px)')
+                  .filter(s => s.indexOf('.os-job-table-wrap') !== -1)[0] || '');
+
+  // .table-wrap sets overflow on BOTH axes, so these wrappers are vertical
+  // scroll containers as well - and once a department is open they cover most
+  // of the page. A vertical drag starting inside one is theirs to handle, and
+  // having nothing to scroll they do nothing with it: the page reads as frozen.
+  // Chrome chains the gesture out; iOS Safari does not.
+  check('a vertical drag over a record table belongs to the PAGE',
+        /\.os-job-table-wrap \{ touch-action: pan-x; \}/.test(mob),
+        'pan-x, so sideways stays with the table and up-and-down does not');
+  check('and it still scrolls sideways, which is why it is a wrapper at all',
+        /\.os-job-table-wrap \{ overflow-x: auto; \}/.test(mob) &&
+        /\.os-job-table \{ min-width: 520px; \}/.test(mob));
+
+  // The filters were one flex column inside a single cell of the Bonus page's
+  // two-column grid. display:contents dissolves the wrapper so each filter is a
+  // grid item in its own right, and the six controls lay out three rows of two.
+  check('the filter wrapper dissolves into the Bonus page grid',
+        /\.os-filters \{ display: contents; \}/.test(mob),
+        'or all four stack down one half of the row');
+  check('the page uses that grid in the first place',
+        R('Web - Index.html').indexOf('class="bonus-page-controls os-controls"') !== -1 &&
+        /\.bonus-page-controls \{\s*display: grid;\s*grid-template-columns: 1fr 1fr;/
+          .test(css));
+  check('and each filter fills its cell, label above control',
+        /\.os-filter \.os-type-select,[\s\S]{0,120}width: 100%/.test(mob) &&
+        /\.os-filter \.breakdown-time-label \{[\s\S]{0,120}font-size: 11px/.test(mob),
+        'the same shape as the Bonus page, which is what was asked for');
+}
+
+head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
+{
+  const css = R('Web - Styles.html');
+  check('the wording is "need to be aware of"',
+        /' need' \+\s*\n?\s*\(total === 1 \? 's' : ''\) \+ ' to be aware of'/.test(PAGE),
+        'and still agrees with itself for a single record');
+  check('one record reads "1 record needs to be aware of"',
+        /total \+ ' record' \+ \(total === 1 \? '' : 's'\)/.test(PAGE));
+  // It has no bar and no count - there is nothing to measure it against - so
+  // the label took the full width instead of wrapping onto two lines beside an
+  // empty bar track.
+  check('the empty bar track and count cell are gone',
+        !/os-dropped-row[\s\S]{0,400}breakdown-bar-wrap/.test(PAGE) &&
+        !/os-dropped-row[\s\S]{0,400}breakdown-count/.test(PAGE));
+  check('and the label IS the bar, at the bar\'s own height',
+        /\.os-dropped-row \.breakdown-label \{[^}]*flex: 1 1 auto/.test(css) &&
+        /\.os-dropped-row \.breakdown-label \{[^}]*height: 30px/.test(css) &&
+        /\.os-dropped-row \.breakdown-label \{[^}]*background: var\(--status-warn-soft\)/.test(css),
+        'so the row still lines up with the zone bars under it');
+  check('with the chevron at the far end, like every other expandable row',
+        /\.os-dropped-row \.breakdown-chevron \{ margin-left: auto; \}/.test(css));
+
+  // The bare `table` rule is table-layout: fixed, which is right for the Data
+  // Table - a column per work area, sharing the width evenly - and wrong here.
+  // It divided the width into nine equal parts regardless of content, so
+  // "Cover - Team Manager" and "15/09/2026" were both clipped to about eighty
+  // pixels and read as "Cov..." and "15/...".
+  check('the OS tables size their columns to what is IN them',
+        /\.os-job-table \{[^}]*table-layout: auto;/.test(css),
+        'nine equal columns clipped every name and every date');
+  check('and the global fixed layout is still there for the Data Table',
+        /\ntable \{\s*\n\s*width: 100%;\s*\n\s*border-collapse: collapse;\s*\n\s*table-layout: fixed;/
+          .test(css),
+        'it is what lets every volume column be visible at once');
+}
+
 head('[16] a refresh does not collapse what you were reading');
 // The page polls, and a refresh used to shut whatever was open.
 {
@@ -711,11 +804,27 @@ head('[12] the log is fetched by the page, not by every dashboard load');
         PAGE.indexOf('.withFailureHandler(function (err) {') !== -1 &&
         /The OS log could not be read/.test(PAGE),
         '"nobody on OS" and "the log broke" look identical otherwise');
-  // Deliberately NO spinner. It arrives in well under a second, and the
-  // animation was landing on top of whatever somebody was already reading.
-  check('there is no loading animation to read around',
-        !/fa-spin/.test(PAGE) && /if \(osLogState === 'loading'\) return;/.test(PAGE),
-        'the body is left as it was and replaced when the rows land');
+  // A skeleton, as everywhere else on the dashboard - not a spinner, which used
+  // to land on top of whatever somebody was already reading. This page fetches
+  // the log on first open, so without one the first thing a new arrival sees is
+  // an empty card, which reads as "nobody was on OS".
+  // The markup, not just the name: os-skeleton also appears in the guard that
+  // stops it being rewritten, so a looser check passed against a loading branch
+  // that had stopped rendering one.
+  check('it shows a skeleton while the log is on its way',
+        !/fa-spin/.test(PAGE) && /osLogState === 'loading'/.test(PAGE) &&
+        /'<div class="os-skeleton"/.test(PAGE),
+        'an empty card and "nobody on OS" look identical otherwise');
+  check('shaped like what is coming, so the page does not jump',
+        PAGE.indexOf('os-skel-summary') !== -1 && PAGE.indexOf('os-skel-row') !== -1 &&
+        R('Web - Styles.html').indexOf('.os-skel-row') !== -1);
+  check('and it uses the same shimmer as every other skeleton',
+        /\.os-skel-summary,[\s\S]{0,200}animation: skelShimmer/.test(R('Web - Styles.html')),
+        'a second animation would run at its own speed beside the first');
+  // Written once. A re-render while still loading - and this page re-renders on
+  // every filter change - would restart every shimmer from the left.
+  check('the skeleton is not rewritten on every re-render',
+        /classList\.contains\('os-skeleton'\)/.test(PAGE));
 
   // The client works out the window, so the server needs no read to do it.
   check('the client sends the dates it wants',

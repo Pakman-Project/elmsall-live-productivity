@@ -27,6 +27,27 @@ const idx = R('Web - Index.html'), state = R('Web - JsState.html'),
       code = R('Web - Code.js'), charts = R('Web - JsCharts.html'),
       ui = R('Web - JsUi.html'), helpers = R('Web - JsHelpers.html');
 
+// The @media block that CONTAINS a given rule, brace-matched.
+//
+// Splitting the stylesheet on the media opener is not good enough: a rule sited
+// just above one lands in the previous chunk, and a chunk always runs past its
+// own closing brace into whatever follows - which quietly breaks any check that
+// a block does NOT contain something.
+function mediaBlock(css, marker, query) {
+  const at = css.indexOf(marker);
+  if (at === -1) return '';
+  const open = css.lastIndexOf('@media ' + (query || '(max-width: 700px)'), at);
+  if (open === -1) return '';
+  let depth = 0;
+  for (let i = css.indexOf('{', open); i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}' && --depth === 0) {
+      return (i > at) ? css.slice(open, i + 1) : '';
+    }
+  }
+  return '';
+}
+
 // Slice a `var NAME = [ ... ];` block without regex-escaping games.
 // Ends at the first `];` rather than a line-start one: the tour's AREAS list is
 // indented, and anchoring to "\n];" ran past it into the next list.
@@ -630,6 +651,78 @@ head('[the control panel: five narrow pickers left, the bonus filter right]');
         /\.hc-field \.warehouse-label \{[^}]*text-overflow: ellipsis/
           .test(css.replace(/\.hc-field \.date-picker-label,\s*/g, '')),
         '"E1/E2, E3" is wider than a half-share of a 900px card');
+
+  // Requested: on a phone the panel is in its shrunk state permanently. Six
+  // labelled controls were taking most of a phone screen before anything below
+  // them got a look in, and the labels are the part that can go - every control
+  // says what it is in its own value, and Filter by Bonus keeps its placeholder.
+  const mobile = mediaBlock(css, '.hc-field #bonusSearch { padding-right: 26px !important; }');
+  check('the labels are hidden on a phone outright',
+        /\.hc-field-label \{ display: none; \}/.test(mobile),
+        'not only once the page has been scrolled');
+  check('and the tight padding is the phone default too',
+        /\.app-headercard \{ padding: 6px 8px; margin-bottom: 6px; \}/.test(mobile));
+  // Which leaves page-scrolled with nothing to do at this width. A rule that
+  // fires and changes nothing is the kind of thing that gets copied onward.
+  check('so scrolling a phone no longer changes the header at all',
+        mobile.indexOf('body.page-scrolled') === -1,
+        'the shrunk state IS the state; there is nothing left to shrink to');
+  // Unchanged above the breakpoint: there the panel starts full size and
+  // tightens on scroll, which is where the mechanism still earns its keep.
+  check('a desktop still shrinks on scroll',
+        /body\.page-scrolled \.hc-field-label \{ display: none; \}/.test(css) &&
+        /body\.page-scrolled \.hc-control \{/.test(css));
+}
+
+head('[the work-area chip strip collapses on a phone]');
+// Eighteen chips wrapped to five or six rows on a phone and took half the
+// screen before the charts or tables they are a legend FOR came into view.
+// Collapsed behind a summary there, untouched on a desktop.
+{
+  const css = R('Web - Styles.html');
+  const helpers = R('Web - JsHelpers.html');
+  const mobile = mediaBlock(css, '.area-chip-more-count {');
+
+  check('the summary button is rendered with the chips',
+        /class="area-chip-more"/.test(helpers) &&
+        /toggleAreaChipStrip_\(\\'' \+ opts\.containerId/.test(helpers),
+        'one renderer, so the Volume and Bonus strips cannot drift apart');
+  check('it says how many areas are on',
+        /class="area-chip-more-count">' \+ shown \+ ' of ' \+ ordered\.length/.test(helpers),
+        'a collapsed control that hides its own state is worse than no control');
+  check('and only when there ARE chips to hide',
+        /if \(wantAreaChips\) \{[\s\S]{0,600}area-chip-more/.test(helpers),
+        'Overall mode on the Bonus page renders the strip with no area chips');
+
+  check('open/closed survives the strip being re-rendered',
+        /var _areaStripOpen_ = \{\}/.test(helpers) &&
+        /_areaStripOpen_\[opts\.containerId\]/.test(helpers),
+        'which happens on every filter change on both pages');
+  check('and the two strips remember separately',
+        /_areaStripOpen_\[containerId\] = !_areaStripOpen_\[containerId\]/.test(helpers),
+        'keyed on the container id');
+
+  check('the button is not there at all on a desktop',
+        /\.area-chip-more \{ display: none; \}/.test(css) &&
+        /\.area-chip-more \{\s*display: inline-flex;/.test(mobile),
+        'there is room for eighteen chips there and nothing to solve');
+  check('closed, the chips and the buttons that act on them both go',
+        /\.bonus-area-toggles:not\(\.chips-open\) \.bonus-area-chip,[\s\S]{0,140}\.area-chip-bulk \{\s*display: none;/
+          .test(mobile),
+        'Select all / Select none acting on chips nobody can see');
+
+  // A tour step rings a chip and waits for a click on it. A target with
+  // display:none is a step that can never be completed.
+  const tour = R('Web - JsTour.html');
+  check('but never while the tour is running',
+        /body:not\(\.tour-running\) \.bonus-area-toggles:not\(\.chips-open\)/.test(mobile) &&
+        /classList\.add\('tour-running'\)/.test(tour) &&
+        /classList\.remove\('tour-running'\)/.test(tour),
+        'the tour clicks a chip; a hidden one is an unfinishable step');
+  check('and the class is cleared on the way out, not only on the way in',
+        tour.indexOf("classList.add('tour-running')") <
+        tour.indexOf("classList.remove('tour-running')"),
+        'left set, every phone would keep the strip open for good');
 }
 
 head('[no source file carries a stray control character]');

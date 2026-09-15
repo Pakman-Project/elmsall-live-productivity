@@ -800,12 +800,23 @@ function readOsLogRows_(ss, want) {
     function note(i, r, why) {
       skipped++;
       if (bad.length >= OS_LOG_MAX_BAD_) return;
+      // The same shape as a GOOD record, minus what could not be parsed. The
+      // page lists these beside the ones the client itself could not place, in
+      // one table, and a server reject that came back with half the columns
+      // blank looked like a second, worse kind of fault rather than the same
+      // kind found earlier.
       bad.push({
         row: OS_LOG_FIRST_ROW_ + i,
         bonus: osLogCell_(r, OS_LOG_COLS_.bonus),
         date: osLogCell_(r, OS_LOG_COLS_.date),
         from: osLogCell_(r, OS_LOG_COLS_.start),
         to: osLogCell_(r, OS_LOG_COLS_.finish),
+        job: osLogCell_(r, OS_LOG_COLS_.job),
+        auth: osLogCell_(r, OS_LOG_COLS_.auth),
+        deployedBy: osLogCell_(r, OS_LOG_COLS_.deployedBy),
+        status: osLogCell_(r, OS_LOG_COLS_.status),
+        site: osLogCell_(r, OS_LOG_COLS_.site),
+        zone: osLogCell_(r, OS_LOG_COLS_.zone),
         why: why
       });
     }

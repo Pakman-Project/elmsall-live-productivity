@@ -886,6 +886,21 @@ function safeTextPak(v) {
   return String(v != null ? v : '');
 }
 
+// Whether each strip is expanded, which only matters on a phone — see
+// .area-chip-more. Keyed on the container id, so the Volume page and the Bonus
+// page remember separately, and it survives the strip being re-rendered on
+// every filter change (which is most interactions on both pages).
+var _areaStripOpen_ = {};
+
+function toggleAreaChipStrip_(containerId) {
+  _areaStripOpen_[containerId] = !_areaStripOpen_[containerId];
+  var el = $(containerId);
+  if (!el) return;
+  el.classList.toggle('chips-open', !!_areaStripOpen_[containerId]);
+  var btn = el.querySelector('.area-chip-more');
+  if (btn) btn.setAttribute('aria-expanded', _areaStripOpen_[containerId] ? 'true' : 'false');
+}
+
 // Shared renderer for the work-area show/hide chips. The Bonus Numbers page and
 // the Volume page use identical chips and differ only in which container they
 // fill, which hidden-key list they read, and which toggle they call — keeping
@@ -932,6 +947,37 @@ function renderAreaToggleChips_(opts) {
   // chart modes that have their own per-series legend, where these would be
   // controls with nothing to control.
   var html = '';
+
+  // The strip's own summary, and the only thing in it on a phone until it is
+  // opened. Eighteen chips wrapped to five or six rows there and took half the
+  // screen before anything they are a legend FOR came into view.
+  //
+  // A disclosure rather than the multi-select dropdown this could have been:
+  // the chips carry the area COLOURS, which is what makes the strip a legend as
+  // well as a control, and a list of ticked options in a menu throws that away.
+  // Opened, it is exactly the strip that was always here.
+  //
+  // Only when there are chips to hide - Overall mode on the Bonus page renders
+  // the strip carrying no area chips at all, and a "0 of 0" summary opening
+  // onto nothing is worse than no summary.
+  if (wantAreaChips) {
+    var shown = 0;
+    for (var c = 0; c < ordered.length; c++) {
+      if (hidden.indexOf(ordered[c].key) === -1) shown++;
+    }
+    var open = !!_areaStripOpen_[opts.containerId];
+    togglesEl.classList.toggle('chips-open', open);
+    html += '<button type="button" class="area-chip-more"' +
+            ' aria-expanded="' + (open ? 'true' : 'false') + '"' +
+            ' onclick="toggleAreaChipStrip_(\'' + opts.containerId + '\')"' +
+            ' title="Show or hide the work-area chips">' +
+            '<i class="fa-solid fa-layer-group" aria-hidden="true"></i>' +
+            '<span>Work areas</span>' +
+            '<span class="area-chip-more-count">' + shown + ' of ' + ordered.length + '</span>' +
+            '<i class="fa-solid fa-chevron-down area-chip-more-caret" aria-hidden="true"></i>' +
+            '</button>';
+  }
+
   if (opts.onSetAll && wantAreaChips) {
     var anyOn = false, anyOff = false;
     for (var s = 0; s < ordered.length; s++) {

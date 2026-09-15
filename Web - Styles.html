@@ -3314,6 +3314,14 @@ body.page-scrolled-far .back-to-top {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.75rem;
+  /* The bare `table` rule sets table-layout: fixed, which is right for the Data
+     Table - it has a column per work area and they must share the width evenly.
+     Here it divided the width into nine equal parts regardless of what was in
+     them, so "Cover - Team Manager" and "15/09/2026" were both clipped to about
+     eighty pixels and read as "Cov..." and "15/...". These columns hold names
+     and times of very different lengths, and the table is already inside a
+     wrapper that scrolls sideways - so it sizes to its content instead. */
+  table-layout: auto;
 }
 
 .os-job-table th {
@@ -3471,9 +3479,33 @@ body.page-scrolled-far .back-to-top {
 }
 
 /* The unreadable rows, as an expandable row of their own rather than a bare
-   sentence: a count nobody can act on is a dead end. */
-.os-dropped-row .breakdown-label { color: var(--status-warn-solid); }
+   sentence: a count nobody can act on is a dead end.
+
+   Unlike a zone, this row has no bar and no count - there is nothing to measure
+   it against - so the label takes the whole width instead of being squeezed
+   into the fixed label column and wrapping onto two lines beside an empty bar
+   track. The chevron then sits at the right-hand end of the row, where every
+   other expandable thing on the dashboard puts it. */
+.os-dropped-row .breakdown-label {
+  color: var(--status-warn-solid);
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  text-align: left;
+  /* The bar's own metrics, because this IS the bar now: the same height and
+     radius as a zone's track, so the row still lines up with the ones under
+     it. Tinted with the warning colour it was already writing in. */
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--status-warn-soft);
+}
+.os-dropped-row .breakdown-chevron { margin-left: auto; }
 .os-dropped-label i:first-child { margin-right: 6px; }
+
+/* The reason is the row's title, so say so. */
+.os-bad-row { cursor: help; }
 
 /* The records that could not be read. Not a warning to be tidied away: an OS
    record with an impossible date or a nineteen-hour shift is a real form
@@ -3488,23 +3520,11 @@ body.page-scrolled-far .back-to-top {
 
 .os-bad-table th { white-space: nowrap; }
 
-/* The row number is what somebody types into the OS log to find it, so it is
-   the one cell worth making easy to read off. */
-.os-bad-row-num {
-  font-weight: 700;
-  color: var(--text);
-}
-
 /* The three cells that are actually wrong, in the same monospace as a time so
    a stray character is visible. */
 .os-bad-cell {
   font-family: 'Roboto Mono', ui-monospace, monospace;
   white-space: nowrap;
-}
-
-.os-bad-why {
-  color: var(--status-warn-solid);
-  font-size: 0.6875rem;
 }
 
 /* Nine columns will not fit a phone, and the table is inside a .table-wrap, so
@@ -3534,6 +3554,70 @@ body.page-scrolled-far .back-to-top {
   .os-job-table { min-width: 520px; }
   .os-job-table-wrap { overflow-x: auto; }
   .os-zone-detail { padding-left: 0; padding-right: 0; }
+
+  /* ...but .table-wrap sets overflow on BOTH axes, which makes these wrappers
+     scroll containers vertically as well - and once a department is open they
+     cover most of the page. A vertical drag that starts inside one is then the
+     inner container's to handle, and since it has nothing to scroll vertically
+     the finger does nothing at all: the OS page reads as frozen, which is
+     exactly what it was reported as. Chrome chains the gesture out to the page;
+     iOS Safari does not.
+     pan-x says the sideways gesture belongs here and the up-and-down one does
+     not, which is the truth about these wrappers and fixes it on both. */
+  .os-job-table-wrap { touch-action: pan-x; }
+
+  /* The four filters were one flex column inside a single cell of the Bonus
+     page's two-column grid, which stacked them down the left and left From /
+     To stranded beside them. display:contents dissolves the wrapper so each
+     filter becomes a grid item in its own right, and the six controls lay out
+     three rows of two - the same shape, and the same label-above-control
+     rhythm, as the Bonus page. */
+  .os-filters { display: contents; }
+  .os-filter { width: auto; min-width: 0; }
+  .os-filter .breakdown-time-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .os-filter .os-type-select,
+  .os-filter .os-multi,
+  .os-filter .os-multi-btn {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+/* ── Loading the OS log ────────────────────────────────────────────────────
+   This page fetches its own data on first open, so it has a loading moment the
+   rest of the dashboard does not - and an empty card during it says "nobody was
+   on OS" rather than "not here yet". Shaped like what is coming: a summary
+   line, then bars. Same shimmer as every other skeleton. */
+.os-skeleton { display: block; }
+
+.os-skel-summary,
+.os-skel-row {
+  border-radius: 8px;
+  background-image: linear-gradient(90deg, var(--w6) 25%, var(--w12) 37%, var(--w6) 63%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+
+.os-skel-summary {
+  height: 22px;
+  width: 210px;
+  margin-bottom: 18px;
+}
+
+.os-skel-row {
+  height: 30px;
+  margin-bottom: 12px;
+}
+.os-skel-row:last-child { margin-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .os-skel-summary,
+  .os-skel-row { animation: none; }
 }
 
 .breakdown-btn {
@@ -4167,6 +4251,55 @@ body.page-scrolled-far .back-to-top {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* ── The strip's summary, for phones ───────────────────────────────────────
+   There is room for eighteen chips on a desktop and there is not on a phone,
+   where they wrapped to five or six rows and took half the screen before the
+   charts or tables they describe came into view. So on a phone the strip
+   collapses to this one button and opens on a tap; on a desktop the button is
+   not there at all and nothing about the strip has changed.
+
+   Deliberately not a multi-select dropdown: the chips carry the area colours,
+   which is what makes this a legend as well as a control. */
+.area-chip-more { display: none; }
+
+@media (max-width: 700px) {
+  .area-chip-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .area-chip-more-count {
+    color: var(--muted);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .area-chip-more-caret {
+    font-size: 9px;
+    opacity: 0.6;
+    transition: transform 0.2s;
+  }
+
+  .bonus-area-toggles.chips-open .area-chip-more-caret { transform: rotate(180deg); }
+
+  /* Closed: the chips and the two bulk buttons go, because both act on chips
+     nobody can see. The summary stays, saying how many of them are on. */
+  body:not(.tour-running) .bonus-area-toggles:not(.chips-open) .bonus-area-chip,
+  body:not(.tour-running) .bonus-area-toggles:not(.chips-open) .area-chip-bulk {
+    display: none;
+  }
 }
 
 /* Show-all / hide-all, leading the chip strip. Deliberately NOT chip-shaped:
@@ -6998,9 +7131,8 @@ body.page-scrolled .hc-field .date-picker-icon,
 body.page-scrolled .hc-field .date-picker-caret,
 body.page-scrolled .hc-field .warehouse-caret { font-size: 0.6rem; }
 
-/* Nothing tightens further on a phone: the compact size IS the phone's default
-   now (see the mobile block at the end of this file), and scrolling there takes
-   the labels away and nothing else. */
+/* None of this applies on a phone: there the shrunk panel IS the panel, in the
+   mobile block at the end of this file, and scrolling changes nothing. */
 
 /* ---- the rail: icon AND word normally, icon alone once shrunk ----
    The word is what makes the rail learnable, so it stays until the moment the
@@ -7055,12 +7187,19 @@ body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
    one select, so it takes the height of one select. */
 .volume-controls { padding-bottom: 6px; }
 
-/* ---- mobile: the compact size IS the size ----
-   Requested: on a phone the panel is always the tight one, and scrolling only
-   takes the labels away. So the control metrics move OUT of :page-scrolled and
-   become the mobile default; page-scrolled now changes exactly one thing. */
+/* ---- mobile: the shrunk panel IS the panel ----
+   The control metrics, the padding and the labels all moved OUT of
+   :page-scrolled and became the mobile default, so scrolling a phone no longer
+   changes the header at all. */
 @media (max-width: 700px) {
-  .app-headercard { padding: 8px; margin-bottom: 8px; }
+  /* Requested: on a phone the panel is in its shrunk state permanently, not
+     only once the page has been scrolled. Six labelled controls were taking
+     most of a phone screen before anything below them got a look in, and the
+     labels are the part that can go: every control says what it is in its own
+     value - Live, 12 Hours, 15 Minutes, E1/E2, E3 - and Filter by Bonus keeps
+     its placeholder. So page-scrolled now changes nothing here at all. */
+  .app-headercard { padding: 6px 8px; margin-bottom: 6px; }
+  .hc-field-label { display: none; }
   .hc-filters { gap: 6px; }
 
   .hc-control,
@@ -7090,10 +7229,6 @@ body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
     background-size: 4px 4px, 4px 4px;
   }
   .hc-field .search-input-wrap .fa-search { right: 8px; font-size: 0.7rem; }
-
-  /* The ONLY thing scrolling changes on a phone. */
-  body.page-scrolled .hc-field-label { display: none; }
-  body.page-scrolled .app-headercard { padding: 6px 8px; margin-bottom: 6px; }
 }
 
 /* ============================================================

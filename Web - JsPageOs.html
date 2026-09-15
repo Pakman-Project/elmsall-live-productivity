@@ -521,11 +521,15 @@
   // This is not a warning to be tidied away. An OS record with an impossible
   // date or a nineteen-hour shift is a real form somebody filled in wrongly,
   // and the point of a dashboard is that the abnormal is visible - so the
-  // section lists each one with the row to open, the code it was logged
-  // against, what the three cells actually said, and WHO authorised and
-  // deployed it, which is who there is to ask about it.
-  var OS_BAD_COLUMNS_ = ['OS log row', 'Bonus', 'Date', 'Start', 'Finish',
-                         'Site / Zone', 'TM Authorising', 'Deployed by', 'Problem'];
+  // section lists each one with the code it was logged against, what the three
+  // cells actually said, the task, its verdict, and WHO authorised and deployed
+  // it, which is who there is to ask about it.
+  // No row number and no Problem column: the row number named a place in a
+  // sheet most readers of this page cannot open, and the reason is on the row
+  // itself as a title instead - so hovering still says what is wrong with it
+  // without spending a column of a table that is already too wide for a phone.
+  var OS_BAD_COLUMNS_ = ['Bonus', 'Date', 'Start', 'Finish', 'Site / Zone',
+                         'Task', 'TM Authorising', 'Deployed by', 'Record Status'];
 
   function osBadRowsHtmlPak_(bad, unnamed) {
     var total = (bad ? bad.length : 0) + (unnamed || 0);
@@ -539,16 +543,14 @@
     html += '<div class="breakdown-label os-dropped-label">' +
             '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
             total + ' record' + (total === 1 ? '' : 's') + ' need' +
-            (total === 1 ? 's' : '') + ' chasing' +
-            '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
-    html += '<div class="breakdown-bar-wrap"></div>';
-    html += '<div class="breakdown-count">&nbsp;</div></div>';
+            (total === 1 ? 's' : '') + ' to be aware of' +
+            '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div></div>';
 
     html += '<div class="breakdown-detail' + (open ? ' open' : '') + '">' +
             '<div class="os-zone-detail">';
     html += '<div class="os-bad-intro">These are on the OS log and could not be ' +
-            'placed on a clock, so they are in none of the figures above. Open the ' +
-            'row on the log to correct it.</div>';
+            'placed on a clock, so they are in none of the figures above. Hover a ' +
+            'row to see what is wrong with it.</div>';
 
     if (bad && bad.length) {
       html += '<div class="table-wrap os-job-table-wrap"><table class="os-job-table os-bad-table"><thead><tr>';
@@ -560,9 +562,12 @@
         var b = bad[i];
         var zone = [b.site, b.zone].filter(function (x) { return String(x || '').trim(); })
                                    .join(' / ');
-        html += '<tr>';
-        html += '<td class="os-time-cell os-bad-row-num">' +
-                escapeTextPak_(String(b.row || '?')) + '</td>';
+        // The reason rides on the row rather than in a column of its own. It is
+        // still the most useful thing here, but it is also the longest, and on
+        // a phone a paragraph-wide last column pushed the eight cells somebody
+        // reads first off the side of the table.
+        html += '<tr' + (b.why ? ' title="' + escapeAttrPak(b.why) + '"' : '') +
+                ' class="os-bad-row">';
         // Clickable like every other bonus number on the dashboard: the code is
         // often the fastest way to find out whose record this is.
         html += '<td>' + (String(b.bonus || '').trim()
@@ -575,9 +580,10 @@
         html += '<td class="os-bad-cell">' + osPersonCellPak_(b.from) + '</td>';
         html += '<td class="os-bad-cell">' + osPersonCellPak_(b.to) + '</td>';
         html += '<td>' + osPersonCellPak_(zone) + '</td>';
+        html += '<td>' + osPersonCellPak_(b.job) + '</td>';
         html += '<td>' + osPersonCellPak_(b.auth) + '</td>';
         html += '<td>' + osPersonCellPak_(b.deployedBy) + '</td>';
-        html += '<td class="os-bad-why">' + escapeTextPak_(b.why || '') + '</td>';
+        html += '<td>' + osStatusChipPak_(b.status) + '</td>';
         html += '</tr>';
       }
       html += '</tbody></table></div>';
@@ -618,11 +624,24 @@
     }
 
     if (osLogState === null) { ensureOsLogPak_(); return; }
-    // No spinner while it loads. It arrives in well under a second and the
-    // animation was landing on top of whatever somebody was already reading -
-    // a moving thing they have to wait out, in place of a page that was fine.
-    // The body is simply left as it was and replaced when the rows land.
-    if (osLogState === 'loading') return;
+    // A skeleton while it loads, as everywhere else on the dashboard - and for
+    // the same reason: this page fetches the log on first open, so without one
+    // the first thing a new arrival sees is an empty card, which reads as
+    // "nobody was on OS" rather than as "not here yet".
+    //
+    // Shaped like what is coming - a summary line, then bars - so the page does
+    // not visibly jump when the rows land. Written once: a re-render while
+    // still loading would restart every shimmer from the left.
+    if (osLogState === 'loading') {
+      if (!body.firstChild || !body.firstChild.classList ||
+          !body.firstChild.classList.contains('os-skeleton')) {
+        body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          '<div class="os-skel-summary"></div>' +
+          '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
+          '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+      }
+      return;
+    }
     if (osLogState !== 'ready') {
       body.innerHTML = '<div class="breakdown-empty">' +
         '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
@@ -650,7 +669,8 @@
         unplaceable.push({
           row: rec.row, bonus: rec.bonus, date: rec.date,
           from: rec.from, to: rec.to, site: rec.site, zone: rec.zone,
-          auth: rec.auth, deployedBy: rec.deployedBy,
+          job: rec.job, auth: rec.auth, deployedBy: rec.deployedBy,
+          status: rec.status,
           why: osSpellProblemPak_(rec) || 'it cannot be placed on a clock'
         });
         continue;

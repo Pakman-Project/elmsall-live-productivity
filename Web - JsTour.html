@@ -617,6 +617,11 @@ function restoreTourState_() {
 function startTour(isAuto, startIndex) {
   if (tourActive) return;
   tourActive = true;
+  // Anything collapsed to save room on a phone has to be open while the tour
+  // is running: a step rings a target and waits for a click on it, and a target
+  // with display:none is a step that can never be completed. Currently that is
+  // the work-area chip strip; the class is the place to hang the next one.
+  document.body.classList.add('tour-running');
   tourStartedAuto = (isAuto === true);
   tourReturnPage = currentPage;
   tourReturnScroll = getActivePageScrollTop_();
@@ -682,6 +687,7 @@ function endTour_() {
   currentInteractiveCfg = null;
   runStepCleanup_();
   tourActive = false;
+  document.body.classList.remove('tour-running');
 
   var ov = $('tourOverlay');
   ov.classList.remove('active', 'no-spotlight', 'passthrough', 'interactive');

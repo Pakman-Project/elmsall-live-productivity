@@ -68,49 +68,80 @@
     return osClipMinsPak_(String(p.end).split(' ').pop(), true);
   }
 
+  // How many minutes wide a block is, read off the block itself rather than off
+  // the Time Window control - the axis is the authority on its own geometry,
+  // and a band drawn from a control the user could change mid-render would be
+  // wrong for exactly one frame in the way that is hardest to reproduce.
+  function osBlockSpanMins_(row) {
+    if (!row || !row.dateTime) return -1;
+    var p = extractRangePartsPak(row.dateTime);
+    var a = osClipMinsPak_(String(p.start).split(' ').pop(), false);
+    var b = osClipMinsPak_(String(p.end).split(' ').pop(), true);
+    return (a < 0 || b < 0 || b <= a) ? -1 : b - a;
+  }
+
+  // Where a clock time sits on the category axis.
+  //
+  // A block's figures cannot be read until the block is OVER: the point
+  // labelled "00:00 - 01:00" is the number as at 01:00, and that point - which
+  // is where the hover crosshair for that block sits - is the axis's own mark
+  // for 01:00. So a time T lands on the point of the block that ENDS at T, and
+  // a T part-way through a block lands proportionally short of it.
+  //
+  // Which makes the rule symmetric and needs no special case for either end:
+  // OS 01:00-03:00 on hour blocks runs from the "00:00 - 01:00" point to the
+  // "02:00 - 03:00" point, and on quarter-hours from "00:45 - 01:00" to
+  // "02:45 - 03:00". A start of 00:58 lands two minutes' worth of block to the
+  // left of the first of those, because the log records the real minute and the
+  // band has no business rounding it away.
+  function osAxisPosPak_(row, index, hhmm, isEnd) {
+    var end = osBlockEndMins_(row);
+    var span = osBlockSpanMins_(row);
+    var t = osClipMinsPak_(hhmm, isEnd);
+    if (end < 0 || span <= 0 || t < 0) return null;
+    return index + (t - end) / span;
+  }
+
   // One band, plus the clipped times behind it: the FIRST start and the LAST
   // end inside its own range. agg is in axis order, so those two are the ends
   // of the spell the band draws - 11:25 and 12:35 for a spell over five blocks
   // - which is what the tooltip reports.
   //
-  // x0 and x1 are the band's PIXEL edges, as fractional axis positions: index
-  // i - 0.5 is the left edge of block i and i + 0.5 its right, and
-  // getPixelForValue is linear in the value on a category scale.
+  // x0 and x1 are the band's PIXEL edges, as fractional axis positions, placed
+  // by osAxisPosPak_ - so both edges land on the crosshair of the block that
+  // ENDS at the spell's own time. getPixelForValue is linear in the value on a
+  // category scale, so a fractional position interpolates between two points
+  // exactly as the eye does.
   //
-  // Whole blocks, not interpolated times. A block's figures can only be read
-  // at its END - the 12:15-12:30 block is not measurable until 12:30 - so a
-  // block belongs to the spell when the spell covers it as far as that point.
-  // For OS 11:25-12:35 that is 11:15-11:30 (11:30 is inside the spell) through
-  // 12:15-12:30 (12:30 is), and NOT 12:30-12:45, because the spell stops at
-  // 12:35 and never reaches 12:45. So the band runs from the LEFT edge of the
-  // first block to the RIGHT edge of the 12:15 one.
+  // Block EDGES, which this used briefly, put both ends half a block to the
+  // right of that: the band then started at the boundary the spell began on
+  // rather than at the last point measured before it, and every reader lining
+  // the grey up against the crosshair found it a block out.
   //
-  // Interpolating to the real minute - which this did briefly - drew a band
-  // that disagreed with every figure beneath it: greying two thirds of a block
-  // whose number is either wholly explained by the absence or not at all.
-  //
-  // The test for "covered as far as its end" is simply that the clip's end IS
-  // the block's end, because the clip is min(spell end, block end).
+  // Both times are searched for across the whole band, not read off its first
+  // and last blocks: a block carries clips only where the pivot had them, and
+  // with several bonuses selected the flagged blocks and the timed ones are not
+  // the same set. Each is then placed against the block it was actually found
+  // on. On a uniform axis that comes to the same number as using the band's own
+  // ends would - the placement is linear in the time either way - but this says
+  // what it means rather than relying on that.
   function pushOsBand_(bands, agg, from, to, status) {
     var band = { from: from, to: to, status: status };
-    var t0 = '', t1 = '', lastWhole = -1;
+    var t0 = '', t1 = '', i0 = -1, i1 = -1;
     for (var i = from; i <= to; i++) {
       if (!agg[i]) continue;
-      if (!t0 && agg[i].osFrom) t0 = agg[i].osFrom;
-      if (agg[i].osTo) {
-        t1 = agg[i].osTo;
-        var blockEnd = osBlockEndMins_(agg[i]);
-        var clipEnd = osClipMinsPak_(agg[i].osTo, true);
-        if (blockEnd >= 0 && clipEnd >= 0 && clipEnd >= blockEnd) lastWhole = i;
-      }
+      if (!t0 && agg[i].osFrom) { t0 = agg[i].osFrom; i0 = i; }
+      if (agg[i].osTo) { t1 = agg[i].osTo; i1 = i; }
     }
     if (t0 && t1) {
       band.t0 = t0;
       band.t1 = t1;
-      band.x0 = from - 0.5;
-      // A spell that ends inside its first block completes none of them. It is
-      // still real, so it keeps that one block rather than vanishing.
-      band.x1 = (lastWhole >= from ? lastWhole : from) + 0.5;
+      var a = osAxisPosPak_(agg[i0], i0, t0, false);
+      var b = osAxisPosPak_(agg[i1], i1, t1, true);
+      // Both or neither: one real edge and one fallback would draw a band with
+      // one end right and the other a block out, which is worse than the old
+      // point-to-point shape eachOsBand_ falls back to.
+      if (a !== null && b !== null) { band.x0 = a; band.x1 = b; }
     }
     bands.push(band);
   }
@@ -176,14 +207,15 @@
   // Walks each band and hands the caller its pixel span.
   //
   // The edges are the SPELL's own times where the row carries them - see
-  // pushOsBand_ - so a 07:26-08:06 spell greys from part-way through the 07:15
-  // block to part-way through the 08:00 one, rather than from one quarter-hour
-  // point to another. The grey then says when the indirect work happened
-  // instead of which blocks it touched, which is the whole of what it is for.
+  // pushOsBand_ and osAxisPosPak_ - so the grey says when the indirect work
+  // happened rather than which blocks it touched, which is the whole of what it
+  // is for.
   //
-  // What that costs, and it is a real cost: the edges no longer line up with
-  // the hover crosshair, which snaps to the nearest block. The tooltip says
-  // the two times outright for that reason.
+  // A spell starting or finishing on a block boundary therefore lands exactly
+  // on a data point, which is where the hover crosshair sits: the two line up,
+  // and a reader can check the band against the crosshair without being wrong.
+  // A spell starting mid-block lands proportionally short of that point, which
+  // is the honest place for it. The tooltip says both times outright either way.
   //
   // Without times - an archive cut before the OS Time column existed - both
   // edges fall back to landing ON their OS point rather than half a step
@@ -287,14 +319,14 @@
         //
         // Nothing used to mark them. The wash is deliberately faint, so the
         // only things on the chart a reader could aim at were the hover
-        // crosshair - which is dashed, and sits on the data POINT the mouse is
-        // nearest, half a block from any boundary - and the status label, which
-        // is centred across the band's whole width. Neither is an edge, and
-        // using either as one makes a correctly placed band look wrong.
+        // crosshair and the status label, which is centred across the band's
+        // whole width - and a label is not an edge, so using it as one makes a
+        // correctly placed band look wrong.
         //
-        // Solid, so it cannot be confused with the dashed crosshair, and one
-        // pixel at the same opacity as a gridline: this says where the block
-        // boundary is, it is not a series of its own.
+        // Solid, so it cannot be confused with the dashed crosshair it now
+        // coincides with on a block-aligned spell, and one pixel at the same
+        // opacity as a gridline: this says where the spell starts and stops, it
+        // is not a series of its own.
         ctx.strokeStyle = CHART_OS_EDGE();
         ctx.lineWidth = 1;
         ctx.beginPath();

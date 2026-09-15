@@ -865,21 +865,58 @@ head('[15b] one x axis, so the bands land in the same place on every chart');
         'the scale offset stays true; only the GRID offset is false');
 }
 
-head('[15d] the band covers whole blocks, and stops at the last COMPLETED one');
-// A block's figures can only be read at its END - the 12:15-12:30 block is not
-// measurable until 12:30 - so a block belongs to the spell when the spell
-// covers it as far as that point. The band is therefore whole blocks, from the
-// left edge of the first to the right edge of the last completed one.
+head('[15d] both band edges land on the point of the block that ENDS at them');
+// A block's figures cannot be read until the block is OVER: the point labelled
+// "00:00 - 01:00" is the number as at 01:00, and that point - where the hover
+// crosshair for that block sits - is the axis's own mark for 01:00. So a time T
+// lands on the point of the block ENDING at T, and a T part-way through a block
+// lands proportionally short of it.
 //
-// It briefly interpolated to the real minute instead, which drew a band
-// disagreeing with every figure underneath it: greying two thirds of a block
-// whose number is either wholly explained by the absence or not at all.
+// Reported against a real spell: OS 01:00-03:00 was drawn from the 01:00
+// boundary to the 03:00 boundary, which is half a block right of both of those
+// points, and the band read a block out against the crosshair every time.
+//
+// index +/- 0.5 is a block EDGE; a whole index is a block's point. These pin
+// points, and nothing here may come out on a .5.
 {
   const blk = (from, to, osFrom, osTo) => ({
     dateTime: '15/09/2026 ' + from + ' - 15/09/2026 ' + to,
     os: true, osStatus: 'Approved', osFrom: osFrom, osTo: osTo
   });
-  // The brief's own example: OS 11:25-12:35 over five blocks from 11:15.
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+
+  // The case as reported, on hour blocks. 00:00-01:00 carries no OS, so the
+  // band's own first block is index 1 - and its left edge still has to reach
+  // back to index 0, the point standing for 01:00.
+  const rep = ctx.mergeOsBands_([
+    { dateTime: '15/09/2026 00:00 - 15/09/2026 01:00', os: false },
+    { dateTime: '15/09/2026 01:00 - 15/09/2026 02:00',
+      os: true, osStatus: 'Approved', osFrom: '01:00', osTo: '02:00' },
+    { dateTime: '15/09/2026 02:00 - 15/09/2026 03:00',
+      os: true, osStatus: 'Approved', osFrom: '02:00', osTo: '03:00' },
+    { dateTime: '15/09/2026 03:00 - 15/09/2026 04:00', os: false }
+  ])[0];
+  check('OS 01:00-03:00 starts on the "00:00 - 01:00" point',
+        near(rep.x0, 0), String(rep.x0) + ' - not 0.5, which is the boundary');
+  check('and ends on the "02:00 - 03:00" point',
+        near(rep.x1, 2), String(rep.x1) + ' - not 2.5');
+
+  // The same spell on quarter-hours: "00:45 - 01:00" through "02:45 - 03:00",
+  // which is index 3 through index 11 of a strip starting at 00:00.
+  const q = [];
+  for (let i = 0; i < 16; i++) {
+    const s = i * 15, e = s + 15;
+    const hhmm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const on = s >= 60 && e <= 180;
+    q.push(on ? blk(hhmm(s), hhmm(e), hhmm(s), hhmm(e))
+              : { dateTime: '15/09/2026 ' + hhmm(s) + ' - 15/09/2026 ' + hhmm(e), os: false });
+  }
+  const qb = ctx.mergeOsBands_(q)[0];
+  check('on 15-minute blocks it runs "00:45 - 01:00" to "02:45 - 03:00"',
+        near(qb.x0, 3) && near(qb.x1, 11),
+        qb.x0 + ' .. ' + qb.x1 + ' (index 3 ends 01:00, index 11 ends 03:00)');
+
+  // The brief's other example: OS 11:25-12:35 over six blocks from 11:15.
   const agg = [{ os: false },
     blk('11:15', '11:30', '11:25', '11:30'),
     blk('11:30', '11:45', '11:30', '11:45'),
@@ -889,32 +926,27 @@ head('[15d] the band covers whole blocks, and stops at the last COMPLETED one');
     blk('12:30', '12:45', '12:30', '12:35'),
     { os: false }];
   const bd = ctx.mergeOsBands_(agg)[0];
-
-  check('it starts at the LEFT edge of the block holding the start',
-        bd.x0 === 0.5, String(bd.x0) + ' (block 1 spans 0.5 to 1.5)');
-  check('and ends at the RIGHT edge of 12:15-12:30',
-        bd.x1 === 5.5, String(bd.x1) + ' (block 5 spans 4.5 to 5.5)');
-  check('so 12:30-12:45 is NOT shaded, because the spell never reaches 12:45',
-        bd.x1 < 6 - 0.5 + 1,
-        'the spell stops at 12:35; that block is not completed by it');
+  // 11:25 is five minutes short of 11:30, which block 1 stands for: a third of
+  // a 15-minute block to the left of index 1.
+  check('a ragged start lands short of its point, in proportion',
+        near(bd.x0, 1 - 5 / 15), String(bd.x0) + ' - 11:25 is 5 of 15 short of 11:30');
+  // 12:35 is five minutes past 12:30, which block 5 stands for.
+  check('and a ragged finish lands past its point, in proportion',
+        near(bd.x1, 5 + 5 / 15), String(bd.x1) + ' - 12:35 is 5 of 15 past 12:30');
   check('the times reported are still the real ones',
         bd.t0 === '11:25' && bd.t1 === '12:35', bd.t0 + ' - ' + bd.t1);
 
-  // A spell that fills its blocks exactly covers them all.
-  const whole = ctx.mergeOsBands_([
-    blk('07:00', '07:15', '07:00', '07:15'),
-    blk('07:15', '07:30', '07:15', '07:30')
+  // The user's own third case, stated as a rule: a start two minutes before the
+  // hour is a shade left of the point, NOT rounded onto it.
+  const ragged = ctx.mergeOsBands_([
+    { dateTime: '15/09/2026 00:45 - 15/09/2026 01:00',
+      os: true, osStatus: 'Approved', osFrom: '00:58', osTo: '01:00' }
   ])[0];
-  check('a block-aligned spell covers every block it touches',
-        whole.x0 === -0.5 && whole.x1 === 1.5, whole.x0 + ' .. ' + whole.x1);
+  check('a 00:58 start sits just left of the point ending 01:00',
+        ragged.x0 < 0 && ragged.x0 > -0.2 && near(ragged.x0, -2 / 15),
+        String(ragged.x0) + ' - two minutes of a fifteen-minute block');
 
-  // One block, entered part-way and left part-way: it completes none, so it
-  // keeps the one block rather than vanishing.
-  const tiny = ctx.mergeOsBands_([blk('09:00', '09:15', '09:03', '09:08')])[0];
-  check('a spell inside one block still shades that block',
-        tiny.x0 === -0.5 && tiny.x1 === 0.5, tiny.x0 + ' .. ' + tiny.x1);
-
-  // 60-minute buckets: the test is the row's OWN end, so nothing here has to
+  // 60-minute buckets: the width is read off the block, so nothing here has to
   // be told which window size is in force.
   const hour = ctx.mergeOsBands_([
     { dateTime: '15/09/2026 07:00 - 15/09/2026 08:00',
@@ -922,10 +954,10 @@ head('[15d] the band covers whole blocks, and stops at the last COMPLETED one');
     { dateTime: '15/09/2026 08:00 - 15/09/2026 09:00',
       os: true, osStatus: 'Approved', osFrom: '08:00', osTo: '08:35' }
   ])[0];
-  check('an hour bucket completed to the hour is shaded',
-        hour.x0 === -0.5 && hour.x1 === 0.5,
-        hour.x0 + ' .. ' + hour.x1 + ' - the 08:00 bucket runs to 09:00, ' +
-        'and the spell stops at 08:35');
+  check('an hour block is divided by sixty, not by fifteen',
+        near(hour.x0, -34 / 60) && near(hour.x1, 1 - 25 / 60),
+        hour.x0 + ' .. ' + hour.x1 + ' - 07:26 is 34 minutes short of 08:00, ' +
+        'and 08:35 is 25 short of 09:00');
 
   // A block ending at midnight ends the day rather than starting it, which is
   // the one value that sorts the wrong way as a clock.
@@ -933,8 +965,24 @@ head('[15d] the band covers whole blocks, and stops at the last COMPLETED one');
     { dateTime: '15/09/2026 23:45 - 16/09/2026 00:00',
       os: true, osStatus: 'Approved', osFrom: '23:50', osTo: '00:00' }
   ])[0];
-  check('a block completed AT midnight counts as completed',
-        mid.x0 === -0.5 && mid.x1 === 0.5, mid.x0 + ' .. ' + mid.x1);
+  check('a spell running to midnight ends ON that block\'s point',
+        near(mid.x1, 0) && near(mid.x0, -10 / 15), mid.x0 + ' .. ' + mid.x1);
+
+  // The clips can sit on a block in the MIDDLE of a band rather than on its
+  // first and last: an OS block carries times only when the pivot had them, and
+  // with several bonuses selected the flagged blocks and the timed ones are not
+  // the same set. Reading only the band's first and last blocks would find no
+  // times here and fall back to the point-to-point shape, losing the real edges
+  // on exactly the bands that have several people in them.
+  const gap = ctx.mergeOsBands_([
+    { dateTime: '15/09/2026 05:00 - 15/09/2026 06:00', os: true, osStatus: 'Approved' },
+    { dateTime: '15/09/2026 06:00 - 15/09/2026 07:00',
+      os: true, osStatus: 'Approved', osFrom: '06:00', osTo: '07:00' },
+    { dateTime: '15/09/2026 07:00 - 15/09/2026 08:00', os: true, osStatus: 'Approved' }
+  ])[0];
+  check('clips on a middle block are still found, and still placed by time',
+        near(gap.x0, 0) && near(gap.x1, 1) && gap.t0 === '06:00' && gap.t1 === '07:00',
+        gap.x0 + ' .. ' + gap.x1 + ' - the only clips are on index 1');
 
   // No times - an archive from before the column existed - and the band falls
   // back to the point-to-point edges every band used to have.
