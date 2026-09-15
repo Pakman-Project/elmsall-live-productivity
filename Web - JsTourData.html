@@ -191,4 +191,66 @@ function buildTourDummyData_() {
     note: ''
   };
 }
+
+// Demo rows for the OS page, which fetches its own log from the server rather
+// than taking it from the payload. Without these the tour would reach page 3
+// and pull the REAL log - real names, against demo bonus numbers that match
+// none of them - and its chapter would have nothing to click if the log
+// happened to be empty.
+//
+// Read off the globals the demo render has just populated (timeRanges,
+// allBonusList) rather than taking arguments, so buildTourDummyData_ needs no
+// new plumbing and the two cannot disagree about which codes exist.
+var TOUR_OS_SITES_ = [
+  { site: 'E1/E2', zones: ['Goods In', 'OSR', 'Despatch'] },
+  { site: 'E3', zones: ['Packing', 'Returns'] }
+];
+var TOUR_OS_DEPTS_ = ['Inbound', 'Outbound', 'Support'];
+var TOUR_OS_JOBS_ = ['Cleaning', 'Training', 'Cover - Team Manager',
+                     'Housekeeping', '5S Audit'];
+var TOUR_OS_PEOPLE_ = ['J Ashworth', 'P Okonkwo', 'S Nowak', 'R Patel', 'D Byrne'];
+// One left blank on purpose: a spell logged without a verdict is a state the
+// page has to render, and the tour is where somebody first sees it.
+var TOUR_OS_STATUS_ = ['OK', 'OK', 'OK', 'authorise or reject', 'Rejected', ''];
+
+function buildTourOsLog_() {
+  if (!timeRanges || !timeRanges.length || !allBonusList || !allBonusList.length) return [];
+
+  // Deterministic, so replaying the tour does not reshuffle the page.
+  var seed = 20260915;
+  function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+
+  var lastEnd = parseDateTimePartPak(
+    extractRangePartsPak(timeRanges[timeRanges.length - 1]).end);
+  if (!lastEnd) return [];
+
+  var out = [];
+  var codes = allBonusList.slice(0, 18);
+  for (var i = 0; i < codes.length; i++) {
+    var s = TOUR_OS_SITES_[i % TOUR_OS_SITES_.length];
+    // Ragged minutes, uneven lengths: the log records real clock times, not
+    // quarter-hours, which is the whole reason the clipped times exist.
+    var finish = new Date(lastEnd.getTime() - Math.floor(rnd() * 200) * 60000);
+    var start = new Date(finish.getTime() - (25 + Math.floor(rnd() * 150)) * 60000);
+    // The Date column is the PRODUCTION day, 06:00 to 06:00, so a spell
+    // starting before six is logged against the previous date.
+    var day = start.getHours() < 6 ? new Date(start.getTime() - 86400000) : start;
+    out.push({
+      date: p2(day.getDate()) + '/' + p2(day.getMonth() + 1) + '/' + day.getFullYear(),
+      bonus: codes[i],
+      dept: TOUR_OS_DEPTS_[i % TOUR_OS_DEPTS_.length],
+      job: TOUR_OS_JOBS_[(i * 3) % TOUR_OS_JOBS_.length],
+      from: p2(start.getHours()) + ':' + p2(start.getMinutes()),
+      to: p2(finish.getHours()) + ':' + p2(finish.getMinutes()),
+      auth: TOUR_OS_PEOPLE_[i % TOUR_OS_PEOPLE_.length],
+      deployedBy: TOUR_OS_PEOPLE_[(i + 2) % TOUR_OS_PEOPLE_.length],
+      reportsTo: TOUR_OS_PEOPLE_[(i + 4) % TOUR_OS_PEOPLE_.length],
+      status: TOUR_OS_STATUS_[i % TOUR_OS_STATUS_.length],
+      site: s.site,
+      zone: s.zones[i % s.zones.length]
+    });
+  }
+  return out;
+}
 </script>

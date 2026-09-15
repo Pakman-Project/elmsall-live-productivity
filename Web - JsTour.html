@@ -605,6 +605,20 @@ function startTour(isAuto, startIndex) {
 
   try { renderDashboardPayload_(buildTourDummyData_()); } catch (e) { console.warn('Tour demo render failed', e); }
 
+  // The OS page fetches its own log now, on first open. Left alone, the tour
+  // would reach page 3 and pull the REAL log from the server - real names and
+  // real spells, against demo bonus numbers that match none of them, in the
+  // middle of a tour that is demo data everywhere else. Its chapter would also
+  // have nothing to click if the log happened to be empty.
+  //
+  // So the tour supplies its own rows and marks the state ready, which stops
+  // the fetch from ever firing while it is running.
+  try {
+    osLogRows = buildTourOsLog_();
+    osLogSkipped = 0;
+    osLogState = 'ready';
+  } catch (e) { console.warn('Tour OS log failed', e); }
+
   // Clear BOTH loading indicators. The tour renders its own demo data, so the
   // cold-load skeleton must come off too — otherwise an auto-started tour on a
   // first visit spends its opening steps pointing at shimmer placeholders and
@@ -655,6 +669,12 @@ function endTour_() {
   restoreTourState_();
   renderBonusChips();
   updateClearBtnVisibility();
+
+  // Back to nothing fetched, so the OS page asks the server for the real log
+  // the next time it is opened rather than keeping the demo rows.
+  osLogRows = [];
+  osLogSkipped = 0;
+  osLogState = null;
 
   var payload = pendingRealData || lastRealPayload;
   pendingRealData = null;

@@ -431,6 +431,27 @@ head('[12] the log is fetched by the page, not by every dashboard load');
   check('and the preview stub answers it too',
         /getOsLogRows: function \(\)/.test(R('tools/preview.js')),
         'or the OS page is permanently empty in the preview');
+
+  // The tour must not reach page 3 and pull the REAL log: real names, against
+  // demo bonus numbers that match none of them, in the middle of a tour that
+  // is demo data everywhere else.
+  const tourData = R('Web - JsTourData.html');
+  const tourJs = R('Web - JsTour.html');
+  check('the tour supplies its own OS rows',
+        /function buildTourOsLog_\(\)/.test(tourData) &&
+        /osLogRows = buildTourOsLog_\(\);/.test(tourJs));
+  check('and marks them ready, so the fetch never fires while it runs',
+        /osLogState = 'ready';/.test(tourJs),
+        'otherwise the tour shows real spells and real names');
+  check('the demo rows are built from the codes the tour actually shows',
+        /allBonusList\.slice\(0, 18\)/.test(tourData),
+        'a code the tour never displays would chip nothing');
+  check('they carry a blank status, which is a state the page must render',
+        /TOUR_OS_STATUS_ = \['OK', 'OK', 'OK', 'authorise or reject', 'Rejected', ''\]/.test(tourData));
+  check('and the state is reset when the tour ends',
+        /osLogState = null;/.test(tourJs) &&
+        tourJs.indexOf("osLogState = null;") > tourJs.indexOf("osLogState = 'ready';"),
+        'or the real log would never be fetched afterwards');
 }
 
 head('[11] Hours Range and Time Window are inert where they do nothing');
