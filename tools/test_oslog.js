@@ -157,7 +157,13 @@ head('[5b] the band cuts on its own points, not half a step outside them');
       save() {}, restore() {},
       fillRect(x, y, w) { painted.push([+x.toFixed(1), +(x + w).toFixed(1)]); },
       fillText() {},
-      set fillStyle(v) {}, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}
+      // The plugin strokes the band edges as well as filling it now, and this
+      // section is only about the FILL geometry - so the strokes are accepted
+      // and ignored rather than recorded. Their own geometry is checked in
+      // [14].
+      beginPath() {}, stroke() {}, moveTo() {}, lineTo() {},
+      set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {},
+      set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}
     },
     canvas: {},
     data: { labels: new Array(N).fill('x') },
@@ -622,6 +628,44 @@ head('[14] the band says the status under the word OS');
           chartsSrc.indexOf('if (room < 16) return;') !== -1 &&
           chartsSrc.indexOf('if (x1 - x0 < 22) return;') === -1,
           'the old test was the band alone, which is all a one-block band has');
+  }
+
+  // ── the edges are visible without hovering ───────────────────────────────
+  // Nothing used to mark them. The wash is faint by design, so the only things
+  // a reader could aim at were the hover crosshair - dashed, and sitting on the
+  // data POINT nearest the mouse, half a block from any boundary - and the
+  // centred status label. Neither is an edge, and using either as one makes a
+  // correctly placed band look wrong. That is exactly what was reported.
+  {
+    const strokes = [];
+    const edgeStub = w => {
+      const c = stub(w);
+      c.ctx.beginPath = function () {};
+      c.ctx.stroke = function () {};
+      c.ctx.moveTo = function (x) { strokes.push(Math.round(x)); };
+      c.ctx.lineTo = function (x) { strokes.push(Math.round(x)); };
+      return c;
+    };
+    strokes.length = 0;
+    ctx.osBandPlugin_.beforeDatasetsDraw(edgeStub(300), null,
+      { bands: [{ from: 1, to: 2, status: 'Approved', x0: 0.5, x1: 2.5 }] });
+    check('both edges are stroked, and only those two',
+          strokes.length === 4, JSON.stringify(strokes));
+    check('each as a full-height line at one x',
+          strokes[0] === strokes[1] && strokes[2] === strokes[3],
+          JSON.stringify(strokes));
+    check('and the two are the band edges, not one point',
+          strokes[0] !== strokes[2], JSON.stringify(strokes));
+    check('solid, so it cannot be read as the dashed crosshair',
+          chartsSrc.indexOf('ctx.strokeStyle = CHART_OS_EDGE();') !== -1 &&
+          chartsSrc.indexOf('setLineDash') >
+          chartsSrc.indexOf('ctx.strokeStyle = CHART_OS_EDGE();'),
+          'pinned to the strokeStyle itself, not to the function existing - ' +
+          'the edge is no use drawn in the wash colour');
+    check('and no stronger than a gridline',
+          chartsSrc.indexOf('function CHART_OS_EDGE()') !== -1 &&
+          /rgba\(0,0,0,0\.2\d\)/.test(chartsSrc),
+          'it marks a boundary; it is not a series of its own');
   }
 
   check('the wash itself is still neutral',

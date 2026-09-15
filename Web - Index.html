@@ -451,12 +451,17 @@
                inside it: a shift running from before the window into it is
                exactly the case this page exists for. -->
           <div class="page">
-            <div class="bonus-page-controls">
-              <div class="os-page-head">
-                <h2 class="os-page-title">Operational Support</h2>
-                <p class="os-page-sub">By site and zone. Click a zone for its departments and jobs.</p>
-              </div>
-              <div class="breakdown-time-bar bonus-time-bar">
+            <!-- One row: the four filters left, the range right. The title and
+                 subtitle that used to sit above this are gone - the rail tab
+                 already says OS, and a page that explains itself in a
+                 paragraph is a paragraph everybody reads once. -->
+            <div class="bonus-page-controls os-controls">
+              <!-- Type, Zones, Departments, Record Status. Rendered from JS
+                   rather than written out here, because the three multi-selects
+                   offer what is actually in range - a zone nobody worked has no
+                   business on the list. -->
+              <div id="osFilters" class="os-filters"></div>
+              <div class="breakdown-time-bar bonus-time-bar os-time-bar">
                 <div class="time-row time-row-from">
                   <label class="breakdown-time-label">From</label>
                   <select id="osFrom" class="breakdown-time-select" onchange="onOsRangeChange()"></select>
@@ -468,11 +473,6 @@
                   <span id="osRangeBadge" class="breakdown-range-badge">-</span>
                 </div>
               </div>
-              <!-- Type, Zones, Departments. Rendered from JS rather than
-                   written out here, because the two multi-selects offer what
-                   is actually in range - a zone nobody worked has no business
-                   on the list. -->
-              <div id="osFilters" class="os-filters"></div>
             </div>
 
             <div class="card panel span-12">

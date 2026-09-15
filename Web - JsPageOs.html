@@ -58,11 +58,22 @@
 
   // A logged record -> the absolute { start, finish } it covers, or null when
   // the row cannot be placed on a clock at all.
-  function osSpellWindowPak_(row) {
+  //
+  // osSpellProblemPak_ is the same walk, returning the REASON instead. The two
+  // are deliberately one function with a flag rather than two implementations:
+  // a page that counts eight bad records and a page that lists them have to
+  // agree about which eight, and two copies of this logic would eventually not.
+  function osSpellWindowPak_(row) { return osSpellWalkPak_(row, false); }
+  function osSpellProblemPak_(row) { return osSpellWalkPak_(row, true); }
+
+  function osSpellWalkPak_(row, why) {
     var d = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(row && row.date || '').trim());
     var a = osLogMinsPak_(row && row.from);
     var b = osLogMinsPak_(row && row.to);
-    if (!d || a < 0 || b < 0) return null;
+    if (!d) return why ? 'the date is not a date' : null;
+    if (a < 0 && b < 0) return why ? 'neither the start nor the finish is a time' : null;
+    if (a < 0) return why ? 'the start is not a time' : null;
+    if (b < 0) return why ? 'the finish is not a time' : null;
 
     var day = new Date(Number(d[3]), Number(d[2]) - 1, Number(d[1]));
     if (Math.floor(a / 60) < OS_DAY_START_HOUR_PAK_) {
@@ -78,8 +89,12 @@
     // A finish typed 06:00 instead of 18:00 is indistinguishable from a real
     // overnight spell, and the line above turns it into twenty-four hours.
     // Dropped rather than drawn across the whole day off one slip.
-    if (finish - start > OS_MAX_SHIFT_HOURS_PAK_ * 3600000) return null;
-    return { start: start, finish: finish };
+    if (finish - start > OS_MAX_SHIFT_HOURS_PAK_ * 3600000) {
+      return why ? ('the shift runs ' +
+                    Math.round((finish - start) / 3600000) + ' hours, over the ' +
+                    OS_MAX_SHIFT_HOURS_PAK_ + '-hour cap') : null;
+    }
+    return why ? '' : { start: start, finish: finish };
   }
 
   // The two selects, filled from the same 96 blocks the Bonus page uses. Kept
@@ -250,8 +265,43 @@
     renderOsPagePak();
   }
 
+  function toggleOsStatusFilter(status) {
+    if (osStatusFilter[status]) { delete osStatusFilter[status]; }
+    else { osStatusFilter[status] = true; }
+    renderOsPagePak();
+  }
+
   function clearOsZoneFilter() { osZoneFilter = {}; renderOsPagePak(); }
   function clearOsDeptFilter() { osDeptFilter = {}; renderOsPagePak(); }
+  function clearOsStatusFilter() { osStatusFilter = {}; renderOsPagePak(); }
+
+  // Filtered on the DISPLAYED verdict, not on the raw wording. The table shows
+  // the three folded states, so "Cancelled" and "Rejected" are one entry here
+  // exactly as they are one chip there - filtering on a wording the reader
+  // cannot see would be a list of options nobody could match to the page.
+  var OS_STATUS_NONE_PAK_ = 'No verdict';
+
+  function osRecordStatusPak_(row) {
+    return osStatusBandPak_(row && row.status) || OS_STATUS_NONE_PAK_;
+  }
+
+  function osStatusValuesPak_(rows) {
+    var seen = {}, out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var v = osRecordStatusPak_(rows[i]);
+      if (!seen[v]) { seen[v] = true; out.push(v); }
+    }
+    // The three verdicts in their own order rather than alphabetically -
+    // approved, undecided, refused is how somebody reads down a list of them -
+    // with anything unrecognised after.
+    var rank = {};
+    rank[OS_STATUS_APPROVED_PAK_] = 1;
+    rank[OS_STATUS_AWAITING_PAK_] = 2;
+    rank[OS_STATUS_REJECTED_PAK_] = 3;
+    rank[OS_STATUS_NONE_PAK_] = 4;
+    out.sort(function (a, b) { return (rank[a] || 9) - (rank[b] || 9); });
+    return out;
+  }
 
   function toggleOsMenu_(id, force) {
     var menu = document.getElementById(id);
@@ -466,47 +516,80 @@
     return html;
   }
 
-  // Records the page could not place on a clock, NAMED. "7 records could not
-  // be read" with no way to find out which seven is a dead end - the whole
-  // point of saying it is so somebody can go and fix those rows.
-  function osBadRowsHtmlPak_(bad, extra) {
-    var total = (bad ? bad.length : 0) + (extra || 0);
+  // The records that could not be read, NAMED and attributable.
+  //
+  // This is not a warning to be tidied away. An OS record with an impossible
+  // date or a nineteen-hour shift is a real form somebody filled in wrongly,
+  // and the point of a dashboard is that the abnormal is visible - so the
+  // section lists each one with the row to open, the code it was logged
+  // against, what the three cells actually said, and WHO authorised and
+  // deployed it, which is who there is to ask about it.
+  var OS_BAD_COLUMNS_ = ['OS log row', 'Bonus', 'Date', 'Start', 'Finish',
+                         'Site / Zone', 'TM Authorising', 'Deployed by', 'Problem'];
+
+  function osBadRowsHtmlPak_(bad, unnamed) {
+    var total = (bad ? bad.length : 0) + (unnamed || 0);
     if (total <= 0) return '';
-    var html = '<div class="breakdown-row clickable-row os-dropped-row"' +
-               ' data-os-key="' + escapeAttrPak(osNodeKeyPak_('__bad')) + '"' +
-               (osOpenNodes[osNodeKeyPak_('__bad')] ? ' expanded' : '') +
-               ' onclick="toggleOsNode(this)">';
+    var key = osNodeKeyPak_('__bad');
+    var open = !!osOpenNodes[key];
+
+    var html = '<div class="breakdown-row clickable-row os-dropped-row' +
+               (open ? ' expanded' : '') + '"' +
+               ' data-os-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
     html += '<div class="breakdown-label os-dropped-label">' +
             '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
-            total + ' record' + (total === 1 ? '' : 's') + ' could not be read' +
+            total + ' record' + (total === 1 ? '' : 's') + ' need' +
+            (total === 1 ? 's' : '') + ' chasing' +
             '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
     html += '<div class="breakdown-bar-wrap"></div>';
     html += '<div class="breakdown-count">&nbsp;</div></div>';
 
-    html += '<div class="breakdown-detail' +
-            (osOpenNodes[osNodeKeyPak_('__bad')] ? ' open' : '') + '"><div class="os-zone-detail">';
-    if (!bad || !bad.length) {
-      html += '<div class="os-multi-empty">The rows are on the OS log; the ' +
-              'server could not say which.</div>';
-    } else {
-      html += '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
-              '<thead><tr><th>OS log row</th><th>Bonus</th><th>Date</th>' +
-              '<th>Start</th><th>Finish</th><th>Why</th></tr></thead><tbody>';
+    html += '<div class="breakdown-detail' + (open ? ' open' : '') + '">' +
+            '<div class="os-zone-detail">';
+    html += '<div class="os-bad-intro">These are on the OS log and could not be ' +
+            'placed on a clock, so they are in none of the figures above. Open the ' +
+            'row on the log to correct it.</div>';
+
+    if (bad && bad.length) {
+      html += '<div class="table-wrap os-job-table-wrap"><table class="os-job-table os-bad-table"><thead><tr>';
+      for (var c = 0; c < OS_BAD_COLUMNS_.length; c++) {
+        html += '<th>' + OS_BAD_COLUMNS_[c] + '</th>';
+      }
+      html += '</tr></thead><tbody>';
       for (var i = 0; i < bad.length; i++) {
         var b = bad[i];
-        html += '<tr><td class="os-time-cell">' + escapeTextPak_(String(b.row || '?')) + '</td>' +
-                '<td>' + osPersonCellPak_(b.bonus) + '</td>' +
-                '<td>' + osPersonCellPak_(b.date) + '</td>' +
-                '<td>' + osPersonCellPak_(b.from) + '</td>' +
-                '<td>' + osPersonCellPak_(b.to) + '</td>' +
-                '<td>' + escapeTextPak_(b.why || '') + '</td></tr>';
+        var zone = [b.site, b.zone].filter(function (x) { return String(x || '').trim(); })
+                                   .join(' / ');
+        html += '<tr>';
+        html += '<td class="os-time-cell os-bad-row-num">' +
+                escapeTextPak_(String(b.row || '?')) + '</td>';
+        // Clickable like every other bonus number on the dashboard: the code is
+        // often the fastest way to find out whose record this is.
+        html += '<td>' + (String(b.bonus || '').trim()
+          ? '<span class="os-bonus-chip bonus-tip-host clickable-bonus"' +
+            ' onclick="event.stopPropagation();toggleBonusFilter(\'' +
+            escapeAttrPak(b.bonus) + '\');">' + escapeTextPak_(b.bonus) +
+            bonusTipHtmlPak_(b.bonus, selectedBonuses.indexOf(b.bonus) !== -1) + '</span>'
+          : '<span class="os-cell-none">&ndash;</span>') + '</td>';
+        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.date) + '</td>';
+        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.from) + '</td>';
+        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.to) + '</td>';
+        html += '<td>' + osPersonCellPak_(zone) + '</td>';
+        html += '<td>' + osPersonCellPak_(b.auth) + '</td>';
+        html += '<td>' + osPersonCellPak_(b.deployedBy) + '</td>';
+        html += '<td class="os-bad-why">' + escapeTextPak_(b.why || '') + '</td>';
+        html += '</tr>';
       }
       html += '</tbody></table></div>';
     }
-    if (extra) {
-      html += '<div class="os-multi-empty">' + extra + ' more could be read but not ' +
-              'placed on a clock - an impossible date, or a shift over ' +
-              OS_MAX_SHIFT_HOURS_PAK_ + ' hours.</div>';
+
+    // Only ever a RESIDUAL: the server counted these but could not name them,
+    // which now means only that it hit its own cap. Counted separately from
+    // the table above so the two cannot double up - the heading used to say
+    // eight and this line say "8 more", which read as sixteen.
+    if (unnamed) {
+      html += '<div class="os-bad-intro">' + unnamed + ' more could not be read, past ' +
+              'the limit on how many the server will name in one go.</div>';
     }
     html += '</div></div>';
     return html;
@@ -535,12 +618,11 @@
     }
 
     if (osLogState === null) { ensureOsLogPak_(); return; }
-    if (osLogState === 'loading') {
-      body.innerHTML = '<div class="breakdown-empty">' +
-        '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>' +
-        'Reading the OS log&hellip;</div>';
-      return;
-    }
+    // No spinner while it loads. It arrives in well under a second and the
+    // animation was landing on top of whatever somebody was already reading -
+    // a moving thing they have to wait out, in place of a page that was fine.
+    // The body is simply left as it was and replaced when the rows land.
+    if (osLogState === 'loading') return;
     if (osLogState !== 'ready') {
       body.innerHTML = '<div class="breakdown-empty">' +
         '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
@@ -555,13 +637,27 @@
     // The building filter is applied here too: Warehouse names buildings and
     // the log names sites, so the two are mapped - see OS_SITE_BY_BUILDING_.
     var inWindow = [];
-    var unplaceable = 0;
+    // The records the CLIENT cannot place, NAMED. These are the ones the page
+    // used to count and then shrug at - "the server could not say which" -
+    // because only the server's own rejects carried a row number. Every record
+    // carries one now, so an over-long shift or an impossible date can be
+    // pointed at like any other.
+    var unplaceable = [];
     for (var i = 0; i < osLogRows.length; i++) {
-      var w = osSpellWindowPak_(osLogRows[i]);
-      if (!w) { unplaceable++; continue; }
+      var rec = osLogRows[i];
+      var w = osSpellWindowPak_(rec);
+      if (!w) {
+        unplaceable.push({
+          row: rec.row, bonus: rec.bonus, date: rec.date,
+          from: rec.from, to: rec.to, site: rec.site, zone: rec.zone,
+          auth: rec.auth, deployedBy: rec.deployedBy,
+          why: osSpellProblemPak_(rec) || 'it cannot be placed on a clock'
+        });
+        continue;
+      }
       if (w.finish <= win.start || w.start >= win.finish) continue;
-      if (!osInBuildingPak_(osLogRows[i].site)) continue;
-      inWindow.push(osLogRows[i]);
+      if (!osInBuildingPak_(rec.site)) continue;
+      inWindow.push(rec);
     }
 
     // The dropdowns offer what is actually in range, so a zone nobody worked
@@ -569,6 +665,7 @@
     // applied, or choosing one would empty the list you chose it from.
     var zoneValues = osUniqueValuesPak_(inWindow, 'zone', 'zone');
     var deptValues = osUniqueValuesPak_(inWindow, 'dept', 'department');
+    var statusValues = osStatusValuesPak_(inWindow);
 
     // Pure OS / Multi Tasks is about the PERSON across the whole window, so it
     // is judged before the zone and department filters narrow the records.
@@ -578,6 +675,7 @@
       if (osTypeFilter === 'multi' && !productive[r.bonus]) return false;
       if (!osPassesSetPak_(osZoneFilter, osLabelPak_(r.zone, 'zone'))) return false;
       if (!osPassesSetPak_(osDeptFilter, osLabelPak_(r.dept, 'department'))) return false;
+      if (!osPassesSetPak_(osStatusFilter, osRecordStatusPak_(r))) return false;
       return true;
     });
 
@@ -601,7 +699,9 @@
         osMultiSelectHtmlPak_('osZoneMenu', 'Zones', zoneValues, osZoneFilter,
                               'toggleOsZoneFilter', 'clearOsZoneFilter') +
         osMultiSelectHtmlPak_('osDeptMenu', 'Departments', deptValues, osDeptFilter,
-                              'toggleOsDeptFilter', 'clearOsDeptFilter');
+                              'toggleOsDeptFilter', 'clearOsDeptFilter') +
+        osMultiSelectHtmlPak_('osStatusMenu', 'Record Status', statusValues, osStatusFilter,
+                              'toggleOsStatusFilter', 'clearOsStatusFilter');
     }
 
     var html = '<div class="breakdown-summary">';
@@ -615,7 +715,12 @@
             '<span class="breakdown-summary-label">record' + (rows.length === 1 ? '' : 's') + '</span>';
     html += '</div>';
 
-    html += osBadRowsHtmlPak_(osLogBad, Math.max(0, (Number(osLogSkipped) || 0) - (osLogBad || []).length) + unplaceable);
+    // One list, server rejects and client drops together, plus whatever the
+    // server counted but could not name. Counted ONCE: the heading used to say
+    // eight and the note underneath say "8 more", which read as sixteen.
+    html += osBadRowsHtmlPak_(
+      (osLogBad || []).concat(unplaceable),
+      Math.max(0, (Number(osLogSkipped) || 0) - (osLogBad || []).length));
 
     if (sites.length === 0) {
       html += '<div class="breakdown-empty">' +

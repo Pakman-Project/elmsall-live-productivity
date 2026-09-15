@@ -311,10 +311,50 @@ head('[9] records that could not be read are NAMED, not just counted');
 // "7 records could not be read" with no way to find out which seven is a dead
 // end. The whole point of saying it is so somebody can go and fix those rows.
 {
-  check('the page counts what it dropped itself', /unplaceable\+\+/.test(PAGE));
-  check('and adds what the server dropped',
-        /Number\(osLogSkipped\) \|\| 0\)/.test(PAGE) && /\+ unplaceable/.test(PAGE),
-        'a page quietly one row short is the worst of the options');
+  // The page NAMES its own drops now, rather than counting them. This is the
+  // defect the screenshot caught: only the server's own rejects carried a row
+  // number, so a record the CLIENT dropped - an over-long shift, an impossible
+  // date - could be counted and then shrugged at, which is how the page came
+  // to say "the server could not say which".
+  check('the page names what IT dropped, not just counts it',
+        /unplaceable\.push\(\{/.test(PAGE) && !/unplaceable\+\+/.test(PAGE),
+        'a record nobody can find is a record nobody can chase');
+
+  // The invariant behind that, run rather than read: every record the window
+  // walk REJECTS has a reason, and every record it ACCEPTS has none. If the
+  // two ever disagree the page would count a row it cannot name - which is
+  // precisely the state the screenshot caught it in.
+  {
+    const cases = [
+      rec({}),                                              // fine
+      rec({ date: 'not a date' }),
+      rec({ from: '' }),
+      rec({ to: 'half past' }),
+      rec({ from: '25:00' }),
+      rec({ from: '', to: '' }),
+      rec({ from: '06:00', to: '05:59' }),                  // over the cap
+      rec({ date: '09/09/2026', from: '06:00', to: '23:00' })
+    ];
+    let mismatched = 0, named = 0;
+    cases.forEach(c => {
+      const placed = ctx.osSpellWindowPak_(c) !== null;
+      const why = ctx.osSpellProblemPak_(c);
+      if (placed === (why !== '')) mismatched++;
+      if (!placed && why) named++;
+    });
+    check('a rejected record always has a reason, an accepted one never does',
+          mismatched === 0, mismatched + ' of ' + cases.length + ' disagreed');
+    check('and every one of the seven bad fixtures is named',
+          named === 7, named + ' of 7 named');
+  }
+  // Twice: once in the good-record push, once in the reject list. Counted
+  // rather than matched across a line break, since the file is CRLF.
+  check('every record carries its sheet row, not only the rejects',
+        (CODE.match(/row: OS_LOG_FIRST_ROW_ \+ i,/g) || []).length === 2,
+        'which is what makes naming a client-side drop possible at all');
+  check('and the two lists are shown as ONE',
+        /\(osLogBad \|\| \[\]\)\.concat\(unplaceable\)/.test(PAGE),
+        'the heading said 8 and the note said "8 more", which read as 16');
   check('the server counts them too', /skipped\+\+/.test(CODE));
 
   // The rows themselves, with the sheet row number so they can be found.
@@ -338,7 +378,26 @@ head('[9] records that could not be read are NAMED, not just counted');
         PAGE.indexOf("osNodeKeyPak_('__bad')") !== -1 &&
         R('Web - Styles.html').indexOf('.os-dropped-row .breakdown-label') !== -1);
   check('with the OS log row number as the first column',
-        /<th>OS log row<\/th>/.test(PAGE));
+        /OS_BAD_COLUMNS_ = \['OS log row',/.test(PAGE));
+  // Not a warning to be tidied away. An impossible date is a real form filled
+  // in wrongly, and the page exists to make the abnormal visible - so the
+  // section says who there is to ask.
+  check('and enough to chase it with',
+        /'TM Authorising', 'Deployed by', 'Problem'\]/.test(PAGE) &&
+        /'Site \/ Zone'/.test(PAGE),
+        'the row to open, the code, the three bad cells, and who signed it off');
+  check('the reason is per-record, from the same walk that rejects it',
+        /function osSpellProblemPak_\(row\)/.test(PAGE) &&
+        /function osSpellWalkPak_\(row, why\)/.test(PAGE),
+        'two copies of that logic would eventually disagree about which rows');
+  check('and it names the actual problem',
+        /'the start is not a time'/.test(PAGE) &&
+        /-hour cap'/.test(PAGE) &&
+        /'the date is not a date'/.test(PAGE));
+  check('the bonus number there is clickable like any other',
+        /os-bonus-chip bonus-tip-host clickable-bonus[\s\S]{0,200}toggleBonusFilter/
+          .test(PAGE.slice(PAGE.indexOf('function osBadRowsHtmlPak_'))),
+        'often the fastest way to find out whose record it is');
 
   // An unreadable log costs the page, not the dashboard.
   check('and an unreadable log degrades rather than failing the load',
@@ -444,6 +503,58 @@ head('[15] a zone opens onto DEPARTMENT bars, and those onto records');
   check('both are styled, and the department reads as the quieter one',
         R('Web - Styles.html').indexOf('.breakdown-bar.os-dept-bar') !== -1 &&
         R('Web - Styles.html').indexOf('.os-dept-row { padding-left') !== -1);
+}
+
+head('[15b] four filters left, the range right, one row');
+{
+  const index = R('Web - Index.html');
+  const css = R('Web - Styles.html');
+  check('the title and subtitle are gone',
+        index.indexOf('os-page-title') === -1 && index.indexOf('os-page-sub') === -1 &&
+        css.indexOf('.os-page-title') === -1,
+        'the rail tab already says OS');
+  check('the filters come before the range in the markup',
+        index.indexOf('id="osFilters"') < index.indexOf('id="osFrom"'),
+        'which is what puts them left of it');
+  check('and the range is pushed hard right',
+        /\.os-controls \.os-time-bar \{[^}]*margin-left: auto/.test(css),
+        'auto margin, so it survives the row wrapping on a narrow window');
+  check('one row, same baseline',
+        /\.os-controls \{[^}]*align-items: flex-end/.test(css) &&
+        /\.os-controls \{[^}]*justify-content: space-between/.test(css));
+
+  // The fourth filter.
+  check('Record Status is a multi-select of its own',
+        /osMultiSelectHtmlPak_\('osStatusMenu', 'Record Status'/.test(PAGE) &&
+        /function toggleOsStatusFilter\(status\)/.test(PAGE));
+  check('it filters on the DISPLAYED verdict, not the raw wording',
+        /function osRecordStatusPak_\(row\)/.test(PAGE) &&
+        /osStatusBandPak_\(row && row\.status\)/.test(PAGE),
+        'the table shows three folded states; listing raw wordings nobody can ' +
+        'see would be unmatchable');
+  check('a record logged without one is its own option',
+        /OS_STATUS_NONE_PAK_ = 'No verdict'/.test(PAGE),
+        'and not silently lumped in with Rejected');
+  check('the options read approved, undecided, refused',
+        /rank\[OS_STATUS_APPROVED_PAK_\] = 1/.test(PAGE) &&
+        /rank\[OS_STATUS_REJECTED_PAK_\] = 3/.test(PAGE),
+        'rather than alphabetically, which puts Awaiting first');
+  check('and it composes with the other three',
+        /osPassesSetPak_\(osStatusFilter, osRecordStatusPak_\(r\)\)/.test(PAGE));
+
+  // Run the real thing.
+  const st = ctx.osRecordStatusPak_;
+  check('OK reads as Approved here too', st({ status: 'OK' }) === 'Approved');
+  check('an unknown wording folds to Rejected',
+        st({ status: 'Escalated to Ops' }) === 'Rejected');
+  check('and a blank is No verdict', st({ status: '' }) === 'No verdict' &&
+        st({}) === 'No verdict');
+  const vals = ctx.osStatusValuesPak_([
+    { status: '' }, { status: 'Rejected' }, { status: 'OK' },
+    { status: 'authorise or reject' }, { status: 'OK' }]);
+  check('the list is unique and in verdict order',
+        vals.join(' | ') === 'Approved | Awaiting Approval | Rejected | No verdict',
+        vals.join(' | '));
 }
 
 head('[16] a refresh does not collapse what you were reading');
@@ -600,8 +711,11 @@ head('[12] the log is fetched by the page, not by every dashboard load');
         PAGE.indexOf('.withFailureHandler(function (err) {') !== -1 &&
         /The OS log could not be read/.test(PAGE),
         '"nobody on OS" and "the log broke" look identical otherwise');
-  check('and the loading state is shown, not just set',
-        /fa-circle-notch fa-spin/.test(PAGE));
+  // Deliberately NO spinner. It arrives in well under a second, and the
+  // animation was landing on top of whatever somebody was already reading.
+  check('there is no loading animation to read around',
+        !/fa-spin/.test(PAGE) && /if \(osLogState === 'loading'\) return;/.test(PAGE),
+        'the body is left as it was and replaced when the rows land');
 
   // The client works out the window, so the server needs no read to do it.
   check('the client sends the dates it wants',

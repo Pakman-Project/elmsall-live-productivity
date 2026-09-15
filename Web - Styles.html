@@ -3217,19 +3217,22 @@ body.page-scrolled-far .back-to-top {
    genuinely new to this page is below - the site heading above the bars, and
    the department / job / record nesting inside them. */
 
-.os-page-head { margin-bottom: 4px; }
-
-.os-page-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
+/* One row: the four filters left, the range right, everything on the same
+   baseline. The title and subtitle that used to sit above this are gone - the
+   rail tab already says OS. */
+.os-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.os-page-sub {
-  margin: 2px 0 0;
-  font-size: 0.75rem;
-  color: var(--muted);
+/* margin-left: auto is what puts From / To hard right, and it survives the
+   row wrapping on a narrow window - a float or a fixed width would not. */
+.os-controls .os-time-bar {
+  margin-left: auto;
+  margin-top: 0;
 }
 
 .os-body { display: block; }
@@ -3404,7 +3407,7 @@ body.page-scrolled-far .back-to-top {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
-  margin-top: 8px;
+  min-width: 0;
 }
 
 .os-filter { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -3471,6 +3474,44 @@ body.page-scrolled-far .back-to-top {
    sentence: a count nobody can act on is a dead end. */
 .os-dropped-row .breakdown-label { color: var(--status-warn-solid); }
 .os-dropped-label i:first-child { margin-right: 6px; }
+
+/* The records that could not be read. Not a warning to be tidied away: an OS
+   record with an impossible date or a nineteen-hour shift is a real form
+   somebody filled in wrongly, and seeing the abnormal is what the page is for.
+   So it reads as a section of the page rather than as an error. */
+.os-bad-intro {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.os-bad-table th { white-space: nowrap; }
+
+/* The row number is what somebody types into the OS log to find it, so it is
+   the one cell worth making easy to read off. */
+.os-bad-row-num {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* The three cells that are actually wrong, in the same monospace as a time so
+   a stray character is visible. */
+.os-bad-cell {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.os-bad-why {
+  color: var(--status-warn-solid);
+  font-size: 0.6875rem;
+}
+
+/* Nine columns will not fit a phone, and the table is inside a .table-wrap, so
+   it scrolls sideways rather than being crushed. */
+@media (max-width: 700px) {
+  .os-bad-table { min-width: 760px; }
+}
 
 /* Records the page could not place on a clock. Said out loud, because a page
    quietly one row short is the worst of the options. */

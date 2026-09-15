@@ -706,6 +706,10 @@ var osLogBad = [];
 var osTypeFilter = 'all';      // all | pure | multi
 var osZoneFilter = {};         // an EMPTY set means no filter, not nothing
 var osDeptFilter = {};
+// Filtered on the DISPLAYED verdict - the three folded states plus "No
+// verdict" - not on the form's raw wording, so the options match the chips in
+// the table rather than listing wordings nobody can see.
+var osStatusFilter = {};
 // Which zone and department rows are open, keyed on their names so they
 // survive a re-render. The page polls, and a refresh used to collapse
 // whatever you were reading.

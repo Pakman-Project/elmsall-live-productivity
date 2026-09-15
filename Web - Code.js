@@ -825,6 +825,13 @@ function readOsLogRows_(ss, want) {
       if (!bonus) { note(i, r, 'no bonus number'); continue; }
       if (!from || !to) { note(i, r, !from && !to ? 'no start or finish' : (!from ? 'the start is not a time' : 'the finish is not a time')); continue; }
       rows.push({
+        // The sheet row, on EVERY record rather than only on the ones the
+        // server itself rejected. The CLIENT drops records too - a shift over
+        // 16 hours, a date that parses but is not real - and without this it
+        // could count them but not name them, which is how the page came to
+        // say "the server could not say which". A record nobody can find is a
+        // record nobody can chase.
+        row: OS_LOG_FIRST_ROW_ + i,
         date: dateKey,
         bonus: bonus,
         dept: osLogCell_(r, OS_LOG_COLS_.dept),

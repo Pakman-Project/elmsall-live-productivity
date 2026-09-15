@@ -14,6 +14,10 @@
   // area or a threshold verdict, and OS is neither - it is the absence of
   // productive work, so it reads as a grey wash rather than as another series.
   function CHART_OS_BAND() { return _isLightTheme_() ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.09)"; }
+  // The band's own two edges. Stronger than the wash but no stronger than a
+  // gridline: it marks where a block boundary is, and a reader has to be able
+  // to tell it from the dashed hover crosshair at a glance.
+  function CHART_OS_EDGE() { return _isLightTheme_() ? "rgba(0,0,0,0.22)" : "rgba(255,255,255,0.26)"; }
 
   // The approval status tints the band's LABEL. The band itself stays grey.
   //
@@ -278,6 +282,29 @@
       eachOsBand_(chart, opts, function(ctx, x0, x1, area) {
         ctx.fillStyle = CHART_OS_BAND();
         ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
+
+        // The two EDGES, drawn solid.
+        //
+        // Nothing used to mark them. The wash is deliberately faint, so the
+        // only things on the chart a reader could aim at were the hover
+        // crosshair - which is dashed, and sits on the data POINT the mouse is
+        // nearest, half a block from any boundary - and the status label, which
+        // is centred across the band's whole width. Neither is an edge, and
+        // using either as one makes a correctly placed band look wrong.
+        //
+        // Solid, so it cannot be confused with the dashed crosshair, and one
+        // pixel at the same opacity as a gridline: this says where the block
+        // boundary is, it is not a series of its own.
+        ctx.strokeStyle = CHART_OS_EDGE();
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Half-pixel offsets, or a 1px line straddles two device pixels and
+        // renders as a 2px smear that is itself hard to align against.
+        ctx.moveTo(Math.round(x0) + 0.5, area.top);
+        ctx.lineTo(Math.round(x0) + 0.5, area.bottom);
+        ctx.moveTo(Math.round(x1) - 0.5, area.top);
+        ctx.lineTo(Math.round(x1) - 0.5, area.bottom);
+        ctx.stroke();
       });
     },
     afterDatasetsDraw: function(chart, args, opts) {
