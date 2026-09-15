@@ -55,56 +55,58 @@
   // approved until 10:00 and awaiting a decision after it draws as two
   // adjacent bands with a label each, not as one band making a claim about
   // both.
-  // Where inside its own block a clip time falls, as a fraction of that block:
-  // 07:26 in a 07:15-07:30 block is 0.733 of the way through it. Both ends of
-  // the block come from the row's own label, so this is right at 15, 30 and 60
-  // minutes without being told which is in force. -1 when it cannot be worked
-  // out, which is the signal to fall back to the block's own edge.
-  function osClipFraction_(row, hhmm, isEnd) {
+  // A block's own end, and the clip's end, as minutes past midnight - so the
+  // two can be compared. 1440 for midnight, since a block ending at 00:00 ends
+  // the day rather than starting it.
+  function osBlockEndMins_(row) {
     if (!row || !row.dateTime) return -1;
     var p = extractRangePartsPak(row.dateTime);
-    var a = osClipMinsPak_(String(p.start).split(' ').pop(), false);
-    var b = osClipMinsPak_(String(p.end).split(' ').pop(), true);
-    var t = osClipMinsPak_(hhmm, isEnd);
-    if (a < 0 || b < 0 || t < 0) return -1;
-    if (b <= a) b += 1440;          // a block that runs past midnight
-    if (t < a) t += 1440;
-    var f = (t - a) / (b - a);
-    return (f < 0 || f > 1) ? -1 : f;
+    return osClipMinsPak_(String(p.end).split(' ').pop(), true);
   }
 
   // One band, plus the clipped times behind it: the FIRST start and the LAST
   // end inside its own range. agg is in axis order, so those two are the ends
-  // of the spell the band draws - 07:26 and 08:06 for a band covering 07:15 to
-  // 08:15 - which is what the tooltip reports.
+  // of the spell the band draws - 11:25 and 12:35 for a spell over five blocks
+  // - which is what the tooltip reports.
   //
-  // x0 and x1 are those same two times as FRACTIONAL axis positions, so the
-  // grey can begin and end where the spell did rather than on the quarter-hour
-  // either side of it. Index i - 0.5 is the left edge of block i and i + 0.5
-  // its right, and getPixelForValue is linear in the value on a category
-  // scale, so a fraction between them interpolates - a 07:26 start lands just
-  // under half way into the 07:15 block's own width.
+  // x0 and x1 are the band's PIXEL edges, as fractional axis positions: index
+  // i - 0.5 is the left edge of block i and i + 0.5 its right, and
+  // getPixelForValue is linear in the value on a category scale.
   //
-  // Every one of these fields is set only when the times are there, so a band
-  // built from a day with no OS Time column keeps exactly the shape, and the
-  // block-edge geometry, that it had before the column existed.
+  // Whole blocks, not interpolated times. A block's figures can only be read
+  // at its END - the 12:15-12:30 block is not measurable until 12:30 - so a
+  // block belongs to the spell when the spell covers it as far as that point.
+  // For OS 11:25-12:35 that is 11:15-11:30 (11:30 is inside the spell) through
+  // 12:15-12:30 (12:30 is), and NOT 12:30-12:45, because the spell stops at
+  // 12:35 and never reaches 12:45. So the band runs from the LEFT edge of the
+  // first block to the RIGHT edge of the 12:15 one.
+  //
+  // Interpolating to the real minute - which this did briefly - drew a band
+  // that disagreed with every figure beneath it: greying two thirds of a block
+  // whose number is either wholly explained by the absence or not at all.
+  //
+  // The test for "covered as far as its end" is simply that the clip's end IS
+  // the block's end, because the clip is min(spell end, block end).
   function pushOsBand_(bands, agg, from, to, status) {
     var band = { from: from, to: to, status: status };
-    var t0 = '', t1 = '', i0 = -1, i1 = -1;
+    var t0 = '', t1 = '', lastWhole = -1;
     for (var i = from; i <= to; i++) {
       if (!agg[i]) continue;
-      if (!t0 && agg[i].osFrom) { t0 = agg[i].osFrom; i0 = i; }
-      if (agg[i].osTo) { t1 = agg[i].osTo; i1 = i; }
+      if (!t0 && agg[i].osFrom) t0 = agg[i].osFrom;
+      if (agg[i].osTo) {
+        t1 = agg[i].osTo;
+        var blockEnd = osBlockEndMins_(agg[i]);
+        var clipEnd = osClipMinsPak_(agg[i].osTo, true);
+        if (blockEnd >= 0 && clipEnd >= 0 && clipEnd >= blockEnd) lastWhole = i;
+      }
     }
     if (t0 && t1) {
       band.t0 = t0;
       band.t1 = t1;
-      var f0 = osClipFraction_(agg[i0], t0, false);
-      var f1 = osClipFraction_(agg[i1], t1, true);
-      if (f0 >= 0 && f1 >= 0) {
-        band.x0 = i0 - 0.5 + f0;
-        band.x1 = i1 - 0.5 + f1;
-      }
+      band.x0 = from - 0.5;
+      // A spell that ends inside its first block completes none of them. It is
+      // still real, so it keeps that one block rather than vanishing.
+      band.x1 = (lastWhole >= from ? lastWhole : from) + 0.5;
     }
     bands.push(band);
   }
@@ -164,8 +166,7 @@
                ? chart.options.plugins.osBand : null;
     if (!opts || !opts.bands || !opts.bands.length) return [];
     var band = osBandAtPak_(opts.bands, items[0].dataIndex);
-    var line = band ? osBandTimeLabelPak_(band.t0, band.t1) : '';
-    return line ? [line] : [];
+    return band ? [osBandTimeLabelPak_(band.status, band.t0, band.t1)] : [];
   }
 
   // Walks each band and hands the caller its pixel span.
@@ -281,11 +282,25 @@
     },
     afterDatasetsDraw: function(chart, args, opts) {
       eachOsBand_(chart, opts, function(ctx, x0, x1, area, band, clear) {
-        // Below this the word overflows its own band and collides with the
-        // neighbouring one. The shading still reads without it.
-        if (x1 - x0 < 22) return;
         var fam = getComputedStyle(chart.canvas).fontFamily || 'sans-serif';
         var mid = (x0 + x1) / 2;
+
+        // The room a label has is the band PLUS the clear chart either side,
+        // taken symmetrically because the text is centred - overrunning one
+        // edge and not the other would sit the word off-centre from the thing
+        // it describes.
+        //
+        // Computed BEFORE the word OS is drawn, and the gate is on the room
+        // rather than on the band's own width. That width alone ruled out a
+        // one-block band - eleven pixels on a 24-hour desktop axis - and drew
+        // nothing at all on exactly the bands that are hardest to read, while
+        // two hundred pixels of empty chart sat beside them.
+        var spare = Math.max(0, Math.min(
+          Math.min(clear.left, clear.right) - OS_LABEL_GUTTER, OS_LABEL_OVERRUN));
+        var room = (x1 - x0 - 4) + 2 * spare;
+        // Below this not even "OS" fits, and the shading still reads without
+        // it. The tooltip says everything either way.
+        if (room < 16) return;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillStyle = CHART_MUTED();
@@ -298,14 +313,7 @@
         var status = osStatusBandPak_(band && band.status);
         if (!status) return;
 
-        // The band PLUS the clear chart either side, taken symmetrically
-        // because the text is centred - overrunning one edge and not the other
-        // would sit the word off-centre from the thing it describes.
-        var spare = Math.max(0, Math.min(
-          Math.min(clear.left, clear.right) - OS_LABEL_GUTTER, OS_LABEL_OVERRUN));
-        // Inset inside the band's own edges, as it always was: text touching
-        // the boundary reads as belonging to whichever side it is nearer.
-        var lab = osBandLabel_(ctx, status, (x1 - x0 - 4) + 2 * spare, fam);
+        var lab = osBandLabel_(ctx, status, room, fam);
         if (!lab) return;
         ctx.font = '700 ' + lab.size + 'px ' + fam;
         ctx.fillStyle = CHART_OS_STATUS(status);
@@ -990,6 +998,22 @@
         }
         if (!vHasVolume) continue;
         overviewDatasets.push({ label: vType.label, data: vData, borderWidth: 2, borderColor: areaColor_(vType), backgroundColor: hexToRgbaPak(areaColor_(vType), CHART_FILL_A(0.6)), tension: 0.35, pointRadius: 2, fill: true });
+      }
+      // Somebody on OS all window has volume in no area at all, so every
+      // series above is dropped and the chart is left with NONE - an empty box
+      // with a grey band across it, and no tooltip anywhere, because Chart.js
+      // has no element to hang one off. That is precisely the person whose
+      // band most needs explaining: hovering it said nothing.
+      //
+      // One flat zero series instead. It states the true thing - there was no
+      // volume - and it gives the tooltip, and so the OS band, something to
+      // attach to.
+      if (overviewDatasets.length === 0) {
+        overviewDatasets.push({
+          label: 'No volume', data: agg.map(function () { return 0; }),
+          borderWidth: 2, borderColor: CHART_MUTED(),
+          backgroundColor: 'rgba(0,0,0,0)', tension: 0, pointRadius: 2, fill: false
+        });
       }
     } else {
       // Whichever areas the viewer chose, defaulting to the first two they can

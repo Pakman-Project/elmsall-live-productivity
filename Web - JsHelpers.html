@@ -772,11 +772,22 @@ function osClipAtPak_(timeRange, minsIn) {
   return ('0' + Math.floor(mins / 60)).slice(-2) + ':' + ('0' + (mins % 60)).slice(-2);
 }
 
-// The line the band adds to a chart tooltip. Empty when the band has no times
-// behind it, which is every archive cut from before those columns existed - so
-// an old day keeps exactly the tooltip it had rather than growing a blank row.
-function osBandTimeLabelPak_(from, to) {
-  return (from && to) ? ('[ OS : ' + from + ' - ' + to + ' ]') : '';
+// The line the band adds to a chart tooltip.
+//
+// The STATUS is in it as well as the times, because the drawn label under the
+// word OS cannot always be there: a band one block wide is about eleven pixels
+// on a 24-hour desktop axis and no font fits. The tooltip is the one channel
+// that is always available, so it carries everything the band knows.
+//
+// Never empty when there is a band. An archive cut before the OS Time column
+// existed has no times, and a spell logged with no verdict has no status, but
+// "[ OS ]" still confirms what the grey means - which is the whole reason
+// somebody hovers it.
+function osBandTimeLabelPak_(status, from, to) {
+  var band = osStatusBandPak_(status);
+  var head = band ? ('OS ' + band) : 'OS';
+  return (from && to) ? ('[ ' + head + ' : ' + from + ' - ' + to + ' ]')
+                      : ('[ ' + head + ' ]');
 }
 
 // The tag itself. Returns nothing when they were not on OS, so callers can

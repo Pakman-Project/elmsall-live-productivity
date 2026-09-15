@@ -363,7 +363,40 @@ head('[7] the notebook writes it, derived from the tab it mirrors');
           'it is still the readable reference');
     check(tag + 'a failure here does not fail the run',
           /the dashboard will fall back to Processed Data/.test(src));
+    // 46 of the ~50 fields on a typical row are exactly zero, so "0" against
+    // "0.0" is a third of the whole tab - and the measured read came back at
+    // 30 cells/ms against 85 for the wide tab, so the cost is charged by the
+    // byte as well as by the cell.
+    // Indentation-agnostic: the backfill notebook runs its pivot inside a
+    // per-day loop, so every line of this block sits four spaces further in.
+    check(tag + 'an integral float loses its ".0"',
+          src.indexOf('if isinstance(c, float) and c.is_integer():') !== -1 &&
+          src.indexOf('s = str(int(c))') !== -1,
+          'a third of the tab, for no change to any value');
   });
+
+  // The rule run rather than grepped, on the real function.
+  {
+    const src = JSON.parse(fs.readFileSync(
+      path.resolve(APPS, '..', 'Databricks-Live-Productivity-Output',
+                   'Elmsall Live Productivity.ipynb'), 'utf8'))
+      .cells.map(c => c.source.join('')).join('\n');
+    // "0" and "0.0" parse to the same number, so shortening cannot change a
+    // figure - which is why the parity check in [1] is still green.
+    check('and "0" reads back as the same number as "0.0"',
+          ctx.toNumber_('0') === ctx.toNumber_('0.0') &&
+          ctx.toNumber_('137') === ctx.toNumber_('137.0'),
+          'the saving costs no precision at all');
+    // Non-integral floats keep every digit: standard hours are a division and
+    // rounding them WOULD change a figure.
+    check('a non-integral float keeps its full precision',
+          src.indexOf('else:\n        s = "" if c is None else str(c)') !== -1 ||
+          /else:\s*\n\s*s = "" if c is None else str\(c\)/.test(src),
+          'standard hours are a division; rounding them would move a number');
+    check('and inf or nan cannot slip through as an integer',
+          /c\.is_integer\(\)/.test(src),
+          'is_integer() is False for both, unlike c == int(c) which throws');
+  }
 }
 
 head('[8] an archive trims BOTH tabs, or reads the untrimmed one');

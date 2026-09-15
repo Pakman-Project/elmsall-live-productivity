@@ -608,6 +608,20 @@ head('[14] the band says the status under the word OS');
           JSON.stringify(lean.map(o => o.text)));
     check('and the lean is capped, so a lone band cannot print across the chart',
           /OS_LABEL_OVERRUN = 24/.test(chartsSrc));
+
+    // A band ONE block wide is about eleven pixels on a 24-hour desktop axis.
+    // Gated on its own width it drew nothing at all - not even "OS" - on
+    // exactly the bands hardest to read, with two hundred pixels of empty
+    // chart sitting beside them. The gate is on the ROOM now, so that clear
+    // space counts towards it.
+    lean = drawBands([{ from: 4, to: 4, status: 'Approved' }]);
+    check('a one-block band still says OS and its status',
+          lean.length === 2 && lean[0].text === 'OS' && lean[1].text === 'Approved',
+          JSON.stringify(lean.map(function (o) { return o.text; })) + '   30px band');
+    check('the gate is on the room, not on the band width',
+          chartsSrc.indexOf('if (room < 16) return;') !== -1 &&
+          chartsSrc.indexOf('if (x1 - x0 < 22) return;') === -1,
+          'the old test was the band alone, which is all a one-block band has');
   }
 
   check('the wash itself is still neutral',
@@ -735,12 +749,31 @@ head('[15] the clipped OS times - when the spell really started and stopped');
         '[{"from":0,"to":1,"status":""}]',
         'so nothing about an archived day changes');
 
-  check('the label reads [ OS : 07:26 - 08:06 ]',
-        ctx.osBandTimeLabelPak_('07:26', '08:06') === '[ OS : 07:26 - 08:06 ]',
-        ctx.osBandTimeLabelPak_('07:26', '08:06'));
-  check('and nothing at all when either end is missing',
-        ctx.osBandTimeLabelPak_('07:26', '') === '' &&
-        ctx.osBandTimeLabelPak_('', '08:06') === '');
+  // The STATUS is in the tooltip as well as the times, because the drawn label
+  // under the word OS cannot always be there - a band one block wide is about
+  // eleven pixels on a 24-hour desktop axis. This is the one channel that is
+  // always available.
+  check('the label reads [ OS Approved : 07:26 - 08:06 ]',
+        ctx.osBandTimeLabelPak_('Approved', '07:26', '08:06') ===
+        '[ OS Approved : 07:26 - 08:06 ]',
+        ctx.osBandTimeLabelPak_('Approved', '07:26', '08:06'));
+  check('the form\'s own wording is folded, as everywhere else',
+        ctx.osBandTimeLabelPak_('OK', '07:26', '08:06') ===
+        '[ OS Approved : 07:26 - 08:06 ]' &&
+        ctx.osBandTimeLabelPak_('Cancelled', '07:26', '08:06') ===
+        '[ OS Rejected : 07:26 - 08:06 ]',
+        ctx.osBandTimeLabelPak_('OK', '07:26', '08:06'));
+  // Never empty while there IS a band: an archive from before the OS Time
+  // column has no times, and a spell logged with no verdict has no status, but
+  // confirming what the grey means is the whole reason somebody hovers it.
+  check('no times still says what the grey is',
+        ctx.osBandTimeLabelPak_('Approved', '', '') === '[ OS Approved ]' &&
+        ctx.osBandTimeLabelPak_('Approved', '07:26', '') === '[ OS Approved ]',
+        ctx.osBandTimeLabelPak_('Approved', '', ''));
+  check('and neither times nor a verdict still says OS',
+        ctx.osBandTimeLabelPak_('', '', '') === '[ OS ]' &&
+        ctx.osBandTimeLabelPak_('YES', '', '') === '[ OS ]',
+        ctx.osBandTimeLabelPak_('', '', ''));
 
   // Hung off the tooltip rather than drawn as a second floating box: the band
   // is the full height of the plot, so pointing anywhere in the grey already
@@ -749,10 +782,10 @@ head('[15] the clipped OS times - when the spell really started and stopped');
   {
     const chart = { options: { plugins: { osBand: { bands: band } } } };
     const tip = i => ctx.osBandTooltipPak_([{ chart: chart, dataIndex: i }]);
-    check('hovering a block inside the band shows the spell',
-          tip(0).join() === '[ OS : 06:07 - 06:52 ]', JSON.stringify(tip(0)));
+    check('hovering a block inside the band shows the spell and the verdict',
+          tip(0).join() === '[ OS Approved : 06:07 - 06:52 ]', JSON.stringify(tip(0)));
     check('any block of it, not just the first',
-          tip(3).join() === '[ OS : 06:07 - 06:52 ]', JSON.stringify(tip(3)));
+          tip(3).join() === '[ OS Approved : 06:07 - 06:52 ]', JSON.stringify(tip(3)));
     check('an EMPTY ARRAY outside it, not an empty string',
           Array.isArray(tip(9)) && tip(9).length === 0,
           'a string would draw a blank line into every tooltip on the chart');
@@ -788,61 +821,79 @@ head('[15b] one x axis, so the bands land in the same place on every chart');
         'the scale offset stays true; only the GRID offset is false');
 }
 
-head('[15d] the band begins and ends where the SPELL did');
-// Its edges used to be the quarter-hour points either side of the spell, so a
-// 07:26 start greyed from 07:15 and the reader had to take the real time on
-// trust. x0 and x1 carry it as a fractional axis position instead - index
-// i - 0.5 is the left edge of block i, and getPixelForValue is linear in the
-// value on a category scale, so a fraction between two indices interpolates.
+head('[15d] the band covers whole blocks, and stops at the last COMPLETED one');
+// A block's figures can only be read at its END - the 12:15-12:30 block is not
+// measurable until 12:30 - so a block belongs to the spell when the spell
+// covers it as far as that point. The band is therefore whole blocks, from the
+// left edge of the first to the right edge of the last completed one.
+//
+// It briefly interpolated to the real minute instead, which drew a band
+// disagreeing with every figure underneath it: greying two thirds of a block
+// whose number is either wholly explained by the absence or not at all.
 {
   const blk = (from, to, osFrom, osTo) => ({
-    dateTime: '09/09/2026 ' + from + ' - 09/09/2026 ' + to,
+    dateTime: '15/09/2026 ' + from + ' - 15/09/2026 ' + to,
     os: true, osStatus: 'Approved', osFrom: osFrom, osTo: osTo
   });
-  // The brief's own example: 07:26-08:06 over four blocks from 07:15.
-  const bd = ctx.mergeOsBands_([
-    blk('07:15', '07:30', '07:26', '07:30'),
-    blk('07:30', '07:45', '07:30', '07:45'),
-    blk('07:45', '08:00', '07:45', '08:00'),
-    blk('08:00', '08:15', '08:00', '08:06')
+  // The brief's own example: OS 11:25-12:35 over five blocks from 11:15.
+  const agg = [{ os: false },
+    blk('11:15', '11:30', '11:25', '11:30'),
+    blk('11:30', '11:45', '11:30', '11:45'),
+    blk('11:45', '12:00', '11:45', '12:00'),
+    blk('12:00', '12:15', '12:00', '12:15'),
+    blk('12:15', '12:30', '12:15', '12:30'),
+    blk('12:30', '12:45', '12:30', '12:35'),
+    { os: false }];
+  const bd = ctx.mergeOsBands_(agg)[0];
+
+  check('it starts at the LEFT edge of the block holding the start',
+        bd.x0 === 0.5, String(bd.x0) + ' (block 1 spans 0.5 to 1.5)');
+  check('and ends at the RIGHT edge of 12:15-12:30',
+        bd.x1 === 5.5, String(bd.x1) + ' (block 5 spans 4.5 to 5.5)');
+  check('so 12:30-12:45 is NOT shaded, because the spell never reaches 12:45',
+        bd.x1 < 6 - 0.5 + 1,
+        'the spell stops at 12:35; that block is not completed by it');
+  check('the times reported are still the real ones',
+        bd.t0 === '11:25' && bd.t1 === '12:35', bd.t0 + ' - ' + bd.t1);
+
+  // A spell that fills its blocks exactly covers them all.
+  const whole = ctx.mergeOsBands_([
+    blk('07:00', '07:15', '07:00', '07:15'),
+    blk('07:15', '07:30', '07:15', '07:30')
   ])[0];
-  // 07:26 is 11 minutes into a 15-minute block, so 0.733 of the way through
-  // it: index 0 - 0.5 + 0.733.
-  check('the left edge is 07:26, not the 07:15 point',
-        Math.abs(bd.x0 - (-0.5 + 11 / 15)) < 1e-9, String(bd.x0));
-  // 08:06 is 6 minutes into the last block: 3 - 0.5 + 0.4.
-  check('and the right edge is 08:06, not the 08:00 point',
-        Math.abs(bd.x1 - (3 - 0.5 + 6 / 15)) < 1e-9, String(bd.x1));
-  check('so it now starts INSIDE the 07:15 block rather than on its point',
-        bd.x0 > -0.5 && bd.x0 < 0.5,
-        'the old edge sat on the point, which is 07:15 exactly');
+  check('a block-aligned spell covers every block it touches',
+        whole.x0 === -0.5 && whole.x1 === 1.5, whole.x0 + ' .. ' + whole.x1);
 
-  // A spell that fills its blocks covers them edge to edge.
-  const whole = ctx.mergeOsBands_([blk('07:00', '07:15', '07:00', '07:15')])[0];
-  check('a block-aligned spell covers its whole block',
-        whole.x0 === -0.5 && whole.x1 === 0.5, whole.x0 + ' .. ' + whole.x1);
+  // One block, entered part-way and left part-way: it completes none, so it
+  // keeps the one block rather than vanishing.
+  const tiny = ctx.mergeOsBands_([blk('09:00', '09:15', '09:03', '09:08')])[0];
+  check('a spell inside one block still shades that block',
+        tiny.x0 === -0.5 && tiny.x1 === 0.5, tiny.x0 + ' .. ' + tiny.x1);
 
-  // 60-minute buckets: the fraction is taken against the ROW's own range, so
-  // nothing here has to be told which window size is in force.
+  // 60-minute buckets: the test is the row's OWN end, so nothing here has to
+  // be told which window size is in force.
   const hour = ctx.mergeOsBands_([
-    { dateTime: '09/09/2026 07:00 - 09/09/2026 08:00',
-      os: true, osStatus: 'Approved', osFrom: '07:26', osTo: '08:00' }
+    { dateTime: '15/09/2026 07:00 - 15/09/2026 08:00',
+      os: true, osStatus: 'Approved', osFrom: '07:26', osTo: '08:00' },
+    { dateTime: '15/09/2026 08:00 - 15/09/2026 09:00',
+      os: true, osStatus: 'Approved', osFrom: '08:00', osTo: '08:35' }
   ])[0];
-  check('an hour bucket scales by the hour, not by fifteen minutes',
-        Math.abs(hour.x0 - (-0.5 + 26 / 60)) < 1e-9, String(hour.x0));
+  check('an hour bucket completed to the hour is shaded',
+        hour.x0 === -0.5 && hour.x1 === 0.5,
+        hour.x0 + ' .. ' + hour.x1 + ' - the 08:00 bucket runs to 09:00, ' +
+        'and the spell stops at 08:35');
 
-  // A block whose range runs past midnight, where the end reads LOWER than the
-  // start as a clock.
+  // A block ending at midnight ends the day rather than starting it, which is
+  // the one value that sorts the wrong way as a clock.
   const mid = ctx.mergeOsBands_([
-    { dateTime: '09/09/2026 23:45 - 10/09/2026 00:00',
+    { dateTime: '15/09/2026 23:45 - 16/09/2026 00:00',
       os: true, osStatus: 'Approved', osFrom: '23:50', osTo: '00:00' }
   ])[0];
-  check('and a block ending at midnight still scales the right way up',
-        Math.abs(mid.x0 - (-0.5 + 5 / 15)) < 1e-9 && mid.x1 === 0.5,
-        mid.x0 + ' .. ' + mid.x1);
+  check('a block completed AT midnight counts as completed',
+        mid.x0 === -0.5 && mid.x1 === 0.5, mid.x0 + ' .. ' + mid.x1);
 
   // No times - an archive from before the column existed - and the band falls
-  // back to the point-to-point edges that every band used to have.
+  // back to the point-to-point edges every band used to have.
   const older = ctx.mergeOsBands_([{ os: true }, { os: true }])[0];
   check('without times the edges fall back to the OS points',
         older.x0 === undefined && older.x1 === undefined,
