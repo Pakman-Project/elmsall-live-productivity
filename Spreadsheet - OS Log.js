@@ -118,6 +118,29 @@ function updateOSLog() {
   }
   
   if (combinedResults.length > 0) {
+    // Column B is the bonus code, and setValues PARSES a string the way typing
+    // it would unless the cell is already formatted as text. Left to itself it
+    // stored "1AM" as the time serial 1/24 and "1E8" as 100000000, on every
+    // refresh, in the one column the whole OS feature joins on - and a mangled
+    // code there does not fail. It silently matches no operator, and that
+    // person's indirect work is simply absent from the dashboard.
+    //
+    // Formatted first, so nothing new is mangled. The same fix, for the same
+    // reason, as correctNameColumn_ in 'Spreadsheet - Name Correction.js'.
+    osLogSheet.getRange(7, 2, combinedResults.length, 1).setNumberFormat('@');
     osLogSheet.getRange(7, 1, combinedResults.length, 20).setValues(combinedResults);
+
+    // And repair what earlier runs already damaged. Called here rather than
+    // put on a trigger of its own: this way the two run in one execution, in
+    // order, which is the only ordering guarantee available - a scheduled
+    // correction could land mid-rewrite.
+    try {
+      var fixed = correctOsLogNames();
+      if (fixed) Logger.log('OS log: ' + fixed + ' bonus code(s) corrected');
+    } catch (e) {
+      // Never fail the rebuild for the correction: a mangled code costs one
+      // operator's band, an exception here costs the whole log.
+      Logger.log('OS log name correction failed: ' + e.message);
+    }
   }
 }

@@ -307,18 +307,188 @@ head('[8] a spell is included when it OVERLAPS the range');
         !overlaps({ date: '08/09/2026', from: '08:10', to: '08:20' }));
 }
 
-head('[9] records that could not be read are said out loud');
+head('[9] records that could not be read are NAMED, not just counted');
+// "7 records could not be read" with no way to find out which seven is a dead
+// end. The whole point of saying it is so somebody can go and fix those rows.
 {
   check('the page counts what it dropped itself', /unplaceable\+\+/.test(PAGE));
   check('and adds what the server dropped',
-        /Number\(osLogSkipped\) \|\| 0\) \+ unplaceable/.test(PAGE),
+        /Number\(osLogSkipped\) \|\| 0\)/.test(PAGE) && /\+ unplaceable/.test(PAGE),
         'a page quietly one row short is the worst of the options');
   check('the server counts them too', /skipped\+\+/.test(CODE));
-  check('there is a place to say it', /class="os-dropped"/.test(PAGE) &&
-        R('Web - Styles.html').indexOf('.os-dropped {') !== -1);
+
+  // The rows themselves, with the sheet row number so they can be found.
+  check('the server names each one',
+        /row: OS_LOG_FIRST_ROW_ \+ i,/.test(CODE) && /bad\.push\(\{/.test(CODE),
+        'the sheet row, the bonus, and what was actually in the three cells');
+  check('and says WHY each one failed',
+        /'the date is not a date'/.test(CODE) &&
+        /'the start is not a time'/.test(CODE) &&
+        /'no bonus number'/.test(CODE),
+        'so the fix is obvious from the row, not a guess');
+  check('the list is capped',
+        /OS_LOG_MAX_BAD_ = 50/.test(CODE) && /bad\.length >= OS_LOG_MAX_BAD_/.test(CODE),
+        'a log whose Date column changed shape would return every row');
+  check('it reaches the page',
+        /osLogBad = \(res && res\.bad\) \|\| \[\];/.test(PAGE) &&
+        /bad: bad/.test(CODE));
+  check('and the page renders them as an expandable row',
+        /function osBadRowsHtmlPak_/.test(PAGE) &&
+        PAGE.indexOf('os-dropped-row') !== -1 &&
+        PAGE.indexOf("osNodeKeyPak_('__bad')") !== -1 &&
+        R('Web - Styles.html').indexOf('.os-dropped-row .breakdown-label') !== -1);
+  check('with the OS log row number as the first column',
+        /<th>OS log row<\/th>/.test(PAGE));
+
   // An unreadable log costs the page, not the dashboard.
   check('and an unreadable log degrades rather than failing the load',
-        /return \{ rows: \[\], skipped: 0 \};/.test(CODE) && /catch \(e\) \{/.test(CODE));
+        /return \{ rows: \[\], skipped: 0, bad: \[\] \};/.test(CODE) && /catch \(e\) \{/.test(CODE));
+}
+
+head('[13] the Warehouse picker filters the OS sites too');
+// The control panel names buildings and the log names sites, so the two are
+// mapped. They were never going to converge on their own.
+{
+  check('the map is declared', /var OS_SITE_BY_BUILDING_ = \{/.test(PAGE));
+  const m = /OS_SITE_BY_BUILDING_ = \{([\s\S]*?)\};/.exec(PAGE);
+  check('E3 is ELMSALL 3', /e3: \['ELMSALL 3'\]/.test(m ? m[1] : ''));
+  check('and E1/E2 is ELMSALL WAY and ELMSALL DRIVE',
+        /e1e2: \['ELMSALL WAY', 'ELMSALL DRIVE'\]/.test(m ? m[1] : ''));
+
+  const site = s => { ctx.siteFilter = s; return ctx.osInBuildingPak_; };
+  ctx.siteFilter = 'e3';
+  check('an E3 view keeps ELMSALL 3 and drops the other two',
+        ctx.osInBuildingPak_('ELMSALL 3') && !ctx.osInBuildingPak_('ELMSALL WAY') &&
+        !ctx.osInBuildingPak_('ELMSALL DRIVE'));
+  ctx.siteFilter = 'e1e2';
+  check('an E1/E2 view keeps both of its sites',
+        ctx.osInBuildingPak_('ELMSALL WAY') && ctx.osInBuildingPak_('ELMSALL DRIVE') &&
+        !ctx.osInBuildingPak_('ELMSALL 3'));
+  ctx.siteFilter = 'all';
+  check('and Elmsall keeps everything', ctx.osInBuildingPak_('ELMSALL 3') &&
+        ctx.osInBuildingPak_('ELMSALL WAY'));
+
+  // Free text off a form.
+  ctx.siteFilter = 'e3';
+  check('the match is trimmed and case-insensitive',
+        ctx.osInBuildingPak_('  elmsall 3 '),
+        '"Elmsall 3 " and "ELMSALL 3" are the same site');
+  // A site nobody mapped is still a real record.
+  check('an unmapped site survives an unfiltered view',
+        (function () { ctx.siteFilter = 'all'; return ctx.osInBuildingPak_('ELMSALL NORTH'); })(),
+        'hiding it would be a silent loss');
+  check('but drops out of a specific building',
+        (function () { ctx.siteFilter = 'e3'; return !ctx.osInBuildingPak_('ELMSALL NORTH'); })());
+  ctx.siteFilter = 'all';
+}
+
+head('[14] the three filters');
+{
+  check('type is all / pure OS / multi tasks',
+        /OS_TYPE_LABELS_ = \{ all: 'All', pure: 'Pure OS', multi: 'Multi Tasks' \}/.test(PAGE));
+  check('zones and departments are multi-select',
+        /function toggleOsZoneFilter\(zone\)/.test(PAGE) &&
+        /function toggleOsDeptFilter\(dept\)/.test(PAGE) &&
+        /aria-multiselectable="true"/.test(PAGE));
+  check('and both offer what is actually in range',
+        /osUniqueValuesPak_\(inWindow, 'zone', 'zone'\)/.test(PAGE) &&
+        /osUniqueValuesPak_\(inWindow, 'dept', 'department'\)/.test(PAGE),
+        'a zone nobody worked has no business on the list');
+  check('built BEFORE those filters are applied',
+        PAGE.indexOf("osUniqueValuesPak_(inWindow, 'zone'") <
+        PAGE.indexOf('osPassesSetPak_(osZoneFilter'),
+        'or choosing one would empty the list you chose it from');
+
+  // An EMPTY set means no filter. The alternative makes the first click on a
+  // fresh dropdown empty the page, which reads as the page being broken.
+  check('an empty set is no filter, not nothing',
+        ctx.osPassesSetPak_({}, 'anything') === true);
+  check('and a chosen set is a whitelist',
+        ctx.osPassesSetPak_({ 'Goods In': true }, 'Goods In') === true &&
+        ctx.osPassesSetPak_({ 'Goods In': true }, 'OSR') === false);
+  check('there is a way back to All in one click',
+        /function clearOsZoneFilter\(\)/.test(PAGE) &&
+        /os-multi-all/.test(PAGE),
+        'rather than un-ticking six things');
+
+  // Pure OS is about the PERSON over the whole window, so it is judged before
+  // the zone and department filters narrow the records.
+  check('pure OS is judged on productive hours, not on the log',
+        /function osPureBonusesPak_\(win\)/.test(PAGE) &&
+        /rawSideData/.test(PAGE),
+        'the log knows nothing about productive work; the pivot does');
+  check('and before the other two filters narrow anything',
+        PAGE.indexOf('var productive = osPureBonusesPak_(win);') <
+        PAGE.indexOf("osTypeFilter === 'pure'"));
+  check('the unique values sort, so the list does not reshuffle',
+        /out\.sort\(\);/.test(PAGE));
+}
+
+head('[15] a zone opens onto DEPARTMENT bars, and those onto records');
+{
+  check('a department is a bar of its own',
+        /class="breakdown-row clickable-row os-dept-row/.test(PAGE) &&
+        /class="breakdown-bar os-dept-bar"/.test(PAGE));
+  check('nested inside the zone it belongs to',
+        PAGE.indexOf('os-zone-detail') < PAGE.indexOf('os-dept-row'));
+  check('and it opens onto the records, grouped by job type',
+        /class="os-dept-detail"/.test(PAGE) &&
+        PAGE.indexOf('os-dept-detail') < PAGE.indexOf('osJobTableHtmlPak_(job.records)'));
+  check('the job type heading carries its record count',
+        /class="os-job-count"/.test(PAGE));
+  // Scaled within their parent, or a small zone's bars are all stubs.
+  check('department bars are scaled within their zone',
+        /maxDept > 0 \? \(dept\.count \/ maxDept \* 100\)/.test(PAGE));
+  check('and zone bars within their site',
+        /maxZone > 0 \? \(zone\.count \/ maxZone \* 100\)/.test(PAGE));
+  check('both are styled, and the department reads as the quieter one',
+        R('Web - Styles.html').indexOf('.breakdown-bar.os-dept-bar') !== -1 &&
+        R('Web - Styles.html').indexOf('.os-dept-row { padding-left') !== -1);
+}
+
+head('[16] a refresh does not collapse what you were reading');
+// The page polls, and a refresh used to shut whatever was open.
+{
+  check('open nodes are kept in state, not in the DOM',
+        /var osOpenNodes = \{\}/.test(R('Web - JsState.html')));
+  check('keyed on the NAMES, so they survive a rebuild',
+        /function osNodeKeyPak_\(\)/.test(PAGE) &&
+        /osNodeKeyPak_\(site\.name, zone\.name\)/.test(PAGE) &&
+        /osNodeKeyPak_\(site\.name, zone\.name, dept\.name\)/.test(PAGE),
+        'an index would move the moment the rows re-sort');
+  check('the render re-applies them',
+        /var zOpen = !!osOpenNodes\[zKey\]/.test(PAGE) &&
+        /\(zOpen \? ' expanded' : ''\)/.test(PAGE) &&
+        /\(zOpen \? ' open' : ''\)/.test(PAGE));
+  check('and a department too',
+        /var dOpen = !!osOpenNodes\[dKey\]/.test(PAGE));
+  check('the toggle writes to that state',
+        /function toggleOsNode\(el\)/.test(PAGE) &&
+        /osOpenNodes\[key\] = true/.test(PAGE));
+  // Not an accordion: two levels plus persistence means several can be open,
+  // and toggleBreakdownDetail would shut the others.
+  check('it does not reuse the accordion toggle',
+        PAGE.indexOf('toggleBreakdownDetail') === -1,
+        'that one shuts every other open row, which fights the whole point');
+  // A key built by joining names needs a separator those names cannot hold.
+  check('the key separator cannot appear in a name',
+        /join\('\\u001f'\)/.test(PAGE),
+        'a unit separator, so "A|B" and "A" + "B" cannot collide');
+
+  const k = ctx.osNodeKeyPak_;
+  check('so two different paths cannot collide',
+        k('E3', 'Packing') !== k('E3Packing') &&
+        k('A', 'B', 'C') !== k('A', 'BC'),
+        k('E3', 'Packing'));
+}
+
+head('[17] the wording is Records, not spells');
+{
+  check('the page says record',
+        PAGE.indexOf(">record' + (rows.length === 1 ? '' : 's')") !== -1);
+  check('and nowhere says spell to the reader',
+        !/>[^<]*spell/i.test(PAGE.replace(/\/\/[^\n]*/g, '')),
+        'the comments still discuss spells; the page does not');
 }
 
 head('[10] the page is wired in at index 3, and the Data Table moved to 4');
@@ -367,6 +537,23 @@ head('[10] the page is wired in at index 3, and the Data Table moved to 4');
         (tour.match(/part: 6, page: 3,/g) || []).length >= 3 &&
         /6: 'OS page'/.test(tour),
         (tour.match(/part: 6, page: 3,/g) || []).length + ' step(s)');
+  // It walks BOTH levels, and opens them through toggleOsNode - a class set
+  // behind the page's back is undone by the next render, which is the very bug
+  // the open-state tracking exists to fix.
+  check('the chapter reaches the department bars and the records',
+        /target: '#osBody \.os-dept-row'/.test(tour) &&
+        /target: '#osBody \.os-dept-detail \.os-job-table'/.test(tour));
+  // Scoped to this chapter: the head breakdown's own steps still use
+  // toggleBreakdownDetail, and legitimately - that page IS an accordion.
+  const ch6 = tour.slice(tour.indexOf('===== Part 6'), tour.indexOf('===== Part 7'));
+  check('and opens them the way a click does',
+        /function tourOpenOsZone_\(\)/.test(tour) &&
+        /function tourOpenOsDept_\(\)/.test(tour) &&
+        ch6.indexOf('toggleBreakdownDetail') === -1,
+        'poking the classes directly would be undone by the next render');
+  check('it closes them again afterwards',
+        /function tourCloseOsNodes_\(\)/.test(tour) &&
+        /cleanup: function \(\) \{ tourCloseOsNodes_\(\); \}/.test(tour));
   check('every part still has a title in the replay menu',
         (() => {
           const parts = {};

@@ -278,7 +278,7 @@ const num = (s, re) => { const m = s.match(re); return m ? Number(m[1]) : null; 
 [['Archive DATA_SORT_COLUMN', num(archive, /DATA_SORT_COLUMN: (\d+)/), at('Date Time Range')],
  ['Cleanup CLEANUP_KEY_COLUMNS_', num(cleanup, /CLEANUP_KEY_COLUMNS_ = (\d+)/), DATA.length],
  ['Cleanup CLEANUP_SORT_COLUMN_', num(cleanup, /CLEANUP_SORT_COLUMN_ = (\d+)/), at('Date Time Range')],
- ['NameCorrection NAME_COLUMN_', num(namec, /NAME_COLUMN_ = (\d+)/), at('PAYLOAD_BONUSCODE')],
+ ['NameCorrection NAME_COLUMN_', num(namec, /var NAME_COLUMN_ = (\d+)/), at('PAYLOAD_BONUSCODE')],
  ['NameCorrection HOURS_OUT_COLUMN_', num(namec, /HOURS_OUT_COLUMN_ = (\d+)/), at('Total_StandardHours')],
  ['NameCorrection HOURS_IN_COLUMN_', num(namec, /HOURS_IN_COLUMN_ = (\d+)/), at('Total_SMV')],
 ].forEach(p => check(p[0], p[1] === p[2], p[1] + ' vs ' + p[2]));
@@ -630,6 +630,54 @@ head('[the control panel: five narrow pickers left, the bonus filter right]');
         /\.hc-field \.warehouse-label \{[^}]*text-overflow: ellipsis/
           .test(css.replace(/\.hc-field \.date-picker-label,\s*/g, '')),
         '"E1/E2, E3" is wider than a half-share of a 900px card');
+}
+
+head('[no source file carries a stray control character]');
+// Found the hard way, twice in one session: a backslash escape that has been
+// interpreted once too often leaves a raw control byte behind, and it is
+// invisible in every editor. Once it was a regex where \b had become a
+// backspace, so the check it guarded silently matched nothing. Once it was two
+// CSS rules where \25B2 had become 0x15 + "B2", so the Data Table's sort
+// arrows had been rendering as a control character followed by "B2".
+//
+// Neither failed loudly. Both are the kind of thing only a sweep finds.
+{
+  const FILES = ['Web - Code.js', 'Web - doPost.js', 'Web - Index.html',
+    'Web - Header.html', 'Web - Styles.html', 'Web - PageOverall.html',
+    'Web - JsState.html', 'Web - JsData.html', 'Web - JsCharts.html',
+    'Web - JsTables.html', 'Web - JsHelpers.html', 'Web - JsUi.html',
+    'Web - JsInit.html', 'Web - JsPageOs.html', 'Web - JsTour.html',
+    'Web - JsTourData.html', 'Web - JsExport.html', 'Web - JsShare.html',
+    'Web - JsModal.html', 'Web - JsReorder.html', 'Web - JsToast.html',
+    'Web - JsPullRefresh.html', 'Web - JsOnboarding.html',
+    'Spreadsheet - Archive.js', 'Spreadsheet - Name Correction.js',
+    'Spreadsheet - OS Log.js', 'Spreadsheet - OS Links.js',
+    'Spreadsheet - OnOpen.js', 'Spreadsheet - Pipeline State.js',
+    'Spreadsheet - Daily Data Cleanup.js'];
+  const found = [];
+  FILES.forEach(f => {
+    const src = R(f);
+    for (let i = 0; i < src.length; i++) {
+      const c = src.charCodeAt(i);
+      // Tab, newline and carriage return are the only ones that belong.
+      if (c < 32 && c !== 9 && c !== 10 && c !== 13) {
+        found.push(f + ' 0x' + c.toString(16) + ' near: ' +
+                   JSON.stringify(src.slice(Math.max(0, i - 40), i + 10)));
+      }
+    }
+  });
+  check('every file is free of them', found.length === 0, found.slice(0, 3).join('  |  '));
+  // Both pairs: the .side-table rules were always intact and the
+  // .main-detail-table ones were not, so only a COUNT catches it.
+  {
+    const css = R('Web - Styles.html');
+    const ups = css.split("content: ' \\25B2'").length - 1;
+    const dns = css.split("content: ' \\25BC'").length - 1;
+    check('and every sort arrow is the escape, not a control byte',
+          ups >= 2 && ups === dns,
+          ups + ' up, ' + dns + ' down - they come in pairs, and a corrupted ' +
+          'one is invisible next to an intact one');
+  }
 }
 
 head('[the load is measurable, and measuring it cannot break it]');

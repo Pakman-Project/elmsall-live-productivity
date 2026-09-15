@@ -708,9 +708,14 @@ function osLogCell_(row, i) {
 // since the Date column is the PRODUCTION day - which runs 06:00 to 06:00 - so
 // a spell starting at 02:00 on the 9th is logged against the 8th.
 //
-// Returns { rows, skipped }. The count is shown on the page rather than
-// swallowed: a spell with an unreadable date or time cannot be placed on a
-// clock, and a page quietly one row short is the worst of the options.
+// Returns { rows, skipped, bad }. `bad` NAMES the rows it could not read -
+// their sheet row number and what was actually in the cells - because "7
+// records could not be read" with no way to find out which seven is a dead
+// end. The whole point of saying it is so somebody can go and fix those rows.
+//
+// Capped, because a log whose Date column has changed shape entirely would
+// otherwise return every row as a complaint.
+var OS_LOG_MAX_BAD_ = 50;
 // The OS page's own entry point, called the first time that page is opened
 // rather than on every dashboard load.
 //
@@ -749,7 +754,7 @@ function getOsLogRows(dateKeys, archiveUrl) {
     ss = archiveUrl ? SpreadsheetApp.openByUrl(archiveUrl)
                     : SpreadsheetApp.getActiveSpreadsheet();
   } catch (e) {
-    return { rows: [], skipped: 0, error: 'Could not open the spreadsheet' };
+    return { rows: [], skipped: 0, bad: [], error: 'Could not open the spreadsheet' };
   }
   tm.mark('open');
 
@@ -776,10 +781,10 @@ function readOsLogRows_(ss, want) {
         break;
       }
     }
-    if (!sheet) { osLogCellsRead_ = 0; return { rows: [], skipped: 0 }; }
+    if (!sheet) { osLogCellsRead_ = 0; return { rows: [], skipped: 0, bad: [] }; }
 
     var lastRow = sheet.getLastRow();
-    if (lastRow < OS_LOG_FIRST_ROW_) { osLogCellsRead_ = 0; return { rows: [], skipped: 0 }; }
+    if (lastRow < OS_LOG_FIRST_ROW_) { osLogCellsRead_ = 0; return { rows: [], skipped: 0, bad: [] }; }
 
     var vals = sheet.getRange(OS_LOG_FIRST_ROW_, 1,
                               lastRow - OS_LOG_FIRST_ROW_ + 1,
@@ -789,6 +794,21 @@ function readOsLogRows_(ss, want) {
     osLogCellsRead_ = vals.length * OS_LOG_WIDTH_;
     var rows = [];
     var skipped = 0;
+    var bad = [];
+    // The sheet row, so somebody can go and look at it. Named rather than
+    // counted: a count alone cannot be acted on.
+    function note(i, r, why) {
+      skipped++;
+      if (bad.length >= OS_LOG_MAX_BAD_) return;
+      bad.push({
+        row: OS_LOG_FIRST_ROW_ + i,
+        bonus: osLogCell_(r, OS_LOG_COLS_.bonus),
+        date: osLogCell_(r, OS_LOG_COLS_.date),
+        from: osLogCell_(r, OS_LOG_COLS_.start),
+        to: osLogCell_(r, OS_LOG_COLS_.finish),
+        why: why
+      });
+    }
     for (var i = 0; i < vals.length; i++) {
       var r = vals[i];
       var bonus = osLogCell_(r, OS_LOG_COLS_.bonus).toUpperCase();
@@ -797,12 +817,13 @@ function readOsLogRows_(ss, want) {
       if (!bonus && !dateKey) continue;
       if (!dateKey || !want[dateKey]) {
         // Out of the window is not a failure; unreadable is.
-        if (!dateKey) skipped++;
+        if (!dateKey) note(i, r, 'the date is not a date');
         continue;
       }
       var from = osLogTime_(osLogCell_(r, OS_LOG_COLS_.start));
       var to = osLogTime_(osLogCell_(r, OS_LOG_COLS_.finish));
-      if (!bonus || !from || !to) { skipped++; continue; }
+      if (!bonus) { note(i, r, 'no bonus number'); continue; }
+      if (!from || !to) { note(i, r, !from && !to ? 'no start or finish' : (!from ? 'the start is not a time' : 'the finish is not a time')); continue; }
       rows.push({
         date: dateKey,
         bonus: bonus,
@@ -818,13 +839,13 @@ function readOsLogRows_(ss, want) {
         zone: osLogCell_(r, OS_LOG_COLS_.zone)
       });
     }
-    return { rows: rows, skipped: skipped };
+    return { rows: rows, skipped: skipped, bad: bad };
   } catch (e) {
     // Degrade, never fail the load: an unreadable OS log costs the OS page,
     // not the dashboard.
     Logger.log('OS log unreadable: ' + e.message);
     osLogCellsRead_ = 0;
-    return { rows: [], skipped: 0 };
+    return { rows: [], skipped: 0, bad: [] };
   }
 }
 

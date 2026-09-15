@@ -155,6 +155,47 @@ head('[6] the format is set BEFORE the write');
   check('and an already-text one still does', run('@') === '1AM', String(run('@')));
 }
 
+head('[6b] the OS log bonus column gets the same treatment');
+// "Spreadsheet - OS Log.js" rebuilds A7:T with one setValues, and setValues
+// parses unless the cell is already text - so "1AM" was stored as the time
+// serial 1/24 on EVERY refresh, in the one column the whole OS feature joins
+// on. A mangled code there does not fail: it matches no operator, and that
+// person's indirect work is simply absent from the dashboard.
+{
+  const os = fs.readFileSync(APPS + 'Spreadsheet - OS Log.js', 'utf8');
+  // Fixed at BOTH ends, because either alone leaves half the problem.
+  check('the OS Log script formats column B before it writes',
+        os.indexOf("getRange(7, 2, combinedResults.length, 1).setNumberFormat('@')") !== -1,
+        'so nothing NEW is mangled');
+  check('and it does that BEFORE the setValues',
+        os.indexOf("setNumberFormat('@')") < os.indexOf('.setValues(combinedResults)'),
+        'the other order undoes every correction as it makes it');
+  check('then repairs what earlier runs already damaged',
+        os.indexOf('correctOsLogNames()') !== -1 &&
+        SRC.indexOf('function correctOsLogNames()') !== -1);
+  // In one execution, in order. A scheduled correction could land mid-rewrite.
+  check('called from the rebuild rather than put on its own trigger',
+        os.indexOf('correctOsLogNames()') > os.indexOf('.setValues(combinedResults)'),
+        'one execution, in order, is the only ordering guarantee available');
+  check('and a failure there cannot cost the whole log',
+        os.indexOf('OS log name correction failed') !== -1 &&
+        os.indexOf('try {') < os.indexOf('correctOsLogNames()'),
+        'a mangled code costs one band; an exception costs the whole log');
+
+  // Column B, row 7 down - the layout the script actually writes.
+  check('it corrects B7 down, matching the layout',
+        /OS_LOG_FIRST_ROW_NC_ = 7/.test(SRC) && /OS_LOG_BONUS_COL_ = 2/.test(SRC));
+  check('and formats before writing there too',
+        SRC.split('function correctOsLogNames')[1].indexOf("setNumberFormat('@')") <
+        SRC.split('function correctOsLogNames')[1].indexOf('setValues(corrected)'),
+        'the same order, for the same reason, as correctNameColumn_');
+  // The tab is "OS log" in the script and "OS Log" in conversation.
+  check('the tab is resolved case-insensitively',
+        /getName\(\)\.trim\(\)\.toLowerCase\(\)/.test(
+          SRC.split('function correctOsLogNames')[1]),
+        'a capital L either way would silently correct nothing');
+}
+
 head('[7] Processed Data is still left alone');
 // Databricks is its sole writer and rebuilds it whole every 15 minutes. A
 // second writer editing its column C mid-rebuild can pair one row's bonus code

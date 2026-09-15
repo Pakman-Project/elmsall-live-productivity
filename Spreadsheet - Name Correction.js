@@ -51,6 +51,21 @@
  ************************************************************/
 
 var DATA_SHEET_NAME_ = 'Data';
+
+// The OS log's own bonus column, which needs exactly the same treatment for
+// exactly the same reason. "Spreadsheet - OS Log.js" rebuilds A7:T with one
+// setValues, and setValues parses a string the way typing it would unless the
+// cell is already text - so "1AM" was being stored as the time serial 1/24 and
+// "1E8" as 100000000, on every refresh, in the column the whole OS feature
+// joins on. A mangled code there does not fail: it silently matches no
+// operator, and that person's indirect work simply is not on the dashboard.
+//
+// Fixed at BOTH ends, because either alone is not enough. The OS Log script
+// now formats the column as text before it writes, so nothing new is mangled;
+// this corrects what previous runs already damaged.
+var OS_LOG_SHEET_NAME_NC_ = 'OS log';
+var OS_LOG_FIRST_ROW_NC_ = 7;
+var OS_LOG_BONUS_COL_ = 2;   // column B
 // Column C (1-based) holds the bonus number / name being corrected.
 var NAME_COLUMN_ = 3;
 // Standard Hours is derived, SMV is its source: StandardHours = SMV / 60.
@@ -292,6 +307,53 @@ function formatColumnCPeriodically() {
   if (lastRow < 2) return;
 
   correctDataRows_(sheet, 2, lastRow - 1);
+}
+
+/**
+ * The OS log's bonus column, B7 down.
+ *
+ * Called from updateOSLog() the moment it finishes writing, so it needs no
+ * trigger of its own and cannot race the thing it is correcting - the two run
+ * in one execution, in order. That is the one ordering guarantee available
+ * here, and it is why this is called rather than scheduled.
+ *
+ * Resolved case-insensitively: the tab is "OS log" in the script and "OS Log"
+ * in conversation, and getSheetByName matches exactly.
+ */
+function correctOsLogNames() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var sheet = null;
+  for (var s = 0; s < sheets.length; s++) {
+    if (sheets[s].getName().trim().toLowerCase() === OS_LOG_SHEET_NAME_NC_.toLowerCase()) {
+      sheet = sheets[s];
+      break;
+    }
+  }
+  if (!sheet) return 0;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < OS_LOG_FIRST_ROW_NC_) return 0;
+  var numRows = lastRow - OS_LOG_FIRST_ROW_NC_ + 1;
+
+  var range = sheet.getRange(OS_LOG_FIRST_ROW_NC_, OS_LOG_BONUS_COL_, numRows, 1);
+  var display = range.getDisplayValues();
+  var corrected = display.map(function (row) {
+    return [correctNameValue_(row[0])];
+  });
+
+  // Format BEFORE the write, for the reason spelled out at length on
+  // correctNameColumn_: the other order undoes every correction as it makes
+  // it, and the result no longer looks like a clock time, so the damage is
+  // permanent and accumulates.
+  range.setNumberFormat('@');
+  range.setValues(corrected);
+
+  var changed = 0;
+  for (var i = 0; i < corrected.length; i++) {
+    if (corrected[i][0] !== display[i][0]) changed++;
+  }
+  return changed;
 }
 
 /**

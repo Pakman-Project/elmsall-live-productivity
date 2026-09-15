@@ -696,6 +696,20 @@ var osLogSkipped = 0;
 // needs to tell "nobody was on OS" apart from "this has not arrived yet",
 // which are the same empty array.
 var osLogState = null;
+// The rows the server could not read, named. "7 records could not be read"
+// with no way to find out which seven is a dead end - the whole point of
+// saying it is so somebody can go and fix those rows.
+var osLogBad = [];
+// OS page filters. Session-only and not persisted, for the same reason the
+// Bonus page's are not: a hidden filter surviving a reload reads as missing
+// data rather than as a choice somebody made.
+var osTypeFilter = 'all';      // all | pure | multi
+var osZoneFilter = {};         // an EMPTY set means no filter, not nothing
+var osDeptFilter = {};
+// Which zone and department rows are open, keyed on their names so they
+// survive a re-render. The page polls, and a refresh used to collapse
+// whatever you were reading.
+var osOpenNodes = {};
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];

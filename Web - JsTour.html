@@ -268,18 +268,20 @@ var TOUR_STEPS = [
     interactive: { sel: '#osBody .breakdown-row', type: 'click' },
     title: 'A bar per zone',
     body: 'Each bar is a zone, and its length is how many people were on OS there — people, not forms, so somebody logged for two jobs counts once. Bars are scaled within their own site. Click one to open it.' },
-  { part: 6, page: 3, target: '#osBody .breakdown-detail.open .os-job-table',
-    action: function () {
-      var row = document.querySelector('#osBody .breakdown-row');
-      if (row && !row.classList.contains('expanded') &&
-          typeof toggleBreakdownDetail === 'function') toggleBreakdownDetail(row);
-    },
-    cleanup: function () {
-      var row = document.querySelector('#osBody .breakdown-row.expanded');
-      if (row && typeof toggleBreakdownDetail === 'function') toggleBreakdownDetail(row);
-    },
-    title: 'Departments, jobs and records',
-    body: 'Inside a zone: its departments, each job type under them, and one row per logged spell — the real start and finish, who authorised it, who deployed them, who they report to, and where the record stands. The bonus number is clickable, like everywhere else.' },
+  { part: 6, page: 3, target: '#osFilters',
+    title: 'Three filters',
+    body: 'Type narrows to people who did nothing but OS, or only those who did both. Zones and Departments are multi-select, and they offer what is actually in range — a zone nobody worked is not on the list. The Warehouse picker up in the control panel narrows the sites too.' },
+  { part: 6, page: 3, target: '#osBody .os-dept-row',
+    interactive: { sel: '#osBody .os-dept-row', type: 'click' },
+    action: function () { tourOpenOsZone_(); },
+    cleanup: function () { tourCloseOsNodes_(); },
+    title: 'A bar per department',
+    body: 'A zone opens onto its departments, as bars of their own — scaled within the zone, the way the zones are scaled within their site. Click one of those to reach the records.' },
+  { part: 6, page: 3, target: '#osBody .os-dept-detail .os-job-table',
+    action: function () { tourOpenOsZone_(); tourOpenOsDept_(); },
+    cleanup: function () { tourCloseOsNodes_(); },
+    title: 'Records, grouped by job type',
+    body: 'One row per logged record: the real start and finish, who authorised it, who deployed them, who they report to, and where the record stands. The bonus number is clickable, like everywhere else on the dashboard.' },
 
   // ===== Part 7 — Data Table page ==========================================
   { part: 7, page: 4, target: '.span-12 .mini-table-title',
@@ -405,6 +407,31 @@ var TOUR_STEPS = [
     title: 'You’re all set ✅',
     body: 'That’s the tour — your real live data is ready now. Replay it any time, or jump to a single section, from the “?” button in the header.' }
 ];
+
+// The OS page's two levels, opened for the tour. Through toggleOsNode rather
+// than by setting classes directly: the page renders from osOpenNodes, so a
+// class set behind its back is undone by the next render - which is the very
+// bug the open-state tracking was added to fix.
+function tourOpenOsZone_() {
+  var row = document.querySelector('#osBody .breakdown-row:not(.os-dept-row):not(.os-dropped-row)');
+  if (row && !row.classList.contains('expanded') && typeof toggleOsNode === 'function') {
+    toggleOsNode(row);
+  }
+}
+
+function tourOpenOsDept_() {
+  var row = document.querySelector('#osBody .os-dept-row');
+  if (row && !row.classList.contains('expanded') && typeof toggleOsNode === 'function') {
+    toggleOsNode(row);
+  }
+}
+
+function tourCloseOsNodes_() {
+  var open = document.querySelectorAll('#osBody .breakdown-row.expanded');
+  for (var i = open.length - 1; i >= 0; i--) {
+    if (typeof toggleOsNode === 'function') toggleOsNode(open[i]);
+  }
+}
 
 // Pre-compute part sub-numbering + total parts for the "PART 2 OF 7 · 2.3" label.
 var TOUR_TOTAL_PARTS = 0;
