@@ -727,8 +727,8 @@ head('[15] the clipped OS times - when the spell really started and stopped');
         '[{"from":0,"to":1,"status":""}]',
         'so nothing about an archived day changes');
 
-  check('the label reads [ Time: 07:26 - 08:06 ]',
-        ctx.osBandTimeLabelPak_('07:26', '08:06') === '[ Time: 07:26 - 08:06 ]',
+  check('the label reads [ OS : 07:26 - 08:06 ]',
+        ctx.osBandTimeLabelPak_('07:26', '08:06') === '[ OS : 07:26 - 08:06 ]',
         ctx.osBandTimeLabelPak_('07:26', '08:06'));
   check('and nothing at all when either end is missing',
         ctx.osBandTimeLabelPak_('07:26', '') === '' &&
@@ -742,9 +742,9 @@ head('[15] the clipped OS times - when the spell really started and stopped');
     const chart = { options: { plugins: { osBand: { bands: band } } } };
     const tip = i => ctx.osBandTooltipPak_([{ chart: chart, dataIndex: i }]);
     check('hovering a block inside the band shows the spell',
-          tip(0).join() === '[ Time: 06:07 - 06:52 ]', JSON.stringify(tip(0)));
+          tip(0).join() === '[ OS : 06:07 - 06:52 ]', JSON.stringify(tip(0)));
     check('any block of it, not just the first',
-          tip(3).join() === '[ Time: 06:07 - 06:52 ]', JSON.stringify(tip(3)));
+          tip(3).join() === '[ OS : 06:07 - 06:52 ]', JSON.stringify(tip(3)));
     check('an EMPTY ARRAY outside it, not an empty string',
           Array.isArray(tip(9)) && tip(9).length === 0,
           'a string would draw a blank line into every tooltip on the chart');
@@ -780,7 +780,70 @@ head('[15b] one x axis, so the bands land in the same place on every chart');
         'the scale offset stays true; only the GRID offset is false');
 }
 
-head('[15c] the two clip columns, both halves of the contract');
+head('[15d] the band begins and ends where the SPELL did');
+// Its edges used to be the quarter-hour points either side of the spell, so a
+// 07:26 start greyed from 07:15 and the reader had to take the real time on
+// trust. x0 and x1 carry it as a fractional axis position instead - index
+// i - 0.5 is the left edge of block i, and getPixelForValue is linear in the
+// value on a category scale, so a fraction between two indices interpolates.
+{
+  const blk = (from, to, osFrom, osTo) => ({
+    dateTime: '09/09/2026 ' + from + ' - 09/09/2026 ' + to,
+    os: true, osStatus: 'Approved', osFrom: osFrom, osTo: osTo
+  });
+  // The brief's own example: 07:26-08:06 over four blocks from 07:15.
+  const bd = ctx.mergeOsBands_([
+    blk('07:15', '07:30', '07:26', '07:30'),
+    blk('07:30', '07:45', '07:30', '07:45'),
+    blk('07:45', '08:00', '07:45', '08:00'),
+    blk('08:00', '08:15', '08:00', '08:06')
+  ])[0];
+  // 07:26 is 11 minutes into a 15-minute block, so 0.733 of the way through
+  // it: index 0 - 0.5 + 0.733.
+  check('the left edge is 07:26, not the 07:15 point',
+        Math.abs(bd.x0 - (-0.5 + 11 / 15)) < 1e-9, String(bd.x0));
+  // 08:06 is 6 minutes into the last block: 3 - 0.5 + 0.4.
+  check('and the right edge is 08:06, not the 08:00 point',
+        Math.abs(bd.x1 - (3 - 0.5 + 6 / 15)) < 1e-9, String(bd.x1));
+  check('so it now starts INSIDE the 07:15 block rather than on its point',
+        bd.x0 > -0.5 && bd.x0 < 0.5,
+        'the old edge sat on the point, which is 07:15 exactly');
+
+  // A spell that fills its blocks covers them edge to edge.
+  const whole = ctx.mergeOsBands_([blk('07:00', '07:15', '07:00', '07:15')])[0];
+  check('a block-aligned spell covers its whole block',
+        whole.x0 === -0.5 && whole.x1 === 0.5, whole.x0 + ' .. ' + whole.x1);
+
+  // 60-minute buckets: the fraction is taken against the ROW's own range, so
+  // nothing here has to be told which window size is in force.
+  const hour = ctx.mergeOsBands_([
+    { dateTime: '09/09/2026 07:00 - 09/09/2026 08:00',
+      os: true, osStatus: 'Approved', osFrom: '07:26', osTo: '08:00' }
+  ])[0];
+  check('an hour bucket scales by the hour, not by fifteen minutes',
+        Math.abs(hour.x0 - (-0.5 + 26 / 60)) < 1e-9, String(hour.x0));
+
+  // A block whose range runs past midnight, where the end reads LOWER than the
+  // start as a clock.
+  const mid = ctx.mergeOsBands_([
+    { dateTime: '09/09/2026 23:45 - 10/09/2026 00:00',
+      os: true, osStatus: 'Approved', osFrom: '23:50', osTo: '00:00' }
+  ])[0];
+  check('and a block ending at midnight still scales the right way up',
+        Math.abs(mid.x0 - (-0.5 + 5 / 15)) < 1e-9 && mid.x1 === 0.5,
+        mid.x0 + ' .. ' + mid.x1);
+
+  // No times - an archive from before the column existed - and the band falls
+  // back to the point-to-point edges that every band used to have.
+  const older = ctx.mergeOsBands_([{ os: true }, { os: true }])[0];
+  check('without times the edges fall back to the OS points',
+        older.x0 === undefined && older.x1 === undefined,
+        'eachOsBand_ then reads from/to, which is exactly the old geometry');
+  check('and eachOsBand_ prefers x0/x1 when they are there',
+        chartsSrc.indexOf('band.x0 === undefined ? band.from : band.x0') !== -1);
+}
+
+head('[15c] the OS Time column, both halves of the contract');
 {
   const csrc = fs.readFileSync(APPS + 'Web - Code.js', 'utf8')
     .replace(/\/\/[^\n]*/g, '');
@@ -789,26 +852,51 @@ head('[15c] the two clip columns, both halves of the contract');
                  'Elmsall Live Productivity.ipynb'), 'utf8'))
     .cells.map(c => c.source.join('')).join('\n');
   // Joined by header NAME, so the two repos agree on one literal or on nothing.
-  ['OS Start Time', 'OS End Time'].forEach(h => {
-    check('the notebook writes "' + h + '"', nb.indexOf('"' + h + '"') !== -1);
-    check('and Code.js looks for it', csrc.indexOf("'" + h + "'") !== -1);
-  });
-  check('they go AFTER OS/ Indirect, which stays the end of the area blocks',
-        /\+ \["OS\/ Indirect", "OS Start Time", "OS End Time"\]/.test(nb),
+  check('the notebook writes "OS Time"', nb.indexOf('"OS Time"') !== -1);
+  check('and Code.js looks for it', csrc.indexOf("'OS Time'") !== -1);
+  check('one column, not the pair it started as',
+        nb.indexOf('OS Start Time') === -1 && csrc.indexOf('OS Start Time') === -1,
+        'the halves are never read apart, and a pair invited half a range');
+  check('it goes AFTER OS/ Indirect, which stays the end of the area blocks',
+        nb.indexOf('+ ["OS/ Indirect", "OS Time"]') !== -1,
         'legacyProcColumnMap_ addresses the hours and volume blocks by position');
-  check('the read is widened to reach them',
-        /map\.osFrom \+ 1, map\.osTo \+ 1/.test(csrc),
+  check('the notebook writes the range as one cell',
+        nb.indexOf('f"{_span[0]} - {_span[1]}" if _span else ""') !== -1,
+        '"07:26 - 07:30"');
+  check('the read is widened to reach it',
+        csrc.indexOf('map.osTime + 1') !== -1,
         'a column past the read width comes back undefined, not short');
-  check('and a file without them resolves to -1 rather than to column A',
-        /os: -1, osFrom: -1, osTo: -1/.test(csrc),
+  check('and a file without it resolves to -1 rather than to column A',
+        csrc.indexOf('os: -1, osTime: -1') !== -1,
         'index 0 would read the Date column as a time');
-  // A time-formatted cell hands getValues() a Date, whose toString is neither
-  // a time nor empty - "Mon Dec 30 1899..." inside the band's tooltip.
-  check('a Date in the cell is formatted, not stringified',
-        /raw instanceof Date/.test(csrc), 'the column looks like a time column');
-  check('and the times are only carried on rows actually on OS',
-        /if \(entry\.os\) \{/.test(csrc),
-        'a clip on a NO row is last run\'s leftover');
+  check('the times are only carried on rows actually on OS',
+        csrc.indexOf('if (entry.os && map.osTime >= 0)') !== -1,
+        'a clip on a NO row is what the previous run left behind');
+  check('and the cell is split back into two ends for the front end',
+        csrc.indexOf('span.from; entry.osTo = span.to') !== -1,
+        'the band places its left edge from one and its right from the other');
+
+  // procOsSpan_ is lifted out and RUN rather than grepped: the pattern is the
+  // whole of the contract, and a grep cannot tell a working one from a typo.
+  {
+    const fn = /function procOsSpan_[\s\S]*?\n\}/.exec(csrc);
+    check('procOsSpan_ is where it says it is', !!fn);
+    if (fn) {
+      const span = new Function(fn[0] + '; return procOsSpan_;')();
+      const j = v => JSON.stringify(span(v));
+      check('a full range parses', j('07:26 - 07:30') === '{"from":"07:26","to":"07:30"}',
+            j('07:26 - 07:30'));
+      check('a single-digit hour is padded to match', j('7:26 - 7:30') ===
+            '{"from":"07:26","to":"07:30"}', j('7:26 - 7:30'));
+      check('midnight at either end survives', j('23:50 - 00:00') ===
+            '{"from":"23:50","to":"00:00"}', j('23:50 - 00:00'));
+      check('half a range reads as NO range',
+            span('07:26 - ') === null && span('07:26') === null,
+            'a tooltip reading "07:26 - " is worse than no tooltip at all');
+      check('and so does an empty cell, or the old YES/NO wording',
+            span('') === null && span(null) === null && span('NO') === null);
+    }
+  }
 }
 
 head('[10] the CSS exists for the class the JS emits');

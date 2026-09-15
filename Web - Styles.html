@@ -3201,6 +3201,226 @@ body.page-scrolled-far .back-to-top {
   font-size: 14px;
 }
 
+.breakdown-empty i {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 28px;
+  opacity: 0.3;
+}
+
+/* ============================================================
+   The OS page
+   ============================================================
+   Reuses .breakdown-row / -bar / -detail wholesale: a zone bar IS a head
+   breakdown bar, down to the chevron and the open/close animation, and a
+   second set of rules that merely looked the same would drift. Only what is
+   genuinely new to this page is below - the site heading above the bars, and
+   the department / job / record nesting inside them. */
+
+.os-page-head { margin-bottom: 4px; }
+
+.os-page-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.os-page-sub {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.os-body { display: block; }
+
+/* One site, its zones under it. Bars are scaled within their own site, so the
+   rule and the count say which set a length is relative to. */
+.os-site + .os-site { margin-top: 18px; }
+
+.os-site-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.os-site-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.os-site-count {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* The zone bar is neutral, not an area colour: a zone is not a work area and
+   borrowing the area palette would imply a mapping that does not exist. */
+.breakdown-bar.os-zone-bar {
+  background: var(--accent-25);
+  border: 1px solid var(--accent-25);
+}
+
+.os-zone-detail { padding: 8px 2px 2px; }
+
+.os-dept + .os-dept {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.os-dept-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.os-dept-count {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--w6);
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.os-job { margin-top: 8px; }
+
+.os-job-head {
+  margin-bottom: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.os-job-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.os-job-table th {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.os-job-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.os-job-table tr:last-child td { border-bottom: none; }
+
+.os-time-cell {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.os-cell-none { color: var(--muted); opacity: 0.6; }
+
+/* The bonus number, clickable like every other one on the dashboard. */
+.os-bonus-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.os-bonus-chip:hover { border-color: var(--accent); }
+.os-bonus-chip.selected {
+  border-color: var(--accent);
+  background: var(--accent-8);
+}
+
+.os-bonus-chip .chip-filter-icon {
+  font-size: 8px;
+  opacity: 0.45;
+}
+
+/* The three display states, worded and coloured exactly as the chart band
+   words and colours them - see osStatusBandPak_. A record reading Approved
+   here and amber on a chart would be the same fact told two ways. */
+.os-status {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.os-status-good {
+  color: var(--status-good-solid);
+  background: var(--status-good-soft);
+}
+.os-status-warn {
+  color: var(--status-warn-solid);
+  background: var(--status-warn-soft);
+}
+.os-status-bad {
+  color: var(--status-bad-solid);
+  background: var(--status-bad-soft);
+}
+.os-status-none {
+  border-color: transparent;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* Records the page could not place on a clock. Said out loud, because a page
+   quietly one row short is the worst of the options. */
+.os-dropped {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--status-warn-solid);
+  color: var(--status-warn-solid);
+  background: var(--status-warn-soft);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  /* Six columns do not fit a phone, and the table is already inside a
+     .table-wrap, so it scrolls sideways rather than being crushed. */
+  .os-job-table { min-width: 520px; }
+  .os-job-table-wrap { overflow-x: auto; }
+  .os-zone-detail { padding-left: 0; padding-right: 0; }
+}
+
 .breakdown-btn {
   display: inline-flex;
   align-items: center;
@@ -5961,7 +6181,7 @@ textarea:focus-visible {
     transform: none !important;
   }
 
-  /* Only what is on screen. The other three are laid out off to the side and
+  /* Only what is on screen. The other four are laid out off to the side and
      would otherwise print as blank or half-drawn sheets. */
   .page { display: none !important; }
   .page.print-active { display: block !important; }
@@ -6569,6 +6789,13 @@ select.hc-control {
 .hc-field .date-picker-icon,
 .hc-field .date-picker-caret,
 .hc-field .warehouse-caret { font-size: 0.75rem; color: var(--muted); }
+
+/* A field that does not apply to the page you are on - Hours Range and Time
+   Window on the Bonus and OS pages, which have their own From / To. Greyed and
+   inert, and still occupying its column, so the row does not reflow as you
+   move between pages. See syncTimeAxisControlsPak_. */
+.hc-field-off { opacity: 0.4; }
+.hc-field-off .hc-control { cursor: not-allowed; }
 
 /* Filter by Bonus keeps a filled ground: it is the one control you TYPE into,
    and the fill is what says so. Everything else is white. */

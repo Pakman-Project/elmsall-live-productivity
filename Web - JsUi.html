@@ -1067,6 +1067,11 @@
     } else if (index === 2) {
       renderSideTablesPak(c.rowsLimit);
     } else if (index === 3) {
+      // Reads osLogRows and its own From / To, so it takes nothing from the
+      // render context - but it still goes through here, so that it is rebuilt
+      // on a refresh like every other page rather than holding yesterday.
+      renderOsPagePak();
+    } else if (index === 4) {
       renderMainTablePak(currentMainRows);
     }
     pageDirty[index] = false;
@@ -1075,9 +1080,42 @@
     setTimeout(refreshScrollEdgesAll_, 0);
   }
 
+  // Hours Range and Time Window shape the time axis that every chart and the
+  // Data Table are drawn on. The Bonus and OS pages do not read either: both
+  // have their own From / To, over the whole 24 hours, and both ignore the
+  // window size entirely.
+  //
+  // So on those two the pair is disabled and greyed rather than left looking
+  // live. A control you can change that then changes nothing reads as the page
+  // being broken; one that is plainly not yours to change on this page reads as
+  // the page having its own range, which is what the row below it is.
+  //
+  // Disabled, not hidden: they keep their place in the row, so the panel does
+  // not reflow every time you move between pages.
+  var PAGES_WITH_OWN_RANGE_ = [2, 3];
+
+  function syncTimeAxisControlsPak_(index) {
+    var off = PAGES_WITH_OWN_RANGE_.indexOf(index) !== -1;
+    var ids = ['hoursRange', 'timeWindow'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (!el) continue;
+      el.disabled = off;
+      // The label greys with it. Walked rather than queried so this works
+      // whatever the field wrapper is called.
+      var field = el.parentNode;
+      while (field && field.classList && !field.classList.contains('hc-field')) {
+        field = field.parentNode;
+      }
+      if (field && field.classList) field.classList.toggle('hc-field-off', off);
+      el.title = off ? 'This page has its own From / To range' : '';
+    }
+  }
+
   function goToPage(index) {
     if (index < 0 || index >= totalPages) return;
     currentPage = index;
+    syncTimeAxisControlsPak_(index);
     currentTranslate = currentPage * -getSwipeWidth();
     prevTranslate = currentTranslate;
     setSliderPosition();

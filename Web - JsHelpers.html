@@ -661,11 +661,21 @@ var OS_STATUS_APPROVED_PAK_ = 'Approved';
 var OS_STATUS_AWAITING_PAK_ = 'Awaiting Approval';
 var OS_STATUS_REJECTED_PAK_ = 'Rejected';
 
+// Both the translated wording and the form's own, because there are now two
+// readers on two different sides of that translation. The notebook re-spells
+// "OK" as Approved and "authorise or reject" as Awaiting Approval on the way
+// into Processed Data - but the OS page reads the log DIRECTLY, and gets what
+// the approver actually typed.
+//
+// Without the raw pair here, every approved spell on that page folded to the
+// catch-all and read "Rejected", in red: the worst possible way to be wrong
+// about somebody's paperwork, and the fold was doing exactly what it was
+// written to do.
 function osStatusBandPak_(status) {
   var s = String(status == null ? '' : status).trim().toLowerCase();
   if (!s || s === 'yes') return '';
-  if (s === 'approved') return OS_STATUS_APPROVED_PAK_;
-  if (s === 'awaiting approval') return OS_STATUS_AWAITING_PAK_;
+  if (s === 'approved' || s === 'ok') return OS_STATUS_APPROVED_PAK_;
+  if (s === 'awaiting approval' || s === 'authorise or reject') return OS_STATUS_AWAITING_PAK_;
   return OS_STATUS_REJECTED_PAK_;
 }
 
@@ -766,7 +776,7 @@ function osClipAtPak_(timeRange, minsIn) {
 // behind it, which is every archive cut from before those columns existed - so
 // an old day keeps exactly the tooltip it had rather than growing a blank row.
 function osBandTimeLabelPak_(from, to) {
-  return (from && to) ? ('[ Time: ' + from + ' - ' + to + ' ]') : '';
+  return (from && to) ? ('[ OS : ' + from + ' - ' + to + ' ]') : '';
 }
 
 // The tag itself. Returns nothing when they were not on OS, so callers can
@@ -953,6 +963,17 @@ function escapeAttrPak(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+// The same five replacements, named for the other job they do.
+//
+// Free text going into a text NODE needs exactly what one going into an
+// attribute needs, and safeTextPak - despite the name - does none of it: it is
+// a String() coercion and nothing more. Everything fed to it so far comes from
+// a fixed config or from a bonus code, so nothing has ever been exposed by
+// that; the OS log is the dashboard's first source of genuinely free-typed
+// text - department names, job types, three people per record, all straight
+// out of a form - and it goes through this instead.
+function escapeTextPak_(s) { return escapeAttrPak(s); }
 
 function trimTimeLabelPak(str) {
   if (!str) return '';

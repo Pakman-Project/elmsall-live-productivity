@@ -146,6 +146,83 @@ const STUB = `
     return d;
   }
 
+  // The OS page reads the OS log, which the tour's payload knows nothing
+  // about, so the demo log is synthesised here from the demo bonus numbers.
+  //
+  // Shaped like the real thing rather than tidied: several sites, uneven zones,
+  // two departments to a zone, a couple of job types each, and a spread of
+  // record statuses including one left blank - which is what the page has to
+  // render, and the only way to see whether it does.
+  var OS_DEMO_SITES_ = [
+    { site: 'E1/E2', zones: ['Goods In', 'OSR', 'Despatch'] },
+    { site: 'E3',    zones: ['Packing', 'Returns'] }
+  ];
+  var OS_DEMO_DEPTS_ = ['Inbound', 'Outbound', 'Support'];
+  var OS_DEMO_JOBS_ = ['Cleaning', 'Training', 'Cover - Team Manager',
+                       'Housekeeping', '5S Audit'];
+  var OS_DEMO_PEOPLE_ = ['J Ashworth', 'P Okonkwo', 'S Nowak', 'R Patel', 'D Byrne'];
+  var OS_DEMO_STATUS_ = ['OK', 'OK', 'OK', 'authorise or reject', 'Rejected', ''];
+
+  function osDemoLog_(d) {
+    if (!d || !d.bonusList || !d.timeRanges || !d.timeRanges.length) return [];
+    // A deterministic shuffle, so reloading the preview does not reshuffle the
+    // whole page and make a layout change impossible to see.
+    var seed = 20260915;
+    var rnd = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    var p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+
+    var last = d.timeRanges[d.timeRanges.length - 1];
+    var endPart = String(last).split(' - ')[1] || '';
+    var bits = endPart.split(' ');
+    var dparts = (bits[0] || '').split('/');
+    var tparts = (bits[1] || '').split(':');
+    if (dparts.length !== 3 || tparts.length < 2) return [];
+    var axisEnd = new Date(Number(dparts[2]), Number(dparts[1]) - 1, Number(dparts[0]),
+                           Number(tparts[0]), Number(tparts[1]));
+
+    var out = [];
+    var bonuses = d.bonusList.slice(0, 18);
+    for (var i = 0; i < bonuses.length; i++) {
+      var s = OS_DEMO_SITES_[i % OS_DEMO_SITES_.length];
+      // Spells ending within the last few hours of the axis, of uneven length,
+      // starting and finishing on ragged minutes - the log records real clock
+      // times, not quarter-hours.
+      var endMin = Math.floor(rnd() * 200);
+      var lenMin = 25 + Math.floor(rnd() * 150);
+      var finish = new Date(axisEnd.getTime() - endMin * 60000);
+      var start = new Date(finish.getTime() - lenMin * 60000);
+      // The Date column is the PRODUCTION day: 06:00 to 06:00, so a spell
+      // starting before six is logged against the previous date.
+      var logDay = start.getHours() < 6
+        ? new Date(start.getTime() - 86400000) : start;
+      out.push({
+        date: p2(logDay.getDate()) + '/' + p2(logDay.getMonth() + 1) + '/' + logDay.getFullYear(),
+        bonus: bonuses[i],
+        dept: OS_DEMO_DEPTS_[i % OS_DEMO_DEPTS_.length],
+        job: OS_DEMO_JOBS_[(i * 3) % OS_DEMO_JOBS_.length],
+        from: p2(start.getHours()) + ':' + p2(start.getMinutes()),
+        to: p2(finish.getHours()) + ':' + p2(finish.getMinutes()),
+        auth: OS_DEMO_PEOPLE_[i % OS_DEMO_PEOPLE_.length],
+        deployedBy: OS_DEMO_PEOPLE_[(i + 2) % OS_DEMO_PEOPLE_.length],
+        reportsTo: OS_DEMO_PEOPLE_[(i + 4) % OS_DEMO_PEOPLE_.length],
+        status: OS_DEMO_STATUS_[i % OS_DEMO_STATUS_.length],
+        site: s.site,
+        zone: s.zones[i % s.zones.length]
+      });
+    }
+    return out;
+  }
+
+  function withOsLog_(d) {
+    if (d) {
+      d.osLog = osDemoLog_(d);
+      // One unreadable row, so the page's own warning is on screen rather than
+      // only ever exercised by a test.
+      d.osLogSkipped = 1;
+    }
+    return d;
+  }
+
   function archiveLinks() {
     var out = [], d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -170,7 +247,7 @@ const STUB = `
     return {
       withSuccessHandler: function (f) { return runner(f, fail); },
       withFailureHandler: function (f) { return runner(ok, f); },
-      getDashboardData: function () { reply(function () { return withNote_(withOsSpell_(buildTourDummyData_())); }); },
+      getDashboardData: function () { reply(function () { return withOsLog_(withNote_(withOsSpell_(buildTourDummyData_()))); }); },
       getArchiveLinks: function () { reply(archiveLinks); },
       getLastRefreshTimestamp: function () { reply(function () { return null; }); }
     };

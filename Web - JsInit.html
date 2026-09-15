@@ -216,6 +216,11 @@
     allSideData = data.rawSideData || [];
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
+    // Not passed through scopeRowsToSite_: Site is a column of the OS log and
+    // a heading ON the OS page, so narrowing by building here would hide the
+    // heading the rows are meant to be read under.
+    osLogRows = data.osLog || [];
+    osLogSkipped = Number(data.osLogSkipped) || 0;
     // The server's list is already every operator on site, which is what the
     // search wants regardless of the building in view.
     allBonusList = data.bonusList || [];
@@ -245,7 +250,7 @@
     // Switch to the linked page once there is something rendered to show.
     if (typeof DEEP_PAGE !== 'undefined' && DEEP_PAGE && !_deepPageApplied) {
       _deepPageApplied = true;
-      var idx = ['overall', 'volume', 'bonus', 'data'].indexOf(DEEP_PAGE);
+      var idx = DEEP_LINK_PAGES_PAK_.indexOf(DEEP_PAGE);
       if (idx !== -1) goToPage(idx);
     }
   }

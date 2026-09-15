@@ -6,7 +6,7 @@ function include(filename) {
 // nothing straight off the URL is ever interpolated into the page. Each is
 // exposed to the template as its own plain string rather than as JSON, which
 // avoids any escaping question inside the <script> block.
-var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'data'];
+var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'os', 'data'];
 // Mirrors the <option> values on the Hours Range and Time Window dropdowns. A
 // link cannot request a setting the UI does not offer.
 var DEEP_LINK_HOURS_ = ['3', '6', '9', '12', '24'];
@@ -264,17 +264,20 @@ var PROC_TOTAL_HEADER_ = 'Sum of Std hrs';
 // reads os:false, and the feature disappears with no error anywhere.
 var PROC_OS_HEADER_ = 'OS/ Indirect';
 
-// The same spell, clipped to the 15-minute block the row is about: a
-// 07:26-08:06 spell reads 07:26-07:30 on the 07:15 row and 08:00-08:06 on the
-// 08:00 one. The band can then report when the indirect work actually started
-// and stopped, instead of the reader inferring it from where the grey begins
-// and ends - which is only ever accurate to a quarter of an hour.
+// The same spell, clipped to the 15-minute block the row is about, as ONE cell
+// reading "07:26 - 07:30": a 07:26-08:06 spell reads 07:26-07:30 on the 07:15
+// row and 08:00-08:06 on the 08:00 one. The band can then start and stop where
+// the indirect work really did, instead of on the quarter-hour either side of
+// it, and say the times outright on hover.
 //
-// Optional, unlike the two above: every archive cut before these columns
-// existed has no header to match, both resolve to -1, and a band from such a
-// day simply carries no times. Nothing else changes.
-var PROC_OS_START_HEADER_ = 'OS Start Time';
-var PROC_OS_END_HEADER_ = 'OS End Time';
+// One column rather than a pair, because the two halves are never read apart -
+// every consumer wants the range - and two columns invited a row carrying a
+// start with no finish, which is half a fact and cannot be drawn.
+//
+// Optional, unlike the two above: every archive cut before this column existed
+// has no header to match, it resolves to -1, and a band from such a day simply
+// carries no times. Nothing else changes.
+var PROC_OS_TIME_HEADER_ = 'OS Time';
 
 var PROC_AREA_COLUMNS_ = [
   { key: 'pie',              stdHeader: 'D.Analysis - OSR PiE',            volHeader: 'Volume - PiE' },
@@ -329,13 +332,11 @@ function buildProcColumnMap_(headerRow) {
 
   var totalIdx = idx[normaliseProcHeader_(PROC_TOTAL_HEADER_)];
   var osIdx = idx[normaliseProcHeader_(PROC_OS_HEADER_)];
-  var osFromIdx = idx[normaliseProcHeader_(PROC_OS_START_HEADER_)];
-  var osToIdx = idx[normaliseProcHeader_(PROC_OS_END_HEADER_)];
+  var osTimeIdx = idx[normaliseProcHeader_(PROC_OS_TIME_HEADER_)];
   var map = {
     total: (totalIdx === undefined) ? -1 : totalIdx,
     os: (osIdx === undefined) ? -1 : osIdx,
-    osFrom: (osFromIdx === undefined) ? -1 : osFromIdx,
-    osTo: (osToIdx === undefined) ? -1 : osToIdx,
+    osTime: (osTimeIdx === undefined) ? -1 : osTimeIdx,
     areas: []
   };
 
@@ -373,7 +374,7 @@ function legacyProcColumnMap_(isV2) {
   var n = isV2 ? 9 : 7;
   var total = 3 + n;
   // No OS columns at all on a file old enough to need this fallback.
-  var map = { total: total, os: -1, osFrom: -1, osTo: -1, areas: [] };
+  var map = { total: total, os: -1, osTime: -1, areas: [] };
 
   for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
     var key = PROC_AREA_COLUMNS_[i].key;
@@ -401,7 +402,7 @@ function readProcRows_(sheet, lastRow) {
   return {
     vals: sheet.getRange(2, 1, lastRow - 1,
                          Math.max(lastCol, map.total + 1, map.os + 1,
-                                  map.osFrom + 1, map.osTo + 1)).getValues(),
+                                  map.osTime + 1)).getValues(),
     // Only columns A:C are ever needed as display values — buildSideEntry_ reads
     // dispsRow[0] (time range) and dispsRow[2] (bonus) and takes every other
     // field from vals. Reading 3 columns instead of the full width removes most
@@ -428,21 +429,158 @@ function procOsStatus_(raw) {
   return (!v || v.toUpperCase() === 'NO') ? '' : v;
 }
 
-// A clip time -> "HH:MM", or '' if the cell holds nothing usable.
+// The OS Time cell -> { from, to }, or null if it holds nothing usable.
 //
-// The notebook writes these with RAW, so they arrive as the strings it wrote.
-// A Date is handled anyway because the column is a TIME column to look at and
-// somebody formatting it as one - or retyping a cell by hand - is the obvious
-// thing to happen to it, and getValues() then hands back a Date object whose
-// toString is neither a time nor empty. Left unhandled that renders as
-// "Mon Dec 30 1899..." inside the band's tooltip.
-function procOsTime_(raw) {
-  if (raw == null || raw === '') return '';
-  if (raw instanceof Date) {
-    return ('0' + raw.getHours()).slice(-2) + ':' + ('0' + raw.getMinutes()).slice(-2);
+// Both halves or neither: half a range cannot be drawn as one, and a tooltip
+// reading "07:26 - " is worse than no tooltip. A cell that is empty, or that
+// holds something this does not recognise, reads as no times at all - which is
+// what an archive cut before the column existed also reads as, so the two
+// cases need no separate handling.
+function procOsSpan_(raw) {
+  if (raw == null) return null;
+  var m = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/.exec(String(raw).trim());
+  if (!m) return null;
+  return {
+    from: ('0' + m[1]).slice(-2) + ':' + m[2],
+    to: ('0' + m[3]).slice(-2) + ':' + m[4]
+  };
+}
+
+// ─────────────────────────────────────────────
+// The OS log -> the OS page
+//
+// Read straight from the log rather than from the pivot. The pivot keeps only
+// that a block WAS indirect and what was decided about it; the OS page is
+// about everything else the form captured - which department, which job, who
+// authorised it, who deployed them, who they report to.
+//
+// Columns, A-indexed, into the 20 that "Spreadsheet - OS Log.js" writes:
+//
+//   A Date   B Bonus   E Department   F Job Type   H Start   I Finish
+//   K TM Authorising   N Deployed by   O Reports to   Q Record Status
+//   R Site   S Zone
+//
+// Those positions are NOT stable across edits to that script: it selects
+// source columns by index into a list, so dropping one shifts every output
+// column after it - which has happened once already, when the log went from
+// 25 columns to 20. A wrong index here reads a POPULATED cell, so the failure
+// is a page of plausible nonsense rather than an error anybody sees. The same
+// indices are pinned from the other side in tools/test_oslog.js.
+// ─────────────────────────────────────────────
+var OS_LOG_SHEET_NAME_ = 'os log';   // matched lower-cased; see readOsLogRows_
+var OS_LOG_FIRST_ROW_ = 7;           // 1-6 are the source URLs and headings
+var OS_LOG_WIDTH_ = 20;              // A:T
+var OS_LOG_COLS_ = {
+  date: 0, bonus: 1, dept: 4, job: 5, start: 7, finish: 8,
+  auth: 10, deployedBy: 13, reportsTo: 14, status: 16, site: 17, zone: 18
+};
+
+function pad2Os_(n) { return ('0' + n).slice(-2); }
+
+// The Date cell -> "dd/mm/yyyy", or '' when it is not a date this understands.
+//
+// Matched on the PARSED value rather than on the cell's text, because the
+// display format is a formatting choice somebody can change: a column showing
+// "9/9/2026" instead of "09/09/2026" would otherwise drop every row, and the
+// page would come back empty with nothing to say why.
+function osLogDateKey_(v) {
+  if (v instanceof Date) {
+    return pad2Os_(v.getDate()) + '/' + pad2Os_(v.getMonth() + 1) + '/' + v.getFullYear();
   }
-  var m = /^(\d{1,2}):(\d{2})/.exec(String(raw).trim());
-  return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : '';
+  var m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(String(v == null ? '' : v).trim());
+  return m ? pad2Os_(Number(m[1])) + '/' + pad2Os_(Number(m[2])) + '/' + m[3] : '';
+}
+
+// A Start / Finish cell -> "HH:MM", or '' when it holds no usable time.
+function osLogTime_(v) {
+  if (v instanceof Date) return pad2Os_(v.getHours()) + ':' + pad2Os_(v.getMinutes());
+  var m = /^(\d{1,2}):(\d{2})/.exec(String(v == null ? '' : v).trim());
+  if (!m) return '';
+  var h = Number(m[1]);
+  return (h >= 0 && h < 24) ? pad2Os_(h) + ':' + m[2] : '';
+}
+
+function osLogCell_(row, i) {
+  return String(row.length > i && row[i] != null ? row[i] : '').trim();
+}
+
+// Every logged spell on the dates the dashboard's own axis covers.
+//
+// Filtered to those dates because the log is rebuilt whole from the approval
+// forms and holds every day they do: unfiltered, the payload would carry
+// months of history to draw one shift. The date BEFORE each is admitted too,
+// since the Date column is the PRODUCTION day - which runs 06:00 to 06:00 - so
+// a spell starting at 02:00 on the 9th is logged against the 8th.
+//
+// Returns { rows, skipped }. The count is shown on the page rather than
+// swallowed: a spell with an unreadable date or time cannot be placed on a
+// clock, and a page quietly one row short is the worst of the options.
+function readOsLogRows_(ss, timeRanges) {
+  try {
+    // "OS log" in the script and "OS Log" in conversation, and getSheetByName
+    // matches exactly. Resolved case-insensitively so a capital L one way or
+    // the other cannot silently empty the whole page.
+    var sheets = ss.getSheets();
+    var sheet = null;
+    for (var s = 0; s < sheets.length; s++) {
+      if (sheets[s].getName().trim().toLowerCase() === OS_LOG_SHEET_NAME_) {
+        sheet = sheets[s];
+        break;
+      }
+    }
+    if (!sheet) return { rows: [], skipped: 0 };
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < OS_LOG_FIRST_ROW_) return { rows: [], skipped: 0 };
+
+    var want = {};
+    for (var t = 0; t < timeRanges.length; t++) {
+      var d = parseTimeRangeStart_(timeRanges[t]);
+      if (!d) continue;
+      want[osLogDateKey_(d)] = true;
+      want[osLogDateKey_(new Date(d.getTime() - 86400000))] = true;
+    }
+
+    var vals = sheet.getRange(OS_LOG_FIRST_ROW_, 1,
+                              lastRow - OS_LOG_FIRST_ROW_ + 1,
+                              OS_LOG_WIDTH_).getDisplayValues();
+    var rows = [];
+    var skipped = 0;
+    for (var i = 0; i < vals.length; i++) {
+      var r = vals[i];
+      var bonus = osLogCell_(r, OS_LOG_COLS_.bonus).toUpperCase();
+      var dateKey = osLogDateKey_(osLogCell_(r, OS_LOG_COLS_.date));
+      // A blank line in the log is a spacer, not a loss.
+      if (!bonus && !dateKey) continue;
+      if (!dateKey || !want[dateKey]) {
+        // Out of the window is not a failure; unreadable is.
+        if (!dateKey) skipped++;
+        continue;
+      }
+      var from = osLogTime_(osLogCell_(r, OS_LOG_COLS_.start));
+      var to = osLogTime_(osLogCell_(r, OS_LOG_COLS_.finish));
+      if (!bonus || !from || !to) { skipped++; continue; }
+      rows.push({
+        date: dateKey,
+        bonus: bonus,
+        dept: osLogCell_(r, OS_LOG_COLS_.dept),
+        job: osLogCell_(r, OS_LOG_COLS_.job),
+        from: from,
+        to: to,
+        auth: osLogCell_(r, OS_LOG_COLS_.auth),
+        deployedBy: osLogCell_(r, OS_LOG_COLS_.deployedBy),
+        reportsTo: osLogCell_(r, OS_LOG_COLS_.reportsTo),
+        status: osLogCell_(r, OS_LOG_COLS_.status),
+        site: osLogCell_(r, OS_LOG_COLS_.site),
+        zone: osLogCell_(r, OS_LOG_COLS_.zone)
+      });
+    }
+    return { rows: rows, skipped: skipped };
+  } catch (e) {
+    // Degrade, never fail the load: an unreadable OS log costs the OS page,
+    // not the dashboard.
+    return { rows: [], skipped: 0 };
+  }
 }
 
 function buildSideEntry_(valsRow, dispsRow, map) {
@@ -462,12 +600,13 @@ function buildSideEntry_(valsRow, dispsRow, map) {
   // Same bargain as the status: carried only on the rows that have one, and
   // only when the row is actually on OS. A clip time on a row reading NO would
   // be a leftover from a previous run rather than a fact about this block.
-  if (entry.os) {
-    var osFrom = map.osFrom >= 0 ? procOsTime_(valsRow[map.osFrom]) : '';
-    var osTo = map.osTo >= 0 ? procOsTime_(valsRow[map.osTo]) : '';
-    // Both or neither. Half a range cannot be drawn as one, and a tooltip
-    // reading "07:26 - " is worse than no tooltip.
-    if (osFrom && osTo) { entry.osFrom = osFrom; entry.osTo = osTo; }
+  //
+  // Split into two fields here rather than passed on as the one string the
+  // sheet holds, because the front end needs the ends apart: the band's left
+  // edge is placed from one and its right edge from the other.
+  if (entry.os && map.osTime >= 0) {
+    var span = procOsSpan_(valsRow[map.osTime]);
+    if (span) { entry.osFrom = span.from; entry.osTo = span.to; }
   }
   for (var i = 0; i < map.areas.length; i++) {
     var a = map.areas[i];
@@ -750,6 +889,10 @@ function getDashboardData(archiveUrl) {
   var b2Val = sheet.getRange(CONFIG.DATETIME_CELL).getValue();
   var noteVal = sheet.getRange('G3').getValue();
 
+  // Read AFTER the timeline trim above, so the dates it filters on are the
+  // ones the dashboard ends up drawing rather than the ones it started with.
+  var osLog = readOsLogRows_(ss, timeRanges);
+
   return {
     threshold: threshold,
     lastRefresh: displayTime || Utilities.formatDate(lastRefresh, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),
@@ -759,7 +902,9 @@ function getDashboardData(archiveUrl) {
     bonusList: Object.keys(bonusSet).sort(),
     currentTimestamp: (b2Val instanceof Date) ? b2Val.getTime() : null,
     note: noteVal,
-    tmDirectory: readTmDirectory_(ss)
+    tmDirectory: readTmDirectory_(ss),
+    osLog: osLog.rows,
+    osLogSkipped: osLog.skipped
   };
 }
 

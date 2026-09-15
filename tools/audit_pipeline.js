@@ -312,13 +312,13 @@ head('[7] notebook internals');
   // No error is raised anywhere along that path, which is why this is a check
   // rather than a comment.
   check(tag + 'OS column in PROC_HEADER', src.indexOf('"OS/ Indirect"') !== -1);
-  // The three OS columns have to stay LAST, and in this order.
+  // Both OS columns have to stay LAST, and in this order.
   // legacyProcColumnMap_ addresses the standard-hours and volume blocks
   // positionally for files too old to have a usable header row, and those
   // offsets only hold while nothing is inserted AHEAD of them. Appending past
-  // them - which is all the two clip times do - costs nothing.
+  // them - which is all OS Time does - costs nothing.
   check(tag + 'the OS columns are last, in order',
-        /\+\s*\[\s*"OS\/ Indirect",\s*"OS Start Time",\s*"OS End Time"\s*\]\s*\)/
+        /\+\s*\[\s*"OS\/ Indirect",\s*"OS Time"\s*\]\s*\)/
           .test(src.replace(/\s*\n\s*/g, ' ')));
 });
 
@@ -402,7 +402,7 @@ head('[8] syntax');
  // the page just as hard - being small is not being safe.
  ['Web - JsModal.html', 1], ['Web - JsReorder.html', 1],
  ['Web - JsToast.html', 1], ['Web - JsPullRefresh.html', 1],
- ['Web - JsOnboarding.html', 1]].forEach(pair => {
+ ['Web - JsOnboarding.html', 1], ['Web - JsPageOs.html', 1]].forEach(pair => {
   let body = R(pair[0]);
   if (pair[1]) body = body.replace(/^\s*<script>/, '').replace(/<\/script>\s*$/, '');
   try { new vm.Script(body, { filename: pair[0] }); check(pair[0], true); }

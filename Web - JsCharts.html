@@ -55,22 +55,57 @@
   // approved until 10:00 and awaiting a decision after it draws as two
   // adjacent bands with a label each, not as one band making a claim about
   // both.
+  // Where inside its own block a clip time falls, as a fraction of that block:
+  // 07:26 in a 07:15-07:30 block is 0.733 of the way through it. Both ends of
+  // the block come from the row's own label, so this is right at 15, 30 and 60
+  // minutes without being told which is in force. -1 when it cannot be worked
+  // out, which is the signal to fall back to the block's own edge.
+  function osClipFraction_(row, hhmm, isEnd) {
+    if (!row || !row.dateTime) return -1;
+    var p = extractRangePartsPak(row.dateTime);
+    var a = osClipMinsPak_(String(p.start).split(' ').pop(), false);
+    var b = osClipMinsPak_(String(p.end).split(' ').pop(), true);
+    var t = osClipMinsPak_(hhmm, isEnd);
+    if (a < 0 || b < 0 || t < 0) return -1;
+    if (b <= a) b += 1440;          // a block that runs past midnight
+    if (t < a) t += 1440;
+    var f = (t - a) / (b - a);
+    return (f < 0 || f > 1) ? -1 : f;
+  }
+
   // One band, plus the clipped times behind it: the FIRST start and the LAST
   // end inside its own range. agg is in axis order, so those two are the ends
   // of the spell the band draws - 07:26 and 08:06 for a band covering 07:15 to
   // 08:15 - which is what the tooltip reports.
   //
-  // The two fields are set only when both are there, so a band built from a day
-  // with no clip columns keeps exactly the shape it had before they existed.
+  // x0 and x1 are those same two times as FRACTIONAL axis positions, so the
+  // grey can begin and end where the spell did rather than on the quarter-hour
+  // either side of it. Index i - 0.5 is the left edge of block i and i + 0.5
+  // its right, and getPixelForValue is linear in the value on a category
+  // scale, so a fraction between them interpolates - a 07:26 start lands just
+  // under half way into the 07:15 block's own width.
+  //
+  // Every one of these fields is set only when the times are there, so a band
+  // built from a day with no OS Time column keeps exactly the shape, and the
+  // block-edge geometry, that it had before the column existed.
   function pushOsBand_(bands, agg, from, to, status) {
     var band = { from: from, to: to, status: status };
-    var t0 = '', t1 = '';
+    var t0 = '', t1 = '', i0 = -1, i1 = -1;
     for (var i = from; i <= to; i++) {
       if (!agg[i]) continue;
-      if (!t0 && agg[i].osFrom) t0 = agg[i].osFrom;
-      if (agg[i].osTo) t1 = agg[i].osTo;
+      if (!t0 && agg[i].osFrom) { t0 = agg[i].osFrom; i0 = i; }
+      if (agg[i].osTo) { t1 = agg[i].osTo; i1 = i; }
     }
-    if (t0 && t1) { band.t0 = t0; band.t1 = t1; }
+    if (t0 && t1) {
+      band.t0 = t0;
+      band.t1 = t1;
+      var f0 = osClipFraction_(agg[i0], t0, false);
+      var f1 = osClipFraction_(agg[i1], t1, true);
+      if (f0 >= 0 && f1 >= 0) {
+        band.x0 = i0 - 0.5 + f0;
+        band.x1 = i1 - 0.5 + f1;
+      }
+    }
     bands.push(band);
   }
 
@@ -135,15 +170,22 @@
 
   // Walks each band and hands the caller its pixel span.
   //
-  // Both edges land ON their OS point rather than half a step outside it.
-  // Covering the whole first and last window is arguably the truer statement,
-  // but it puts grey outside the points the hover line sits on, which reads as
-  // the band overrunning where the OS actually started and stopped. Cutting at
-  // the points makes the edges and the hover line agree.
+  // The edges are the SPELL's own times where the row carries them - see
+  // pushOsBand_ - so a 07:26-08:06 spell greys from part-way through the 07:15
+  // block to part-way through the 08:00 one, rather than from one quarter-hour
+  // point to another. The grey then says when the indirect work happened
+  // instead of which blocks it touched, which is the whole of what it is for.
   //
-  // The cost is that a band of ONE window has no width at all, so it gets a
-  // minimum, centred on its point. That is the one case where the edges are not
-  // the honest thing - being invisible would be worse.
+  // What that costs, and it is a real cost: the edges no longer line up with
+  // the hover crosshair, which snaps to the nearest block. The tooltip says
+  // the two times outright for that reason.
+  //
+  // Without times - an archive cut before the OS Time column existed - both
+  // edges fall back to landing ON their OS point rather than half a step
+  // outside it, which is where they used to be for every band.
+  //
+  // Either way a band can come out with no width at all, so it gets a minimum,
+  // centred on itself. Being invisible would be worse.
   var OS_BAND_MIN_W = 8;
 
   function eachOsBand_(chart, opts, fn) {
@@ -161,8 +203,9 @@
     // crowded. Without it the only options were an abbreviation or nothing.
     var spans = [];
     for (var b = 0; b < opts.bands.length; b++) {
-      var p0 = x.getPixelForValue(opts.bands[b].from);
-      var p1 = x.getPixelForValue(opts.bands[b].to);
+      var band = opts.bands[b];
+      var p0 = x.getPixelForValue(band.x0 === undefined ? band.from : band.x0);
+      var p1 = x.getPixelForValue(band.x1 === undefined ? band.to : band.x1);
       if (!isFinite(p0) || !isFinite(p1)) { spans.push(null); continue; }
       if (p1 - p0 < OS_BAND_MIN_W) {
         var mid = (p0 + p1) / 2;

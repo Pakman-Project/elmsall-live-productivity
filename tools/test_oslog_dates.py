@@ -249,13 +249,17 @@ check("and it is no longer a gate",
 # The Apps Script is the other half of this contract: these indices are only
 # right for as long as it writes that layout.
 script = open(os.path.join(HERE, "..", "Spreadsheet - OS Log.js"), encoding="utf-8").read()
-check("the pivot writes both clipped times",
-      "_span[0], _span[1]" in "".join(cells) and
-      '"OS/ Indirect", "OS Start Time", "OS End Time"' in "".join(cells),
-      "BB and BC on Processed Data (15mins)")
-check("and blanks them on a row that was never on OS",
-      'OS_SPAN.get((dtr, bonus)) or ["", ""]' in "".join(cells),
-      "a short row would leave the previous run's cells under the new figures")
+check("the pivot writes the clipped range as ONE cell",
+      'f"{_span[0]} - {_span[1]}" if _span else ""' in "".join(cells) and
+      '"OS/ Indirect", "OS Time"' in "".join(cells),
+      "BB on Processed Data (15mins), reading \"07:26 - 07:30\"")
+check("and there is no trace of the pair it started as",
+      "OS Start Time" not in "".join(cells),
+      "the two halves are never read apart, and a pair invited half a range")
+check("a row that was never on OS gets a blank, not a short row",
+      'OS_SPAN.get((dtr, bonus))' in "".join(cells) and
+      'if _span else ""' in "".join(cells),
+      "a short row would leave the previous run's cell under the new figures")
 
 check("the script still writes 20 columns",
       "combinedResults.length, 20)" in script,

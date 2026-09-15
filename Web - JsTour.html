@@ -255,11 +255,37 @@ var TOUR_STEPS = [
     title: 'Site-wide filter',
     body: 'This banner shows the active filter — every page now reflects only that operator. “Clear all” removes it.' },
 
-  // ===== Part 6 — Data Table page ==========================================
-  { part: 6, page: 3, target: '.span-12 .mini-table-title',
+  // ===== Part 6 — OS page ==================================================
+  // A page the tour would otherwise swipe straight through on its way to the
+  // Data Table, which is how a whole page ends up undiscovered.
+  { part: 6, page: 3, target: '.os-page-head',
+    title: 'Operational Support',
+    body: 'Who was NOT producing, and why. This page reads the OS log itself rather than the pivot, so it can show the department, the job, and who signed it off — none of which the productivity figures carry.' },
+  { part: 6, page: 3, target: '#osFrom',
+    title: 'Its own From / To',
+    body: 'Like the Bonus page, this one has its own range over the whole 24 hours — which is why Hours Range and Time Window grey out while you are here. A spell counts if it OVERLAPS the range, so somebody who started before it and is still on OS still appears.' },
+  { part: 6, page: 3, target: '#osBody .breakdown-row',
+    interactive: { sel: '#osBody .breakdown-row', type: 'click' },
+    title: 'A bar per zone',
+    body: 'Each bar is a zone, and its length is how many people were on OS there — people, not forms, so somebody logged for two jobs counts once. Bars are scaled within their own site. Click one to open it.' },
+  { part: 6, page: 3, target: '#osBody .breakdown-detail.open .os-job-table',
+    action: function () {
+      var row = document.querySelector('#osBody .breakdown-row');
+      if (row && !row.classList.contains('expanded') &&
+          typeof toggleBreakdownDetail === 'function') toggleBreakdownDetail(row);
+    },
+    cleanup: function () {
+      var row = document.querySelector('#osBody .breakdown-row.expanded');
+      if (row && typeof toggleBreakdownDetail === 'function') toggleBreakdownDetail(row);
+    },
+    title: 'Departments, jobs and records',
+    body: 'Inside a zone: its departments, each job type under them, and one row per logged spell — the real start and finish, who authorised it, who deployed them, who they report to, and where the record stands. The bonus number is clickable, like everywhere else.' },
+
+  // ===== Part 7 — Data Table page ==========================================
+  { part: 7, page: 4, target: '.span-12 .mini-table-title',
     title: 'Data Table page',
     body: 'The raw numbers behind everything — one row per time block. You can search, sort, expand, and export it.' },
-  { part: 6, page: 3,
+  { part: 7, page: 4,
     interactive: function (isMobile) {
       return isMobile
         ? { sel: '#mainSortSelect', type: 'change', changeValue: 'performance' }
@@ -267,7 +293,7 @@ var TOUR_STEPS = [
     },
     title: 'Sort any column',
     body: 'A column header sorts by that column (on mobile, the sort dropdown does the same) — here it sorts by Productivity %.' },
-  { part: 6, page: 3,
+  { part: 7, page: 4,
     interactive: function (isMobile) {
       // Desktop rows are clickable anywhere; mobile cards only toggle from their header.
       return isMobile
@@ -276,34 +302,34 @@ var TOUR_STEPS = [
     },
     title: 'Expand a row',
     body: 'A row expands to show the per-operator detail behind that time block — tap its header on mobile.' },
-  { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content',
+  { part: 7, page: 4, target: '.main-detail-row.open .main-detail-content',
     action: function () { tourEnsureExpandedRow_(); },
     title: 'Per-operator detail',
     body: 'Each expanded row lists every operator in that block with their volumes and productivity. The bonus numbers in here are clickable too.' },
-  { part: 6, page: 3, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
+  { part: 7, page: 4, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
     interactive: { sel: '.main-detail-row.open .main-detail-content .clickable-bonus', type: 'click' },
     action: function () { tourEnsureExpandedRow_(); },
     title: 'Filter from the detail',
     body: 'Just like on the Bonus page, an operator here filters the whole dashboard to them.' },
-  { part: 6, page: 3, target: '#activeFilterBanner',
+  { part: 7, page: 4, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
     action: function () { tourEnsureExpandedRow_(); tourEnsureFilter_(); },
     cleanup: function () { expandedRowKey = null; },
     title: 'Filtered again',
     body: 'Same site-wide filter, reached from the data table. “Clear all” removes it.' },
-  { part: 6, page: 3, target: '#downloadRawDataBtn',
+  { part: 7, page: 4, target: '#downloadRawDataBtn',
     title: 'Export to CSV',
     body: 'Clicking “Download raw data” exports every individual entry as a CSV — handy for pivoting in Excel.' },
 
-  // ===== Part 7 — Sharing ==================================================
-  { part: 7, page: 0, target: '#shareBtn',
+  // ===== Part 8 — Sharing ==================================================
+  { part: 8, page: 0, target: '#shareBtn',
     // Folded into the burger menu whenever the header is collapsed, where it
     // measures 0x0 and the ring has nothing to draw around.
     action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     interactive: { sel: '#shareBtn', type: 'click' },
     title: 'Share what you are looking at',
     body: 'Found something worth passing on? The share button gives you a link, or an image of the page.' },
-  { part: 7, page: 0, target: '#shareOverlay .breakdown-close', modal: true,
+  { part: 8, page: 0, target: '#shareOverlay .breakdown-close', modal: true,
     interactive: { sel: '#shareOverlay .breakdown-close', type: 'click' },
     // Reached forwards the dialog is already open; reached BACKWARDS (from the
     // next part) it is not, and the step would have had nothing to point at.
@@ -318,8 +344,8 @@ var TOUR_STEPS = [
     title: 'A link, or a picture',
     body: 'The link reopens this exact view for whoever you send it to — same page, same day, same bonus filter. Or download the page as an image: it captures the WHOLE page, including anything scrolled out of sight, stamped with the time of the data. Click the × to close.' },
 
-  // ===== Part 8 — Arranging the layout =====================================
-  { part: 8, page: 0, target: '#reorderBtn',
+  // ===== Part 9 — Arranging the layout =====================================
+  { part: 9, page: 0, target: '#reorderBtn',
     // Whenever the header is collapsed this button is inside the burger menu,
     // so the ring would have nothing visible to point at. Opening the menu
     // first puts it on screen at any width; the cleanup on the last step of
@@ -327,12 +353,12 @@ var TOUR_STEPS = [
     action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     title: 'Arrange the layout',
     body: 'Not everyone reads these pages in the same order. The pen button turns on rearrange mode, where you can move the panels around to suit how you work.' },
-  { part: 8, page: 0, target: '.reorder-bar',
+  { part: 9, page: 0, target: '.reorder-bar',
     action: function () { tourEnterReorder_(); },
     interactive: { sel: '.reorder-bar .reorder-btn:not([disabled])', type: 'click' },
     title: 'Move a panel',
     body: 'Every panel now carries a bar showing its position, with arrows to move it earlier or later — watch one move. No dragging, so it works the same on a phone and never fights with scrolling.' },
-  { part: 8, page: 0, target: '.toast',
+  { part: 9, page: 0, target: '.toast',
     // Rearrange mode is what raises this toast, and the step is ringing it —
     // so reaching here backwards, after the mode was turned off, needs it back.
     action: function () { tourEnterReorder_(); },
@@ -341,21 +367,21 @@ var TOUR_STEPS = [
     body: 'This message stays up for as long as rearrange mode is on, so you always know where you are. “Done” finishes, “Reset order” puts everything back. It works the same on the Volume and Bonus pages.',
     cleanup: function () { tourRestoreReorder_(); } },
 
-  // ===== Part 9 — Your settings are remembered =============================
-  { part: 9, page: 0, target: '.hc-filters',
+  // ===== Part 10 — Your settings are remembered =============================
+  { part: 10, page: 0, target: '.hc-filters',
     title: 'It remembers your setup',
     body: 'You don’t have to set things up twice. Your Hours Range and Time Window are saved in this browser and come back automatically next time you open the dashboard.' },
-  { part: 9, page: 0, target: null,
+  { part: 10, page: 0, target: null,
     title: 'What else is saved',
     body: 'Also remembered: the Volume and Bonus display modes, which work areas you’ve hidden with the chips, your Area Groups and split charts, the panel order you arranged, and how many rows the bonus tables show. Your bonus-number filter is NOT saved — every visit starts showing everyone.' },
-  { part: 9, page: 0, target: '#settingsBtn',
+  { part: 10, page: 0, target: '#settingsBtn',
     // Like every other header button, this one folds into the burger menu on a
     // narrow window, where it would measure 0x0 and get no visible ring.
     action: function () { tourOpenHeaderMenuIfCollapsed_(); },
     interactive: { sel: '#settingsBtn', type: 'click' },
     title: 'Where you change all this',
     body: 'The gear button opens Settings — the handful of things you can change about how the dashboard behaves for you. Here it goes.' },
-  { part: 9, page: 0, target: '#settingsOverlay .breakdown-close', modal: true,
+  { part: 10, page: 0, target: '#settingsOverlay .breakdown-close', modal: true,
     interactive: { sel: '#settingsOverlay .breakdown-close', type: 'click' },
     // Reached forwards the dialog is already open; reached BACKWARDS (from the
     // theme step) it is not, and the step would have had nothing to point at.
@@ -366,7 +392,7 @@ var TOUR_STEPS = [
     cleanup: function () { if (typeof closeSettings === 'function') closeSettings(); },
     title: 'What you can change',
     body: 'Filtering: normally picking a bonus number replaces the last one — turn this on to build up a set of people instead. Work areas: hiding an area on Volume hides it on Bonus too, unless you turn that off. Below them, every keyboard shortcut, and a reset that puts the whole dashboard back to how it arrives out of the box. All of it saved in this browser only. Click the × to close.' },
-  { part: 9, page: 0, target: '#themeToggleBtn',
+  { part: 10, page: 0, target: '#themeToggleBtn',
     // Also inside the burger menu when the header is collapsed. The menu is
     // held open for this last step of the part, then closed.
     action: function () { tourOpenHeaderMenuIfCollapsed_(); },
@@ -374,8 +400,8 @@ var TOUR_STEPS = [
     title: 'Light or dark',
     body: 'This button switches between light and dark mode — that’s remembered too, so the dashboard always opens the way you like it.' },
 
-  // ===== Part 10 — Wrap up ==================================================
-  { part: 10, page: 0, target: null,
+  // ===== Part 11 — Wrap up ==================================================
+  { part: 11, page: 0, target: null,
     title: 'You’re all set ✅',
     body: 'That’s the tour — your real live data is ready now. Replay it any time, or jump to a single section, from the “?” button in the header.' }
 ];
@@ -399,17 +425,18 @@ var TOUR_PART_TITLES = {
   3: 'Overall — charts & groups',
   4: 'Volume page',
   5: 'Bonus Numbers page',
-  6: 'Data Table page',
-  7: 'Sharing a view',
-  8: 'Arranging the layout',
-  9: 'Your saved settings',
-  10: 'Wrap up'
+  6: 'OS page',
+  7: 'Data Table page',
+  8: 'Sharing a view',
+  9: 'Arranging the layout',
+  10: 'Your saved settings',
+  11: 'Wrap up'
 };
 
 // Parts that are skipped in the "?" replay menu — the wrap-up is just a
 // closing note, so it isn't worth jumping to on its own. It still runs at the
 // end of a full tour.
-var TOUR_MENU_HIDDEN_PARTS = { 10: true };
+var TOUR_MENU_HIDDEN_PARTS = { 11: true };
 
 function firstStepIndexOfPart_(part) {
   for (var i = 0; i < TOUR_STEPS.length; i++) {

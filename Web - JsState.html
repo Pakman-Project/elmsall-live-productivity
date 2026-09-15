@@ -677,6 +677,18 @@ var allBonusList = [];
 // upper-cased code, matching how bonus numbers are canonicalised everywhere
 // else; see readTmDirectory_ in Code.js.
 var tmDirectory = {};
+// Every logged OS spell on the dates the axis covers, straight from the OS log
+// - one object per RECORD, not per 15-minute block, which is what makes the OS
+// page able to show the department, job, authoriser and times that the pivot
+// throws away. See readOsLogRows_ in Code.js.
+//
+// Not narrowed by the warehouse picker: Site is a column of the log and a
+// grouping level ON the page, so filtering by building here would hide the
+// heading it is meant to be read under.
+var osLogRows = [];
+// Records dropped for an unreadable date or time. Shown on the page rather
+// than swallowed - a page quietly one row short is the worst of the options.
+var osLogSkipped = 0;
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];
@@ -744,9 +756,18 @@ var syncAreaChips = true;
 // Deferred per-page rendering: inputs from the last applyLocalFiltersPak() pass,
 // plus which pages still need building. Pages are rendered on first view.
 var pageRenderCtx = null;
-var pageDirty = [true, true, true, true];
+// Overall, Volume, Bonus, OS, Data Table. OS was inserted at 3 rather than
+// appended, because the rail order IS the page order - the swipe and the
+// arrow keys move by index - so a tab out of place would navigate backwards.
+//
+// The same order, by name, as Code.js's DEEP_LINK_PAGES_. A deep link resolves
+// to an INDEX in this list, so the two have to agree or ?page=data opens the
+// OS page. Declared here rather than written out at the point of use, where a
+// second copy sat and was missed when this page was inserted.
+var DEEP_LINK_PAGES_PAK_ = ['overall', 'volume', 'bonus', 'os', 'data'];
+var pageDirty = [true, true, true, true, true];
 var currentPage = 0;
-var totalPages = 4;
+var totalPages = 5;
 var startX = 0;
 var startY = 0;
 var currentTranslate = 0;

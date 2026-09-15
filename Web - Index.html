@@ -109,7 +109,14 @@
             <i class="rail-icon fa-solid fa-hashtag" aria-hidden="true"></i>
             <span class="rail-label">Bonus</span>
           </button>
-          <button type="button" class="rail-item" onclick="goToPage(3)" title="Data Table">
+          <!-- Operational Support. Sits next to Bonus because it answers the
+               other half of the same question: Bonus is who produced what, OS
+               is who was not producing and why. -->
+          <button type="button" class="rail-item" onclick="goToPage(3)" title="Operational Support">
+            <i class="rail-icon fa-solid fa-people-carry-box" aria-hidden="true"></i>
+            <span class="rail-label">OS</span>
+          </button>
+          <button type="button" class="rail-item" onclick="goToPage(4)" title="Data Table">
             <i class="rail-icon fa-solid fa-table-list" aria-hidden="true"></i>
             <span class="rail-label">Data Table</span>
           </button>
@@ -431,6 +438,41 @@
             </div>
 
             <div id="bonusTablesContainer" class="bonus-tables-grid"></div>
+          </div>
+
+          <!-- Operational Support.
+               Read from the OS log rather than the pivot: the pivot keeps only
+               that a block was indirect and what was decided about it, and this
+               page is about the rest of what the form captured.
+
+               Its own From / To, like the Bonus page, over the whole 24 hours -
+               which is why Hours Range and Time Window grey out on both. A
+               spell is included when it OVERLAPS the range, not when it fits
+               inside it: a shift running from before the window into it is
+               exactly the case this page exists for. -->
+          <div class="page">
+            <div class="bonus-page-controls">
+              <div class="os-page-head">
+                <h2 class="os-page-title">Operational Support</h2>
+                <p class="os-page-sub">By site and zone. Click a zone for its departments and jobs.</p>
+              </div>
+              <div class="breakdown-time-bar bonus-time-bar">
+                <div class="time-row time-row-from">
+                  <label class="breakdown-time-label">From</label>
+                  <select id="osFrom" class="breakdown-time-select" onchange="onOsRangeChange()"></select>
+                  <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="time-row time-row-to">
+                  <label class="breakdown-time-label">To</label>
+                  <select id="osTo" class="breakdown-time-select" onchange="onOsRangeChange()"></select>
+                  <span id="osRangeBadge" class="breakdown-range-badge">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card panel span-12">
+              <div id="osBody" class="os-body"></div>
+            </div>
           </div>
 
           <div class="page">
@@ -791,6 +833,7 @@
     <?!= include('Web - JsHelpers'); ?>
     <?!= include('Web - JsData'); ?>
     <?!= include('Web - JsCharts'); ?>
+    <?!= include('Web - JsPageOs'); ?>
     <?!= include('Web - JsTables'); ?>
     <?!= include('Web - JsExport'); ?>
     <?!= include('Web - JsToast'); ?>

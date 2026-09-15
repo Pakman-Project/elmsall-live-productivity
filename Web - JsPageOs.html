@@ -1,0 +1,387 @@
+<script>
+  // ── The OS page ────────────────────────────────────────────────────────────
+  // Operational Support: who was on an indirect task, by site and zone.
+  //
+  // Read from the OS log rather than from "Processed Data (15mins)", because
+  // the pivot keeps only two facts about an indirect block - that it was one,
+  // and what was decided about it. Everything a manager actually asks next is
+  // in the log and nowhere else: which department, which job, who authorised
+  // it, who deployed them, who they report to.
+  //
+  // Shaped like the Head Deployed Breakdown on purpose - a bar per zone whose
+  // length is the head count, click to open it. Same gesture, same reading,
+  // one fewer thing to learn.
+
+  // Production counts a day from 06:00 to 06:00, so the log's Date column is
+  // NOT the calendar date the work happened on: a row reading 08/09 with a
+  // 02:00 start happened on the 09th. Getting this wrong moves a whole night
+  // shift onto the wrong day, where it matches no window and simply vanishes.
+  // Same rule, same constants, as the notebook's _os_windows.
+  var OS_DAY_START_HOUR_PAK_ = 6;
+  var OS_MAX_SHIFT_HOURS_PAK_ = 16;
+
+  // "HH:MM" -> minutes past midnight, or -1.
+  function osLogMinsPak_(v) {
+    var m = /^(\d{1,2}):(\d{2})/.exec(String(v == null ? '' : v).trim());
+    if (!m) return -1;
+    var h = Number(m[1]), mi = Number(m[2]);
+    return (h >= 0 && h < 24 && mi >= 0 && mi < 60) ? h * 60 + mi : -1;
+  }
+
+  // A logged record -> the absolute { start, finish } it covers, or null when
+  // the row cannot be placed on a clock at all.
+  function osSpellWindowPak_(row) {
+    var d = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(row && row.date || '').trim());
+    var a = osLogMinsPak_(row && row.from);
+    var b = osLogMinsPak_(row && row.to);
+    if (!d || a < 0 || b < 0) return null;
+
+    var day = new Date(Number(d[3]), Number(d[2]) - 1, Number(d[1]));
+    if (Math.floor(a / 60) < OS_DAY_START_HOUR_PAK_) {
+      day = new Date(day.getTime() + 86400000);
+    }
+    var start = new Date(day.getFullYear(), day.getMonth(), day.getDate(),
+                         Math.floor(a / 60), a % 60);
+    var finish = new Date(day.getFullYear(), day.getMonth(), day.getDate(),
+                          Math.floor(b / 60), b % 60);
+    // 22:00-02:00 finishes the next morning, and the log has one Date column
+    // with nowhere to say so.
+    if (finish <= start) finish = new Date(finish.getTime() + 86400000);
+    // A finish typed 06:00 instead of 18:00 is indistinguishable from a real
+    // overnight spell, and the line above turns it into twenty-four hours.
+    // Dropped rather than drawn across the whole day off one slip.
+    if (finish - start > OS_MAX_SHIFT_HOURS_PAK_ * 3600000) return null;
+    return { start: start, finish: finish };
+  }
+
+  // The two selects, filled from the same 96 blocks the Bonus page uses. Kept
+  // separate from that page's pair rather than shared: the two pages are
+  // looked at for different reasons and a range set on one has no business
+  // moving the other.
+  function ensureOsTimeSelects_() {
+    var fromSel = $('osFrom');
+    var toSel = $('osTo');
+    if (!fromSel || !toSel) return;
+
+    var sliced = timeRanges.slice(-96);
+    var sig = sliced.length
+      ? (sliced[0] + '||' + sliced[sliced.length - 1] + '||' + sliced.length) : '';
+    if (fromSel.dataset.sig === sig) return;
+
+    var prevFrom = fromSel.value;
+    var prevTo = toSel.value;
+    fromSel.innerHTML = '';
+    toSel.innerHTML = '';
+
+    for (var i = 0; i < sliced.length; i++) {
+      var parts = extractRangePartsPak(sliced[i]);
+      var optF = document.createElement('option');
+      optF.value = sliced[i];
+      optF.textContent = parts.start;
+      fromSel.appendChild(optF);
+
+      var optT = document.createElement('option');
+      optT.value = sliced[i];
+      optT.textContent = parts.end;
+      toSel.appendChild(optT);
+    }
+    fromSel.dataset.sig = sig;
+
+    var fromRestored = false, toRestored = false;
+    for (var j = 0; j < sliced.length; j++) {
+      if (sliced[j] === prevFrom) { fromSel.selectedIndex = j; fromRestored = true; }
+      if (sliced[j] === prevTo) { toSel.selectedIndex = j; toRestored = true; }
+    }
+    // An hour, rather than the Bonus page's four blocks: a shift of OS is
+    // hours long, and opening on fifteen minutes of it shows one zone bar
+    // where there are six.
+    if (!fromRestored || !toRestored || toSel.selectedIndex < fromSel.selectedIndex) {
+      fromSel.selectedIndex = Math.max(0, sliced.length - 4);
+      toSel.selectedIndex = sliced.length - 1;
+    }
+  }
+
+  function onOsRangeChange() {
+    var fromSel = $('osFrom');
+    var toSel = $('osTo');
+    if (!fromSel || !toSel) return;
+    if (toSel.selectedIndex < fromSel.selectedIndex) {
+      toSel.selectedIndex = fromSel.selectedIndex;
+    }
+    renderOsPagePak();
+  }
+
+  // The chosen range as an absolute half-open interval. Half-open because the
+  // blocks are: a spell finishing exactly at 08:00 does not belong to the
+  // 08:00 block.
+  function osSelectedWindowPak_() {
+    var fromSel = $('osFrom');
+    var toSel = $('osTo');
+    if (!fromSel || !toSel || !fromSel.value || !toSel.value) return null;
+    var a = parseDateTimePartPak(extractRangePartsPak(fromSel.value).start);
+    var b = parseDateTimePartPak(extractRangePartsPak(toSel.value).end);
+    return (a && b && b > a) ? { start: a, finish: b } : null;
+  }
+
+  // "07:26 - 08:06", trimmed to the clock times. The date is on the page's own
+  // range picker; repeating it on every row of every job would crowd out the
+  // six things the row is there to show.
+  function osRowTimeTextPak_(row) {
+    return row.from + ' - ' + row.to;
+  }
+
+  // Blank site, zone, department and job names all happen - the form does not
+  // require them - and an unlabelled heading reads as a rendering fault. Named
+  // rather than dropped, because the spell underneath it is real.
+  function osLabelPak_(v, kind) {
+    var s = String(v == null ? '' : v).trim();
+    return s || ('(no ' + kind + ')');
+  }
+
+  // Sorted so the same data draws the same way twice: heads descending, then
+  // the name, so two zones of equal size do not swap places between renders.
+  function osByCountThenNamePak_(a, b) {
+    return (b.count - a.count) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  }
+
+  // site -> zone -> department -> job type -> records.
+  //
+  // Counted in unique BONUS NUMBERS at every level, not in records: one person
+  // re-submitting a form, or logged for two jobs in the same zone, is one head
+  // on OS. Counting records would make the bars a measure of paperwork.
+  function osGroupPak_(rows) {
+    var sites = {};
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var siteName = osLabelPak_(r.site, 'site');
+      var zoneName = osLabelPak_(r.zone, 'zone');
+      var deptName = osLabelPak_(r.dept, 'department');
+      var jobName = osLabelPak_(r.job, 'job type');
+
+      var site = sites[siteName] || (sites[siteName] = { name: siteName, zones: {}, heads: {} });
+      site.heads[r.bonus] = true;
+      var zone = site.zones[zoneName] || (site.zones[zoneName] = { name: zoneName, depts: {}, heads: {} });
+      zone.heads[r.bonus] = true;
+      var dept = zone.depts[deptName] || (zone.depts[deptName] = { name: deptName, jobs: {}, heads: {} });
+      dept.heads[r.bonus] = true;
+      var job = dept.jobs[jobName] || (dept.jobs[jobName] = { name: jobName, records: [] });
+      job.records.push(r);
+    }
+
+    // Objects to sorted arrays, with the head counts resolved to numbers.
+    var out = [];
+    Object.keys(sites).forEach(function (sk) {
+      var s = sites[sk];
+      var zones = [];
+      Object.keys(s.zones).forEach(function (zk) {
+        var z = s.zones[zk];
+        var depts = [];
+        Object.keys(z.depts).forEach(function (dk) {
+          var d = z.depts[dk];
+          var jobs = Object.keys(d.jobs).map(function (jk) { return d.jobs[jk]; });
+          jobs.forEach(function (j) {
+            // Earliest spell first: a job's records read as a timeline.
+            j.records.sort(function (a, b) {
+              return (a.from < b.from ? -1 : a.from > b.from ? 1 : 0) ||
+                     (a.bonus < b.bonus ? -1 : a.bonus > b.bonus ? 1 : 0);
+            });
+          });
+          jobs.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+          depts.push({ name: d.name, jobs: jobs, count: Object.keys(d.heads).length });
+        });
+        depts.sort(osByCountThenNamePak_);
+        zones.push({ name: z.name, depts: depts, count: Object.keys(z.heads).length });
+      });
+      zones.sort(osByCountThenNamePak_);
+      out.push({ name: s.name, zones: zones, count: Object.keys(s.heads).length });
+    });
+    out.sort(osByCountThenNamePak_);
+    return out;
+  }
+
+  // The status, spelled the way the rest of the dashboard spells it: the three
+  // display states from osStatusBandPak_, so a chart band and this row cannot
+  // disagree about what happened to the same record. The raw wording is kept
+  // in the title, for anybody auditing a specific one.
+  function osStatusChipPak_(status) {
+    var band = osStatusBandPak_(status);
+    var raw = String(status == null ? '' : status).trim();
+    if (!band) {
+      // Logged with the status cell empty. Not a verdict, so it is not given
+      // one - calling an undecided spell rejected would be an accusation the
+      // data does not support.
+      return '<span class="os-status os-status-none" title="Logged without a verdict against it">&ndash;</span>';
+    }
+    var cls = band === OS_STATUS_APPROVED_PAK_ ? 'os-status-good'
+            : band === OS_STATUS_AWAITING_PAK_ ? 'os-status-warn' : 'os-status-bad';
+    var title = (raw && raw.toLowerCase() !== band.toLowerCase())
+      ? ' title="Logged as: ' + escapeAttrPak(raw) + '"' : '';
+    return '<span class="os-status ' + cls + '"' + title + '>' + escapeTextPak_(band) + '</span>';
+  }
+
+  function osPersonCellPak_(v) {
+    var s = String(v == null ? '' : v).trim();
+    return s ? escapeTextPak_(s) : '<span class="os-cell-none">&ndash;</span>';
+  }
+
+  var OS_JOB_COLUMNS_ = ['Bonus', 'Time', 'TM Authorising', 'Deployed by',
+                         'Reports to', 'Record Status'];
+
+  function osJobTableHtmlPak_(records) {
+    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table"><thead><tr>';
+    for (var c = 0; c < OS_JOB_COLUMNS_.length; c++) {
+      html += '<th>' + OS_JOB_COLUMNS_[c] + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      var esc = escapeAttrPak(r.bonus);
+      var picked = selectedBonuses.indexOf(r.bonus) !== -1;
+      // bonus-tip-host, like every other bonus number on the dashboard: this
+      // page is often where a manager first meets a code they do not know, and
+      // the card is what gives them the name and the email to copy.
+      html += '<tr>';
+      html += '<td><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+              (picked ? ' selected' : '') + '"' +
+              ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
+              escapeTextPak_(r.bonus) +
+              '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
+              bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
+      html += '<td class="os-time-cell">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
+      html += '<td>' + osPersonCellPak_(r.auth) + '</td>';
+      html += '<td>' + osPersonCellPak_(r.deployedBy) + '</td>';
+      html += '<td>' + osPersonCellPak_(r.reportsTo) + '</td>';
+      html += '<td>' + osStatusChipPak_(r.status) + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function renderOsPagePak() {
+    var body = document.getElementById('osBody');
+    if (!body) return;
+    ensureOsTimeSelects_();
+
+    var win = osSelectedWindowPak_();
+    var badge = document.getElementById('osRangeBadge');
+    if (badge) {
+      badge.textContent = win
+        ? (Math.round((win.finish - win.start) / 60000) + ' min')
+        : '-';
+    }
+
+    if (!win) {
+      body.innerHTML = '<div class="breakdown-empty">' +
+        '<i class="fa-solid fa-clock" aria-hidden="true"></i>' +
+        'Waiting for a time range</div>';
+      return;
+    }
+
+    // OVERLAP, not containment. A spell that started before the window and is
+    // still running is the case this page exists for; requiring it to fit
+    // inside would hide exactly the people currently on OS.
+    var rows = [];
+    var unplaceable = 0;
+    for (var i = 0; i < osLogRows.length; i++) {
+      var w = osSpellWindowPak_(osLogRows[i]);
+      if (!w) { unplaceable++; continue; }
+      if (w.finish <= win.start || w.start >= win.finish) continue;
+      rows.push(osLogRows[i]);
+    }
+
+    var heads = {};
+    for (var h = 0; h < rows.length; h++) { heads[rows[h].bonus] = true; }
+    var headCount = Object.keys(heads).length;
+    var sites = osGroupPak_(rows);
+    var zoneCount = 0;
+    for (var s = 0; s < sites.length; s++) { zoneCount += sites[s].zones.length; }
+
+    var html = '<div class="breakdown-summary">';
+    html += '<span class="breakdown-summary-num">' + headCount + '</span>' +
+            '<span class="breakdown-summary-label">on OS</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + zoneCount + '</span>' +
+            '<span class="breakdown-summary-label">zone' + (zoneCount === 1 ? '' : 's') + '</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + rows.length + '</span>' +
+            '<span class="breakdown-summary-label">spell' + (rows.length === 1 ? '' : 's') + ' logged</span>';
+    html += '</div>';
+
+    // Said out loud rather than swallowed: a record with an unreadable date or
+    // time cannot be placed on a clock, and a page quietly one row short is
+    // the worst of the options.
+    var dropped = (Number(osLogSkipped) || 0) + unplaceable;
+    if (dropped > 0) {
+      html += '<div class="os-dropped"><i class="fa-solid fa-triangle-exclamation"></i>' +
+              dropped + ' logged ' + (dropped === 1 ? 'spell' : 'spells') +
+              ' could not be read - check the date, start and finish on those rows' +
+              '</div>';
+    }
+
+    if (sites.length === 0) {
+      html += '<div class="breakdown-empty">' +
+              '<i class="fa-solid fa-ghost" aria-hidden="true"></i>' +
+              'Nobody on OS in the selected range</div>';
+      body.innerHTML = html;
+      return;
+    }
+
+    for (var si = 0; si < sites.length; si++) {
+      var site = sites[si];
+      // The bars are scaled WITHIN their site, not across the whole page: a
+      // site with three people on OS still deserves a readable breakdown, and
+      // scaled against a site of forty every one of its bars would be a stub.
+      var maxCount = 0;
+      for (var z = 0; z < site.zones.length; z++) {
+        if (site.zones[z].count > maxCount) maxCount = site.zones[z].count;
+      }
+
+      html += '<div class="os-site">';
+      html += '<div class="os-site-head"><span class="os-site-name">' +
+              escapeTextPak_(site.name) + '</span>' +
+              '<span class="os-site-count">' + site.count +
+              ' on OS</span></div>';
+
+      for (var zi = 0; zi < site.zones.length; zi++) {
+        var zone = site.zones[zi];
+        var pct = maxCount > 0 ? (zone.count / maxCount * 100) : 0;
+        html += '<div class="breakdown-row clickable-row" onclick="toggleBreakdownDetail(this)">';
+        html += '<div class="breakdown-label">' + escapeTextPak_(zone.name) +
+                '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
+        html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar os-zone-bar"' +
+                ' style="width:0%;" data-target="' + pct + '"></div></div>';
+        html += '<div class="breakdown-count">' + zone.count + '</div></div>';
+
+        html += '<div class="breakdown-detail"><div class="os-zone-detail">';
+        for (var di = 0; di < zone.depts.length; di++) {
+          var dept = zone.depts[di];
+          html += '<div class="os-dept">';
+          html += '<div class="os-dept-head">' + escapeTextPak_(dept.name) +
+                  '<span class="os-dept-count">' + dept.count + '</span></div>';
+          for (var ji = 0; ji < dept.jobs.length; ji++) {
+            var job = dept.jobs[ji];
+            html += '<div class="os-job">';
+            html += '<div class="os-job-head">' + escapeTextPak_(job.name) + '</div>';
+            html += osJobTableHtmlPak_(job.records);
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    body.innerHTML = html;
+    // Widths are set after the markup lands so the CSS transition has a value
+    // to animate FROM - the same trick, and the same 60ms, as the head
+    // breakdown's bars.
+    setTimeout(function () {
+      var bars = body.querySelectorAll('.breakdown-bar');
+      for (var i = 0; i < bars.length; i++) {
+        bars[i].style.width = bars[i].dataset.target + '%';
+      }
+    }, 60);
+  }
+</script>
