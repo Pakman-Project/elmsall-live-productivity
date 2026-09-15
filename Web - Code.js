@@ -147,6 +147,7 @@ function loadTimer_() {
   var t0 = Date.now();
   var last = t0;
   var parts = [];
+  var line = '';
   return {
     // A read that just finished. `cells` optional - omit it for anything that
     // is not a range read.
@@ -164,11 +165,15 @@ function loadTimer_() {
     // measures is worse than no instrumentation, and there is nothing a
     // logging failure could tell the caller that is worth failing a load for.
     done: function (label) {
-      try {
-        Logger.log('TIMING ' + label + ' TOTAL=' + (Date.now() - t0) + 'ms  ' +
-                   parts.join('  '));
-      } catch (e) {}
-    }
+      line = 'TIMING ' + label + ' TOTAL=' + (Date.now() - t0) + 'ms  ' + parts.join('  ');
+      try { Logger.log(line); } catch (e) {}
+      return line;
+    },
+    // The same line, for the payload. Reading Executions means opening the
+    // script editor and hunting for the right run; the person actually
+    // waiting on a slow load is the one who should be able to see why it was
+    // slow, so it goes to their console too.
+    line: function () { return line; }
   };
 }
 
@@ -1004,7 +1009,7 @@ function getDashboardData(archiveUrl) {
 
   tm.note('rows=' + rawSideData.length + ' bonuses=' + payload.bonusList.length +
           ' blocks=' + timeRanges.length);
-  tm.done(isLiveMode ? 'LIVE' : 'ARCHIVE');
+  payload.timing = tm.done(isLiveMode ? 'LIVE' : 'ARCHIVE');
   return payload;
 }
 

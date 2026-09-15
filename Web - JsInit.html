@@ -410,6 +410,10 @@
     google.script.run.withSuccessHandler(function(data) {
       // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
       try {
+        // Logged HERE rather than in renderDashboardPayload_, which also runs
+        // for the localStorage paint - a stale timing line reported as this
+        // load's would be worse than none. Only a fresh fetch has one.
+        if (data && data.timing) { console.info(data.timing); }
         savePayloadCache_(data, urlToFetch);
 
         if (tourActive) {

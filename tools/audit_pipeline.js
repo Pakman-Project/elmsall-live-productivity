@@ -692,6 +692,18 @@ head('[the load is measurable, and measuring it cannot break it]');
   } catch (e) { escaped = e.message; }
   check('a logging failure cannot fail a load', escaped === null,
         escaped || 'swallowed');
+
+  // Reading Executions means opening the script editor and hunting for the
+  // right run. The person actually waiting on a slow load is the one who
+  // should be able to see why it was slow.
+  const init = R('Web - JsInit.html');
+  check('the same line reaches the browser console',
+        code.indexOf('payload.timing = tm.done(') !== -1 &&
+        init.indexOf('if (data && data.timing) { console.info(data.timing); }') !== -1);
+  check('and only for a FRESH fetch, not the cached paint',
+        init.indexOf('console.info(data.timing)') <
+        init.indexOf('savePayloadCache_(data, urlToFetch)'),
+        'a stale line reported as this load would be worse than none');
 }
 
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
