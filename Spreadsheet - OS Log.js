@@ -35,6 +35,10 @@ function updateOSLog() {
   //   L   (idx 11)   : =IF(B, IF(J>=6.5, J-0.5, J), "")
   //   M   (idx 12)   : =IF(L, L*60, "")
   //   N–T (idx 13–19): extra mapped columns
+  //
+  // A number in baseSelect/extraSelect is a source column INDEX (0 = firstCol);
+  // anything else is written through as a literal. calcSelect overrides the two
+  // computed columns with literals where a tab has no hours to compute from.
   const SHEET_CONFIGS = [
     {
       sheetName: 'OS Form',
@@ -53,6 +57,23 @@ function updateOSLog() {
       baseSelect: [0, 3, 11, 'Indirect', 4, 5, ' ', 6, 7, 15, 9],
       extraSelect: [9, 10, 22, 13, 11, 12, 14],   // M, N, Z, Q, O, P, R
       hourIdx: 15    // source col S -> output J
+    },
+    {
+      // Spells an operative has STARTED and not yet finished. They carry no
+      // finish time by definition, so they can never be placed on a clock and
+      // never reach the dashboard's figures - the OS page lists them on a card
+      // of their own instead, to be chased. The literal 'Open' in output T is
+      // what identifies them there: it is written for every row from this tab
+      // whatever the operative typed, which is the only marker that cannot be
+      // wrong.
+      sheetName: 'Open',
+      startRow: 8,
+      firstCol: 4,
+      numCols: 16,   // D:S
+      baseSelect: [0, 3, 11, 'Indirect', 4, 5, '', 7, 9, 10, '-'],
+      calcSelect: ['-', '-'],                       // no hours to compute from
+      extraSelect: [13, 14, '', 15, 11, 12, 'Open'],  // Q, R, '', S, O, P, 'Open'
+      hourIdx: 10    // source col N -> output J
     }
   ];
 
@@ -85,9 +106,10 @@ function updateOSLog() {
               row[cfg.hourIdx] = dateToSerial(row[cfg.hourIdx]);
             }
             
-            const base = cfg.baseSelect.map(spec => typeof spec === 'number' ? row[spec] : spec); // A:K
-            const extra = cfg.extraSelect.map(i => row[i]);                                       // N:T
-            
+            const pick = spec => typeof spec === 'number' ? row[spec] : spec;
+            const base = cfg.baseSelect.map(pick);    // A:K
+            const extra = cfg.extraSelect.map(pick);  // N:T
+
             // L = IFERROR(IF(B<>, IF(J>=6.5, J-0.5, J), ""), "")
             let l = "";
             if (base[1]) {                    // output column B
@@ -97,11 +119,12 @@ function updateOSLog() {
                 if (!isNaN(j)) l = (j >= 6.5) ? j - 0.5 : j;
               }
             }
-            
+
             // M = IF(L<>, L*60, "")
             const m = l ? l * 60 : "";
-            
-            return base.concat([l, m], extra);
+
+            const calc = cfg.calcSelect ? cfg.calcSelect.slice() : [l, m];
+            return base.concat(calc, extra);
           });
         
         combinedResults = combinedResults.concat(mapped);

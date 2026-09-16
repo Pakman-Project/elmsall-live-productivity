@@ -98,26 +98,36 @@
       </div>
     </div>
 
+    <!-- Both of these are native <select>s, which draw a caret of their own
+         that matches nothing else on the row. Wrapped so the same FA chevron
+         Date and Warehouse carry can sit on top of them instead - see
+         .select-caret-wrap and .fa-caret-select. -->
     <div class="hc-field">
       <label class="hc-field-label" for="hoursRange">Hours Range</label>
-      <select id="hoursRange" class="hc-control row-select" data-sync="hoursRange"
-              onchange="handleControlChangePak(this, 'hoursRange')">
-        <option value="3" selected>3 Hours</option>
-        <option value="6">6 Hours</option>
-        <option value="9">9 Hours</option>
-        <option value="12">12 Hours</option>
-        <option value="24">24 Hours</option>
-      </select>
+      <div class="select-caret-wrap">
+        <select id="hoursRange" class="hc-control row-select fa-caret-select" data-sync="hoursRange"
+                onchange="handleControlChangePak(this, 'hoursRange')">
+          <option value="3" selected>3 Hours</option>
+          <option value="6">6 Hours</option>
+          <option value="9">9 Hours</option>
+          <option value="12">12 Hours</option>
+          <option value="24">24 Hours</option>
+        </select>
+        <i class="fa-solid fa-chevron-down hc-select-caret" aria-hidden="true"></i>
+      </div>
     </div>
 
     <div class="hc-field">
       <label class="hc-field-label" for="timeWindow">Time Window</label>
-      <select id="timeWindow" class="hc-control row-select" data-sync="timeWindow"
-              onchange="handleControlChangePak(this, 'timeWindow')">
-        <option value="15">15 Minutes</option>
-        <option value="30">30 Minutes</option>
-        <option value="60">60 Minutes</option>
-      </select>
+      <div class="select-caret-wrap">
+        <select id="timeWindow" class="hc-control row-select fa-caret-select" data-sync="timeWindow"
+                onchange="handleControlChangePak(this, 'timeWindow')">
+          <option value="15">15 Minutes</option>
+          <option value="30">30 Minutes</option>
+          <option value="60">60 Minutes</option>
+        </select>
+        <i class="fa-solid fa-chevron-down hc-select-caret" aria-hidden="true"></i>
+      </div>
     </div>
 
     <!-- Warehouse: a multi-select of the two buildings rather than the old

@@ -222,7 +222,17 @@ const STUB = `
     if (d) {
       // One unreadable row, so the page's own warning is on screen rather than
       // only ever exercised by a test.
-      OS_LOG_STASH = { rows: osDemoLog_(d), skipped: 1 };
+      var _rows = osDemoLog_(d);
+      // Two spells nobody has closed, so the Open card has something to draw.
+      var _open = _rows.slice(0, 2).map(function (r, i) {
+        return Object.assign({}, r, {
+          bonus: 'OP' + i, to: '', source: 'Open', status: 'Awaiting Approval'
+        });
+      });
+      OS_LOG_STASH = { rows: _rows, skipped: 1,
+        bad: _open.map(function (r) {
+          return Object.assign({}, r, { row: 900, why: 'the finish is not a time' });
+        }) };
     }
     return d;
   }

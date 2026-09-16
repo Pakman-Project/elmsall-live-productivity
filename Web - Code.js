@@ -663,8 +663,17 @@ var OS_LOG_FIRST_ROW_ = 7;           // 1-6 are the source URLs and headings
 var OS_LOG_WIDTH_ = 20;              // A:T
 var OS_LOG_COLS_ = {
   date: 0, bonus: 1, dept: 4, job: 5, start: 7, finish: 8,
-  auth: 10, deployedBy: 13, reportsTo: 14, status: 16, site: 17, zone: 18
+  auth: 10, deployedBy: 13, reportsTo: 14, status: 16, site: 17, zone: 18,
+  // Which tab of the source workbook the row came from, written as a literal
+  // by 'Spreadsheet - OS Log.js'. Only the Open tab marks itself - the two
+  // that produce finishable spells leave it as whatever they mapped there -
+  // so this is read as "is it the string Open", not as a name to display.
+  source: 19
 };
+// A spell the operative started and has not finished. No finish time, so it
+// can never be placed on a clock; the OS page lists these to be chased rather
+// than filing them with the rows that are simply wrong.
+var OS_SOURCE_OPEN_ = 'Open';
 
 // Cells the last readOsLogRows_ call marshalled. A module-level count rather
 // than a return value, because the function's contract is rows and skips and
@@ -817,6 +826,7 @@ function readOsLogRows_(ss, want) {
         status: osLogCell_(r, OS_LOG_COLS_.status),
         site: osLogCell_(r, OS_LOG_COLS_.site),
         zone: osLogCell_(r, OS_LOG_COLS_.zone),
+        source: osLogCell_(r, OS_LOG_COLS_.source),
         why: why
       });
     }
@@ -854,7 +864,8 @@ function readOsLogRows_(ss, want) {
         reportsTo: osLogCell_(r, OS_LOG_COLS_.reportsTo),
         status: osLogCell_(r, OS_LOG_COLS_.status),
         site: osLogCell_(r, OS_LOG_COLS_.site),
-        zone: osLogCell_(r, OS_LOG_COLS_.zone)
+        zone: osLogCell_(r, OS_LOG_COLS_.zone),
+        source: osLogCell_(r, OS_LOG_COLS_.source)
       });
     }
     return { rows: rows, skipped: skipped, bad: bad };

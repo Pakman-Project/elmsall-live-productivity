@@ -856,11 +856,51 @@ body.loading-skeleton #mainTableWrapper::after {
 .date-picker-icon { flex: 0 0 auto; font-size: 12px; opacity: 0.85; }
 .date-picker-caret {
   flex: 0 0 auto;
-  font-size: 10px;
   opacity: 0.7;
   transition: transform 0.15s ease;
 }
 #datePickerBtn[aria-expanded="true"] .date-picker-caret { transform: rotate(180deg); }
+
+/* ── One chevron, one size, everywhere ────────────────────────────────────
+   Every dropdown on the dashboard now ends in the same Font Awesome
+   chevron-down: the Date and Warehouse buttons always did, the OS page's four
+   filters and the control panel's Hours Range and Time Window were given one,
+   and the sizes had drifted to six different values across the breakpoints
+   (10px, 0.75rem, 0.62rem, 0.6rem, 0.55rem, and un-set on the OS page, where
+   it inherited the button's own 14px).
+
+   One number, in one place. Sized in px rather than rem so it does NOT track
+   the control's font-size: the text in these controls legitimately shrinks on
+   a phone and while scrolled, but a caret is a fixed piece of furniture and
+   shrinking it just made it hard to see. */
+:root { --caret-size: 11px; }
+
+.date-picker-caret,
+.warehouse-caret,
+.hc-select-caret { font-size: var(--caret-size); }
+
+/* A native <select> cannot hold an icon, so the chevron is a sibling laid over
+   it. The wrapper is only here to be the thing it positions against. */
+.select-caret-wrap { position: relative; }
+
+.hc-select-caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  /* Laid over the control purely to be seen; every click still has to reach
+     the select underneath it. */
+  pointer-events: none;
+}
+
+/* select.hc-control draws a thin caret of its own out of two gradients. Any
+   select carrying the FA chevron above switches that off, or the two sit side
+   by side. */
+select.hc-control.fa-caret-select {
+  background-image: none;
+  padding-right: 30px;
+}
 /* Viewing an archived day is a state worth seeing without reading the label -
    it is the difference between "these numbers are still moving" and "this day
    is finished". */
@@ -3446,27 +3486,9 @@ body.page-scrolled-far .back-to-top {
 .os-filter { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .os-filter .breakdown-time-label { white-space: nowrap; }
 
-/* The wrapper is .os-multi too (see the markup), purely so a native <select>
-   gets the same positioning context the three real multi-selects use for
-   their chevron - see .os-type-caret - and the same fixed column width, with
-   no separate rule needed here to get either. */
-select.hc-control.os-type-select {
-  /* select.hc-control draws its own thin caret via a background-image
-     gradient. Removed here in favour of the same FA chevron the other three
-     controls use, so all four carry one icon rather than three matching and
-     the fourth looking like it was left unfinished. */
-  background-image: none;
-  padding-right: 30px;
-}
-.os-type-caret {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  /* The icon sits on top of the select purely to be seen; every click still
-     has to reach the control underneath it. */
-  pointer-events: none;
-}
+/* The Type control's wrapper is .os-multi as well as .select-caret-wrap (see
+   the markup), which is what gives it the same fixed column width as the three
+   real multi-selects beside it with no rule of its own. */
 
 /* The three multi-selects. Same shape as the Warehouse picker in the control
    panel - it is the same gesture, so it should look the same - which is why
@@ -3550,6 +3572,27 @@ select.hc-control.os-type-select {
 
 /* The reason is the row's title, so say so. */
 .os-bad-row { cursor: help; }
+
+/* ── Spells nobody has closed ──────────────────────────────────────────────
+   Same card, same table, same everything as the faults below the sites - the
+   only difference is which problem it is and who has to fix it, so the only
+   difference here is the colour. Amber says "wrong"; this is not wrong, it is
+   unfinished, so it borrows the accent instead. */
+.os-open-row .breakdown-label {
+  color: var(--accent);
+  background: var(--accent-8);
+}
+.os-open-card { margin-bottom: 16px; }
+
+/* ── A filter that is actually filtering ───────────────────────────────────
+   All four controls read much the same whether or not they are narrowing
+   anything - "All Zones" and "OST OSR" are both just words in a box - so a
+   view that had been cut down to one zone looked identical to the whole
+   floor at a glance. The accent border and tint say which ones are on. */
+.hc-control.os-filter-on {
+  border-color: var(--accent) !important;
+  background: var(--accent-8) !important;
+}
 
 /* The records that could not be read. Not a warning to be tidied away: an OS
    record with an impossible date or a nineteen-hour shift is a real form
@@ -6070,6 +6113,38 @@ kbd {
     height: 36px;
     min-height: 0;
   }
+
+  /* ---- and all of them the SAME height ----
+     The rules above got every page dropdown to one text size and one padding,
+     which left them at roughly 34px - close to, but not the same as, the 24px
+     the control panel and the OS page's own four filters settle at (.hc-control
+     is 38px, then 30px on a phone, then 24px from the last rule in the file,
+     which carries !important and wins). Close-but-not
+     equal is the version a reader notices, because the two sizes appear on one
+     screen together.
+
+     Stated as a height rather than as padding: padding leaves the final number
+     to the font, and the font legitimately differs between these controls.
+     The ids are named for the same reason they are named above - an id beats a
+     class however late this block sits. */
+  .row-select,
+  .bonus-controls .row-select,
+  .breakdown-time-select,
+  .time-row .breakdown-time-select,
+  .bonus-page-controls .time-row .breakdown-time-select,
+  #mainSortSelect,
+  #hoursRange,
+  #timeWindow,
+  #volumeChartMode,
+  #bonusViewMode,
+  #sharedRowsLimit,
+  #bonusAreaCount {
+    height: 24px;
+    min-height: 24px;
+    padding-top: 0;
+    padding-bottom: 0;
+    box-sizing: border-box;
+  }
 }
 
 @media (max-width: 380px) {
@@ -7078,9 +7153,9 @@ select.hc-control {
   line-height: 1;
 }
 
-.hc-field .date-picker-icon,
+.hc-field .date-picker-icon { font-size: 0.75rem; color: var(--muted); }
 .hc-field .date-picker-caret,
-.hc-field .warehouse-caret { font-size: 0.75rem; color: var(--muted); }
+.hc-field .warehouse-caret { color: var(--muted); }
 
 /* A field that does not apply to the page you are on - Hours Range and Time
    Window on the Bonus and OS pages, which have their own From / To. Greyed and
@@ -7110,9 +7185,7 @@ select.hc-control {
   body.page-scrolled .hc-field select.hc-control {
     font-size: 0.64rem;
   }
-  body.page-scrolled .hc-field .date-picker-icon,
-  body.page-scrolled .hc-field .date-picker-caret,
-  body.page-scrolled .hc-field .warehouse-caret { font-size: 0.55rem; }
+  body.page-scrolled .hc-field .date-picker-icon { font-size: 0.55rem; }
 }
 
 /* ============================================================
@@ -7171,9 +7244,7 @@ body.page-scrolled select.hc-control {
   background-size: 4px 4px, 4px 4px;
 }
 body.page-scrolled .hc-field .search-input-wrap .fa-search { right: 8px; font-size: 0.7rem; }
-body.page-scrolled .hc-field .date-picker-icon,
-body.page-scrolled .hc-field .date-picker-caret,
-body.page-scrolled .hc-field .warehouse-caret { font-size: 0.6rem; }
+body.page-scrolled .hc-field .date-picker-icon { font-size: 0.6rem; }
 
 /* None of this applies on a phone: there the shrunk panel IS the panel, in the
    mobile block at the end of this file, and scrolling changes nothing. */
@@ -7263,9 +7334,7 @@ body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
   .hc-field #bonusSearch::placeholder,
   .hc-field select.hc-control { font-size: 0.7rem; }
 
-  .hc-field .date-picker-icon,
-  .hc-field .date-picker-caret,
-  .hc-field .warehouse-caret { font-size: 0.6rem; }
+  .hc-field .date-picker-icon { font-size: 0.6rem; }
 
   select.hc-control {
     padding-right: 22px !important;
@@ -7310,9 +7379,7 @@ body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
 .hc-field .hc-threshold,
 .hc-field #bonusSearch::placeholder,
 .hc-field select.hc-control { font-size: 0.72rem; }
-.hc-field .date-picker-icon,
-.hc-field .date-picker-caret,
-.hc-field .warehouse-caret { font-size: 0.62rem; }
+.hc-field .date-picker-icon { font-size: 0.62rem; }
 select.hc-control {
   padding-right: 22px;
   background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;

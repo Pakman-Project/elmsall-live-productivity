@@ -27,6 +27,22 @@ const check = (label, ok, detail) => {
   console.log('  ' + (ok ? 'ok  ' : 'FAIL') + '  ' + label + (detail ? '   ' + detail : ''));
 };
 const strip = s => s.replace(/<\/?script>/g, '');
+// The @media block CONTAINING a rule, brace-matched - splitting on the media
+// opener puts a rule sited just above one into the previous chunk, and lets a
+// chunk run past its own closing brace into whatever follows.
+function mediaBlockFor(css, marker) {
+  const at = css.indexOf(marker);
+  if (at === -1) return '';
+  const open = css.lastIndexOf('@media (max-width: 700px)', at);
+  if (open === -1) return '';
+  let depth = 0;
+  for (let i = css.indexOf('{', open); i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}' && --depth === 0) return (i > at) ? css.slice(open, i + 1) : '';
+  }
+  return '';
+}
+
 const R = f => fs.readFileSync(APPS + f, 'utf8');
 
 const ctx = { console, document: undefined };
@@ -332,7 +348,7 @@ head('[9] records that could not be read are NAMED, not just counted');
   // date - could be counted and then shrugged at, which is how the page came
   // to say "the server could not say which".
   check('the page names what IT dropped, not just counts it',
-        /unplaceable\.push\(\{/.test(PAGE) && !/unplaceable\+\+/.test(PAGE),
+        /\? openRecords : unplaceable\)\.push\(\{/.test(PAGE) && !/unplaceable\+\+/.test(PAGE),
         'a record nobody can find is a record nobody can chase');
 
   // The invariant behind that, run rather than read: every record the window
@@ -390,7 +406,7 @@ head('[9] records that could not be read are NAMED, not just counted');
   check('and the page renders them as an expandable row',
         /function osBadRowsHtmlPak_/.test(PAGE) &&
         PAGE.indexOf('os-dropped-row') !== -1 &&
-        PAGE.indexOf("osNodeKeyPak_('__bad')") !== -1 &&
+        /key: '__bad'/.test(PAGE) && /osNodeKeyPak_\(kind\.key\)/.test(PAGE) &&
         R('Web - Styles.html').indexOf('.os-dropped-row .breakdown-label') !== -1);
   // Not a warning to be tidied away. An impossible date is a real form filled
   // in wrongly, and the page exists to make the abnormal visible - so the
@@ -414,11 +430,11 @@ head('[9] records that could not be read are NAMED, not just counted');
   // Both halves have to carry the new cells or the table is a column of
   // dashes: the server's own rejects, and the ones the client could not place.
   check('the server fills the new columns too',
-        /job: osLogCell_\(r, OS_LOG_COLS_\.job\),[\s\S]{0,300}status: osLogCell_\(r, OS_LOG_COLS_\.status\),[\s\S]{0,200}zone: osLogCell_\(r, OS_LOG_COLS_\.zone\),[\s\S]{0,40}why: why/
+        /job: osLogCell_\(r, OS_LOG_COLS_\.job\),[\s\S]{0,300}status: osLogCell_\(r, OS_LOG_COLS_\.status\),[\s\S]{0,200}zone: osLogCell_\(r, OS_LOG_COLS_\.zone\),[\s\S]{0,120}why: why/
           .test(CODE),
         'a server reject with half the row blank looks like a worse kind of fault');
   check('and so does the client-side drop',
-        /unplaceable\.push\(\{[\s\S]{0,400}job: rec\.job,[\s\S]{0,200}status: rec\.status,/.test(PAGE));
+        /openRecords : unplaceable\)\.push\(\{[\s\S]{0,400}job: rec\.job,[\s\S]{0,200}status: rec\.status,/.test(PAGE));
   check('the verdict there is the same chip as everywhere else',
         /osStatusChipPak_\(b\.status\)/.test(PAGE),
         'a second way of writing Approved would eventually disagree with the first');
@@ -484,7 +500,7 @@ head('[13] the Warehouse picker filters the OS sites too');
           .test(PAGE),
         'a record for the OTHER warehouse should not be on screen at all');
   check('and so are the server\'s own rejects',
-        /var badInBuilding = \(osLogBad \|\| \[\]\)\.filter\(function \(b\) \{\s*\n\s*return osInBuildingPak_\(b\.site\);/
+        /\(osLogBad \|\| \[\]\)\.forEach\(function \(b\) \{\s*\n\s*if \(!osInBuildingPak_\(b\.site\)\) return;/
           .test(PAGE),
         'they carry a Site cell too, read off the same OS Log row');
   check('badInBuilding is what reaches the card, not the raw list',
@@ -708,7 +724,7 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
         /' that cannot be placed on a clock'/.test(PAGE),
         'which is the same thing the section underneath then explains');
   check('and it still agrees with itself for a single record',
-        /total \+ ' record' \+ \(total === 1 \? '' : 's'\)/.test(PAGE) &&
+        /n \+ ' record' \+ \(n === 1 \? '' : 's'\) \+ ' that cannot be placed on a clock'/.test(PAGE) &&
         !/need[s]? to be aware of/.test(PAGE),
         '"1 record that cannot be placed on a clock"');
 
@@ -722,15 +738,14 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
         /id="osBadCard"[^>]*hidden[\s\S]{0,80}id="osBadBody"/.test(R('Web - Index.html')),
         'separate from the breakdown card, and hidden until there is something to show');
   check('rendered into that card by its own function',
-        /function osRenderBadCardPak_\(bad, unnamed\)/.test(PAGE) &&
-        /getElementById\('osBadCard'\)/.test(PAGE) &&
-        /getElementById\('osBadBody'\)/.test(PAGE));
+        /function osRenderDroppedCardPak_\(cardId, bodyId, bad, unnamed, kind\)/.test(PAGE) &&
+        /osRenderDroppedCardPak_\('osBadCard', 'osBadBody'/.test(PAGE));
   check('hidden outright when there is nothing to show',
         /card\.hidden = !html;/.test(PAGE),
         'an empty card would still draw a border round nothing');
   check('called once, before either exit, so both get it the same way',
-        (PAGE.match(/osRenderBadCardPak_\(\s*\n\s*badInBuilding/g) || []).length === 1 &&
-        PAGE.indexOf('osRenderBadCardPak_(\n      badInBuilding') < PAGE.indexOf("for (var si = 0"),
+        (PAGE.match(/osRenderDroppedCardPak_\('osBadCard'/g) || []).length === 1 &&
+        PAGE.indexOf("osRenderDroppedCardPak_('osBadCard'") < PAGE.indexOf("for (var si = 0"),
         'one call site above the branch, not one per exit that could drift apart');
   check('and it no longer renders inside #osBody',
         !/html \+= osBadRowsHtmlPak_\(/.test(PAGE) &&
@@ -1103,14 +1118,197 @@ head('[20] the four filter controls match: width, and the Type chevron');
         !/\.os-filters \.os-filter \{ width:/.test(css),
         'an ancestor-qualified selector would have outranked the phone grid rule regardless of source order');
   check('Type is wrapped for a caret the same way the other three are',
-        /<div class="os-multi os-type-wrap">/.test(PAGE));
+        /<div class="os-multi os-type-wrap select-caret-wrap">/.test(PAGE));
   check('its native caret is switched off in favour of the FA chevron',
-        /select\.hc-control\.os-type-select \{[\s\S]{0,400}background-image: none;/.test(css));
-  check('and the chevron itself reuses .warehouse-caret, positioned to sit on the select',
-        /fa-solid fa-chevron-down warehouse-caret os-type-caret/.test(PAGE) &&
-        /\.os-type-caret \{\s*\n\s*position: absolute;/.test(css));
+        /select\.hc-control\.fa-caret-select \{[\s\S]{0,200}background-image: none;/.test(css) &&
+        /class="hc-control fa-caret-select os-type-select/.test(PAGE));
+  check('and the chevron is the one shared class, positioned over the select',
+        /fa-solid fa-chevron-down hc-select-caret/.test(PAGE) &&
+        /\.hc-select-caret \{\s*\n\s*position: absolute;/.test(css));
   check('clicks pass through the icon to the control underneath it',
-        /\.os-type-caret \{[^}]*pointer-events: none;/.test(css));
+        /\.hc-select-caret \{[^}]*pointer-events: none;/.test(css));
+}
+
+
+head('[21] the Open tab: spells nobody has closed');
+// An operative starts a spell and does not finish it. There is no finish time,
+// so it can never be placed on a clock - but it is not a FAULT in the record
+// the way an impossible date is, and it needs a different person to do a
+// different thing about it. Its own card, above the sites.
+{
+  const os = R('Spreadsheet - OS Log.js');
+  const css = R('Web - Styles.html');
+
+  // The mapping, pinned from the script side. A wrong index here reads a
+  // populated cell, so the failure is plausible nonsense rather than an error.
+  const cfg = /sheetName: 'Open',[\s\S]*?hourIdx: (\d+)/.exec(os);
+  check('there is an Open config at all', !!cfg);
+  check('it starts at row 8 of the Open tab',
+        /sheetName: 'Open',\s*\n\s*startRow: 8,/.test(os));
+  check('reading D:S, which is every column the mapping names',
+        /sheetName: 'Open',[\s\S]{0,200}firstCol: 4,\s*\n\s*numCols: 16,/.test(os));
+  check('A-K are D, G, O, Indirect, H, I, blank, K, M, N and a dash',
+        /baseSelect: \[0, 3, 11, 'Indirect', 4, 5, '', 7, 9, 10, '-'\]/.test(os),
+        'output A date, B bonus, E dept, F job, H start, I finish, J hours');
+  check('N-T are Q, R, blank, S, O, P and the Open marker',
+        /extraSelect: \[13, 14, '', 15, 11, 12, 'Open'\]/.test(os),
+        'output N deployedBy, O reportsTo, Q status, R site, S zone, T marker');
+  // Site and zone land on the same source columns the OS Form tab uses, which
+  // is the check that the two tabs group under one heading rather than two.
+  const form = /sheetName: 'OS Form',[\s\S]*?extraSelect: \[([^\]]+)\]/.exec(os);
+  check('site and zone match the OS Form tab, so both group together',
+        !!form && /11, 12,/.test(form[1]),
+        form ? form[1] : 'not found');
+  check('the two computed columns are dashes, having no hours to compute from',
+        /calcSelect: \['-', '-'\]/.test(os));
+  check('and a literal in extraSelect is written through, not used as an index',
+        /const pick = spec => typeof spec === 'number' \? row\[spec\] : spec;/.test(os) &&
+        /const extra = cfg\.extraSelect\.map\(pick\);/.test(os),
+        'extraSelect used to be numbers only and would have read row[undefined]');
+
+  // The marker has to survive the trip to the page.
+  check('the server reads column T as the source marker',
+        /source: 19/.test(CODE) && /var OS_SOURCE_OPEN_ = 'Open';/.test(CODE));
+  check('and carries it on BOTH the good rows and the rejects',
+        (CODE.match(/source: osLogCell_\(r, OS_LOG_COLS_\.source\)/g) || []).length === 2,
+        'an unfinished spell is rejected server-side, so the rejects matter most');
+
+  // Read off the marker, not the status cell: the marker is written by our own
+  // script for every row of that tab, whatever the operative typed.
+  check('the page tests the marker, not the Record Status cell',
+        /function osIsOpenRecordPak_\(row\)/.test(PAGE) &&
+        /String\(row && row\.source \|\| ''\)\.trim\(\)\.toLowerCase\(\) === 'open'/.test(PAGE));
+  const isOpen = ctx.osIsOpenRecordPak_;
+  check('an Open row is one', isOpen({ source: 'Open' }) === true);
+  check('trimmed and case-insensitive, being a sheet cell',
+        isOpen({ source: '  open ' }) === true);
+  check('a row from either other tab is not',
+        isOpen({ source: '' }) === false && isOpen({}) === false &&
+        isOpen({ source: 'W' }) === false);
+  check('and a Record Status of Open does NOT make one',
+        isOpen({ status: 'Open', source: '' }) === false,
+        'the status cell is a human typing; the marker is not');
+
+  // Split at both the places a record can be dropped.
+  check('the client sends its own drops to whichever list they belong in',
+        /\(osIsOpenRecordPak_\(rec\) \? openRecords : unplaceable\)\.push/.test(PAGE));
+  check('and so does the server-reject loop',
+        /\(osIsOpenRecordPak_\(b\) \? openRecords : badInBuilding\)\.push\(b\);/.test(PAGE));
+
+  // One builder for both cards, so they cannot drift apart in format.
+  check('both cards come out of ONE function',
+        /function osBadRowsHtmlPak_\(bad, unnamed, kindName\)/.test(PAGE) &&
+        (PAGE.match(/osRenderDroppedCardPak_\('os/g) || []).length === 2);
+  check('with only the heading, the icon, the key and the colour differing',
+        /var OS_DROPPED_KINDS_ = \{/.test(PAGE) &&
+        /key: '__open',/.test(PAGE) && /rowClass: ' os-open-row',/.test(PAGE));
+  check('the heading is the one that was asked for',
+        /' Open record' \+ \(n === 1 \? '' : 's'\) \+ ', Operatives need to add ' \+\s*\n\s*'finish times to these OS entries'/
+          .test(PAGE));
+  check('the two cards remember open/closed separately',
+        /key: '__bad'/.test(PAGE) && /key: '__open'/.test(PAGE),
+        'one key for both would open and close them together');
+
+  // Above the sites, unlike the card of faults - something to go and close
+  // now, not a footnote to read afterwards.
+  const index = R('Web - Index.html');
+  // The three indexes are required to EXIST first: a missing card gives -1,
+  // which sorts before everything and made this pass by being absent.
+  check('the Open card sits ABOVE the breakdown card in the markup',
+        index.indexOf('id="osOpenCard"') !== -1 &&
+        index.indexOf('id="osOpenCard"') < index.indexOf('id="osBody"') &&
+        index.indexOf('id="osBody"') < index.indexOf('id="osBadCard"'),
+        'open on top, breakdown, then the faults underneath');
+  check('and is hidden until there is something in it',
+        /id="osOpenCard" hidden/.test(index));
+  check('its banner is tinted apart from the amber one',
+        /\.os-open-row \.breakdown-label \{[\s\S]{0,120}color: var\(--accent\)/.test(css),
+        'a different problem, so a different colour - not a worse fault');
+}
+
+head('[22] a control the USER moved skeletons; the clock ticking does not');
+// The opposite of the silent background refresh, and for the opposite reason:
+// somebody is waiting on an answer they just asked for.
+{
+  const data = R('Web - JsData.html');
+  const ui = R('Web - JsUi.html');
+  const init = R('Web - JsInit.html');
+
+  check('there is one function for "the user moved something"',
+        /function osMarkControlChangedPak_\(\) \{\s*\n\s*osLogState = null;\s*\n\s*osLogNeedsRefresh = false;/
+          .test(PAGE),
+        'null is the first-load path, which is the one that skeletons');
+  check('it leaves the ROWS alone',
+        !/function osMarkControlChangedPak_\(\)[\s\S]{0,200}osLogRows = \[\]/.test(PAGE),
+        'if the re-fetch fails, what is there is still true of the window it was read for');
+
+  check('every control-panel dropdown goes through it',
+        /function handleControlChangePak[\s\S]{0,1000}osMarkControlChangedPak_\(\);/.test(data));
+  check('the Warehouse picker too, but only when it actually changed',
+        /if \(changed && typeof osMarkControlChangedPak_ === 'function'\)/.test(ui));
+  check('and the date picker, since another day is other data entirely',
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,400}osMarkControlChangedPak_\(\);/
+          .test(init),
+        'otherwise yesterday spells swap for today under the reader, silently');
+  check('all three call sites are guarded, the OS page being a separate file',
+        (init + data + ui).split('osMarkControlChangedPak_').length - 1 >= 6,
+        'each is a typeof test plus a call');
+}
+
+head('[23] one chevron size, and one dropdown height on a phone');
+{
+  const css = R('Web - Styles.html');
+  const header = R('Web - Header.html');
+
+  check('the size is stated once, as a token',
+        /:root \{ --caret-size: 11px; \}/.test(css));
+  check('and all three caret classes read it',
+        /\.date-picker-caret,\s*\n\.warehouse-caret,\s*\n\.hc-select-caret \{ font-size: var\(--caret-size\); \}/
+          .test(css));
+  // Six different values had accumulated across the breakpoints, and the OS
+  // page's carets matched none of them because nothing set them at all.
+  check('no breakpoint overrides a caret size any more',
+        !/\.warehouse-caret \{ font-size:/.test(css) &&
+        !/\.date-picker-caret,\s*\n[^}]*\{ font-size: 0\./.test(css),
+        'the calendar glyph still scales; the caret is furniture');
+
+  check('Hours Range and Time Window carry the chevron now',
+        (header.match(/fa-chevron-down hc-select-caret/g) || []).length === 2 &&
+        (header.match(/class="select-caret-wrap"/g) || []).length === 2);
+  check('and switch off the caret a native select draws for itself',
+        (header.match(/row-select fa-caret-select/g) || []).length === 2 &&
+        /select\.hc-control\.fa-caret-select \{[\s\S]{0,120}background-image: none;/.test(css),
+        'or the two sit side by side');
+
+  // The page dropdowns were about 34px and the control panel 30px - close
+  // enough to look like a mistake rather than a choice, and both on screen at
+  // once.
+  const mob = mediaBlockFor(css, '#bonusAreaCount');
+  check('every page dropdown is the control panel height on a phone',
+        /height: 24px;\s*\n\s*min-height: 24px;/.test(mob) &&
+        /\.breakdown-time-select,/.test(mob) && /#mainSortSelect,/.test(mob),
+        'the From/To pair included, which is what was asked for');
+  check('stated as a height, not as padding',
+        /padding-top: 0;\s*\n\s*padding-bottom: 0;/.test(mob),
+        'padding leaves the final number to a font that differs between them');
+  // .hc-control is 38px, 30px on a phone, then 24px from the last rule in the
+  // file - which carries !important and is what actually renders. The page
+  // dropdowns have to match THAT, not the rule that reads first.
+  check('and it is the same 24px .hc-control actually renders at',
+        /\.hc-control,[\s\S]{0,300}height: 24px !important;/.test(css));
+}
+
+head('[24] a filter that is narrowing something says so');
+{
+  const css = R('Web - Styles.html');
+  check('the three multi-selects light up when anything is picked',
+        /\(picked\.length \? ' os-filter-on' : ''\)/.test(PAGE));
+  check('and Type when it is not on All',
+        /\(osTypeFilter === 'all' \? '' : ' os-filter-on'\)/.test(PAGE));
+  check('the tint is the accent, not another status colour',
+        /\.hc-control\.os-filter-on \{[\s\S]{0,140}border-color: var\(--accent\)/.test(css) &&
+        /\.hc-control\.os-filter-on \{[\s\S]{0,140}background: var\(--accent-8\)/.test(css),
+        'green/amber/red already mean a verdict on this page');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

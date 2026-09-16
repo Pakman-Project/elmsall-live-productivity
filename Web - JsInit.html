@@ -560,6 +560,10 @@
 
     $('archiveSelect').addEventListener('change', function() {
       currentArchiveUrl = this.value;
+      // A different day is different data, not a newer read of the same
+      // window - so the OS page starts from nothing rather than silently
+      // swapping yesterday's spells for today's under the reader.
+      if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
       if (currentArchiveUrl) {
         var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
         for (var i = 0; i < syncedHours.length; i++) { syncedHours[i].value = '24'; }

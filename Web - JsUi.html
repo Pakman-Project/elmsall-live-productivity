@@ -676,6 +676,12 @@
     // Area groups and hidden-area choices can name areas from the other
     // building; those simply stop matching rather than being rewritten, so
     // switching back restores exactly what was there before.
+    //
+    // The building narrows the OS page too, so it gets the same skeleton a
+    // control-panel change gives it - the reader asked for this one.
+    if (changed && typeof osMarkControlChangedPak_ === 'function') {
+      osMarkControlChangedPak_();
+    }
     if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
     if (changed && typeof saveUserPreferences === 'function') saveUserPreferences();
   }

@@ -209,6 +209,21 @@
     }
   }
 
+  // A control the user just moved, as opposed to the clock ticking round to
+  // the next automatic refresh.
+  //
+  // Both end up re-reading the log, but they want opposite things from the
+  // page: the automatic one must not interrupt anybody (see osLogNeedsRefresh),
+  // and this one must visibly acknowledge the click. Dropping the state back to
+  // null puts it on the first-load path, which is the one that skeletons.
+  //
+  // The ROWS are deliberately left alone: if the fetch fails, what was there is
+  // still the truth about the window it was read for.
+  function osMarkControlChangedPak_() {
+    osLogState = null;
+    osLogNeedsRefresh = false;
+  }
+
   // silent: a background refresh keeps showing whatever is already on screen
   // while it waits, and on failure keeps it showing rather than replacing good
   // data with an error - the next refresh will simply try again. The first
@@ -358,6 +373,18 @@
     return osStatusTextPak_(row && row.status) || OS_STATUS_NONE_PAK_;
   }
 
+  // A spell the operative started and never finished.
+  //
+  // Read off the SOURCE marker - the literal 'Open' the OS Log script writes
+  // into column T for every row of the Open tab - rather than off the Record
+  // Status cell. The status column holds whatever the form put there, which is
+  // a human's typing; the marker is written by our own script for every row of
+  // that tab whatever the human did, so it is the one signal that cannot be
+  // wrong about which tab a row came from.
+  function osIsOpenRecordPak_(row) {
+    return String(row && row.source || '').trim().toLowerCase() === 'open';
+  }
+
   function osStatusValuesPak_(rows) {
     var seen = {}, out = [];
     for (var i = 0; i < rows.length; i++) {
@@ -418,7 +445,11 @@
     var html = '<div class="os-filter">';
     html += '<span class="breakdown-time-label">' + title + '</span>';
     html += '<div class="os-multi">';
-    html += '<button type="button" class="hc-control os-multi-btn" id="' + id + 'Btn"' +
+    // A narrowed filter has to be visible without opening it: the button reads
+    // "All Zones" or a name either way, and at a glance across four controls
+    // that difference is easy to miss entirely.
+    html += '<button type="button" class="hc-control os-multi-btn' +
+            (picked.length ? ' os-filter-on' : '') + '" id="' + id + 'Btn"' +
             ' onclick="osFilterMenuClick_(\'' + id + '\')" aria-haspopup="listbox"' +
             ' aria-expanded="false" aria-controls="' + id + '">' +
             '<span class="os-multi-label">' + escapeTextPak_(label) + '</span>' +
@@ -648,26 +679,57 @@
   var OS_BAD_COLUMNS_ = ['Bonus', 'Date', 'Start', 'Finish', 'Site / Zone',
                          'Task', 'TM Authorising', 'Deployed by', 'Record Status'];
 
-  function osBadRowsHtmlPak_(bad, unnamed) {
+  // The two cards of records that reach no figure: the ones that cannot be
+  // placed on a clock at all, and the ones that simply have not finished yet.
+  // Different problems needing different people to act, so different cards -
+  // but identical in format, which is guaranteed by building both here rather
+  // than by two copies agreeing to stay in step.
+  var OS_DROPPED_KINDS_ = {
+    bad: {
+      key: '__bad',
+      rowClass: '',
+      icon: 'fa-triangle-exclamation',
+      heading: function (n) {
+        return n + ' record' + (n === 1 ? '' : 's') + ' that cannot be placed on a clock';
+      },
+      intro: 'These are on the OS log and could not be placed on a clock, so they ' +
+             'are in none of the figures above. Hover a row to see what is wrong with it.'
+    },
+    open: {
+      key: '__open',
+      rowClass: ' os-open-row',
+      icon: 'fa-hourglass-half',
+      heading: function (n) {
+        return n + ' Open record' + (n === 1 ? '' : 's') + ', Operatives need to add ' +
+               'finish times to these OS entries';
+      },
+      // Not a fault in the record, which is why it is not on the other card:
+      // the form is fine, the spell is simply still running as far as the log
+      // knows, and somebody has to go and close it.
+      intro: 'These were started and never finished, so they cannot be placed on a ' +
+             'clock and are in none of the figures below. Hover a row to see what is ' +
+             'missing from it.'
+    }
+  };
+
+  function osBadRowsHtmlPak_(bad, unnamed, kindName) {
+    var kind = OS_DROPPED_KINDS_[kindName] || OS_DROPPED_KINDS_.bad;
     var total = (bad ? bad.length : 0) + (unnamed || 0);
     if (total <= 0) return '';
-    var key = osNodeKeyPak_('__bad');
+    var key = osNodeKeyPak_(kind.key);
     var open = !!osOpenNodes[key];
 
-    var html = '<div class="breakdown-row clickable-row os-dropped-row' +
+    var html = '<div class="breakdown-row clickable-row os-dropped-row' + kind.rowClass +
                (open ? ' expanded' : '') + '"' +
                ' data-os-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
     html += '<div class="breakdown-label os-dropped-label">' +
-            '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
-            total + ' record' + (total === 1 ? '' : 's') +
-            ' that cannot be placed on a clock' +
+            '<i class="fa-solid ' + kind.icon + '" aria-hidden="true"></i>' +
+            kind.heading(total) +
             '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div></div>';
 
     html += '<div class="breakdown-detail' + (open ? ' open' : '') + '">' +
             '<div class="os-zone-detail">';
-    html += '<div class="os-bad-intro">These are on the OS log and could not be ' +
-            'placed on a clock, so they are in none of the figures above. Hover a ' +
-            'row to see what is wrong with it.</div>';
+    html += '<div class="os-bad-intro">' + kind.intro + '</div>';
 
     if (bad && bad.length) {
       html += '<div class="table-wrap os-job-table-wrap"><table class="os-job-table os-bad-table"><thead><tr>';
@@ -786,6 +848,9 @@
     // carries one now, so an over-long shift or an impossible date can be
     // pointed at like any other.
     var unplaceable = [];
+    // Started and not yet finished - a different problem, needing a different
+    // person to do something about it, so a card of its own above the sites.
+    var openRecords = [];
     for (var i = 0; i < osLogRows.length; i++) {
       var rec = osLogRows[i];
       // The building filter first: a record for the OTHER warehouse is not
@@ -796,11 +861,11 @@
       if (!osInBuildingPak_(rec.site)) continue;
       var w = osSpellWindowPak_(rec);
       if (!w) {
-        unplaceable.push({
+        (osIsOpenRecordPak_(rec) ? openRecords : unplaceable).push({
           row: rec.row, bonus: rec.bonus, date: rec.date,
           from: rec.from, to: rec.to, site: rec.site, zone: rec.zone,
           job: rec.job, auth: rec.auth, deployedBy: rec.deployedBy,
-          status: rec.status,
+          status: rec.status, source: rec.source,
           why: osSpellProblemPak_(rec) || 'it cannot be placed on a clock'
         });
         continue;
@@ -811,9 +876,13 @@
 
     // The server's own rejects go through the same filter - they carry a Site
     // cell too, and a reject from the other building is exactly the "elsewhere"
-    // case above.
-    var badInBuilding = (osLogBad || []).filter(function (b) {
-      return osInBuildingPak_(b.site);
+    // case above. An unfinished spell has no finish time, so the SERVER is
+    // where most of them are rejected; they are split out here for the same
+    // reason the client's own are, and by the same test.
+    var badInBuilding = [];
+    (osLogBad || []).forEach(function (b) {
+      if (!osInBuildingPak_(b.site)) return;
+      (osIsOpenRecordPak_(b) ? openRecords : badInBuilding).push(b);
     });
 
     // The dropdowns offer what is actually in range, so a zone nobody worked
@@ -863,14 +932,16 @@
         // so all four controls carry the same icon rather than three matching
         // and one looking unfinished.
         '<div class="os-filter"><span class="breakdown-time-label">Type</span>' +
-        '<div class="os-multi os-type-wrap">' +
-        '<select class="hc-control os-type-select" onchange="setOsTypeFilter(this.value)"' +
+        '<div class="os-multi os-type-wrap select-caret-wrap">' +
+        '<select class="hc-control fa-caret-select os-type-select' +
+        (osTypeFilter === 'all' ? '' : ' os-filter-on') +
+        '" onchange="setOsTypeFilter(this.value)"' +
         ' title="Everyone on OS, only those who did nothing else, or only those who did both">' +
         Object.keys(OS_TYPE_LABELS_).map(function (k) {
           return '<option value="' + k + '"' + (osTypeFilter === k ? ' selected' : '') +
                  '>' + OS_TYPE_LABELS_[k] + '</option>';
         }).join('') + '</select>' +
-        '<i class="fa-solid fa-chevron-down warehouse-caret os-type-caret" aria-hidden="true"></i>' +
+        '<i class="fa-solid fa-chevron-down hc-select-caret" aria-hidden="true"></i>' +
         '</div></div>' +
         osMultiSelectHtmlPak_('osZoneMenu', 'Zones', zoneValues, osZoneFilter,
                               'toggleOsZoneFilter', 'clearOsZoneFilter') +
@@ -905,9 +976,13 @@
     // unfiltered rather than guessed at: a building filter that silently
     // dropped a number it cannot actually attribute would undercount without
     // saying so.
-    osRenderBadCardPak_(
+    osRenderDroppedCardPak_('osBadCard', 'osBadBody',
       badInBuilding.concat(unplaceable),
-      Math.max(0, (Number(osLogSkipped) || 0) - (osLogBad || []).length));
+      Math.max(0, (Number(osLogSkipped) || 0) - (osLogBad || []).length), 'bad');
+    // Above the sites rather than below them, unlike the card of faults: an
+    // unfinished spell is something to go and close now, not a footnote to
+    // read afterwards.
+    osRenderDroppedCardPak_('osOpenCard', 'osOpenBody', openRecords, 0, 'open');
 
     if (sites.length === 0) {
       html += '<div class="breakdown-empty">' +
@@ -1002,14 +1077,17 @@
   }
 
   // Its own card, separate from the breakdown: these records are in none of
-  // the figures up there, and a warning living inside that card read as part
-  // of the same total it is explicitly excluded from. Hidden outright rather
-  // than left as an empty card when there is nothing to show.
-  function osRenderBadCardPak_(bad, unnamed) {
-    var card = document.getElementById('osBadCard');
-    var body = document.getElementById('osBadBody');
+  // the figures there, and a warning living inside that card read as part of
+  // the same total it is explicitly excluded from. Hidden outright rather than
+  // left as an empty card when there is nothing to show.
+  //
+  // One function for both cards, so the faults and the unfinished spells
+  // cannot end up rendered two different ways.
+  function osRenderDroppedCardPak_(cardId, bodyId, bad, unnamed, kind) {
+    var card = document.getElementById(cardId);
+    var body = document.getElementById(bodyId);
     if (!card || !body) return;
-    var html = osBadRowsHtmlPak_(bad, unnamed);
+    var html = osBadRowsHtmlPak_(bad, unnamed, kind);
     card.hidden = !html;
     body.innerHTML = html;
   }

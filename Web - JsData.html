@@ -44,6 +44,13 @@ function handleControlChangePak(sourceElement, type) {
   for (var i = 0; i < allSynced.length; i++) {
     if (allSynced[i] !== sourceElement) { allSynced[i].value = sourceElement.value; }
   }
+  // A control the USER just moved is the one case where the OS page should
+  // show its skeleton rather than update in place: they are waiting on an
+  // answer they asked for, and a page that sits still for a second looks like
+  // it ignored the click. The silent path stays for the automatic refresh,
+  // which nobody asked for and nobody should have to watch - see
+  // osMarkControlChangedPak_.
+  if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
   applyLocalFiltersPak();
 }
 
