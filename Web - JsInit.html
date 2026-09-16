@@ -230,11 +230,20 @@
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
     // The OS log no longer travels in the payload - the OS page fetches it
-    // itself on first open. Cleared here so a refresh re-fetches against the
-    // new window rather than showing the previous one's spells.
-    osLogRows = [];
-    osLogSkipped = 0;
-    osLogState = null;
+    // itself. A refresh has to re-fetch it too, against the new window,
+    // rather than going on showing the previous one's spells - but ONLY the
+    // very first fetch may show a skeleton for that. Once the log has been
+    // read successfully at least once (osLogEverLoaded), later refreshes are
+    // marked as merely needing an update and the OS page re-fetches quietly
+    // the next time it renders, keeping the old rows on screen until the new
+    // ones land - see ensureOsLogPak_ and osFetchLogPak_ in JsPageOs.
+    if (osLogEverLoaded) {
+      osLogNeedsRefresh = true;
+    } else {
+      osLogRows = [];
+      osLogSkipped = 0;
+      osLogState = null;
+    }
     // The server's list is already every operator on site, which is what the
     // search wants regardless of the building in view.
     allBonusList = data.bonusList || [];

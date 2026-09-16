@@ -185,23 +185,56 @@
   // Fetched once, on first open, rather than with every dashboard load: it
   // cost 431ms of a load for a page most viewers never look at. A second open
   // is served from osLogRows without a round trip.
+  //
+  // Two call sites, two different appetites for interruption: the FIRST load
+  // has nothing on screen yet, so a skeleton is honest about that. Every
+  // refresh after is the dashboard's own data moving on to a new window - the
+  // rest of the page updates its numbers in place with no flash of any kind,
+  // and this page did not use to, because renderDashboardPayload_ reset
+  // osLogState to null on every refresh and this function cannot tell that
+  // apart from a real first load. It can now, via osLogEverLoaded.
   function ensureOsLogPak_() {
-    if (osLogState !== null) return;
-    osLogState = 'loading';
-    renderOsPagePak();
+    if (osLogState === null) {
+      osLogState = 'loading';
+      renderOsPagePak();
+      osFetchLogPak_(false);
+      return;
+    }
+    if (osLogState === 'ready' && osLogNeedsRefresh) {
+      // Cleared before the fetch starts, not after it lands: a second
+      // dashboard refresh arriving while this one is still in flight must not
+      // queue a duplicate request for the same window.
+      osLogNeedsRefresh = false;
+      osFetchLogPak_(true);
+    }
+  }
+
+  // silent: a background refresh keeps showing whatever is already on screen
+  // while it waits, and on failure keeps it showing rather than replacing good
+  // data with an error - the next refresh will simply try again. The first
+  // load has nothing to protect and shows the real loading and error states.
+  function osFetchLogPak_(silent) {
     google.script.run
       .withSuccessHandler(function (res) {
         osLogRows = (res && res.rows) || [];
         osLogSkipped = (res && Number(res.skipped)) || 0;
         osLogBad = (res && res.bad) || [];
-        osLogState = (res && res.error) ? res.error : 'ready';
+        if (res && res.error) {
+          if (!silent) { osLogState = res.error; }
+          else { console.warn('OS log background refresh failed: ' + res.error); }
+        } else {
+          osLogState = 'ready';
+          osLogEverLoaded = true;
+        }
         if (res && res.timing) { console.info(res.timing); }
         renderOsPagePak();
       })
       .withFailureHandler(function (err) {
+        var message = (err && err.message) || 'The OS log could not be read';
+        if (silent) { console.warn('OS log background refresh failed: ' + message); return; }
         // Named rather than left as an empty page: "nobody was on OS" and
         // "the log could not be read" look identical otherwise.
-        osLogState = (err && err.message) || 'The OS log could not be read';
+        osLogState = message;
         renderOsPagePak();
       })
       .getOsLogRows(osLogWantDates_(), currentArchiveUrl || null);
@@ -255,13 +288,24 @@
     return true;
   }
 
+  // Departments cascades from Zones, and Record Status cascades from
+  // Departments - see the rowsForDept/rowsForStatus computation in
+  // renderOsPagePak, which is what actually narrows each dropdown's options.
+  // A stale selection in a downstream filter has to be cleared the moment its
+  // upstream one changes, or it would go on filtering by a value the dropdown
+  // no longer even offers - invisible in the UI, since the picked count is
+  // read against the NEW narrower list and would show as "All" while still
+  // silently excluding everything.
   function toggleOsZoneFilter(zone) {
     if (osZoneFilter[zone]) { delete osZoneFilter[zone]; } else { osZoneFilter[zone] = true; }
+    osDeptFilter = {};
+    osStatusFilter = {};
     renderOsPagePak();
   }
 
   function toggleOsDeptFilter(dept) {
     if (osDeptFilter[dept]) { delete osDeptFilter[dept]; } else { osDeptFilter[dept] = true; }
+    osStatusFilter = {};
     renderOsPagePak();
   }
 
@@ -271,8 +315,17 @@
     renderOsPagePak();
   }
 
-  function clearOsZoneFilter() { osZoneFilter = {}; renderOsPagePak(); }
-  function clearOsDeptFilter() { osDeptFilter = {}; renderOsPagePak(); }
+  function clearOsZoneFilter() {
+    osZoneFilter = {};
+    osDeptFilter = {};
+    osStatusFilter = {};
+    renderOsPagePak();
+  }
+  function clearOsDeptFilter() {
+    osDeptFilter = {};
+    osStatusFilter = {};
+    renderOsPagePak();
+  }
   function clearOsStatusFilter() { osStatusFilter = {}; renderOsPagePak(); }
 
   // Filtered on the DISPLAYED verdict, not on the raw wording - filtering on
@@ -330,6 +383,10 @@
     return out;
   }
 
+  // Paints ONE menu's open/closed class. Kept separate from the click handler
+  // below because renderOsPagePak also calls this directly, to put the
+  // persisted osOpenFilterMenu back open after the filter row has just been
+  // rebuilt from scratch - which every selection inside it triggers.
   function toggleOsMenu_(id, force) {
     var menu = document.getElementById(id);
     var btn = document.getElementById(id + 'Btn');
@@ -337,6 +394,20 @@
     var open = (typeof force === 'boolean') ? force : !menu.classList.contains('open');
     menu.classList.toggle('open', open);
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  var OS_FILTER_MENU_IDS_ = ['osZoneMenu', 'osDeptMenu', 'osStatusMenu'];
+
+  // The button's own onclick - as opposed to a re-render restoring state, this
+  // is the user actually asking for a menu to open or close. One open slot for
+  // all three: opening one force-closes whichever else was open, so two of
+  // them can never be on screen fighting for the same space at once.
+  function osFilterMenuClick_(id) {
+    var opening = !document.getElementById(id).classList.contains('open');
+    for (var i = 0; i < OS_FILTER_MENU_IDS_.length; i++) {
+      toggleOsMenu_(OS_FILTER_MENU_IDS_[i], OS_FILTER_MENU_IDS_[i] === id && opening);
+    }
+    osOpenFilterMenu = opening ? id : null;
   }
 
   function osMultiSelectHtmlPak_(id, title, values, chosen, handler, clearHandler) {
@@ -348,7 +419,7 @@
     html += '<span class="breakdown-time-label">' + title + '</span>';
     html += '<div class="os-multi">';
     html += '<button type="button" class="hc-control os-multi-btn" id="' + id + 'Btn"' +
-            ' onclick="toggleOsMenu_(\'' + id + '\')" aria-haspopup="listbox"' +
+            ' onclick="osFilterMenuClick_(\'' + id + '\')" aria-haspopup="listbox"' +
             ' aria-expanded="false" aria-controls="' + id + '">' +
             '<span class="os-multi-label">' + escapeTextPak_(label) + '</span>' +
             '<i class="fa-solid fa-chevron-down warehouse-caret" aria-hidden="true"></i>' +
@@ -521,8 +592,21 @@
   var OS_JOB_COLUMNS_ = ['Bonus', 'Time', 'TM Authorising', 'Deployed by',
                          'Reports to', 'Record Status'];
 
+  // One job type is one table, and a zone can hold a dozen of them down the
+  // page - so unlike the bad-records table, this one has to agree with every
+  // OTHER job table on where its columns sit, not just read well on its own.
+  // A percentage per column, spent on a bonus chip needing little and three
+  // name columns needing more, rather than the six-way equal split the bare
+  // `table` rule would otherwise give it.
+  var OS_JOB_COL_WIDTHS_ = [10, 13, 19, 19, 19, 20];
+
   function osJobTableHtmlPak_(records) {
-    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table"><thead><tr>';
+    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
+               '<colgroup>';
+    for (var w = 0; w < OS_JOB_COL_WIDTHS_.length; w++) {
+      html += '<col style="width:' + OS_JOB_COL_WIDTHS_[w] + '%">';
+    }
+    html += '</colgroup><thead><tr>';
     for (var c = 0; c < OS_JOB_COLUMNS_.length; c++) {
       html += '<th>' + OS_JOB_COLUMNS_[c] + '</th>';
     }
@@ -681,6 +765,13 @@
         escapeTextPak_(osLogState) + '</div>';
       return;
     }
+    // Already showing real rows. If the dashboard's data has moved on since
+    // they were fetched, this kicks off a background re-fetch - silently,
+    // because ensureOsLogPak_ only ever flips osLogState to 'loading' on a
+    // TRUE first load - and falls straight through to draw with what is on
+    // screen already, which is a few minutes stale at worst and about to be
+    // replaced with no flash at all once the fetch lands.
+    ensureOsLogPak_();
 
     // OVERLAP, not containment. A spell that started before the window and is
     // still running is the case this page exists for; requiring it to fit
@@ -727,10 +818,21 @@
 
     // The dropdowns offer what is actually in range, so a zone nobody worked
     // is not on the list. Built BEFORE the zone and department filters are
-    // applied, or choosing one would empty the list you chose it from.
+    // applied, or choosing one would empty the list you chose it from -
+    // EXCEPT that Departments and Record Status also cascade from whatever is
+    // upstream of them: Departments offers only what exists under the chosen
+    // Zones, and Record Status only what exists under the chosen Departments
+    // (which is itself already narrowed by Zones). Zones has nothing upstream
+    // of it, so it alone is built from the whole window.
+    var rowsForDept = inWindow.filter(function (r) {
+      return osPassesSetPak_(osZoneFilter, osLabelPak_(r.zone, 'zone'));
+    });
+    var rowsForStatus = rowsForDept.filter(function (r) {
+      return osPassesSetPak_(osDeptFilter, osLabelPak_(r.dept, 'department'));
+    });
     var zoneValues = osUniqueValuesPak_(inWindow, 'zone', 'zone');
-    var deptValues = osUniqueValuesPak_(inWindow, 'dept', 'department');
-    var statusValues = osStatusValuesPak_(inWindow);
+    var deptValues = osUniqueValuesPak_(rowsForDept, 'dept', 'department');
+    var statusValues = osStatusValuesPak_(rowsForStatus);
 
     // Pure OS / Multi Tasks is about the PERSON across the whole window, so it
     // is judged before the zone and department filters narrow the records.
@@ -754,19 +856,33 @@
     var controls = document.getElementById('osFilters');
     if (controls) {
       controls.innerHTML =
+        // Wrapped in .os-multi too, purely for the positioning context a
+        // native <select> cannot provide for itself - it is what lets the
+        // same chevron the three real multi-selects use sit on top of this
+        // one instead of the thin caret select.hc-control draws by default,
+        // so all four controls carry the same icon rather than three matching
+        // and one looking unfinished.
         '<div class="os-filter"><span class="breakdown-time-label">Type</span>' +
+        '<div class="os-multi os-type-wrap">' +
         '<select class="hc-control os-type-select" onchange="setOsTypeFilter(this.value)"' +
         ' title="Everyone on OS, only those who did nothing else, or only those who did both">' +
         Object.keys(OS_TYPE_LABELS_).map(function (k) {
           return '<option value="' + k + '"' + (osTypeFilter === k ? ' selected' : '') +
                  '>' + OS_TYPE_LABELS_[k] + '</option>';
-        }).join('') + '</select></div>' +
+        }).join('') + '</select>' +
+        '<i class="fa-solid fa-chevron-down warehouse-caret os-type-caret" aria-hidden="true"></i>' +
+        '</div></div>' +
         osMultiSelectHtmlPak_('osZoneMenu', 'Zones', zoneValues, osZoneFilter,
                               'toggleOsZoneFilter', 'clearOsZoneFilter') +
         osMultiSelectHtmlPak_('osDeptMenu', 'Departments', deptValues, osDeptFilter,
                               'toggleOsDeptFilter', 'clearOsDeptFilter') +
         osMultiSelectHtmlPak_('osStatusMenu', 'Record Status', statusValues, osStatusFilter,
                               'toggleOsStatusFilter', 'clearOsStatusFilter');
+      // The filter row is rebuilt from scratch on every change - including a
+      // selection made INSIDE an open menu - so whichever one was open has to
+      // be told to open again, or ticking a single box would close the very
+      // dropdown it was ticked in.
+      if (osOpenFilterMenu) { toggleOsMenu_(osOpenFilterMenu, true); }
     }
 
     var html = '<div class="breakdown-summary">';
@@ -804,13 +920,6 @@
 
     for (var si = 0; si < sites.length; si++) {
       var site = sites[si];
-      // Bars are scaled WITHIN their site, not across the whole page: a site
-      // with three people on OS still deserves a readable breakdown, and
-      // scaled against a site of forty every one of its bars would be a stub.
-      var maxZone = 0;
-      for (var z = 0; z < site.zones.length; z++) {
-        if (site.zones[z].count > maxZone) maxZone = site.zones[z].count;
-      }
 
       html += '<div class="os-site">';
       html += '<div class="os-site-head"><span class="os-site-name">' +
@@ -821,7 +930,14 @@
         var zone = site.zones[zi];
         var zKey = osNodeKeyPak_(site.name, zone.name);
         var zOpen = !!osOpenNodes[zKey];
-        var zPct = maxZone > 0 ? (zone.count / maxZone * 100) : 0;
+        // A share of the OVERALL total - headCount, the same number the
+        // summary line above calls "N on OS" - not of the largest zone at its
+        // own site. Scaled per site, which this did, a 56-strong zone at a
+        // busy site and a 28-strong zone at a quiet one both drew full-width
+        // bars, because each was simply the biggest thing beside it: two
+        // numbers a reader could not tell apart by looking, three times too
+        // confident about the smaller one.
+        var zPct = headCount > 0 ? Math.min(100, zone.count / headCount * 100) : 0;
 
         html += '<div class="breakdown-row clickable-row' + (zOpen ? ' expanded' : '') + '"' +
                 ' data-os-key="' + escapeAttrPak(zKey) + '" onclick="toggleOsNode(this)">';
@@ -913,7 +1029,8 @@
     }, 60);
   }
 
-  // Click-away for the two multi-selects, matching how the header menus close.
+  // Click-away for all three multi-selects, matching how the header menus
+  // close.
   //
   // Guarded, because everything else in this file is pure string and date work
   // that its test suite runs directly with no DOM at all. One unguarded
@@ -922,8 +1039,10 @@
     document.addEventListener('click', function (e) {
       if (!e.target || !e.target.closest) return;
       if (e.target.closest('.os-multi')) return;
-      toggleOsMenu_('osZoneMenu', false);
-      toggleOsMenu_('osDeptMenu', false);
+      for (var i = 0; i < OS_FILTER_MENU_IDS_.length; i++) {
+        toggleOsMenu_(OS_FILTER_MENU_IDS_[i], false);
+      }
+      osOpenFilterMenu = null;
     });
   }
 </script>

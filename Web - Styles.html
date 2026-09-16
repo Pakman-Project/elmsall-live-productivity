@@ -3319,15 +3319,25 @@ body.page-scrolled-far .back-to-top {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.75rem;
-  /* The bare `table` rule sets table-layout: fixed, which is right for the Data
-     Table - it has a column per work area and they must share the width evenly.
-     Here it divided the width into nine equal parts regardless of what was in
-     them, so "Cover - Team Manager" and "15/09/2026" were both clipped to about
-     eighty pixels and read as "Cov..." and "15/...". These columns hold names
-     and times of very different lengths, and the table is already inside a
-     wrapper that scrolls sideways - so it sizes to its content instead. */
-  table-layout: auto;
 }
+
+/* The RECORDS table - one per job type, many down a department, many more
+   down a zone - has to line its columns up against every other one of itself
+   on the page, or Bonus under one department sits under Reports To of the
+   next. table-layout: auto sizes a table from its OWN content and cannot do
+   that: two tables with a longer name in one column draw different widths for
+   every column, not just that one. Fixed, with the shares in the colgroup
+   osJobTableHtmlPak_ writes - not an equal split six ways, which is what the
+   bare `table` rule gives by default and crushes the bonus chip to the width
+   of "TM Authorising". */
+.os-job-table:not(.os-bad-table) { table-layout: fixed; }
+
+/* The BAD-RECORDS table appears once, is not a column of anything else, and
+   holds a real date and a real name in most of its nine cells - a fixed equal
+   split clipped "Cover - Team Manager" and "15/09/2026" to "Cov..." and
+   "15/...". Sized to its own content instead, which is right precisely
+   because there is nothing else on the page for it to line up against. */
+.os-bad-table { table-layout: auto; }
 
 .os-job-table th {
   padding: 4px 8px;
@@ -3414,7 +3424,7 @@ body.page-scrolled-far .back-to-top {
   opacity: 0.6;
 }
 
-/* The three OS filters: Type, Zones, Departments. */
+/* The four OS filters: Type, Zones, Departments, Record Status. */
 .os-filters {
   display: flex;
   flex-wrap: wrap;
@@ -3423,12 +3433,42 @@ body.page-scrolled-far .back-to-top {
   min-width: 0;
 }
 
+/* A fixed width on the COLUMN, not just a min-width on the control inside it -
+   Type used to be 120px and the three multi-selects 150px, which read as the
+   row not quite lining up. All four controls stretch to fill their column
+   (native block/flex-stretch behaviour, since neither sets its own width), so
+   fixing the column is the one place this has to be said.
+   Same specificity as the mobile override below (both are plain .os-filter),
+   which is deliberate: the mobile rule wins there on SOURCE ORDER alone, and
+   an ancestor-qualified selector here would have outranked it regardless of
+   order and broken the phone grid this was already built for. */
+.os-filter { width: 170px; flex: 0 0 170px; }
 .os-filter { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .os-filter .breakdown-time-label { white-space: nowrap; }
 
-.os-type-select { min-width: 120px; }
+/* The wrapper is .os-multi too (see the markup), purely so a native <select>
+   gets the same positioning context the three real multi-selects use for
+   their chevron - see .os-type-caret - and the same fixed column width, with
+   no separate rule needed here to get either. */
+select.hc-control.os-type-select {
+  /* select.hc-control draws its own thin caret via a background-image
+     gradient. Removed here in favour of the same FA chevron the other three
+     controls use, so all four carry one icon rather than three matching and
+     the fourth looking like it was left unfinished. */
+  background-image: none;
+  padding-right: 30px;
+}
+.os-type-caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  /* The icon sits on top of the select purely to be seen; every click still
+     has to reach the control underneath it. */
+  pointer-events: none;
+}
 
-/* The two multi-selects. Same shape as the Warehouse picker in the control
+/* The three multi-selects. Same shape as the Warehouse picker in the control
    panel - it is the same gesture, so it should look the same - which is why
    this reuses .warehouse-menu and .warehouse-item wholesale and only adds the
    button and the positioning. */
@@ -3436,7 +3476,6 @@ body.page-scrolled-far .back-to-top {
 
 .os-multi-btn {
   justify-content: space-between;
-  min-width: 150px;
   cursor: pointer;
 }
 

@@ -502,12 +502,40 @@ head('[14] the three filters');
         /aria-multiselectable="true"/.test(PAGE));
   check('and both offer what is actually in range',
         /osUniqueValuesPak_\(inWindow, 'zone', 'zone'\)/.test(PAGE) &&
-        /osUniqueValuesPak_\(inWindow, 'dept', 'department'\)/.test(PAGE),
+        /osUniqueValuesPak_\(rowsForDept, 'dept', 'department'\)/.test(PAGE),
         'a zone nobody worked has no business on the list');
-  check('built BEFORE those filters are applied',
-        PAGE.indexOf("osUniqueValuesPak_(inWindow, 'zone'") <
-        PAGE.indexOf('osPassesSetPak_(osZoneFilter'),
+  check('zones is built from the WHOLE window, unfiltered by itself',
+        /var zoneValues = osUniqueValuesPak_\(inWindow, 'zone', 'zone'\);/.test(PAGE),
         'or choosing one would empty the list you chose it from');
+
+  // Departments cascades from Zones, and Record Status cascades from
+  // Departments: each dropdown offers only what exists under whatever is
+  // chosen upstream of it, not the whole window regardless.
+  check('departments is narrowed by the chosen zones first',
+        /var rowsForDept = inWindow\.filter\(function \(r\) \{\s*\n\s*return osPassesSetPak_\(osZoneFilter, osLabelPak_\(r\.zone, 'zone'\)\);/
+          .test(PAGE));
+  check('and record status by the chosen zones AND departments',
+        /var rowsForStatus = rowsForDept\.filter\(function \(r\) \{\s*\n\s*return osPassesSetPak_\(osDeptFilter, osLabelPak_\(r\.dept, 'department'\)\);/
+          .test(PAGE) &&
+        /osStatusValuesPak_\(rowsForStatus\)/.test(PAGE),
+        'built on rowsForDept, which is already zone-narrowed - not on inWindow again');
+  // A stale downstream selection has to be cleared the moment its upstream
+  // changes, or it goes on filtering by a value its own dropdown no longer
+  // even lists - which the picked-count label would then misreport as "All".
+  check('choosing a zone clears the departments and status selections',
+        /function toggleOsZoneFilter\(zone\) \{[\s\S]{0,160}osDeptFilter = \{\};[\s\S]{0,40}osStatusFilter = \{\};/
+          .test(PAGE));
+  check('clearing zones does too',
+        /function clearOsZoneFilter\(\) \{[\s\S]{0,80}osDeptFilter = \{\};[\s\S]{0,40}osStatusFilter = \{\};/
+          .test(PAGE));
+  check('choosing a department clears the status selection',
+        /function toggleOsDeptFilter\(dept\) \{[\s\S]{0,140}osStatusFilter = \{\};/.test(PAGE));
+  check('clearing departments does too',
+        /function clearOsDeptFilter\(\) \{[\s\S]{0,60}osStatusFilter = \{\};/.test(PAGE));
+  check('but record status has nothing downstream to clear',
+        /function toggleOsStatusFilter\(status\) \{[\s\S]{0,120}renderOsPagePak\(\);\s*\n\s*\}/
+          .test(PAGE) &&
+        !/function toggleOsStatusFilter\(status\) \{[\s\S]{0,160}osZoneFilter = \{\}/.test(PAGE));
 
   // An EMPTY set means no filter. The alternative makes the first click on a
   // fresh dropdown empty the page, which reads as the page being broken.
@@ -557,8 +585,15 @@ head('[15] a zone opens onto DEPARTMENT bars, and those onto records');
   check('and clamped, because one head can be in two departments',
         /Math\.min\(100, dept\.count \/ zone\.count \* 100\)/.test(PAGE),
         'the parts can legitimately sum past the whole');
-  check('and zone bars within their site',
-        /maxZone > 0 \? \(zone\.count \/ maxZone \* 100\)/.test(PAGE));
+  // Zone bars are a share of the OVERALL total (headCount, the same number the
+  // summary calls "N on OS"), not of the largest zone at their own site.
+  // Scaled per site, a 56-strong zone at a busy site and a 28-strong zone at a
+  // quiet one both drew full-width bars - each was simply the biggest thing
+  // beside it, which told the reader nothing about how they compared.
+  check('zone bars are a share of the OVERALL total, not their own site',
+        /headCount > 0 \? Math\.min\(100, zone\.count \/ headCount \* 100\)/.test(PAGE) &&
+        PAGE.indexOf('maxZone') === -1,
+        'a 56-strong zone and a 28-strong one should not both fill the bar');
   check('both are styled, and the department reads as the quieter one',
         R('Web - Styles.html').indexOf('.breakdown-bar.os-dept-bar') !== -1 &&
         R('Web - Styles.html').indexOf('.os-dept-row { padding-left') !== -1);
@@ -720,16 +755,33 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
 
   // The bare `table` rule is table-layout: fixed, which is right for the Data
   // Table - a column per work area, sharing the width evenly - and wrong here.
-  // It divided the width into nine equal parts regardless of content, so
-  // "Cover - Team Manager" and "15/09/2026" were both clipped to about eighty
-  // pixels and read as "Cov..." and "15/...".
-  check('the OS tables size their columns to what is IN them',
-        /\.os-job-table \{[^}]*table-layout: auto;/.test(css),
+  // The bad-records table appears once and is not a column of anything else,
+  // so it sizes to its own content: a fixed equal split clipped
+  // "Cover - Team Manager" and "15/09/2026" to "Cov..." and "15/...".
+  check('the bad-records table sizes its columns to what is IN them',
+        /\.os-bad-table \{ table-layout: auto; \}/.test(css),
         'nine equal columns clipped every name and every date');
   check('and the global fixed layout is still there for the Data Table',
         /\ntable \{\s*\n\s*width: 100%;\s*\n\s*border-collapse: collapse;\s*\n\s*table-layout: fixed;/
           .test(css),
         'it is what lets every volume column be visible at once');
+
+  // The RECORDS table is the opposite case: one job type is one table, and a
+  // zone can hold a dozen down the page, so it has to agree with every other
+  // job table on where its columns sit rather than read well on its own.
+  check('the records table is fixed, with shares spent on what needs them',
+        /\.os-job-table:not\(\.os-bad-table\) \{ table-layout: fixed; \}/.test(css),
+        'auto would size each table from its own content and misalign the next one down');
+  check('a colgroup carries those shares, not a blind six-way split',
+        /var OS_JOB_COL_WIDTHS_ = \[10, 13, 19, 19, 19, 20\];/.test(PAGE) &&
+        /html \+= '<col style="width:' \+ OS_JOB_COL_WIDTHS_\[w\] \+ '%">';/.test(PAGE),
+        'the bare `table` rule\'s equal split crushed the bonus chip to the ' +
+        'width of "TM Authorising"');
+  const widths = /var OS_JOB_COL_WIDTHS_ = \[([^\]]+)\];/.exec(PAGE);
+  check('one share per column, summing to the whole table',
+        !!widths && widths[1].split(',').map(Number).length === ctx.OS_JOB_COLUMNS_.length &&
+        widths[1].split(',').map(Number).reduce((a, b) => a + b, 0) === 100,
+        widths ? widths[1] : 'not found');
 }
 
 head('[16] a refresh does not collapse what you were reading');
@@ -871,9 +923,9 @@ head('[12] the log is fetched by the page, not by every dashboard load');
         /function getOsLogRows\(dateKeys, archiveUrl\)/.test(CODE));
   check('the page calls it on first open',
         /\.getOsLogRows\(osLogWantDates_\(\), currentArchiveUrl \|\| null\)/.test(PAGE));
-  check('once only - a second open is served from memory',
-        /if \(osLogState !== null\) return;/.test(PAGE),
-        'osLogState guards the fetch, not the render');
+  check('a true first load is the only one that shows a skeleton',
+        /if \(osLogState === null\) \{[\s\S]{0,80}osLogState = 'loading';/.test(PAGE),
+        'osLogState guards which branch fetches, not whether the render happens');
 
   // The three states have to be distinguishable. An empty array means both
   // "nobody was on OS" and "this has not arrived yet".
@@ -969,6 +1021,96 @@ head('[11] Hours Range and Time Window are inert where they do nothing');
         'the one use left is the Data Table detail row, on page 4');
   check('and the OS page reads its own selects only',
         !/hoursRange|timeWindow/.test(PAGE) && /\$\('osFrom'\)/.test(PAGE));
+}
+
+head('[18] a dashboard refresh updates the log SILENTLY after the first load');
+// The dashboard's own data refreshes every few minutes, and each one used to
+// reset osLogState to null - indistinguishable from a true first load - so the
+// skeleton flashed over rows that were still perfectly good. osLogEverLoaded
+// is what tells the two apart.
+{
+  const init = R('Web - JsInit.html');
+  check('osLogEverLoaded is declared, defaulting to false', /var osLogEverLoaded = false;/.test(R('Web - JsState.html')));
+  check('and osLogNeedsRefresh alongside it', /var osLogNeedsRefresh = false;/.test(R('Web - JsState.html')));
+  check('a refresh before the first successful load still resets and skeletons',
+        /if \(osLogEverLoaded\) \{\s*\n\s*osLogNeedsRefresh = true;\s*\n\s*\} else \{\s*\n\s*osLogRows = \[\];\s*\n\s*osLogSkipped = 0;\s*\n\s*osLogState = null;/
+          .test(init),
+        'the first load has nothing on screen to protect');
+  check('a refresh after it only marks the log as needing one, and touches nothing else',
+        !/osLogEverLoaded\)[\s\S]{0,20}osLogRows = \[\]/.test(init),
+        'clearing the rows would blank the page for the seconds the fetch takes');
+
+  check('ensureOsLogPak_ treats null and ready+needsRefresh as two different jobs',
+        /if \(osLogState === null\) \{[\s\S]{0,120}osFetchLogPak_\(false\);/.test(PAGE) &&
+        /if \(osLogState === 'ready' && osLogNeedsRefresh\) \{[\s\S]{0,400}osFetchLogPak_\(true\);/
+          .test(PAGE),
+        'only the first is allowed to show loading state');
+  check('the flag is cleared before the fetch starts, not after it lands',
+        /osLogNeedsRefresh = false;\s*\n\s*osFetchLogPak_\(true\);/.test(PAGE),
+        'a second refresh arriving mid-fetch must not queue a duplicate request');
+  check('the render dispatch kicks it off, once the ready branch is confirmed',
+        /if \(osLogState !== 'ready'\) \{[\s\S]{0,700}ensureOsLogPak_\(\);/.test(PAGE));
+
+  // A silent fetch changes osLogState only on real success, or on failure it
+  // is silently a no-op that keeps the old good data rather than replacing it
+  // with an error - a first-load fetch does both, visibly.
+  check('a silent success updates the rows without ever visiting "loading"',
+        /function osFetchLogPak_\(silent\)/.test(PAGE) &&
+        !/osFetchLogPak_[\s\S]{0,300}osLogState = 'loading'/.test(PAGE));
+  check('a silent failure is swallowed, not shown',
+        /if \(silent\) \{ console\.warn\('OS log background refresh failed: ' \+ message\); return; \}/
+          .test(PAGE),
+        'the next refresh will simply try again');
+  check('but a first-load failure still names itself on screen',
+        /osLogState = message;\s*\n\s*renderOsPagePak\(\);/.test(PAGE));
+}
+
+head('[19] only one filter menu can be open at a time');
+// Opening Departments while Zones was still open used to leave both on
+// screen - the click-away handler only closed the two it knew about, and
+// neither one closed when the OTHER was opened.
+{
+  check('one shared slot, not a flag per menu',
+        /var osOpenFilterMenu = null;/.test(R('Web - JsState.html')));
+  check('the three menu ids are declared once and reused',
+        /var OS_FILTER_MENU_IDS_ = \['osZoneMenu', 'osDeptMenu', 'osStatusMenu'\];/.test(PAGE));
+  check('opening one force-closes the other two, in the same pass',
+        /function osFilterMenuClick_\(id\) \{[\s\S]{0,220}for \(var i = 0; i < OS_FILTER_MENU_IDS_\.length; i\+\+\) \{[\s\S]{0,120}toggleOsMenu_\(OS_FILTER_MENU_IDS_\[i\], OS_FILTER_MENU_IDS_\[i\] === id && opening\);/
+          .test(PAGE));
+  check('the buttons call the exclusive opener, not the bare painter',
+        /onclick="osFilterMenuClick_\(\\'' \+ id \+ '\\'\)"/.test(PAGE) &&
+        !/onclick="toggleOsMenu_\(\\'' \+ id \+ '\\'\)"/.test(PAGE));
+  check('click-away closes all three now, Record Status included',
+        /for \(var i = 0; i < OS_FILTER_MENU_IDS_\.length; i\+\+\) \{\s*\n\s*toggleOsMenu_\(OS_FILTER_MENU_IDS_\[i\], false\);/
+          .test(PAGE),
+        'the old handler only knew about Zones and Departments');
+
+  // Item 2: a selection inside an open menu rebuilds the whole filter row -
+  // every toggle/clear handler calls renderOsPagePak - and used to lose the
+  // open state in that rebuild. It is restored from osOpenFilterMenu now.
+  check('the freshly rebuilt row re-opens whichever menu was open',
+        /if \(osOpenFilterMenu\) \{ toggleOsMenu_\(osOpenFilterMenu, true\); \}/.test(PAGE),
+        'a tick inside a menu used to close the very menu it was ticked in');
+}
+
+head('[20] the four filter controls match: width, and the Type chevron');
+{
+  const css = R('Web - Styles.html');
+  check('one fixed column width for all four, not four different min-widths',
+        /\.os-filter \{ width: 170px; flex: 0 0 170px; \}/.test(css),
+        'Type was 120px and the three multi-selects 150px');
+  check('at the SAME specificity as the mobile override, deliberately',
+        !/\.os-filters \.os-filter \{ width:/.test(css),
+        'an ancestor-qualified selector would have outranked the phone grid rule regardless of source order');
+  check('Type is wrapped for a caret the same way the other three are',
+        /<div class="os-multi os-type-wrap">/.test(PAGE));
+  check('its native caret is switched off in favour of the FA chevron',
+        /select\.hc-control\.os-type-select \{[\s\S]{0,400}background-image: none;/.test(css));
+  check('and the chevron itself reuses .warehouse-caret, positioned to sit on the select',
+        /fa-solid fa-chevron-down warehouse-caret os-type-caret/.test(PAGE) &&
+        /\.os-type-caret \{\s*\n\s*position: absolute;/.test(css));
+  check('clicks pass through the icon to the control underneath it',
+        /\.os-type-caret \{[^}]*pointer-events: none;/.test(css));
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

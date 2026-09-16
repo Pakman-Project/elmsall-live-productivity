@@ -696,6 +696,20 @@ var osLogSkipped = 0;
 // needs to tell "nobody was on OS" apart from "this has not arrived yet",
 // which are the same empty array.
 var osLogState = null;
+// True once the log has been successfully read at least once. Distinct from
+// osLogState === 'ready': that flips back toward null/'loading' on the very
+// first load and stays there through a real error, but this stays true
+// forever after, which is exactly what tells a later dashboard refresh to
+// re-fetch SILENTLY - see osFetchLogPak_ - rather than showing the skeleton
+// again for data that is merely a few minutes stale.
+var osLogEverLoaded = false;
+// Set when the dashboard's own data refreshes while the log has already been
+// read once: the window has moved on, so the log needs re-reading too, but
+// not by flashing a skeleton over rows that are still perfectly readable.
+// Cleared the moment the silent re-fetch is kicked off, not when it lands, so
+// a second dashboard refresh arriving before the first fetch returns cannot
+// queue two requests for the same window.
+var osLogNeedsRefresh = false;
 // The rows the server could not read, named. "7 records could not be read"
 // with no way to find out which seven is a dead end - the whole point of
 // saying it is so somebody can go and fix those rows.
@@ -710,6 +724,12 @@ var osDeptFilter = {};
 // verdict" - not on the form's raw wording, so the options match the chips in
 // the table rather than listing wordings nobody can see.
 var osStatusFilter = {};
+// Which of the three multi-select MENUS is open, or null. One slot rather
+// than a flag per menu, so only one can ever be open - opening a second
+// closes the first, there being nowhere else for its id to live - and so a
+// re-render (every filter change rebuilds the whole row from scratch) can put
+// the SAME one back open afterwards instead of every selection closing it.
+var osOpenFilterMenu = null;
 // Which zone and department rows are open, keyed on their names so they
 // survive a re-render. The page polls, and a refresh used to collapse
 // whatever you were reading.
