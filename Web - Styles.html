@@ -3504,6 +3504,11 @@ body.page-scrolled-far .back-to-top {
 .os-dropped-row .breakdown-chevron { margin-left: auto; }
 .os-dropped-label i:first-child { margin-right: 6px; }
 
+/* It sits after the last site now, not between the summary and the first one,
+   so it needs the same separation from the block above it that two sites give
+   each other. */
+.os-site + .os-dropped-row { margin-top: 18px; }
+
 /* The reason is the row's title, so say so. */
 .os-bad-row { cursor: help; }
 

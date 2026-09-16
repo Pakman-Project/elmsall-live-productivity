@@ -221,13 +221,28 @@ head('[6] the status is worded and coloured as the chart bands word it');
         /os-status-warn/.test(chip('authorise or reject')) &&
         />Awaiting Approval</.test(chip('authorise or reject')));
   check('Rejected is red', /os-status-bad/.test(chip('Rejected')));
-  check('and so is a wording nobody enumerated',
-        /os-status-bad/.test(chip('Escalated to Ops')) &&
-        />Rejected</.test(chip('Escalated to Ops')),
-        'an unknown verdict is not an excused one');
-  check('with the raw wording kept in the title for an audit',
-        /title="Logged as: Escalated to Ops"/.test(chip('Escalated to Ops')),
+  // De-grouped, on this page only. The chart's fold sends everything that is
+  // neither approved nor pending to "Rejected", which is right for a band - one
+  // label, full height of the plot - and wrong for a cell per record. A spell
+  // logged "Cancelled" is not a rejection, and this page is where somebody
+  // comes to find out what actually happened to a record.
+  check('a wording nobody enumerated says what was LOGGED',
+        />Escalated to Ops</.test(chip('Escalated to Ops')) &&
+        !/>Rejected</.test(chip('Escalated to Ops')),
         chip('Escalated to Ops'));
+  check('but keeps the red, because it still did not get its hours',
+        /os-status-bad/.test(chip('Escalated to Ops')) &&
+        /os-status-bad/.test(chip('Cancelled')),
+        'the colour is the three-state fold; only the word is de-grouped');
+  check('the two known translations still fold',
+        />Approved</.test(chip('OK')) &&
+        />Awaiting Approval</.test(chip('authorise or reject')),
+        'those are the form words for states the page already names');
+  check('and a passed-through wording needs no "Logged as" title',
+        !/title="Logged as/.test(chip('Escalated to Ops')),
+        'the cell already says it; repeating it in a tooltip is noise');
+  check('while a folded one still carries the raw wording for an audit',
+        /title="Logged as: OK"/.test(chip('OK')), chip('OK'));
   check('an empty status is not given a verdict',
         /os-status-none/.test(chip('')) && !/Rejected/.test(chip('')),
         'calling an undecided spell rejected is an accusation the data cannot support');
@@ -516,9 +531,17 @@ head('[15] a zone opens onto DEPARTMENT bars, and those onto records');
         PAGE.indexOf('os-dept-detail') < PAGE.indexOf('osJobTableHtmlPak_(job.records)'));
   check('the job type heading carries its record count',
         /class="os-job-count"/.test(PAGE));
-  // Scaled within their parent, or a small zone's bars are all stubs.
-  check('department bars are scaled within their zone',
-        /maxDept > 0 \? \(dept\.count \/ maxDept \* 100\)/.test(PAGE));
+  // A department bar is a SHARE OF ITS ZONE - 9 of 33 is a third of the track.
+  // Scaled against the largest department instead, which this did, the biggest
+  // always filled the track whatever it was: 9, 9, 9 and 6 drew three full-width
+  // bars and one at two thirds, reading as "nearly everybody" three times over.
+  check('department bars are a share of the zone total',
+        /zone\.count > 0[\s\S]{0,60}dept\.count \/ zone\.count \* 100/.test(PAGE) &&
+        PAGE.indexOf('maxDept') === -1,
+        'the zone total is the number on the row the reader just looked at');
+  check('and clamped, because one head can be in two departments',
+        /Math\.min\(100, dept\.count \/ zone\.count \* 100\)/.test(PAGE),
+        'the parts can legitimately sum past the whole');
   check('and zone bars within their site',
         /maxZone > 0 \? \(zone\.count \/ maxZone \* 100\)/.test(PAGE));
   check('both are styled, and the department reads as the quieter one',
@@ -548,33 +571,47 @@ head('[15b] four filters left, the range right, one row');
   check('Record Status is a multi-select of its own',
         /osMultiSelectHtmlPak_\('osStatusMenu', 'Record Status'/.test(PAGE) &&
         /function toggleOsStatusFilter\(status\)/.test(PAGE));
-  check('it filters on the DISPLAYED verdict, not the raw wording',
+  // The filter and the cell have to offer the same words, or the dropdown is a
+  // list of options nobody can match to the page. Both go through one function.
+  check('the filter reads what the CELL reads',
         /function osRecordStatusPak_\(row\)/.test(PAGE) &&
-        /osStatusBandPak_\(row && row\.status\)/.test(PAGE),
-        'the table shows three folded states; listing raw wordings nobody can ' +
-        'see would be unmatchable');
+        /osStatusTextPak_\(row && row\.status\)/.test(PAGE) &&
+        /var text = osStatusTextPak_\(status\);/.test(PAGE),
+        'one function, so a filter option can always be matched to a chip');
   check('a record logged without one is its own option',
         /OS_STATUS_NONE_PAK_ = 'No verdict'/.test(PAGE),
         'and not silently lumped in with Rejected');
-  check('the options read approved, undecided, refused',
+  check('approved first, then undecided, then the blanks last',
         /rank\[OS_STATUS_APPROVED_PAK_\] = 1/.test(PAGE) &&
-        /rank\[OS_STATUS_REJECTED_PAK_\] = 3/.test(PAGE),
-        'rather than alphabetically, which puts Awaiting first');
+        /rank\[OS_STATUS_AWAITING_PAK_\] = 2/.test(PAGE) &&
+        /rank\[OS_STATUS_NONE_PAK_\] = 4/.test(PAGE),
+        'alphabetically would put Awaiting first');
+  check('with the logged wordings between them, sorted among themselves',
+        /\(rank\[a\] \|\| 3\) - \(rank\[b\] \|\| 3\)/.test(PAGE) &&
+        /d \|\| \(a < b \? -1 : a > b \? 1 : 0\)/.test(PAGE),
+        'they are no longer a fixed set, so the order has to be stable by name');
   check('and it composes with the other three',
         /osPassesSetPak_\(osStatusFilter, osRecordStatusPak_\(r\)\)/.test(PAGE));
 
   // Run the real thing.
   const st = ctx.osRecordStatusPak_;
   check('OK reads as Approved here too', st({ status: 'OK' }) === 'Approved');
-  check('an unknown wording folds to Rejected',
-        st({ status: 'Escalated to Ops' }) === 'Rejected');
+  check('an unknown wording is passed through as logged',
+        st({ status: 'Escalated to Ops' }) === 'Escalated to Ops',
+        st({ status: 'Escalated to Ops' }));
+  check('and Rejected stays Rejected, being a real verdict',
+        st({ status: 'Rejected' }) === 'Rejected');
+  check('trimmed, so one typed with a trailing space is not a second option',
+        st({ status: '  Cancelled ' }) === 'Cancelled');
   check('and a blank is No verdict', st({ status: '' }) === 'No verdict' &&
         st({}) === 'No verdict');
   const vals = ctx.osStatusValuesPak_([
     { status: '' }, { status: 'Rejected' }, { status: 'OK' },
-    { status: 'authorise or reject' }, { status: 'OK' }]);
-  check('the list is unique and in verdict order',
-        vals.join(' | ') === 'Approved | Awaiting Approval | Rejected | No verdict',
+    { status: 'authorise or reject' }, { status: 'OK' },
+    { status: 'Cancelled' }, { status: 'Escalated to Ops' }]);
+  check('the list is unique, verdicts first, wordings by name',
+        vals.join(' | ') === 'Approved | Awaiting Approval | Cancelled | ' +
+                             'Escalated to Ops | Rejected | No verdict',
         vals.join(' | '));
 }
 
@@ -617,11 +654,35 @@ head('[15e] the OS page on a phone');
 head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
 {
   const css = R('Web - Styles.html');
-  check('the wording is "need to be aware of"',
-        /' need' \+\s*\n?\s*\(total === 1 \? 's' : ''\) \+ ' to be aware of'/.test(PAGE),
-        'and still agrees with itself for a single record');
-  check('one record reads "1 record needs to be aware of"',
-        /total \+ ' record' \+ \(total === 1 \? '' : 's'\)/.test(PAGE));
+  check('the wording says what is actually wrong with them',
+        /' that cannot be placed on a clock'/.test(PAGE),
+        'which is the same thing the section underneath then explains');
+  check('and it still agrees with itself for a single record',
+        /total \+ ' record' \+ \(total === 1 \? '' : 's'\)/.test(PAGE) &&
+        !/need[s]? to be aware of/.test(PAGE),
+        '"1 record that cannot be placed on a clock"');
+
+  // It sat between the summary and the first site, which put a warning in the
+  // reader's way before the thing they opened the page for. These records are
+  // in none of the figures, so they are a footnote to the breakdown.
+  // BOTH exits, counted rather than merely matched: there is an early return
+  // for "nobody on OS", and a check that only proved one of the two passed
+  // happily while the other had dropped the section entirely.
+  check('the section is built before the sites but appended after them',
+        /var badHtml = osBadRowsHtmlPak_\(/.test(PAGE) &&
+        (PAGE.match(/body\.innerHTML = html \+ badHtml;/g) || []).length === 2 &&
+        PAGE.indexOf('var badHtml') < PAGE.indexOf("for (var si = 0"),
+        'built next to the two lists it is made of, shown last, on both exits');
+  check('and nothing renders it in the old place',
+        !/html \+= osBadRowsHtmlPak_\(/.test(PAGE),
+        'two call sites would draw it twice');
+  check('an empty page still shows it, with nothing above it',
+        /body\.innerHTML = html \+ badHtml;[\s\S]{0,200}osApplyBarsPak_\(body\);[\s\S]{0,40}return;/
+          .test(PAGE),
+        'a page whose only content is records nobody can place is worth reading');
+  check('it is separated from the last site',
+        /\.os-site \+ \.os-dropped-row \{ margin-top: 18px; \}/.test(css),
+        'or it reads as another row of the site above it');
   // It has no bar and no count - there is nothing to measure it against - so
   // the label took the full width instead of wrapping onto two lines beside an
   // empty bar track.
