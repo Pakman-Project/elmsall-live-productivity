@@ -478,6 +478,14 @@
             <div class="card panel span-12">
               <div id="osBody" class="os-body"></div>
             </div>
+
+            <!-- Its own card, not a row inside the breakdown above: these
+                 records are in none of the figures in that card, so a warning
+                 living inside it read as part of the same total. Hidden by JS
+                 whenever there is nothing to show - see osRenderBadCardPak_. -->
+            <div class="card panel span-12" id="osBadCard" hidden>
+              <div id="osBadBody"></div>
+            </div>
           </div>
 
           <div class="page">

@@ -697,6 +697,12 @@
     var unplaceable = [];
     for (var i = 0; i < osLogRows.length; i++) {
       var rec = osLogRows[i];
+      // The building filter first: a record for the OTHER warehouse is not
+      // "on OS, elsewhere" once E3 is chosen, and it should not be either once
+      // it also cannot be placed on a clock. The Site column is exactly what
+      // the mapping in OS_SITE_BY_BUILDING_ is for, and it is read off the row
+      // whether or not the row parses as a valid spell.
+      if (!osInBuildingPak_(rec.site)) continue;
       var w = osSpellWindowPak_(rec);
       if (!w) {
         unplaceable.push({
@@ -709,9 +715,15 @@
         continue;
       }
       if (w.finish <= win.start || w.start >= win.finish) continue;
-      if (!osInBuildingPak_(rec.site)) continue;
       inWindow.push(rec);
     }
+
+    // The server's own rejects go through the same filter - they carry a Site
+    // cell too, and a reject from the other building is exactly the "elsewhere"
+    // case above.
+    var badInBuilding = (osLogBad || []).filter(function (b) {
+      return osInBuildingPak_(b.site);
+    });
 
     // The dropdowns offer what is actually in range, so a zone nobody worked
     // is not on the list. Built BEFORE the zone and department filters are
@@ -772,22 +784,20 @@
     // server counted but could not name. Counted ONCE: the heading used to say
     // eight and the note underneath say "8 more", which read as sixteen.
     //
-    // Built here, next to the two lists it is made of, but appended AFTER every
-    // site - see the end of this function. It sat between the summary and the
-    // first site, which put a warning in the reader's way before the thing they
-    // opened the page for: these records are in none of the figures, so they
-    // are a footnote to the breakdown rather than a preface to it.
-    var badHtml = osBadRowsHtmlPak_(
-      (osLogBad || []).concat(unplaceable),
+    // The residual - rows the server counted but hit its cap before it could
+    // name - carries no Site cell to filter by, because it was never read. Left
+    // unfiltered rather than guessed at: a building filter that silently
+    // dropped a number it cannot actually attribute would undercount without
+    // saying so.
+    osRenderBadCardPak_(
+      badInBuilding.concat(unplaceable),
       Math.max(0, (Number(osLogSkipped) || 0) - (osLogBad || []).length));
 
     if (sites.length === 0) {
       html += '<div class="breakdown-empty">' +
               '<i class="fa-solid fa-ghost" aria-hidden="true"></i>' +
               'Nobody on OS in the selected range</div>';
-      // Still shown with nothing above it: an empty page whose only content is
-      // twelve records nobody can place is the page most worth reading.
-      body.innerHTML = html + badHtml;
+      body.innerHTML = html;
       osApplyBarsPak_(body);
       return;
     }
@@ -871,8 +881,21 @@
       html += '</div>';
     }
 
-    body.innerHTML = html + badHtml;
+    body.innerHTML = html;
     osApplyBarsPak_(body);
+  }
+
+  // Its own card, separate from the breakdown: these records are in none of
+  // the figures up there, and a warning living inside that card read as part
+  // of the same total it is explicitly excluded from. Hidden outright rather
+  // than left as an empty card when there is nothing to show.
+  function osRenderBadCardPak_(bad, unnamed) {
+    var card = document.getElementById('osBadCard');
+    var body = document.getElementById('osBadBody');
+    if (!card || !body) return;
+    var html = osBadRowsHtmlPak_(bad, unnamed);
+    card.hidden = !html;
+    body.innerHTML = html;
   }
 
   // Widths are set after the markup lands so the CSS transition has a value to

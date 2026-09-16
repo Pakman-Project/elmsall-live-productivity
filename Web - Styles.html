@@ -3237,6 +3237,11 @@ body.page-scrolled-far .back-to-top {
 
 .os-body { display: block; }
 
+/* The bad-records card sits directly under the breakdown card - the page has
+   no grid gap of its own here, unlike the charts grid most span-12 cards live
+   in, so the two would otherwise sit flush against each other. */
+#osBadCard { margin-top: 16px; }
+
 /* One site, its zones under it. Bars are scaled within their own site, so the
    rule and the count say which set a length is relative to. */
 .os-site + .os-site { margin-top: 18px; }
@@ -3503,11 +3508,6 @@ body.page-scrolled-far .back-to-top {
 }
 .os-dropped-row .breakdown-chevron { margin-left: auto; }
 .os-dropped-label i:first-child { margin-right: 6px; }
-
-/* It sits after the last site now, not between the summary and the first one,
-   so it needs the same separation from the block above it that two sites give
-   each other. */
-.os-site + .os-dropped-row { margin-top: 18px; }
 
 /* The reason is the row's title, so say so. */
 .os-bad-row { cursor: help; }

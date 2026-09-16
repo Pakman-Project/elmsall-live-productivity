@@ -368,7 +368,7 @@ head('[9] records that could not be read are NAMED, not just counted');
         (CODE.match(/row: OS_LOG_FIRST_ROW_ \+ i,/g) || []).length === 2,
         'which is what makes naming a client-side drop possible at all');
   check('and the two lists are shown as ONE',
-        /\(osLogBad \|\| \[\]\)\.concat\(unplaceable\)/.test(PAGE),
+        /badInBuilding\.concat\(unplaceable\)/.test(PAGE),
         'the heading said 8 and the note said "8 more", which read as 16');
   check('the server counts them too', /skipped\+\+/.test(CODE));
 
@@ -475,6 +475,21 @@ head('[13] the Warehouse picker filters the OS sites too');
   check('but drops out of a specific building',
         (function () { ctx.siteFilter = 'e3'; return !ctx.osInBuildingPak_('ELMSALL NORTH'); })());
   ctx.siteFilter = 'all';
+
+  // The filter has to reach the records that never made it onto a clock too -
+  // a reject for the OTHER building is exactly the "elsewhere" case the picker
+  // exists for, whether or not it also failed to parse.
+  check('unplaceable records are checked against the building before anything else',
+        /if \(!osInBuildingPak_\(rec\.site\)\) continue;\s*\n\s*var w = osSpellWindowPak_\(rec\);/
+          .test(PAGE),
+        'a record for the OTHER warehouse should not be on screen at all');
+  check('and so are the server\'s own rejects',
+        /var badInBuilding = \(osLogBad \|\| \[\]\)\.filter\(function \(b\) \{\s*\n\s*return osInBuildingPak_\(b\.site\);/
+          .test(PAGE),
+        'they carry a Site cell too, read off the same OS Log row');
+  check('badInBuilding is what reaches the card, not the raw list',
+        PAGE.indexOf('badInBuilding.concat(unplaceable)') !== -1 &&
+        !/osLogBad \|\| \[\]\)\.concat\(unplaceable\)/.test(PAGE));
 }
 
 head('[14] the three filters');
@@ -665,24 +680,30 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
   // It sat between the summary and the first site, which put a warning in the
   // reader's way before the thing they opened the page for. These records are
   // in none of the figures, so they are a footnote to the breakdown.
-  // BOTH exits, counted rather than merely matched: there is an early return
-  // for "nobody on OS", and a check that only proved one of the two passed
-  // happily while the other had dropped the section entirely.
-  check('the section is built before the sites but appended after them',
-        /var badHtml = osBadRowsHtmlPak_\(/.test(PAGE) &&
-        (PAGE.match(/body\.innerHTML = html \+ badHtml;/g) || []).length === 2 &&
-        PAGE.indexOf('var badHtml') < PAGE.indexOf("for (var si = 0"),
-        'built next to the two lists it is made of, shown last, on both exits');
-  check('and nothing renders it in the old place',
-        !/html \+= osBadRowsHtmlPak_\(/.test(PAGE),
-        'two call sites would draw it twice');
-  check('an empty page still shows it, with nothing above it',
-        /body\.innerHTML = html \+ badHtml;[\s\S]{0,200}osApplyBarsPak_\(body\);[\s\S]{0,40}return;/
-          .test(PAGE),
-        'a page whose only content is records nobody can place is worth reading');
-  check('it is separated from the last site',
-        /\.os-site \+ \.os-dropped-row \{ margin-top: 18px; \}/.test(css),
-        'or it reads as another row of the site above it');
+  // Its own card now, not a row appended inside the breakdown: these records
+  // are in none of the figures in that card, and a warning living inside it
+  // read as part of the same total it is explicitly excluded from.
+  check('the bad-records section is its own card in the markup',
+        /id="osBadCard"[^>]*hidden[\s\S]{0,80}id="osBadBody"/.test(R('Web - Index.html')),
+        'separate from the breakdown card, and hidden until there is something to show');
+  check('rendered into that card by its own function',
+        /function osRenderBadCardPak_\(bad, unnamed\)/.test(PAGE) &&
+        /getElementById\('osBadCard'\)/.test(PAGE) &&
+        /getElementById\('osBadBody'\)/.test(PAGE));
+  check('hidden outright when there is nothing to show',
+        /card\.hidden = !html;/.test(PAGE),
+        'an empty card would still draw a border round nothing');
+  check('called once, before either exit, so both get it the same way',
+        (PAGE.match(/osRenderBadCardPak_\(\s*\n\s*badInBuilding/g) || []).length === 1 &&
+        PAGE.indexOf('osRenderBadCardPak_(\n      badInBuilding') < PAGE.indexOf("for (var si = 0"),
+        'one call site above the branch, not one per exit that could drift apart');
+  check('and it no longer renders inside #osBody',
+        !/html \+= osBadRowsHtmlPak_\(/.test(PAGE) &&
+        !/body\.innerHTML = html \+ badHtml/.test(PAGE),
+        'the old in-card placement');
+  check('separated from the card above it',
+        /#osBadCard \{ margin-top: 16px; \}/.test(R('Web - Styles.html')),
+        'the page has no grid gap of its own here; the two cards would sit flush');
   // It has no bar and no count - there is nothing to measure it against - so
   // the label took the full width instead of wrapping onto two lines beside an
   // empty bar track.
