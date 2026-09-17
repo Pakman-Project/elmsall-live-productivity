@@ -647,6 +647,49 @@ head('[the control panel: five narrow pickers left, the bonus filter right]');
         'a grid item wider than its track overruns the one beside it');
   // Date and Warehouse hold a text span rather than being a control with its
   // own text, so nothing shrinks it for them.
+  // ── The Threshold explainer ──────────────────────────────────────────────
+  // Front!A2 renders as a bare "0.15" with nothing to say what it means, and
+  // it is load-bearing: it decides which blocks count toward a person's
+  // Productivity % and toward the "Head >" KPI.
+  check('Threshold carries a tooltip, reusing the KPI one',
+        /class="kpi-tooltip hc-threshold-tip"/.test(hdr) &&
+        /fa-solid fa-circle-info/.test(hdr),
+        'same markup as the KPI cards, so initKpiTooltipTaps_ wires it for free');
+  // In the CONTROL, not the label: .hc-field-label is display:none on a phone
+  // AND on a scrolled desktop, which is exactly when a bare number is hardest
+  // to make sense of.
+  check('and it sits inside the control, not the label above it',
+        /<div class="hc-control hc-threshold">[\s\S]{0,200}kpi-threshold-marker|<div class="hc-control hc-threshold">[\s\S]{0,260}hc-threshold-tip/
+          .test(hdr) &&
+        !/hc-field-label[^<]*<span class="kpi-tooltip/.test(hdr),
+        'the label is hidden in both of the states the explainer is most needed');
+  check('it explains the rule in plain words, not by naming the cell',
+        /least an operator can log in a 15-minute block/.test(hdr) &&
+        /Productivity %/.test(hdr) && /Head &gt;/.test(hdr),
+        'what it does to the numbers, not where it is stored');
+  // Static markup, because initKpiTooltipTaps_ runs once at DOMContentLoaded
+  // (Web - JsInit.html) - anything rendered later never gets a tap handler.
+  check('the header is still static, so the tap handler finds it',
+        R('Web - JsUi.html').indexOf('function initKpiTooltipTaps_') !== -1 &&
+        !/getElementById\('appHeaderCard'\)[\s\S]{0,80}innerHTML/.test(R('Web - JsInit.html')));
+  // .tt-title is a <span> and the display:block rule is scoped to
+  // .kpi-cell-label, so without a twin the title runs into the sentence.
+  check('the title is a block here too',
+        /\.hc-threshold-tip \.kpi-tooltip-content \.tt-title \{ display: block;/.test(css));
+  check('and the panel drops the control\u2019s monospace and bold',
+        /\.hc-threshold-tip \.kpi-tooltip-content \{[\s\S]{0,200}font-family: 'Poppins'/.test(css) &&
+        /\.hc-threshold-tip \.kpi-tooltip-content \{[\s\S]{0,200}font-weight: 400;/.test(css));
+  // 280px centred on a 14px circle hangs off the card on a desktop and off the
+  // screen on a phone - it is anchored differently at each width for that.
+  check('the panel is pinned so it cannot hang off the card',
+        /\.hc-threshold-tip \.kpi-tooltip-content \{[\s\S]{0,240}right: 0;/.test(css),
+        'this control sits near the end of the filter row');
+  check('and re-anchored to the FIELD on a phone, where that would go off-screen',
+        /\.hc-field-threshold \{ position: relative; \}/.test(css) &&
+        /\.hc-threshold-tip \{ position: static; \}/.test(css) &&
+        /max-width: calc\(100vw - 20px\);/.test(css),
+        'Threshold is in the left column of the phone grid; right-anchored it ran to -116px');
+
   check('the two button labels can shorten rather than spill',
         /\.hc-field \.warehouse-label \{[^}]*text-overflow: ellipsis/
           .test(css.replace(/\.hc-field \.date-picker-label,\s*/g, '')),

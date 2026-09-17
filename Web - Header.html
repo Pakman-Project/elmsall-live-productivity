@@ -154,7 +154,24 @@
 
     <div class="hc-field hc-field-threshold">
       <span class="hc-field-label">Threshold</span>
-      <div class="hc-control hc-threshold"><span id="thresholdDisplay">-</span></div>
+      <!-- The explainer sits in the CONTROL, not in the label above it: the
+           label is display:none on a phone and again on a desktop once the
+           page is scrolled, which is exactly when a bare "0.15" with nothing
+           beside it is hardest to make sense of. Static markup, because
+           initKpiTooltipTaps_ wires the tap-to-open handler once, at
+           DOMContentLoaded. -->
+      <div class="hc-control hc-threshold"><span id="thresholdDisplay">-</span>
+        <span class="kpi-tooltip hc-threshold-tip">
+          <i class="fa-solid fa-circle-info"></i>
+          <span class="kpi-tooltip-content">
+            <span class="tt-title">Threshold</span>
+            <span>The least an operator can log in a 15-minute block and still
+              count as working it. At or below this, the block is left out of
+              their Productivity % and out of the "Head &gt;" count. Read from
+              the Front sheet, so it is the same for everybody.</span>
+          </span>
+        </span>
+      </div>
     </div>
     <div class="hc-field hc-field-grow">
       <label class="hc-field-label" for="bonusSearch">Filter by Bonus</label>

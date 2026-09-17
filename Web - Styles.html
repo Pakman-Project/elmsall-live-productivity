@@ -6713,6 +6713,47 @@ textarea:focus-visible {
 }
 .kpi-cell-label .kpi-tooltip-content .tt-title { display: block; font-weight: 700; margin-bottom: 4px; }
 
+/* The Threshold explainer in the header control panel. The same tooltip, so
+   only what its surroundings break needs saying here.
+   .tt-title is a <span> and the block rule above is scoped to .kpi-cell-label,
+   so without this the title runs into the sentence after it. */
+.hc-threshold-tip .kpi-tooltip-content .tt-title { display: block; margin-bottom: 4px; }
+/* It lives inside .hc-threshold, which is centred, bold and monospace. The
+   circle and the panel both set their own absolute sizes, so only the family
+   and the weight have to be handed back.
+   Pinned to the icon's right edge rather than centred on it: this control sits
+   near the end of the filter row, and a 280px panel centred on a 14px circle
+   hangs off the side of the card. */
+.hc-threshold-tip .kpi-tooltip-content {
+  font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-weight: 400;
+  white-space: normal;
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* On a phone the control panel is a two-column grid and Threshold sits in the
+   left one, so anchoring a 240px panel to the icon's RIGHT edge hangs it off
+   the side of the screen. Anchored to the FIELD instead: .hc-threshold-tip
+   goes position:static so the panel resolves against .hc-field-threshold,
+   which puts it below the whole field and flush with its left edge, and caps
+   it so it cannot reach past the opposite margin. */
+@media (max-width: 700px) {
+  .hc-field-threshold { position: relative; }
+  .hc-threshold-tip { position: static; }
+  .hc-threshold-tip .kpi-tooltip-content {
+    left: 0;
+    right: auto;
+    width: auto;
+    /* width:auto shrinks to the FIELD, which is half a phone screen and too
+       narrow for three lines of explanation. This spends the rest of the
+       screen without ever reaching past the far margin. */
+    min-width: 260px;
+    max-width: calc(100vw - 20px);
+  }
+}
+
 /* Mobile: one column, horizontal rules between cells. A 1px vertical divider
    between stacked blocks divides nothing. */
 @media (max-width: 700px) {
