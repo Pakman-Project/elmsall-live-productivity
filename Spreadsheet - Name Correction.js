@@ -66,6 +66,9 @@ var DATA_SHEET_NAME_ = 'Data';
 var OS_LOG_SHEET_NAME_NC_ = 'OS log';
 var OS_LOG_FIRST_ROW_NC_ = 7;
 var OS_LOG_BONUS_COL_ = 2;   // column B
+// The NPL log is the same hazard on the same column of a different sheet.
+var NPL_LOG_SHEET_NAME_NC_ = 'NPL Log';
+var NPL_LOG_FIRST_ROW_NC_ = 7;
 // Column C (1-based) holds the bonus number / name being corrected.
 var NAME_COLUMN_ = 3;
 // Standard Hours is derived, SMV is its source: StandardHours = SMV / 60.
@@ -321,11 +324,34 @@ function formatColumnCPeriodically() {
  * in conversation, and getSheetByName matches exactly.
  */
 function correctOsLogNames() {
+  return correctLogBonusColumn_(OS_LOG_SHEET_NAME_NC_, OS_LOG_FIRST_ROW_NC_);
+}
+
+/**
+ * The NPL log's bonus column, B7 down. Same column, same hazard, same fix.
+ *
+ * Called from nplWriteRowsPak_ the moment it finishes writing, for the same
+ * reason correctOsLogNames is called from updateOSLog: the two run in one
+ * execution, in order, and a scheduled correction could land mid-rewrite.
+ */
+function correctNplLogNames() {
+  return correctLogBonusColumn_(NPL_LOG_SHEET_NAME_NC_, NPL_LOG_FIRST_ROW_NC_);
+}
+
+/**
+ * Both of the above. The two logs differ only in which tab and which first
+ * row, so this is one implementation rather than two that have to be kept
+ * agreeing about the ordering below - which is the part that is easy to get
+ * wrong and impossible to notice.
+ *
+ * Returns how many cells it changed.
+ */
+function correctLogBonusColumn_(sheetName, firstRow) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheets = ss.getSheets();
   var sheet = null;
   for (var s = 0; s < sheets.length; s++) {
-    if (sheets[s].getName().trim().toLowerCase() === OS_LOG_SHEET_NAME_NC_.toLowerCase()) {
+    if (sheets[s].getName().trim().toLowerCase() === sheetName.toLowerCase()) {
       sheet = sheets[s];
       break;
     }
@@ -333,10 +359,10 @@ function correctOsLogNames() {
   if (!sheet) return 0;
 
   var lastRow = sheet.getLastRow();
-  if (lastRow < OS_LOG_FIRST_ROW_NC_) return 0;
-  var numRows = lastRow - OS_LOG_FIRST_ROW_NC_ + 1;
+  if (lastRow < firstRow) return 0;
+  var numRows = lastRow - firstRow + 1;
 
-  var range = sheet.getRange(OS_LOG_FIRST_ROW_NC_, OS_LOG_BONUS_COL_, numRows, 1);
+  var range = sheet.getRange(firstRow, OS_LOG_BONUS_COL_, numRows, 1);
   var display = range.getDisplayValues();
   var corrected = display.map(function (row) {
     return [correctNameValue_(row[0])];

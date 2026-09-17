@@ -778,18 +778,18 @@ head('[no source file carries a stray control character]');
 //
 // Neither failed loudly. Both are the kind of thing only a sweep finds.
 {
-  const FILES = ['Web - Code.js', 'Web - doPost.js', 'Web - Index.html',
-    'Web - Header.html', 'Web - Styles.html', 'Web - PageOverall.html',
-    'Web - JsState.html', 'Web - JsData.html', 'Web - JsCharts.html',
-    'Web - JsTables.html', 'Web - JsHelpers.html', 'Web - JsUi.html',
-    'Web - JsInit.html', 'Web - JsPageOs.html', 'Web - JsTour.html',
-    'Web - JsTourData.html', 'Web - JsExport.html', 'Web - JsShare.html',
-    'Web - JsModal.html', 'Web - JsReorder.html', 'Web - JsToast.html',
-    'Web - JsPullRefresh.html', 'Web - JsOnboarding.html',
-    'Spreadsheet - Archive.js', 'Spreadsheet - Name Correction.js',
-    'Spreadsheet - OS Log.js', 'Spreadsheet - OS Links.js',
-    'Spreadsheet - OnOpen.js', 'Spreadsheet - Pipeline State.js',
-    'Spreadsheet - Daily Data Cleanup.js'];
+  // READ off the folder, not written out here. This was a hand-kept list of
+  // thirty names, and a hand-kept list of every file is a list that stops
+  // being every file the moment somebody adds one: 'Spreadsheet - NPL Log.js'
+  // was written with three raw 0x1f bytes in it and swept clean, because the
+  // list had never heard of it. A sweep that only covers what it was told
+  // about is not a sweep.
+  const FILES = fs.readdirSync(APPS)
+    .filter(f => /\.(js|html)$/.test(f))
+    .sort();
+  check('the sweep covers every source file in the folder',
+        FILES.length >= 30 && FILES.indexOf('Web - Code.js') !== -1,
+        FILES.length + ' files');
   const found = [];
   FILES.forEach(f => {
     const src = R(f);
