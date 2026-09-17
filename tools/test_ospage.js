@@ -689,17 +689,40 @@ head('[15e] the OS page on a phone');
   const mob = (css.split('@media (max-width: 700px)')
                   .filter(s => s.indexOf('.os-job-table-wrap') !== -1)[0] || '');
 
-  // .table-wrap sets overflow on BOTH axes, so these wrappers are vertical
-  // scroll containers as well - and once a department is open they cover most
-  // of the page. A vertical drag starting inside one is theirs to handle, and
-  // having nothing to scroll they do nothing with it: the page reads as frozen.
-  // Chrome chains the gesture out; iOS Safari does not.
-  check('a vertical drag over a record table belongs to the PAGE',
-        /\.os-job-table-wrap \{ touch-action: pan-x; \}/.test(mob),
-        'pan-x, so sideways stays with the table and up-and-down does not');
-  check('and it still scrolls sideways, which is why it is a wrapper at all',
-        /\.os-job-table-wrap \{ overflow-x: auto; \}/.test(mob) &&
-        /\.os-job-table \{ min-width: 520px; \}/.test(mob));
+  // Scrolling the table sideways to fit six-to-nine columns on a phone used to
+  // need pan-x to keep that gesture off the page swipe, and even then a finger
+  // placed over an open record table on iOS Safari did nothing at all - Safari
+  // does not chain a captured horizontal drag out to the page the way Chrome
+  // does. Cards side-step the trade instead of picking a side of it: nothing
+  // inside a card scrolls, so there is no gesture left to fight over.
+  check('the wrapper no longer captures the gesture at all',
+        /\.table-wrap\.os-job-table-wrap \{/.test(mob) &&
+        /overflow: visible; touch-action: auto;/.test(mob),
+        'a vertical drag over a record table has to reach the page');
+  check('...beating the LATER rule that puts overflow-x back for other tables',
+        mob.indexOf('.table-wrap.os-job-table-wrap') !== -1,
+        'a single-class selector here would lose the tie to source order');
+  check('the table lays out as blocks, one row one card',
+        /\.os-job-table, \.os-job-table tbody, \.os-job-table tr \{ display: block; width: 100%; \}/.test(mob) &&
+        /\.os-job-table thead \{ display: none; \}/.test(mob));
+  check('each cell shows the label the hidden header used to carry',
+        /\.os-job-table td::before \{\s*content: attr\(data-label\);/.test(mob),
+        'so the value is still identifiable once the header is gone');
+
+  // The CSS reads the attribute; this is the other half - that every <td> in
+  // every one of the four builders (both here and in JsPageNpl) actually
+  // carries one. A cell with none would render with no label at all once the
+  // header hides, on a phone, which is exactly where nobody would be looking
+  // at a wide screen to notice.
+  const cellsAndLabels = src => (src.match(/<td[^>]*>/g) || []).length ===
+                                 (src.match(/data-label="/g) || []).length &&
+                                 (src.match(/data-label="/g) || []).length > 0;
+  check('every OS job cell carries its label',
+        cellsAndLabels(PAGE.slice(PAGE.indexOf('function osJobTableHtmlPak_'),
+                                   PAGE.indexOf('function renderOsPagePak'))));
+  check('and every OS bad-record cell too',
+        cellsAndLabels(PAGE.slice(PAGE.indexOf('function osBadRowsHtmlPak_'),
+                                   PAGE.indexOf('function renderOsPagePak'))));
 
   // The filters were one flex column inside a single cell of the Bonus page's
   // two-column grid. display:contents dissolves the wrapper so each filter is a

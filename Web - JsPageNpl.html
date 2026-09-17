@@ -232,16 +232,16 @@
       var esc = escapeAttrPak(r.bonus);
       var picked = selectedBonuses.indexOf(r.bonus) !== -1;
       html += '<tr>';
-      html += '<td><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+      html += '<td data-label="Bonus"><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
               (picked ? ' selected' : '') + '"' +
               ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
               escapeTextPak_(r.bonus) +
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
-      html += '<td class="os-time-cell">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
-      html += '<td>' + osPersonCellPak_(r.siteTransfer) + '</td>';
-      html += '<td>' + osPersonCellPak_(r.tmAuth) + '</td>';
-      html += '<td>' + nplCheckChipPak_(r.check) + '</td>';
+      html += '<td class="os-time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
+      html += '<td data-label="Site Transfer">' + osPersonCellPak_(r.siteTransfer) + '</td>';
+      html += '<td data-label="TM authorised">' + osPersonCellPak_(r.tmAuth) + '</td>';
+      html += '<td data-label="Check">' + nplCheckChipPak_(r.check) + '</td>';
       html += '</tr>';
     }
     html += '</tbody></table></div>';
@@ -295,19 +295,19 @@
         // the side of the table.
         html += '<tr' + (b.why ? ' title="' + escapeAttrPak(b.why) + '"' : '') +
                 ' class="os-bad-row">';
-        html += '<td>' + (String(b.bonus || '').trim()
+        html += '<td data-label="Bonus">' + (String(b.bonus || '').trim()
           ? '<span class="os-bonus-chip bonus-tip-host clickable-bonus"' +
             ' onclick="event.stopPropagation();toggleBonusFilter(\'' +
             escapeAttrPak(b.bonus) + '\');">' + escapeTextPak_(b.bonus) +
             bonusTipHtmlPak_(b.bonus, selectedBonuses.indexOf(b.bonus) !== -1) + '</span>'
           : '<span class="os-cell-none">&ndash;</span>') + '</td>';
-        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.date) + '</td>';
-        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.from) + '</td>';
-        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.to) + '</td>';
-        html += '<td>' + osPersonCellPak_(b.dept) + '</td>';
-        html += '<td>' + osPersonCellPak_(b.task) + '</td>';
-        html += '<td>' + osPersonCellPak_(b.tmAuth) + '</td>';
-        html += '<td>' + nplCheckChipPak_(b.check) + '</td>';
+        html += '<td class="os-bad-cell" data-label="Date">' + osPersonCellPak_(b.date) + '</td>';
+        html += '<td class="os-bad-cell" data-label="Start">' + osPersonCellPak_(b.from) + '</td>';
+        html += '<td class="os-bad-cell" data-label="Finish">' + osPersonCellPak_(b.to) + '</td>';
+        html += '<td data-label="Department">' + osPersonCellPak_(b.dept) + '</td>';
+        html += '<td data-label="Task">' + osPersonCellPak_(b.task) + '</td>';
+        html += '<td data-label="TM authorised">' + osPersonCellPak_(b.tmAuth) + '</td>';
+        html += '<td data-label="Check">' + nplCheckChipPak_(b.check) + '</td>';
         html += '</tr>';
       }
       html += '</tbody></table></div>';

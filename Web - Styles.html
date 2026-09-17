@@ -3647,12 +3647,6 @@ body.page-scrolled-far .back-to-top {
   white-space: nowrap;
 }
 
-/* Nine columns will not fit a phone, and the table is inside a .table-wrap, so
-   it scrolls sideways rather than being crushed. */
-@media (max-width: 700px) {
-  .os-bad-table { min-width: 760px; }
-}
-
 /* Records the page could not place on a clock. Said out loud, because a page
    quietly one row short is the worst of the options. */
 .os-dropped {
@@ -3669,22 +3663,60 @@ body.page-scrolled-far .back-to-top {
 }
 
 @media (max-width: 700px) {
-  /* Six columns do not fit a phone, and the table is already inside a
-     .table-wrap, so it scrolls sideways rather than being crushed. */
-  .os-job-table { min-width: 520px; }
-  .os-job-table-wrap { overflow-x: auto; }
+  /* Six to nine columns do not fit a phone at any width, and scrolling the
+     table sideways to see them used to be the fix - but the wrapper then had
+     to claim the horizontal drag for itself, which took the vertical one that
+     swipes between pages with it: a finger placed over an open record table
+     did nothing at all, on iOS Safari worst of all, which does not chain the
+     gesture out the way Chrome does. Cards side-step the trade rather than
+     picking a side of it - one record per card, every value fully visible,
+     nothing inside it to scroll, so there is no gesture left to fight over.
+     osJobTableHtmlPak_ and its three siblings write the SAME <table> markup
+     either width; only the layout changes here, and the label each td shows
+     itself as comes from the data-label attribute the header text was moved
+     into as part of the same edit. */
+  /* .table-wrap's own border and radius drew a second box around a stack of
+     already-bordered cards - each record reads as its own card now, so the
+     wrap goes back to being an invisible layout container.
+     Both classes named, not just this one: a LATER mobile rule sets
+     .table-wrap's own overflow-x back to auto (for the tables that still
+     need to scroll), and a single-class selector here would lose to it on
+     source order once the two ties on specificity - see test_ospage.js. */
+  .table-wrap.os-job-table-wrap {
+    overflow: visible; touch-action: auto; border: none; border-radius: 0;
+  }
+  .os-job-table, .os-job-table tbody, .os-job-table tr { display: block; width: 100%; }
+  .os-job-table { min-width: 0; }
+  .os-job-table thead { display: none; }
+  .os-job-table tr {
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .os-job-table tbody tr:last-child { margin-bottom: 0; }
+  .os-job-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    white-space: normal;
+  }
+  .os-job-table td:last-child { border-bottom: none; }
+  .os-job-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+  }
   .os-zone-detail { padding-left: 0; padding-right: 0; }
-
-  /* ...but .table-wrap sets overflow on BOTH axes, which makes these wrappers
-     scroll containers vertically as well - and once a department is open they
-     cover most of the page. A vertical drag that starts inside one is then the
-     inner container's to handle, and since it has nothing to scroll vertically
-     the finger does nothing at all: the OS page reads as frozen, which is
-     exactly what it was reported as. Chrome chains the gesture out to the page;
-     iOS Safari does not.
-     pan-x says the sideways gesture belongs here and the up-and-down one does
-     not, which is the truth about these wrappers and fixes it on both. */
-  .os-job-table-wrap { touch-action: pan-x; }
 
   /* The four filters were one flex column inside a single cell of the Bonus
      page's two-column grid, which stacked them down the left and left From /

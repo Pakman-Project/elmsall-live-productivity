@@ -25,6 +25,12 @@ const check = (label, ok, detail) => {
 };
 const strip = s => s.replace(/<\/?script>/g, '');
 const R = f => fs.readFileSync(APPS + f, 'utf8');
+// Every <td> a builder writes carries a data-label the shared mobile CSS reads
+// once the real header hides on a phone - a cell with none would render with
+// no label at all, and nobody testing at a desktop width would ever see it.
+const cellsAndLabels = src => (src.match(/<td[^>]*>/g) || []).length ===
+                               (src.match(/data-label="/g) || []).length &&
+                               (src.match(/data-label="/g) || []).length > 0;
 const nl = R('Web - JsPageNpl.html').indexOf('\r\n') === -1 ? '\n' : '\r\n';
 
 const ctx = { console, document: undefined };
@@ -297,6 +303,16 @@ head('[8] the record table');
   check('Site Transfer and TM authorised fall back to a dash when blank',
         /osPersonCellPak_\(r\.siteTransfer\)/.test(PAGE) &&
         /osPersonCellPak_\(r\.tmAuth\)/.test(PAGE));
+
+  // The table becomes a stack of cards on a phone - one .os-job-table CSS rule
+  // in Web - Styles.html covers both pages, which is only true if this table
+  // is built with the SAME class and the SAME data-label convention the OS
+  // page's cells use. Not redeclared here; borrowed.
+  check('built with the class the shared mobile card CSS targets',
+        /<table class="os-job-table">/.test(PAGE));
+  check('every task cell carries the label the hidden header used to show',
+        cellsAndLabels(PAGE.slice(PAGE.indexOf('function nplTaskTableHtmlPak_'),
+                                   PAGE.indexOf('function nplBadRowsHtmlPak_'))));
 }
 
 head('[9] the records that reach no figure are named, not counted');
@@ -327,6 +343,9 @@ head('[9] the records that reach no figure are named, not counted');
   // No Open card: the NPL log has no Source column to split on.
   check('there is no Open card, there being no Source column to split on',
         !/osIsOpenRecordPak_|OS_SOURCE_OPEN_/.test(PAGE));
+  check('every bad-record cell carries its label too',
+        cellsAndLabels(PAGE.slice(PAGE.indexOf('function nplBadRowsHtmlPak_'),
+                                   PAGE.indexOf('function renderNplPagePak'))));
 }
 
 head('[10] fetch once, refresh silently');
