@@ -2108,6 +2108,29 @@ canvas {
   opacity: 0.8;
 }
 
+/* "NPL" - the same footnote for non-productive labour, and the same register.
+   Its own class rather than a modifier on .os-tag so the two can sit on one
+   name without either knowing about the other, which they do whenever
+   somebody appears in both logs in the same window.
+   Everything but the width is shared, so this only says what differs: nothing
+   yet, but a rule of its own is what lets that change without touching OS. */
+.npl-tag {
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  padding: 1px 2px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.clickable-bonus:hover .npl-tag,
+.clickable-bonus.active .npl-tag {
+  opacity: 0.8;
+}
+
 /* Both non-table hosts. The card is absolutely positioned against its host
    until it is lifted out to <body>, so the host needs to be a containing
    block; and neither may clip it, or it is cut off before the lift happens. */

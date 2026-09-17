@@ -333,14 +333,25 @@ head('[7] notebook internals');
   // No error is raised anywhere along that path, which is why this is a check
   // rather than a comment.
   check(tag + 'OS column in PROC_HEADER', src.indexOf('"OS/ Indirect"') !== -1);
-  // Both OS columns have to stay LAST, and in this order.
+  check(tag + 'NPL column in PROC_HEADER', src.indexOf('"NPL Status"') !== -1);
+  // What actually matters is stated in the comment this check used to carry:
   // legacyProcColumnMap_ addresses the standard-hours and volume blocks
-  // positionally for files too old to have a usable header row, and those
-  // offsets only hold while nothing is inserted AHEAD of them. Appending past
-  // them - which is all OS Time does - costs nothing.
-  check(tag + 'the OS columns are last, in order',
-        /\+\s*\[\s*"OS\/ Indirect",\s*"OS Time"\s*\]\s*\)/
-          .test(src.replace(/\s*\n\s*/g, ' ')));
+  // POSITIONALLY for files too old to have a usable header row, and those
+  // offsets hold only while nothing is inserted AHEAD of them. Appending past
+  // them is free - which is all OS Time was, and all the NPL pair is.
+  //
+  // So this pins the ORDER of the appended tail rather than asserting that OS
+  // is last, which it no longer is. Written as one line first, so a change of
+  // line breaks in the notebook cannot fail it.
+  const flat = src.replace(/\s*\n\s*/g, ' ');
+  check(tag + 'the appended columns are in order, after the positional block',
+        /\+\s*\[\s*"OS\/ Indirect",\s*"OS Time"\s*\]\s*\+\s*\[\s*"NPL Status",\s*"NPL Time"\s*\]\s*\)/
+          .test(flat));
+  // The thing the offsets actually depend on: nothing new ahead of them.
+  check(tag + 'and nothing was inserted ahead of them',
+        /PROC_HEADER = \(\["Date", "Hour", "BONUS"\] \+ \[a\["report"\] for a in PROC_AREAS\] \+ \["Sum of Std hrs"\]/
+          .test(flat),
+        'the identity columns, the areas and the total, in that order');
 });
 
 head('[7c] OS column agrees across repos');

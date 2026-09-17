@@ -747,6 +747,11 @@ var currentDetailAreaCount = {};
 // shape and lifecycle as the two above, rebuilt per render by bonusOsMapPak_.
 var currentBonusOsMap = {};
 var currentDetailOsMap = {};
+// The NPL twins. Kept apart from the OS pair rather than merged into one
+// map of flags: a person can be in both logs in one window, and the two
+// tags then sit side by side on their name.
+var currentBonusNplMap = {};
+var currentDetailNplMap = {};
 // 'all' | 'single' | 'multi' - whether to show everyone, only people who
 // stayed in one work area, or only the ones who moved between several.
 //

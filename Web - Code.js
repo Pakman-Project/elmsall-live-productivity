@@ -371,6 +371,16 @@ var PROC_OS_HEADER_ = 'OS/ Indirect';
 // carries no times. Nothing else changes.
 var PROC_OS_TIME_HEADER_ = 'OS Time';
 
+// Non-Productive Labour: the same pair again, from the NPL log rather than the
+// OS one, and joined by header NAME for the same reason - spelled differently
+// from the notebook's PROC_HEADER these resolve to -1, every row reads
+// npl:false, and the feature disappears with no error anywhere.
+//
+// Both optional: every archive cut before these columns existed has no header
+// to match, exactly as OS Time already handles.
+var PROC_NPL_HEADER_ = 'NPL Status';
+var PROC_NPL_TIME_HEADER_ = 'NPL Time';
+
 var PROC_AREA_COLUMNS_ = [
   { key: 'pie',              stdHeader: 'D.Analysis - OSR PiE',            volHeader: 'Volume - PiE' },
   { key: 'topUp',            stdHeader: 'D.Analysis - OSR Topup',          volHeader: 'Volume - Top Up' },
@@ -425,10 +435,14 @@ function buildProcColumnMap_(headerRow) {
   var totalIdx = idx[normaliseProcHeader_(PROC_TOTAL_HEADER_)];
   var osIdx = idx[normaliseProcHeader_(PROC_OS_HEADER_)];
   var osTimeIdx = idx[normaliseProcHeader_(PROC_OS_TIME_HEADER_)];
+  var nplIdx = idx[normaliseProcHeader_(PROC_NPL_HEADER_)];
+  var nplTimeIdx = idx[normaliseProcHeader_(PROC_NPL_TIME_HEADER_)];
   var map = {
     total: (totalIdx === undefined) ? -1 : totalIdx,
     os: (osIdx === undefined) ? -1 : osIdx,
     osTime: (osTimeIdx === undefined) ? -1 : osTimeIdx,
+    npl: (nplIdx === undefined) ? -1 : nplIdx,
+    nplTime: (nplTimeIdx === undefined) ? -1 : nplTimeIdx,
     areas: []
   };
 
@@ -465,8 +479,11 @@ function legacyProcColumnMap_(isV2) {
                     'inboundDecanting', 'osrDecanting', 'bcrInducting', 'e1e2Inducting'];
   var n = isV2 ? 9 : 7;
   var total = 3 + n;
-  // No OS columns at all on a file old enough to need this fallback.
-  var map = { total: total, os: -1, osTime: -1, areas: [] };
+  // No OS or NPL columns at all on a file old enough to need this fallback.
+  // Declared as -1 rather than left off: the read width takes Math.max over
+  // these, and an absent field makes that NaN, which fails the whole getRange
+  // rather than the one column.
+  var map = { total: total, os: -1, osTime: -1, npl: -1, nplTime: -1, areas: [] };
 
   for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
     var key = PROC_AREA_COLUMNS_[i].key;
@@ -593,7 +610,8 @@ function readProcRows_(sheet, lastRow) {
     header: header,
     vals: sheet.getRange(2, 1, lastRow - 1,
                          Math.max(lastCol, map.total + 1, map.os + 1,
-                                  map.osTime + 1)).getValues(),
+                                  map.osTime + 1, map.npl + 1,
+                                  map.nplTime + 1)).getValues(),
     // Only columns A:C are ever needed as display values — buildSideEntry_ reads
     // dispsRow[0] (time range) and dispsRow[2] (bonus) and takes every other
     // field from vals. Reading 3 columns instead of the full width removes most
@@ -903,6 +921,17 @@ function buildSideEntry_(valsRow, dispsRow, map) {
     var span = procOsSpan_(valsRow[map.osTime]);
     if (span) { entry.osFrom = span.from; entry.osTo = span.to; }
   }
+  // NPL, on exactly the same terms as OS above - same shape of column, same
+  // reasons for carrying each field only on the rows that have one. A block
+  // can be both: the two logs are independent and a person can appear in
+  // either, or in both if the paperwork overlaps.
+  var nplStatus = map.npl >= 0 ? procOsStatus_(valsRow[map.npl]) : '';
+  entry.npl = nplStatus !== '';
+  if (nplStatus && nplStatus.toUpperCase() !== 'YES') entry.nplStatus = nplStatus;
+  if (entry.npl && map.nplTime >= 0) {
+    var nplSpan = procOsSpan_(valsRow[map.nplTime]);
+    if (nplSpan) { entry.nplFrom = nplSpan.from; entry.nplTo = nplSpan.to; }
+  }
   for (var i = 0; i < map.areas.length; i++) {
     var a = map.areas[i];
     entry[a.key + 'Std'] = a.std >= 0 ? toNumber_(valsRow[a.std]) : 0;
@@ -1064,7 +1093,11 @@ function getDashboardData(archiveUrl) {
         // lines rather than entry objects, because the objects ran to ~19MB
         // and the write was refused every time. A v6 entry fed to the line
         // splitter would come back as garbage rather than as a miss.
-        yCacheKey = 'ydayArch_v7_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
+        // v8: the pivot grew NPL Status and NPL Time. A cached v7 line carries
+        // the old header, so those resolve to -1 and yesterday's half of the
+        // window would show no NPL while today's did - the same "it changed at
+        // midnight" reading v5 and v6 were bumped to avoid.
+        yCacheKey = 'ydayArch_v8_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
                     '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
         var yCached = cacheGetLarge_(yCacheKey);
         if (yCached) {

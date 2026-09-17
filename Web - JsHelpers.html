@@ -633,11 +633,18 @@ function multiAreaIconHtmlPak(areaCount) {
 // ANY flagged block in the window counts. Somebody who cleared RSPS for one
 // block and picked for the rest genuinely was on OS, and the tag is there to
 // explain the dent that leaves in their figure.
-function bonusOsMapPak_(entries) {
+function bonusOsMapPak_(entries) { return bonusFlagMapPak_(entries, 'os'); }
+
+// The same question for Non-Productive Labour. A person can carry both tags:
+// the two logs are independent and nothing stops somebody being on an indirect
+// task in one block and on NPL in another.
+function bonusNplMapPak_(entries) { return bonusFlagMapPak_(entries, 'npl'); }
+
+function bonusFlagMapPak_(entries, kind) {
   var out = {};
   if (!entries || !entries.length) return out;
   for (var i = 0; i < entries.length; i++) {
-    if (entries[i].os === true) out[entries[i].bonus] = true;
+    if (entries[i][kind] === true) out[entries[i].bonus] = true;
   }
   return out;
 }
@@ -712,6 +719,37 @@ function osStatusOfPak_(statuses) {
   return seen;
 }
 
+// ── NPL's Check, which is NOT folded ──────────────────────────────────────
+// The OS status is folded to three known states because a band carries one
+// label and the form's wordings are many. NPL's Check is shown AS LOGGED
+// instead: only "OK" means the time was signed off, and every other wording
+// means it was not, so there is nothing to gain by renaming any of them and
+// something to lose - a reader chasing "Awaiting sign off" wants to see those
+// words, not a translation of them.
+var NPL_CHECK_OK_PAK_ = 'OK';
+
+// Is this check the good one? The only question the colour has to answer.
+// Trimmed and case-insensitive, being a cell somebody typed.
+function nplCheckIsOkPak_(check) {
+  return String(check == null ? '' : check).trim().toLowerCase() ===
+         NPL_CHECK_OK_PAK_.toLowerCase();
+}
+
+// Blank is not a verdict, exactly as in osStatusOfPak_: it says the spell
+// happened without saying what was decided, so it neither supplies a label nor
+// contradicts one. Two DIFFERENT wordings over one block cancel to nothing,
+// again for the same reason - one label cannot speak for both.
+function nplStatusOfPak_(statuses) {
+  var seen = '';
+  for (var i = 0; i < statuses.length; i++) {
+    var s = String(statuses[i] == null ? '' : statuses[i]).trim();
+    if (!s || s.toUpperCase() === 'YES') continue;
+    if (!seen) seen = s;
+    else if (seen !== s) return '';
+  }
+  return seen;
+}
+
 // ── the clipped OS times ───────────────────────────────────────────────────
 // Processed Data carries the logged spell clipped to each 15-minute block:
 // 07:26-07:30 on the 07:15 row, then two whole blocks, then 08:00-08:06 on the
@@ -744,16 +782,24 @@ function osClipMinsPak_(hhmm, isEnd) {
 // Union rather than first-wins, because with several bonuses selected the band
 // means "one or more of these was indirect", and the honest range for that
 // claim is the whole of the time any of them was.
-function osSpanOfPak_(rows) {
+function osSpanOfPak_(rows) { return spanOfPak_(rows, 'os'); }
+function nplSpanOfPak_(rows) { return spanOfPak_(rows, 'npl'); }
+
+// Both of the above. OS and NPL carry the identical shape of data - a flag, a
+// status and a clipped pair - from two different logs, so this takes the
+// FIELD PREFIX rather than existing twice. The two got their geometry right
+// once; two copies of it would not stay that way.
+function spanOfPak_(rows, kind) {
+  var flag = kind, fromKey = kind + 'From', toKey = kind + 'To';
   var from = '', to = '', fromM = -1, toM = -1;
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
-    if (r.os !== true || !r.osFrom || !r.osTo) continue;
-    var a = osClipMinsPak_(r.osFrom, false);
-    var b = osClipMinsPak_(r.osTo, true);
+    if (r[flag] !== true || !r[fromKey] || !r[toKey]) continue;
+    var a = osClipMinsPak_(r[fromKey], false);
+    var b = osClipMinsPak_(r[toKey], true);
     if (a < 0 || b < 0) continue;
-    if (fromM < 0 || a < fromM) { fromM = a; from = r.osFrom; }
-    if (toM < 0 || b > toM) { toM = b; to = r.osTo; }
+    if (fromM < 0 || a < fromM) { fromM = a; from = r[fromKey]; }
+    if (toM < 0 || b > toM) { toM = b; to = r[toKey]; }
   }
   return { from: from, to: to };
 }
@@ -790,12 +836,30 @@ function osBandTimeLabelPak_(status, from, to) {
                       : ('[ ' + head + ' ]');
 }
 
+// The NPL twin. The Check is NOT folded on the way in - it reads as logged,
+// for the reason nplStatusOfPak_ gives - so this passes it through as-is.
+function nplBandTimeLabelPak_(check, from, to) {
+  var c = String(check == null ? '' : check).trim();
+  var head = c ? ('NPL ' + c) : 'NPL';
+  return (from && to) ? ('[ ' + head + ' : ' + from + ' - ' + to + ' ]')
+                      : ('[ ' + head + ' ]');
+}
+
 // The tag itself. Returns nothing when they were not on OS, so callers can
 // concatenate it unconditionally - same contract as multiAreaIconHtmlPak.
 function osTagHtmlPak_(isOs) {
   if (!isOs) return '';
   return '<span class="os-tag" title="On OS / indirect work in this period"' +
          ' aria-label="On OS">OS</span>';
+}
+
+// The NPL twin. Its own class rather than a modifier on .os-tag, so the two
+// can sit side by side on one name without either having to know about the
+// other - which they do, whenever somebody appears in both logs.
+function nplTagHtmlPak_(isNpl) {
+  if (!isNpl) return '';
+  return '<span class="npl-tag" title="On non-productive labour in this period"' +
+         ' aria-label="On NPL">NPL</span>';
 }
 
 // All / single-area only / multi-area only, over rows carrying a `bonus`.

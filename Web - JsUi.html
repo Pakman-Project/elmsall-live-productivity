@@ -1600,6 +1600,7 @@
     // several areas" would eventually come to mean two different things.
     var bonusAreaCount = bonusAreaCountMapPak(rangeData);
     var bonusOs = bonusOsMapPak_(rangeData);
+    var bonusNpl = bonusNplMapPak_(rangeData);
 
     var allBonuses = {};
     for (var i = 0; i < rangeData.length; i++) { allBonuses[rangeData[i].bonus] = true; }
@@ -1675,7 +1676,8 @@
         // This modal is often the first place a manager sees a number they do
         // not recognise, and a title attribute gives them nothing to copy and
         // nothing at all on a phone.
-        var osTag = osTagHtmlPak_(bonusOs[bonusName]);
+        var osTag = osTagHtmlPak_(bonusOs[bonusName]) +
+                    nplTagHtmlPak_(bonusNpl[bonusName]);
         // The name in its own element so it, and not the OS tag beside it, is
         // what truncates when the chip runs out of room. See .chip-name.
         var chipName = '<span class="chip-name">' + safeTextPak(bonusName) + '</span>';

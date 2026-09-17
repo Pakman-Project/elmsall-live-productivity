@@ -286,7 +286,9 @@ head('[5] the archive cache stores lines, and now fits');
         /var yMap = buildProcColumnMap_\(yLines\[0\]\.split\(BACKEND_DELIM_\)\)/.test(CODE) &&
         /if \(yMap\.total >= 0\)/.test(CODE));
   check('the key is bumped, as it is for every field change',
-        /ydayArch_v7_/.test(CODE), 'v6 entries hold objects and would not parse');
+        /ydayArch_v8_/.test(CODE),
+        'v7 lines carry the pre-NPL header, so yesterday would show no NPL '
+        + 'while today did - the same midnight seam v5 and v6 were bumped for');
 
   // Round-trip the real thing: lines in, entries out, identical.
   const cached = LINES.join('\n');

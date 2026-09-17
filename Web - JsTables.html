@@ -291,6 +291,7 @@ function buildMainRowDetail(rowData) {
   // moved between areas.
   currentDetailAreaCount = bonusAreaCountMapPak(slice);
   currentDetailOsMap = bonusOsMapPak_(slice);
+  currentDetailNplMap = bonusNplMapPak_(slice);
 
   var entryRows = buildIndividualEntryRows_(slice).sort(compareEntryDetailPak);
   return isCardModePak() ? buildMainDetailCardsHtml_(entryRows) : buildMainDetailTableHtml_(entryRows);
@@ -388,6 +389,7 @@ function buildEntryDetailCardHtml_(r) {
         multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
         safeTextPak(r.bonus) +
         osTagHtmlPak_(currentDetailOsMap[r.bonus]) +
+        nplTagHtmlPak_(currentDetailNplMap[r.bonus]) +
         ' <i class="fa-solid fa-filter filter-icon"></i>' +
         bonusTipHtmlPak_(r.bonus, isActive) +
       '</span>' +
@@ -415,6 +417,7 @@ function buildEntryDetailRowHtml_(r) {
     multiAreaIconHtmlPak(currentDetailAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
     osTagHtmlPak_(currentDetailOsMap[r.bonus]) +
+    nplTagHtmlPak_(currentDetailNplMap[r.bonus]) +
     ' <i class="fa-solid fa-filter filter-icon"></i>' +
     bonusTipHtmlPak_(r.bonus, isActive) +
     '</span></td>' +
@@ -581,6 +584,7 @@ function buildBonusRowHtml_(r) {
     multiAreaIconHtmlPak(currentBonusAreaCount[r.bonus]) +
     safeTextPak(r.bonus) +
     osTagHtmlPak_(currentBonusOsMap[r.bonus]) +
+    nplTagHtmlPak_(currentBonusNplMap[r.bonus]) +
     ' <i class="fa-solid fa-filter filter-icon"></i>' +
     bonusTipHtmlPak_(r.bonus, isActive) +
     '</span></td>' +
@@ -831,6 +835,7 @@ function renderSideTablesPak(rowsLimit) {
   // panel's own rows can never tell you that someone also worked elsewhere.
   currentBonusAreaCount = bonusAreaCountMapPak(windowData);
   currentBonusOsMap = bonusOsMapPak_(windowData);
+  currentBonusNplMap = bonusNplMapPak_(windowData);
 
   var modeSel = $('bonusViewMode');
   var mode = modeSel ? modeSel.value : 'overall';

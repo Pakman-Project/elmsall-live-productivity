@@ -133,11 +133,22 @@ const STUB = `
     // band's own edges cannot.
     var trKeys = Object.keys(want);
     trKeys.forEach(function (tr, n) {
+      // The first two thirds are OS, the last third NPL, and the middle block
+      // of the run is BOTH - which is the case worth being able to look at,
+      // since the two bands then cover the same blocks and have to stay
+      // readable over each other.
+      var isNpl = n >= Math.floor(trKeys.length * 0.55);
+      var isOs = n <= Math.floor(trKeys.length * 0.62);
       d.rawSideData.push(Object.assign({}, blank, {
-        timeRange: tr, bonus: bonus, value: 0, os: true,
-        osStatus: 'Awaiting Approval',
-        osFrom: osClipAtPak_(tr, n === 0 ? 7 : 0),
-        osTo: osClipAtPak_(tr, n === trKeys.length - 1 ? 8 : 15)
+        timeRange: tr, bonus: bonus, value: 0,
+        os: isOs,
+        osStatus: isOs ? 'Awaiting Approval' : '',
+        osFrom: isOs ? osClipAtPak_(tr, n === 0 ? 7 : 0) : '',
+        osTo: isOs ? osClipAtPak_(tr, n === trKeys.length - 1 ? 8 : 15) : '',
+        npl: isNpl,
+        nplStatus: isNpl ? 'Awaiting sign off' : '',
+        nplFrom: isNpl ? osClipAtPak_(tr, 0) : '',
+        nplTo: isNpl ? osClipAtPak_(tr, n === trKeys.length - 1 ? 8 : 15) : ''
       }));
     });
     // Bands only draw under a bonus filter, so apply one.

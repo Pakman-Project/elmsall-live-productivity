@@ -319,6 +319,7 @@ ctx.selectedBonuses = [];
 ctx.sideSortMetric = 'performance';
 ctx.currentBonusAreaCount = {};
 ctx.currentBonusOsMap = {};
+ctx.currentBonusNplMap = {};
 ctx.currentThreshold = 0.15;
 
 const placeOf = perf => {
@@ -365,6 +366,7 @@ check('and the split no longer moves with the live threshold',
 
 head('[13] an OS operator still reaches a table, and is tagged there');
 ctx.currentBonusOsMap = { OSGUY: true };
+ctx.currentBonusNplMap = {};
 const osHtml = ctx.buildBonusPanel_('T', [
   { bonus: 'OSGUY', standardHour: 0, deployedHour: 0, performance: 0 }
 ], 10);
@@ -372,6 +374,7 @@ check('listed', osHtml.indexOf('OSGUY') !== -1);
 check('in Unproductive', osHtml.split('Unproductive')[1].indexOf('OSGUY') !== -1);
 check('with the tag beside the name', /OSGUY[\s\S]{0,120}os-tag|os-tag[\s\S]{0,120}OSGUY/.test(osHtml));
 ctx.currentBonusOsMap = {};
+ctx.currentBonusNplMap = {};
 check('the tag is emitted at all three render sites',
       (rsrc.match(/osTagHtmlPak_/g) || []).length === 3,
       'bonus rows + both Data Table detail layouts');
