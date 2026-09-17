@@ -682,6 +682,13 @@
     if (changed && typeof osMarkControlChangedPak_ === 'function') {
       osMarkControlChangedPak_();
     }
+    // The NPL page is NOT narrowed by the building - its log has no Site
+    // column - but its rows are still read for a window that the switch can
+    // move, so it re-fetches on the same terms rather than being left holding
+    // the previous building's window.
+    if (changed && typeof nplMarkControlChangedPak_ === 'function') {
+      nplMarkControlChangedPak_();
+    }
     if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
     if (changed && typeof saveUserPreferences === 'function') saveUserPreferences();
   }
@@ -1078,6 +1085,9 @@
       // on a refresh like every other page rather than holding yesterday.
       renderOsPagePak();
     } else if (index === 4) {
+      // Same as the OS page above, off the other log.
+      renderNplPagePak();
+    } else if (index === 5) {
       renderMainTablePak(currentMainRows);
     }
     pageDirty[index] = false;
@@ -1087,9 +1097,9 @@
   }
 
   // Hours Range and Time Window shape the time axis that every chart and the
-  // Data Table are drawn on. The Bonus and OS pages do not read either: both
-  // have their own From / To, over the whole 24 hours, and both ignore the
-  // window size entirely.
+  // Data Table are drawn on. The Bonus, OS and NPL pages do not read either:
+  // all three have their own From / To, over the whole 24 hours, and all three
+  // ignore the window size entirely.
   //
   // So on those two the pair is disabled and greyed rather than left looking
   // live. A control you can change that then changes nothing reads as the page
@@ -1098,7 +1108,7 @@
   //
   // Disabled, not hidden: they keep their place in the row, so the panel does
   // not reflow every time you move between pages.
-  var PAGES_WITH_OWN_RANGE_ = [2, 3];
+  var PAGES_WITH_OWN_RANGE_ = [2, 3, 4];
 
   function syncTimeAxisControlsPak_(index) {
     var off = PAGES_WITH_OWN_RANGE_.indexOf(index) !== -1;

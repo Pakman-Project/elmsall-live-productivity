@@ -116,7 +116,13 @@
             <i class="rail-icon fa-solid fa-people-carry-box" aria-hidden="true"></i>
             <span class="rail-label">OS</span>
           </button>
-          <button type="button" class="rail-item" onclick="goToPage(4)" title="Data Table">
+          <!-- Non-Productive Labour. The other half of the same question OS
+               answers, off a second log, so it sits beside it. -->
+          <button type="button" class="rail-item" onclick="goToPage(4)" title="Non-Productive Labour">
+            <i class="rail-icon fa-solid fa-hourglass-half" aria-hidden="true"></i>
+            <span class="rail-label">NPL</span>
+          </button>
+          <button type="button" class="rail-item" onclick="goToPage(5)" title="Data Table">
             <i class="rail-icon fa-solid fa-table-list" aria-hidden="true"></i>
             <span class="rail-label">Data Table</span>
           </button>
@@ -498,6 +504,42 @@
             </div>
           </div>
 
+          <!-- Non-Productive Labour. The OS page's shape, off the NPL log, with
+               no Site or Zone column to group or filter by - so one level of
+               bar, department, opening onto its tasks. Its own From / To over
+               the whole 24 hours, like OS and Bonus, which is why Hours Range
+               and Time Window grey out here too. -->
+          <div class="page">
+            <div class="bonus-page-controls os-controls">
+              <!-- Type, Departments, Tasks, Checks. Rendered from JS, because
+                   the three multi-selects offer what is actually in range. -->
+              <div id="nplFilters" class="os-filters"></div>
+              <div class="breakdown-time-bar bonus-time-bar os-time-bar">
+                <div class="time-row time-row-from">
+                  <label class="breakdown-time-label">From</label>
+                  <select id="nplFrom" class="breakdown-time-select" onchange="onNplRangeChange()"></select>
+                  <span class="breakdown-time-sep"><i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="time-row time-row-to">
+                  <label class="breakdown-time-label">To</label>
+                  <select id="nplTo" class="breakdown-time-select" onchange="onNplRangeChange()"></select>
+                  <span id="nplRangeBadge" class="breakdown-range-badge">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card panel span-12">
+              <div id="nplBody" class="os-body"></div>
+            </div>
+
+            <!-- Its own card, not a row inside the breakdown above: these
+                 records are in none of the figures in that card. Hidden by JS
+                 whenever there is nothing to show. -->
+            <div class="card panel span-12" id="nplBadCard" hidden>
+              <div id="nplBadBody"></div>
+            </div>
+          </div>
+
           <div class="page">
             <div class="card panel span-12">
               <div class="mini-table-title">
@@ -862,6 +904,9 @@
     <?!= include('Web - JsData'); ?>
     <?!= include('Web - JsCharts'); ?>
     <?!= include('Web - JsPageOs'); ?>
+    <!-- After JsPageOs, not before: the NPL page is built on that file's
+         range picker, spell walk, multi-select and bar animation. -->
+    <?!= include('Web - JsPageNpl'); ?>
     <?!= include('Web - JsTables'); ?>
     <?!= include('Web - JsExport'); ?>
     <?!= include('Web - JsToast'); ?>

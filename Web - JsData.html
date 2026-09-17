@@ -51,6 +51,7 @@ function handleControlChangePak(sourceElement, type) {
   // which nobody asked for and nobody should have to watch - see
   // osMarkControlChangedPak_.
   if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
+  if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
   applyLocalFiltersPak();
 }
 
@@ -142,9 +143,9 @@ function applyLocalFiltersPak() {
   if (windowMinutes !== 15) { tableData = getAggregatedDataPak(tableBaseRows, windowMinutes); }
   currentMainRows = tableData;
 
-  // Only the page the user is actually looking at is rendered now; the other
-  // three are marked dirty and built when first shown (see renderPageIfNeeded_).
-  // Rendering all four up front meant building ~13 charts and every table on
+  // Only the page the user is actually looking at is rendered now; the rest
+  // are marked dirty and built when first shown (see renderPageIfNeeded_).
+  // Rendering every page up front meant building ~13 charts and every table on
   // load, even though only one page is visible.
   invalidateChartCommon_();
   pageRenderCtx = {

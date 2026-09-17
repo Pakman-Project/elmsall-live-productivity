@@ -6,7 +6,7 @@ function include(filename) {
 // nothing straight off the URL is ever interpolated into the page. Each is
 // exposed to the template as its own plain string rather than as JSON, which
 // avoids any escaping question inside the <script> block.
-var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'os', 'data'];
+var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'os', 'npl', 'data'];
 // Mirrors the <option> values on the Hours Range and Time Window dropdowns. A
 // link cannot request a setting the UI does not offer.
 var DEEP_LINK_HOURS_ = ['3', '6', '9', '12', '24'];
@@ -688,6 +688,26 @@ var OS_LOG_COLS_ = {
   // so this is read as "is it the string Open", not as a name to display.
   source: 19
 };
+// ── The NPL Log ──────────────────────────────────────────────────────────
+// Written by 'Spreadsheet - NPL Log.js' into A:P. Same hazard as the OS block
+// above: the source script picks columns by INDEX, so dropping one shifts
+// every output column after it and a wrong index here reads a populated cell
+// rather than erroring. Pinned from the other side in tools/test_npllog.js.
+//
+//   A Date      B Bonus     C Department  D Task     E Protected Bonus Area
+//   F Site Transfer         G Strictly P1/MI only    H Start    I Finish
+//   J Duration  K TM authorised           L Exceptional Circumstances Task
+//   M Check     N Allow duplicate         O TOTAL Non prod hours
+//   P Unproductive Minutes
+var NPL_LOG_SHEET_NAME_ = 'npl log';  // matched lower-cased; see findSheetLower_
+var NPL_LOG_FIRST_ROW_ = 7;           // 1-6 are the source URLs and headings
+var NPL_LOG_WIDTH_ = 16;              // A:P
+var NPL_LOG_COLS_ = {
+  date: 0, bonus: 1, dept: 2, task: 3, siteTransfer: 5,
+  start: 7, finish: 8, tmAuth: 10, check: 12
+};
+var nplLogCellsRead_ = 0;
+
 // A spell the operative started and has not finished. No finish time, so it
 // can never be placed on a clock; the OS page lists these to be chased rather
 // than filing them with the rows that are simply wrong.
@@ -795,19 +815,21 @@ function getOsLogRows(dateKeys, archiveUrl) {
 
 // `want` is a set of dd/mm/yyyy keys, already including the production day
 // before each - see osLogWantDates_ on the client, which builds it.
+// "OS log" in the script and "OS Log" in conversation, and getSheetByName
+// matches exactly. Resolved case-insensitively so a capital L one way or the
+// other cannot silently empty a whole page - which is a blank screen with
+// nothing on it to say why, the worst kind of failure this codebase has.
+function findSheetLower_(ss, lowerName) {
+  var sheets = ss.getSheets();
+  for (var s = 0; s < sheets.length; s++) {
+    if (sheets[s].getName().trim().toLowerCase() === lowerName) return sheets[s];
+  }
+  return null;
+}
+
 function readOsLogRows_(ss, want) {
   try {
-    // "OS log" in the script and "OS Log" in conversation, and getSheetByName
-    // matches exactly. Resolved case-insensitively so a capital L one way or
-    // the other cannot silently empty the whole page.
-    var sheets = ss.getSheets();
-    var sheet = null;
-    for (var s = 0; s < sheets.length; s++) {
-      if (sheets[s].getName().trim().toLowerCase() === OS_LOG_SHEET_NAME_) {
-        sheet = sheets[s];
-        break;
-      }
-    }
+    var sheet = findSheetLower_(ss, OS_LOG_SHEET_NAME_);
     if (!sheet) { osLogCellsRead_ = 0; return { rows: [], skipped: 0, bad: [] }; }
 
     var lastRow = sheet.getLastRow();
@@ -892,6 +914,116 @@ function readOsLogRows_(ss, want) {
     // not the dashboard.
     Logger.log('OS log unreadable: ' + e.message);
     osLogCellsRead_ = 0;
+    return { rows: [], skipped: 0, bad: [] };
+  }
+}
+
+// The NPL page's entry point. Same contract as getOsLogRows, same reasons:
+// fetched the first time that page is opened rather than on every load, keyed
+// on the dates asked for so a different window cannot be served a stale
+// answer, and a short TTL because the log is edited by hand all shift.
+function getNplLogRows(dateKeys, archiveUrl) {
+  var tm = loadTimer_();
+  var want = {};
+  var keys = [];
+  for (var i = 0; dateKeys && i < dateKeys.length; i++) {
+    var k = osLogDateKey_(dateKeys[i]);
+    if (k && !want[k]) { want[k] = true; keys.push(k); }
+  }
+  keys.sort();
+
+  var cacheKey = 'nplLog_v1_' + (archiveUrl ? 'a' : 'l') + '_' + keys.join(',');
+  var cached = cacheGetLarge_(cacheKey);
+  if (cached) {
+    try {
+      tm.note('nplLogCache=HIT');
+      tm.done('NPLLOG');
+      return JSON.parse(cached);
+    } catch (e) {}
+  }
+
+  var ss;
+  try {
+    ss = archiveUrl ? SpreadsheetApp.openByUrl(archiveUrl)
+                    : SpreadsheetApp.getActiveSpreadsheet();
+  } catch (e) {
+    return { rows: [], skipped: 0, bad: [], error: 'Could not open the spreadsheet' };
+  }
+  tm.mark('open');
+
+  var out = readNplLogRows_(ss, want);
+  tm.mark('nplLog', nplLogCellsRead_);
+  tm.note('rows=' + out.rows.length);
+  out.timing = tm.done('NPLLOG');
+  cachePutLarge_(cacheKey, JSON.stringify(out), 300);
+  return out;
+}
+
+function readNplLogRows_(ss, want) {
+  try {
+    var sheet = findSheetLower_(ss, NPL_LOG_SHEET_NAME_);
+    if (!sheet) { nplLogCellsRead_ = 0; return { rows: [], skipped: 0, bad: [] }; }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < NPL_LOG_FIRST_ROW_) { nplLogCellsRead_ = 0; return { rows: [], skipped: 0, bad: [] }; }
+
+    var vals = sheet.getRange(NPL_LOG_FIRST_ROW_, 1,
+                              lastRow - NPL_LOG_FIRST_ROW_ + 1,
+                              NPL_LOG_WIDTH_).getDisplayValues();
+    nplLogCellsRead_ = vals.length * NPL_LOG_WIDTH_;
+    var rows = [];
+    var skipped = 0;
+    var bad = [];
+    // Named, not counted - see the OS twin above. A record nobody can find is
+    // a record nobody can chase.
+    function note(i, r, why) {
+      skipped++;
+      if (bad.length >= OS_LOG_MAX_BAD_) return;
+      bad.push({
+        row: NPL_LOG_FIRST_ROW_ + i,
+        bonus: osLogCell_(r, NPL_LOG_COLS_.bonus),
+        date: osLogCell_(r, NPL_LOG_COLS_.date),
+        from: osLogCell_(r, NPL_LOG_COLS_.start),
+        to: osLogCell_(r, NPL_LOG_COLS_.finish),
+        dept: osLogCell_(r, NPL_LOG_COLS_.dept),
+        task: osLogCell_(r, NPL_LOG_COLS_.task),
+        siteTransfer: osLogCell_(r, NPL_LOG_COLS_.siteTransfer),
+        tmAuth: osLogCell_(r, NPL_LOG_COLS_.tmAuth),
+        check: osLogCell_(r, NPL_LOG_COLS_.check),
+        why: why
+      });
+    }
+    for (var i = 0; i < vals.length; i++) {
+      var r = vals[i];
+      var bonus = osLogCell_(r, NPL_LOG_COLS_.bonus).toUpperCase();
+      var dateKey = osLogDateKey_(osLogCell_(r, NPL_LOG_COLS_.date));
+      if (!bonus && !dateKey) continue;
+      if (!dateKey || !want[dateKey]) {
+        if (!dateKey) note(i, r, 'the date is not a date');
+        continue;
+      }
+      var from = osLogTime_(osLogCell_(r, NPL_LOG_COLS_.start));
+      var to = osLogTime_(osLogCell_(r, NPL_LOG_COLS_.finish));
+      if (!bonus) { note(i, r, 'no bonus number'); continue; }
+      if (!from || !to) { note(i, r, !from && !to ? 'no start or finish' : (!from ? 'the start is not a time' : 'the finish is not a time')); continue; }
+      rows.push({
+        row: NPL_LOG_FIRST_ROW_ + i,
+        date: dateKey,
+        bonus: bonus,
+        dept: osLogCell_(r, NPL_LOG_COLS_.dept),
+        task: osLogCell_(r, NPL_LOG_COLS_.task),
+        from: from,
+        to: to,
+        siteTransfer: osLogCell_(r, NPL_LOG_COLS_.siteTransfer),
+        tmAuth: osLogCell_(r, NPL_LOG_COLS_.tmAuth),
+        check: osLogCell_(r, NPL_LOG_COLS_.check)
+      });
+    }
+    return { rows: rows, skipped: skipped, bad: bad };
+  } catch (e) {
+    // Degrade, never fail the load - an unreadable NPL log costs the NPL page.
+    Logger.log('NPL log unreadable: ' + e.message);
+    nplLogCellsRead_ = 0;
     return { rows: [], skipped: 0, bad: [] };
   }
 }

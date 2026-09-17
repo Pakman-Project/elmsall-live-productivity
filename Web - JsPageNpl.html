@@ -1,0 +1,536 @@
+<script>
+  // ── The NPL page ───────────────────────────────────────────────────────────
+  // Non-Productive Labour: who was on a non-productive task, by department and
+  // task.
+  //
+  // The OS page's twin, and deliberately built on its parts rather than beside
+  // them - the spell walk, the 06:00-to-06:00 rule, the multi-select, the
+  // open/closed memory, the bar animation and the range picker are all reused
+  // from 'Web - JsPageOs', which is included before this file. Two copies of
+  // that machinery would drift, and the geometry in it was got right once.
+  //
+  // What differs is the SHAPE of the data. The NPL log has no Site and no Zone
+  // column, so there is no site heading, no zone bars and no Zones filter - and
+  // the Warehouse picker in the control panel cannot narrow this page at all,
+  // which the page says on screen rather than leaving the reader to wonder why
+  // clicking it does nothing. One level of bar - department - opening onto its
+  // tasks, each of which is a table of records.
+
+  // ── the range picker ───────────────────────────────────────────────────────
+  // Its own From / To, separate from the OS page's pair for the same reason
+  // that pair is separate from the Bonus page's: two pages looked at for two
+  // reasons, and a range set on one has no business moving the other.
+
+  function onNplRangeChange() {
+    var fromSel = $('nplFrom');
+    var toSel = $('nplTo');
+    if (!fromSel || !toSel) return;
+    if (toSel.selectedIndex < fromSel.selectedIndex) {
+      toSel.selectedIndex = fromSel.selectedIndex;
+    }
+    renderNplPagePak();
+  }
+
+  // ── the fetch ──────────────────────────────────────────────────────────────
+  // Same first-open / silent-refresh contract as the OS page, down to the
+  // reasons - see ensureOsLogPak_ and osFetchLogPak_, which these mirror.
+
+  function ensureNplLogPak_() {
+    if (nplLogState === null) {
+      nplLogState = 'loading';
+      renderNplPagePak();
+      nplFetchLogPak_(false);
+      return;
+    }
+    if (nplLogState === 'ready' && nplLogNeedsRefresh) {
+      nplLogNeedsRefresh = false;
+      nplFetchLogPak_(true);
+    }
+  }
+
+  function nplMarkControlChangedPak_() {
+    nplLogState = null;
+    nplLogNeedsRefresh = false;
+  }
+
+  function nplFetchLogPak_(silent) {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        nplLogRows = (res && res.rows) || [];
+        nplLogSkipped = (res && Number(res.skipped)) || 0;
+        nplLogBad = (res && res.bad) || [];
+        if (res && res.error) {
+          if (!silent) { nplLogState = res.error; }
+          else { console.warn('NPL log background refresh failed: ' + res.error); }
+        } else {
+          nplLogState = 'ready';
+          nplLogEverLoaded = true;
+        }
+        if (res && res.timing) { console.info(res.timing); }
+        renderNplPagePak();
+      })
+      .withFailureHandler(function (err) {
+        var message = (err && err.message) || 'The NPL log could not be read';
+        if (silent) { console.warn('NPL log background refresh failed: ' + message); return; }
+        nplLogState = message;
+        renderNplPagePak();
+      })
+      .getNplLogRows(osLogWantDates_(), currentArchiveUrl || null);
+  }
+
+  // ── filters ────────────────────────────────────────────────────────────────
+  // Four, and they compose. Type is about the PERSON and the other three are
+  // about the record, which is why Type is judged against the whole window
+  // rather than against what the others left.
+
+  var NPL_TYPE_LABELS_ = { all: 'All', pure: 'Pure NPL', multi: 'Multi Tasks' };
+
+  function setNplTypeFilter(mode) {
+    nplTypeFilter = (NPL_TYPE_LABELS_[mode] ? mode : 'all');
+    renderNplPagePak();
+  }
+
+  // Departments cascades nothing upstream; Task cascades from Departments and
+  // Check from Task. A stale downstream selection has to be cleared the moment
+  // its upstream changes, or it goes on filtering by a value its own dropdown
+  // no longer offers - invisible, because the picked count is read against the
+  // new narrower list and would show "All" while excluding everything.
+  function toggleNplDeptFilter(dept) {
+    if (nplDeptFilter[dept]) { delete nplDeptFilter[dept]; } else { nplDeptFilter[dept] = true; }
+    nplTaskFilter = {};
+    nplCheckFilter = {};
+    renderNplPagePak();
+  }
+
+  function toggleNplTaskFilter(task) {
+    if (nplTaskFilter[task]) { delete nplTaskFilter[task]; } else { nplTaskFilter[task] = true; }
+    nplCheckFilter = {};
+    renderNplPagePak();
+  }
+
+  function toggleNplCheckFilter(check) {
+    if (nplCheckFilter[check]) { delete nplCheckFilter[check]; }
+    else { nplCheckFilter[check] = true; }
+    renderNplPagePak();
+  }
+
+  function clearNplDeptFilter() {
+    nplDeptFilter = {};
+    nplTaskFilter = {};
+    nplCheckFilter = {};
+    renderNplPagePak();
+  }
+  function clearNplTaskFilter() {
+    nplTaskFilter = {};
+    nplCheckFilter = {};
+    renderNplPagePak();
+  }
+  function clearNplCheckFilter() { nplCheckFilter = {}; renderNplPagePak(); }
+
+  // ── the Check column ───────────────────────────────────────────────────────
+  // Shown as logged, verbatim. No fold, unlike OS Record Status: OS has a known
+  // vocabulary off a form with three meanings behind it, and NPL's Check is a
+  // free cell whose exact wording is the whole content of the column. Folding
+  // it would rename somebody's answer to something they did not write.
+  //
+  // Only "OK" is signed off - see nplCheckIsOkPak_, which the chart band shares,
+  // so the colour on this page and the colour under the chart cannot disagree.
+  var NPL_CHECK_NONE_PAK_ = 'No check';
+
+  function nplCheckValuePak_(row) {
+    return String(row && row.check || '').trim() || NPL_CHECK_NONE_PAK_;
+  }
+
+  function nplCheckValuesPak_(rows) {
+    var seen = {}, out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var v = nplCheckValuePak_(rows[i]);
+      if (!seen[v]) { seen[v] = true; out.push(v); }
+    }
+    // Signed off first, then everything that was not, then the blanks. Reading
+    // down a list of verdicts that way is how somebody thinks about them;
+    // alphabetically would scatter the not-OK wordings around the OK.
+    out.sort(function (a, b) {
+      var ra = nplCheckIsOkPak_(a) ? 1 : (a === NPL_CHECK_NONE_PAK_ ? 3 : 2);
+      var rb = nplCheckIsOkPak_(b) ? 1 : (b === NPL_CHECK_NONE_PAK_ ? 3 : 2);
+      return (ra - rb) || (a < b ? -1 : a > b ? 1 : 0);
+    });
+    return out;
+  }
+
+  function nplCheckChipPak_(check) {
+    var raw = String(check == null ? '' : check).trim();
+    if (!raw) {
+      // Logged with the cell empty. Not a verdict, so it is not given one.
+      return '<span class="os-status os-status-none" title="Logged without a check against it">&ndash;</span>';
+    }
+    var cls = nplCheckIsOkPak_(raw) ? 'os-status-good' : 'os-status-bad';
+    return '<span class="os-status ' + cls + '">' + escapeTextPak_(raw) + '</span>';
+  }
+
+  // ── grouping ───────────────────────────────────────────────────────────────
+
+  // department -> task -> records.
+  //
+  // Counted in unique BONUS NUMBERS at the department level, not in records:
+  // one person logged for two tasks in the same department is one head on NPL.
+  // Counting records would make the bars a measure of paperwork.
+  function nplGroupPak_(rows) {
+    var depts = {};
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var deptName = osLabelPak_(r.dept, 'department');
+      var taskName = osLabelPak_(r.task, 'task');
+
+      var dept = depts[deptName] ||
+                 (depts[deptName] = { name: deptName, tasks: {}, heads: {} });
+      dept.heads[r.bonus] = true;
+      var task = dept.tasks[taskName] ||
+                 (dept.tasks[taskName] = { name: taskName, records: [] });
+      task.records.push(r);
+    }
+
+    var out = [];
+    Object.keys(depts).forEach(function (dk) {
+      var d = depts[dk];
+      var tasks = Object.keys(d.tasks).map(function (tk) { return d.tasks[tk]; });
+      tasks.forEach(function (t) {
+        // Earliest record first: a task's records read as a timeline.
+        t.records.sort(function (a, b) {
+          return (a.from < b.from ? -1 : a.from > b.from ? 1 : 0) ||
+                 (a.bonus < b.bonus ? -1 : a.bonus > b.bonus ? 1 : 0);
+        });
+      });
+      tasks.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+      out.push({ name: d.name, tasks: tasks, count: Object.keys(d.heads).length });
+    });
+    out.sort(osByCountThenNamePak_);
+    return out;
+  }
+
+  // ── the record table ──────────────────────────────────────────────────────
+
+  var NPL_TASK_COLUMNS_ = ['Bonus', 'Time', 'Site Transfer', 'TM authorised', 'Check'];
+  // A percentage per column, summing to 100, so every task table down the page
+  // lines its columns up with every other one - the bare `table` rule would
+  // give five equal fifths and spend as much on the bonus chip as on a name.
+  var NPL_TASK_COL_WIDTHS_ = [14, 18, 24, 24, 20];
+
+  function nplTaskTableHtmlPak_(records) {
+    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
+               '<colgroup>';
+    for (var w = 0; w < NPL_TASK_COL_WIDTHS_.length; w++) {
+      html += '<col style="width:' + NPL_TASK_COL_WIDTHS_[w] + '%">';
+    }
+    html += '</colgroup><thead><tr>';
+    for (var c = 0; c < NPL_TASK_COLUMNS_.length; c++) {
+      html += '<th>' + NPL_TASK_COLUMNS_[c] + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      var esc = escapeAttrPak(r.bonus);
+      var picked = selectedBonuses.indexOf(r.bonus) !== -1;
+      html += '<tr>';
+      html += '<td><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+              (picked ? ' selected' : '') + '"' +
+              ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
+              escapeTextPak_(r.bonus) +
+              '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
+              bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
+      html += '<td class="os-time-cell">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
+      html += '<td>' + osPersonCellPak_(r.siteTransfer) + '</td>';
+      html += '<td>' + osPersonCellPak_(r.tmAuth) + '</td>';
+      html += '<td>' + nplCheckChipPak_(r.check) + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  // The records that could not be read, NAMED and attributable - the OS page's
+  // card in NPL's columns. Not a warning to be tidied away: an NPL record with
+  // an impossible date or a nineteen-hour shift is a real form somebody filled
+  // in wrongly, and the point of a dashboard is that the abnormal is visible.
+  //
+  // No Open card here, unlike OS: the NPL log has no Source column marking
+  // which rows came from an unfinished-spell tab, so there is nothing to split
+  // these on and guessing would be worse than one honest list.
+  var NPL_BAD_COLUMNS_ = ['Bonus', 'Date', 'Start', 'Finish', 'Department',
+                          'Task', 'TM authorised', 'Check'];
+
+  function nplBadRowsHtmlPak_(bad, unnamed) {
+    var total = (bad ? bad.length : 0) + (unnamed || 0);
+    if (total <= 0) return '';
+    var key = osNodeKeyPak_('npl', '__bad');
+    var open = !!osOpenNodes[key];
+
+    var html = '<div class="breakdown-row clickable-row os-dropped-row' +
+               (open ? ' expanded' : '') + '"' +
+               ' data-os-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
+    html += '<div class="breakdown-label os-dropped-label">' +
+            '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
+            total + ' record' + (total === 1 ? '' : 's') +
+            ' that cannot be placed on a clock' +
+            '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div></div>';
+
+    html += '<div class="breakdown-detail' + (open ? ' open' : '') + '">' +
+            '<div class="os-zone-detail">';
+    html += '<div class="os-bad-intro">These are on the NPL log and could not be ' +
+            'placed on a clock, so they are in none of the figures above. Hover a ' +
+            'row to see what is wrong with it.</div>';
+
+    if (bad && bad.length) {
+      html += '<div class="table-wrap os-job-table-wrap">' +
+              '<table class="os-job-table os-bad-table"><thead><tr>';
+      for (var c = 0; c < NPL_BAD_COLUMNS_.length; c++) {
+        html += '<th>' + NPL_BAD_COLUMNS_[c] + '</th>';
+      }
+      html += '</tr></thead><tbody>';
+      for (var i = 0; i < bad.length; i++) {
+        var b = bad[i];
+        // The reason rides on the row rather than in a column of its own: it is
+        // the most useful thing here and also the longest, and on a phone a
+        // paragraph-wide last column pushes the cells somebody reads first off
+        // the side of the table.
+        html += '<tr' + (b.why ? ' title="' + escapeAttrPak(b.why) + '"' : '') +
+                ' class="os-bad-row">';
+        html += '<td>' + (String(b.bonus || '').trim()
+          ? '<span class="os-bonus-chip bonus-tip-host clickable-bonus"' +
+            ' onclick="event.stopPropagation();toggleBonusFilter(\'' +
+            escapeAttrPak(b.bonus) + '\');">' + escapeTextPak_(b.bonus) +
+            bonusTipHtmlPak_(b.bonus, selectedBonuses.indexOf(b.bonus) !== -1) + '</span>'
+          : '<span class="os-cell-none">&ndash;</span>') + '</td>';
+        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.date) + '</td>';
+        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.from) + '</td>';
+        html += '<td class="os-bad-cell">' + osPersonCellPak_(b.to) + '</td>';
+        html += '<td>' + osPersonCellPak_(b.dept) + '</td>';
+        html += '<td>' + osPersonCellPak_(b.task) + '</td>';
+        html += '<td>' + osPersonCellPak_(b.tmAuth) + '</td>';
+        html += '<td>' + nplCheckChipPak_(b.check) + '</td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table></div>';
+    }
+
+    // Only ever a RESIDUAL: the server counted these but hit its own cap before
+    // it could name them. Counted separately from the table above so the two
+    // cannot double up.
+    if (unnamed) {
+      html += '<div class="os-bad-intro">' + unnamed + ' more could not be read, past ' +
+              'the limit on how many the server will name in one go.</div>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  // ── the page ───────────────────────────────────────────────────────────────
+
+  function renderNplPagePak() {
+    var body = document.getElementById('nplBody');
+    if (!body) return;
+    ensureTimeSelectsPak_('nplFrom', 'nplTo');
+
+    var win = selectedWindowPak_('nplFrom', 'nplTo');
+    var badge = document.getElementById('nplRangeBadge');
+    if (badge) {
+      badge.textContent = win
+        ? (Math.round((win.finish - win.start) / 60000) + ' min')
+        : '-';
+    }
+
+    if (!win) {
+      body.innerHTML = '<div class="breakdown-empty">' +
+        '<i class="fa-solid fa-clock" aria-hidden="true"></i>' +
+        'Waiting for a time range</div>';
+      return;
+    }
+
+    if (nplLogState === null) { ensureNplLogPak_(); return; }
+    // A skeleton while it loads, shaped like what is coming, and written once -
+    // a re-render while still loading would restart every shimmer from the left.
+    if (nplLogState === 'loading') {
+      if (!body.firstChild || !body.firstChild.classList ||
+          !body.firstChild.classList.contains('os-skeleton')) {
+        body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          '<div class="os-skel-summary"></div>' +
+          '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
+          '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+      }
+      return;
+    }
+    if (nplLogState !== 'ready') {
+      body.innerHTML = '<div class="breakdown-empty">' +
+        '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
+        escapeTextPak_(nplLogState) + '</div>';
+      return;
+    }
+    // Already showing real rows; kick off a silent re-fetch if the dashboard's
+    // window has moved on, and fall straight through to draw with what is on
+    // screen already.
+    ensureNplLogPak_();
+
+    // OVERLAP, not containment. A spell that started before the window and is
+    // still running is the case this page exists for.
+    //
+    // No building filter, unlike the OS page: the NPL log carries no Site
+    // column, so there is nothing to map the Warehouse picker onto. Said on the
+    // page rather than silently ignored - see the note under the summary line.
+    var inWindow = [];
+    var unplaceable = [];
+    for (var i = 0; i < nplLogRows.length; i++) {
+      var rec = nplLogRows[i];
+      var w = osSpellWindowPak_(rec);
+      if (!w) {
+        unplaceable.push({
+          row: rec.row, bonus: rec.bonus, date: rec.date,
+          from: rec.from, to: rec.to, dept: rec.dept, task: rec.task,
+          siteTransfer: rec.siteTransfer, tmAuth: rec.tmAuth, check: rec.check,
+          why: osSpellProblemPak_(rec) || 'it cannot be placed on a clock'
+        });
+        continue;
+      }
+      if (w.finish <= win.start || w.start >= win.finish) continue;
+      inWindow.push(rec);
+    }
+
+    // The dropdowns offer what is actually in range, so a department nobody
+    // worked is not on the list. Built BEFORE their own filter is applied, or
+    // choosing one would empty the list it was chosen from - except that Task
+    // and Check also cascade from whatever is upstream of them.
+    var rowsForTask = inWindow.filter(function (r) {
+      return osPassesSetPak_(nplDeptFilter, osLabelPak_(r.dept, 'department'));
+    });
+    var rowsForCheck = rowsForTask.filter(function (r) {
+      return osPassesSetPak_(nplTaskFilter, osLabelPak_(r.task, 'task'));
+    });
+    var deptValues = osUniqueValuesPak_(inWindow, 'dept', 'department');
+    var taskValues = osUniqueValuesPak_(rowsForTask, 'task', 'task');
+    var checkValues = nplCheckValuesPak_(rowsForCheck);
+
+    // Pure NPL / Multi Tasks is about the PERSON across the whole window, so it
+    // is judged before the other filters narrow the records. Read off
+    // rawSideData, because the log knows nothing about productive work.
+    var productive = osPureBonusesPak_(win);
+    var rows = inWindow.filter(function (r) {
+      if (nplTypeFilter === 'pure' && productive[r.bonus]) return false;
+      if (nplTypeFilter === 'multi' && !productive[r.bonus]) return false;
+      if (!osPassesSetPak_(nplDeptFilter, osLabelPak_(r.dept, 'department'))) return false;
+      if (!osPassesSetPak_(nplTaskFilter, osLabelPak_(r.task, 'task'))) return false;
+      if (!osPassesSetPak_(nplCheckFilter, nplCheckValuePak_(r))) return false;
+      return true;
+    });
+
+    var heads = {};
+    for (var h = 0; h < rows.length; h++) { heads[rows[h].bonus] = true; }
+    var headCount = Object.keys(heads).length;
+    var depts = nplGroupPak_(rows);
+    var taskCount = 0;
+    for (var d = 0; d < depts.length; d++) { taskCount += depts[d].tasks.length; }
+
+    var controls = document.getElementById('nplFilters');
+    if (controls) {
+      controls.innerHTML =
+        // Wrapped in .os-multi purely for the positioning context a native
+        // <select> cannot provide for itself, so the same chevron the three
+        // real multi-selects use sits on top of this one too.
+        '<div class="os-filter"><span class="breakdown-time-label">Type</span>' +
+        '<div class="os-multi os-type-wrap select-caret-wrap">' +
+        '<select class="hc-control fa-caret-select os-type-select' +
+        (nplTypeFilter === 'all' ? '' : ' os-filter-on') +
+        '" onchange="setNplTypeFilter(this.value)"' +
+        ' title="Everyone on NPL, only those who did nothing else, or only those who did both">' +
+        Object.keys(NPL_TYPE_LABELS_).map(function (k) {
+          return '<option value="' + k + '"' + (nplTypeFilter === k ? ' selected' : '') +
+                 '>' + NPL_TYPE_LABELS_[k] + '</option>';
+        }).join('') + '</select>' +
+        '<i class="fa-solid fa-chevron-down hc-select-caret" aria-hidden="true"></i>' +
+        '</div></div>' +
+        osMultiSelectHtmlPak_('nplDeptMenu', 'Departments', deptValues, nplDeptFilter,
+                              'toggleNplDeptFilter', 'clearNplDeptFilter') +
+        osMultiSelectHtmlPak_('nplTaskMenu', 'Tasks', taskValues, nplTaskFilter,
+                              'toggleNplTaskFilter', 'clearNplTaskFilter') +
+        osMultiSelectHtmlPak_('nplCheckMenu', 'Checks', checkValues, nplCheckFilter,
+                              'toggleNplCheckFilter', 'clearNplCheckFilter');
+      // The filter row is rebuilt from scratch on every change - including a
+      // selection made INSIDE an open menu - so whichever one was open has to
+      // be told to open again.
+      if (osOpenFilterMenu) { toggleOsMenu_(osOpenFilterMenu, true); }
+    }
+
+    var html = '<div class="breakdown-summary">';
+    html += '<span class="breakdown-summary-num">' + headCount + '</span>' +
+            '<span class="breakdown-summary-label">on NPL</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + taskCount + '</span>' +
+            '<span class="breakdown-summary-label">task' + (taskCount === 1 ? '' : 's') + '</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + rows.length + '</span>' +
+            '<span class="breakdown-summary-label">record' + (rows.length === 1 ? '' : 's') + '</span>';
+    html += '</div>';
+
+    nplRenderDroppedCardPak_(unplaceable.concat(nplLogBad || []),
+      Math.max(0, (Number(nplLogSkipped) || 0) - (nplLogBad || []).length));
+
+    if (depts.length === 0) {
+      html += '<div class="breakdown-empty">' +
+              '<i class="fa-solid fa-ghost" aria-hidden="true"></i>' +
+              'Nobody on NPL in the selected range</div>';
+      body.innerHTML = html;
+      osApplyBarsPak_(body);
+      return;
+    }
+
+    for (var di = 0; di < depts.length; di++) {
+      var dept = depts[di];
+      // The key carries an 'npl' segment so it cannot collide with an OS node
+      // of the same department name in the shared osOpenNodes map.
+      var dKey = osNodeKeyPak_('npl', dept.name);
+      var dOpen = !!osOpenNodes[dKey];
+      // A share of the OVERALL total - headCount, the same number the summary
+      // line above calls "N on NPL" - not of the largest department. Scaled
+      // against the largest instead, the biggest one always fills the track
+      // whatever it is, which reads as "nearly everybody" every time.
+      //
+      // Clamped, because a person logged in two departments is one head in each
+      // and one overall, so the parts can legitimately sum past the whole.
+      var dPct = headCount > 0 ? Math.min(100, dept.count / headCount * 100) : 0;
+
+      html += '<div class="breakdown-row clickable-row' + (dOpen ? ' expanded' : '') + '"' +
+              ' data-os-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
+      html += '<div class="breakdown-label">' + escapeTextPak_(dept.name) +
+              '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
+      html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar os-zone-bar"' +
+              ' style="width:0%;" data-target="' + dPct + '"></div></div>';
+      html += '<div class="breakdown-count">' + dept.count + '</div></div>';
+
+      html += '<div class="breakdown-detail' + (dOpen ? ' open' : '') + '">' +
+              '<div class="os-dept-detail">';
+      for (var ti = 0; ti < dept.tasks.length; ti++) {
+        var task = dept.tasks[ti];
+        html += '<div class="os-job">';
+        html += '<div class="os-job-head">' + escapeTextPak_(task.name) +
+                '<span class="os-job-count">' + task.records.length + '</span></div>';
+        html += nplTaskTableHtmlPak_(task.records);
+        html += '</div>';
+      }
+      html += '</div></div>';
+    }
+
+    body.innerHTML = html;
+    osApplyBarsPak_(body);
+  }
+
+  // Its own card, separate from the breakdown: these records are in none of the
+  // figures there, and a warning living inside that card reads as part of the
+  // same total it is explicitly excluded from. Hidden outright rather than left
+  // as an empty card when there is nothing to show.
+  function nplRenderDroppedCardPak_(bad, unnamed) {
+    var card = document.getElementById('nplBadCard');
+    var body = document.getElementById('nplBadBody');
+    if (!card || !body) return;
+    var html = nplBadRowsHtmlPak_(bad, unnamed);
+    card.hidden = !html;
+    body.innerHTML = html;
+  }
+</script>

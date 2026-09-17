@@ -844,7 +844,7 @@ head('[17] the wording is Records, not spells');
         'the comments still discuss spells; the page does not');
 }
 
-head('[10] the page is wired in at index 3, and the Data Table moved to 4');
+head('[10] the page is wired in at index 3, with NPL at 4 and the Data Table at 5');
 // The rail order IS the page order - the swipe and the arrow keys move by
 // index - so inserting a tab renumbers everything after it. Every list that
 // counts pages has to move together or a tab navigates somewhere else.
@@ -855,26 +855,29 @@ head('[10] the page is wired in at index 3, and the Data Table moved to 4');
   const tour = R('Web - JsTour.html');
   const init = R('Web - JsInit.html');
 
-  check('five pages', /var totalPages = 5;/.test(state) &&
-        /var pageDirty = \[true, true, true, true, true\];/.test(state));
+  check('six pages', /var totalPages = 6;/.test(state) &&
+        /var pageDirty = \[true, true, true, true, true, true\];/.test(state));
   const rail = (index.match(/onclick="goToPage\((\d)\)"/g) || []).map(s => s.replace(/\D/g, ''));
-  check('five rail tabs, in order', rail.join() === '0,1,2,3,4', rail.join());
+  check('six rail tabs, in order', rail.join() === '0,1,2,3,4,5', rail.join());
   check('the OS tab is the fourth', /goToPage\(3\)" title="Operational Support"/.test(index));
-  check('and the Data Table the fifth', /goToPage\(4\)" title="Data Table"/.test(index));
-  // Four in the markup plus the Overall page, which is its own include.
+  check('the NPL tab is the fifth', /goToPage\(4\)" title="Non-Productive Labour"/.test(index));
+  check('and the Data Table the sixth', /goToPage\(5\)" title="Data Table"/.test(index));
+  // Five in the markup plus the Overall page, which is its own include.
   const pageDivs = (index.match(/<div class="page">/g) || []).length +
                    (R('Web - PageOverall.html').match(/<div class="page">/g) || []).length;
-  check('there are five .page containers, one per tab', pageDivs === 5, String(pageDivs));
+  check('there are six .page containers, one per tab', pageDivs === 6, String(pageDivs));
 
   check('the dispatcher builds the OS page at 3',
         /index === 3\) \{[\s\S]{0,400}renderOsPagePak\(\)/.test(ui));
-  check('and the main table at 4',
-        /index === 4\) \{\s*renderMainTablePak/.test(ui));
+  check('the NPL page at 4',
+        /index === 4\) \{[\s\S]{0,400}renderNplPagePak\(\)/.test(ui));
+  check('and the main table at 5',
+        /index === 5\) \{\s*renderMainTablePak/.test(ui));
 
   // One list of page names, read by the deep link on both sides.
   check('the deep-link names agree across the two files',
-        /DEEP_LINK_PAGES_ = \['overall', 'volume', 'bonus', 'os', 'data'\]/.test(CODE) &&
-        /DEEP_LINK_PAGES_PAK_ = \['overall', 'volume', 'bonus', 'os', 'data'\]/.test(state),
+        /DEEP_LINK_PAGES_ = \['overall', 'volume', 'bonus', 'os', 'npl', 'data'\]/.test(CODE) &&
+        /DEEP_LINK_PAGES_PAK_ = \['overall', 'volume', 'bonus', 'os', 'npl', 'data'\]/.test(state),
         '?page=data would otherwise open the OS page');
   check('and JsInit reads the list rather than keeping a third copy',
         /DEEP_LINK_PAGES_PAK_\.indexOf\(DEEP_PAGE\)/.test(init),
@@ -883,9 +886,16 @@ head('[10] the page is wired in at index 3, and the Data Table moved to 4');
   // The tour walks pages by index too, and it has a chapter of its own for
   // this page - a tour that swipes straight through one on its way to the next
   // is how a whole page ends up undiscovered.
-  check('the tour follows the Data Table to page 4',
-        (tour.match(/page: 4,/g) || []).length === 7,
-        (tour.match(/page: 4,/g) || []).length + ' step(s)');
+  check('the tour follows the Data Table to page 5',
+        (tour.match(/page: 5,/g) || []).length === 7,
+        (tour.match(/page: 5,/g) || []).length + ' step(s)');
+  // NPL has no chapter, so the tour steps straight past it - which would fire
+  // a REAL request for the real log in the middle of demo data unless the page
+  // is parked as already-read first.
+  check('and parks the NPL page so it cannot fetch mid-tour',
+        /nplLogState = 'ready';/.test(tour) &&
+        tour.indexOf('nplLogState = null;') > tour.indexOf("nplLogState = 'ready';"),
+        'or the real NPL log would never be fetched afterwards');
   check('and has a chapter on the OS page',
         (tour.match(/part: 6, page: 3,/g) || []).length >= 3 &&
         /6: 'OS page'/.test(tour),
@@ -1020,8 +1030,8 @@ head('[11] Hours Range and Time Window are inert where they do nothing');
 {
   const ui = R('Web - JsUi.html');
   const tables = R('Web - JsTables.html');
-  check('the Bonus and OS pages are the two',
-        /var PAGES_WITH_OWN_RANGE_ = \[2, 3\];/.test(ui));
+  check('the Bonus, OS and NPL pages are the three',
+        /var PAGES_WITH_OWN_RANGE_ = \[2, 3, 4\];/.test(ui));
   check('and goToPage syncs it', /syncTimeAxisControlsPak_\(index\);/.test(ui));
   check('both controls are disabled, not hidden',
         /\['hoursRange', 'timeWindow'\]/.test(ui) && /el\.disabled = off;/.test(ui),
@@ -1087,8 +1097,11 @@ head('[19] only one filter menu can be open at a time');
 {
   check('one shared slot, not a flag per menu',
         /var osOpenFilterMenu = null;/.test(R('Web - JsState.html')));
-  check('the three menu ids are declared once and reused',
-        /var OS_FILTER_MENU_IDS_ = \['osZoneMenu', 'osDeptMenu', 'osStatusMenu'\];/.test(PAGE));
+  // Both pages' menus in the one list, and the one open slot. Only one page
+  // is on screen at a time, so a slot per page would buy nothing and the
+  // click-away handler would need to know which page it was closing for.
+  check('every menu id is declared once and reused',
+        /var OS_FILTER_MENU_IDS_ = \['osZoneMenu', 'osDeptMenu', 'osStatusMenu',\s*'nplDeptMenu', 'nplTaskMenu', 'nplCheckMenu'\];/.test(PAGE));
   check('opening one force-closes the other two, in the same pass',
         /function osFilterMenuClick_\(id\) \{[\s\S]{0,220}for \(var i = 0; i < OS_FILTER_MENU_IDS_\.length; i\+\+\) \{[\s\S]{0,120}toggleOsMenu_\(OS_FILTER_MENU_IDS_\[i\], OS_FILTER_MENU_IDS_\[i\] === id && opening\);/
           .test(PAGE));

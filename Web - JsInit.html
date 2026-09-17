@@ -244,6 +244,14 @@
       osLogSkipped = 0;
       osLogState = null;
     }
+    // The NPL page, on exactly the same terms and for the same reasons.
+    if (nplLogEverLoaded) {
+      nplLogNeedsRefresh = true;
+    } else {
+      nplLogRows = [];
+      nplLogSkipped = 0;
+      nplLogState = null;
+    }
     // The server's list is already every operator on site, which is what the
     // search wants regardless of the building in view.
     allBonusList = data.bonusList || [];

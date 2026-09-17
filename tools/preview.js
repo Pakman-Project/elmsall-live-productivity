@@ -17,6 +17,7 @@
 //   node tools/preview.js --page=volume --site=e3
 //   node tools/preview.js --tour=1
 //   node tools/preview.js --os          # one bonus put on OS, filtered to them
+//   node tools/preview.js --page=npl    # straight to the NPL page
 //   node tools/preview.js --note="NOTE TEST"   # what Front!G3 renders as
 //
 // In VS Code: right-click preview.html -> Open with Live Preview. Prefer that
@@ -174,6 +175,31 @@ const STUB = `
   var OS_DEMO_PEOPLE_ = ['J Ashworth', 'P Okonkwo', 'S Nowak', 'R Patel', 'D Byrne'];
   var OS_DEMO_STATUS_ = ['OK', 'OK', 'OK', 'authorise or reject', 'Rejected', ''];
 
+  // NPL's own vocabulary. Check is a free cell, so the not-OK wordings are
+  // deliberately several different ones rather than a single "Not OK" - the
+  // page shows them verbatim, and a preview with only one would not show that.
+  var NPL_DEMO_TASKS_ = ['Cleaning', 'Waiting for work', 'Toolbox talk',
+                         'Breakdown', 'Meeting'];
+  var NPL_DEMO_CHECKS_ = ['OK', 'OK', 'OK', 'Needs review', 'Adjusted', ''];
+  var NPL_DEMO_TRANSFER_ = ['No', 'Yes', 'No', 'No', ''];
+
+  // The OS spells, re-dressed as NPL ones. Built off the same generator rather
+  // than a second copy of it: what makes these rows useful is the clock times
+  // and the production-day handling, which the OS builder already gets right,
+  // and the only thing that differs is which columns they are dressed in.
+  function nplDemoLog_(d) {
+    return osDemoLog_(d).map(function (r, i) {
+      return {
+        date: r.date, bonus: r.bonus, dept: r.dept,
+        task: NPL_DEMO_TASKS_[(i * 2) % NPL_DEMO_TASKS_.length],
+        from: r.from, to: r.to,
+        siteTransfer: NPL_DEMO_TRANSFER_[i % NPL_DEMO_TRANSFER_.length],
+        tmAuth: OS_DEMO_PEOPLE_[(i + 1) % OS_DEMO_PEOPLE_.length],
+        check: NPL_DEMO_CHECKS_[i % NPL_DEMO_CHECKS_.length]
+      };
+    });
+  }
+
   function osDemoLog_(d) {
     if (!d || !d.bonusList || !d.timeRanges || !d.timeRanges.length) return [];
     // A deterministic shuffle, so reloading the preview does not reshuffle the
@@ -229,8 +255,20 @@ const STUB = `
   // getOsLogRows can answer, and built from the payload because that is where
   // the demo bonus numbers and time ranges live.
   var OS_LOG_STASH = null;
+  var NPL_LOG_STASH = null;
   function withOsLog_(d) {
     if (d) {
+      // The NPL page's own log, on the same terms - including one row the page
+      // cannot place, so its warning card is on screen rather than only ever
+      // exercised by a test.
+      var _npl = nplDemoLog_(d);
+      NPL_LOG_STASH = {
+        rows: _npl, skipped: 1,
+        bad: _npl.slice(0, 1).map(function (r) {
+          return Object.assign({}, r, { row: 901, to: '',
+                                        why: 'the finish is not a time' });
+        })
+      };
       // One unreadable row, so the page's own warning is on screen rather than
       // only ever exercised by a test.
       var _rows = osDemoLog_(d);
@@ -279,6 +317,11 @@ const STUB = `
       getOsLogRows: function () {
         reply(function () {
           return OS_LOG_STASH || { rows: [], skipped: 0 };
+        });
+      },
+      getNplLogRows: function () {
+        reply(function () {
+          return NPL_LOG_STASH || { rows: [], skipped: 0 };
         });
       },
       getLastRefreshTimestamp: function () { reply(function () { return null; }); }

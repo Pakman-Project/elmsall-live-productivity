@@ -101,9 +101,14 @@
   // separate from that page's pair rather than shared: the two pages are
   // looked at for different reasons and a range set on one has no business
   // moving the other.
-  function ensureOsTimeSelects_() {
-    var fromSel = $('osFrom');
-    var toSel = $('osTo');
+  function ensureOsTimeSelects_() { ensureTimeSelectsPak_('osFrom', 'osTo'); }
+
+  // Takes the element ids rather than naming them, because the NPL page has a
+  // pair of its own and the filling logic - the 96-block signature, the
+  // restore-or-default - is the fiddly part that must not exist twice.
+  function ensureTimeSelectsPak_(fromId, toId) {
+    var fromSel = $(fromId);
+    var toSel = $(toId);
     if (!fromSel || !toSel) return;
 
     var sliced = timeRanges.slice(-96);
@@ -154,9 +159,11 @@
   // The chosen range as an absolute half-open interval. Half-open because the
   // blocks are: a spell finishing exactly at 08:00 does not belong to the
   // 08:00 block.
-  function osSelectedWindowPak_() {
-    var fromSel = $('osFrom');
-    var toSel = $('osTo');
+  function osSelectedWindowPak_() { return selectedWindowPak_('osFrom', 'osTo'); }
+
+  function selectedWindowPak_(fromId, toId) {
+    var fromSel = $(fromId);
+    var toSel = $(toId);
     if (!fromSel || !toSel || !fromSel.value || !toSel.value) return null;
     var a = parseDateTimePartPak(extractRangePartsPak(fromSel.value).start);
     var b = parseDateTimePartPak(extractRangePartsPak(toSel.value).end);
@@ -423,7 +430,12 @@
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
-  var OS_FILTER_MENU_IDS_ = ['osZoneMenu', 'osDeptMenu', 'osStatusMenu'];
+  // Both pages' menus, in one list. There is one open slot for all of them,
+  // which is right rather than merely convenient: only one page is on screen at
+  // a time, and the click-away handler below has to close whichever is open
+  // without caring which page it belonged to.
+  var OS_FILTER_MENU_IDS_ = ['osZoneMenu', 'osDeptMenu', 'osStatusMenu',
+                             'nplDeptMenu', 'nplTaskMenu', 'nplCheckMenu'];
 
   // The button's own onclick - as opposed to a re-render restoring state, this
   // is the user actually asking for a menu to open or close. One open slot for
@@ -1107,8 +1119,8 @@
     }, 60);
   }
 
-  // Click-away for all three multi-selects, matching how the header menus
-  // close.
+  // Click-away for every multi-select on both pages, matching how the header
+  // menus close.
   //
   // Guarded, because everything else in this file is pure string and date work
   // that its test suite runs directly with no DOM at all. One unguarded

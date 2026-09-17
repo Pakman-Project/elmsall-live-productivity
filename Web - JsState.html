@@ -734,6 +734,33 @@ var osOpenFilterMenu = null;
 // survive a re-render. The page polls, and a refresh used to collapse
 // whatever you were reading.
 var osOpenNodes = {};
+
+// ── NPL page ──────────────────────────────────────────────────────────────
+// The OS twins, one for one, and for the same reasons - see the block above.
+// Separate variables rather than one keyed object: the two pages fetch two
+// different logs from two different endpoints, and a shared slot would mean
+// opening one page could put the other into 'loading'.
+//
+// Not narrowed by the warehouse picker either, but for a different reason: the
+// NPL log has no Site column at all, so there is nothing to narrow it BY.
+var nplLogRows = [];
+var nplLogSkipped = 0;
+var nplLogState = null;        // null | 'loading' | 'ready' | an error message
+var nplLogEverLoaded = false;  // what makes a later refresh silent
+var nplLogNeedsRefresh = false;
+var nplLogBad = [];
+// Session-only, not persisted - a hidden filter surviving a reload reads as
+// missing data rather than as a choice somebody made.
+var nplTypeFilter = 'all';     // all | pure | multi
+var nplDeptFilter = {};        // an EMPTY set means no filter, not nothing
+var nplTaskFilter = {};
+// Filtered on the Check as LOGGED, verbatim, plus "No check" for the blanks -
+// unlike OS Record Status, which folds. See nplCheckValuePak_.
+var nplCheckFilter = {};
+// The open/closed rows are keyed into osOpenNodes with an 'npl' first segment,
+// so a department of the same name on both pages cannot share a slot. One map
+// rather than two, because the keys already carry which page they belong to.
+
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];
@@ -806,18 +833,20 @@ var syncAreaChips = true;
 // Deferred per-page rendering: inputs from the last applyLocalFiltersPak() pass,
 // plus which pages still need building. Pages are rendered on first view.
 var pageRenderCtx = null;
-// Overall, Volume, Bonus, OS, Data Table. OS was inserted at 3 rather than
-// appended, because the rail order IS the page order - the swipe and the
-// arrow keys move by index - so a tab out of place would navigate backwards.
+// Overall, Volume, Bonus, OS, NPL, Data Table. OS and NPL were INSERTED at 3
+// and 4 rather than appended, because the rail order IS the page order - the
+// swipe and the arrow keys move by index - so a tab out of place would
+// navigate backwards. NPL sits next to OS because it answers the same question
+// about the other log.
 //
 // The same order, by name, as Code.js's DEEP_LINK_PAGES_. A deep link resolves
 // to an INDEX in this list, so the two have to agree or ?page=data opens the
 // OS page. Declared here rather than written out at the point of use, where a
 // second copy sat and was missed when this page was inserted.
-var DEEP_LINK_PAGES_PAK_ = ['overall', 'volume', 'bonus', 'os', 'data'];
-var pageDirty = [true, true, true, true, true];
+var DEEP_LINK_PAGES_PAK_ = ['overall', 'volume', 'bonus', 'os', 'npl', 'data'];
+var pageDirty = [true, true, true, true, true, true];
 var currentPage = 0;
-var totalPages = 5;
+var totalPages = 6;
 var startX = 0;
 var startY = 0;
 var currentTranslate = 0;
