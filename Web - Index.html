@@ -502,18 +502,23 @@
             <div class="card panel span-12">
               <div class="mini-table-title">
                 <h2>Main Table</h2>
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                  <input id="search" class="input" type="text" placeholder="Search rows...">
-                  <button class="btn" id="downloadRawDataBtn" onclick="downloadRawDataCsvPak()" title="Download all individual raw entries as CSV">
-                    <i class="fa-solid fa-download"></i> Download raw data
-                  </button>
-                  <span class="tag">Click headers to sort</span>
+                <div class="main-table-controls">
+                  <!-- Sort controls first in the markup, the button after: both
+                       are invisible on the other's screen size (main-sort-mobile
+                       is display:none until the mobile breakpoint, the tag is
+                       hidden there instead), so this order costs desktop nothing
+                       and is what puts the dropdown, the direction icon and the
+                       button on one row, in that order, on a phone. -->
                   <div class="main-sort-mobile">
                     <select id="mainSortSelect" class="row-select"></select>
                     <button class="btn icon-btn" id="mainSortDirBtn" type="button" title="Toggle sort direction">
                       <i class="fa-solid fa-arrow-down-wide-short"></i>
                     </button>
                   </div>
+                  <button class="btn" id="downloadRawDataBtn" onclick="downloadRawDataCsvPak()" title="Download all individual raw entries as CSV">
+                    <i class="fa-solid fa-download"></i> Raw data
+                  </button>
+                  <span class="tag">Click headers to sort</span>
                 </div>
               </div>
               <div id="mainTableWrapper">

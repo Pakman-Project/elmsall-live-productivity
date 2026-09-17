@@ -1953,6 +1953,16 @@ canvas {
   margin-right: auto;
 }
 
+/* The sort controls, the download button and the "click headers" tag - was an
+   inline style on the div, moved here so the mobile rules below have a class
+   to target rather than needing !important against inline styles. */
+.main-table-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .tag {
   padding: 4px 8px;
   border-radius: 999px;
@@ -4978,13 +4988,6 @@ body.page-scrolled-far .back-to-top {
     height: 44px;
     font-size: 18px;
   }
-  #search {
-    width: 100% !important;
-    padding: 10px 12px;
-    font-size: 16px;
-    min-height: 44px;
-    box-sizing: border-box;
-  }
   .table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -5184,12 +5187,20 @@ body.page-scrolled-far .back-to-top {
   .mini-table-title .tag {
     display: none;
   }
+  /* The three controls that remain on a phone - sort dropdown, direction
+     icon, Raw data - sit on one row. main-table-controls used to wrap after
+     each one because .main-sort-mobile claimed the full row on its own; it
+     shares the row with the button now, shrinking as needed (min-width: 0 is
+     what lets the SELECT itself shrink rather than overflowing). */
+  .main-table-controls { flex-wrap: nowrap; }
   .main-sort-mobile {
     display: flex;
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   #mainSortSelect {
     flex: 1;
+    min-width: 0;
     padding: 10px 30px 10px 12px;
     font-size: 14px;
     min-height: 44px;
@@ -6107,11 +6118,23 @@ kbd {
   }
 
   /* The direction toggle shares a row with the sort dropdown, so it shrinks to
-     match — a 44px button beside a 34px select reads as a mistake. */
+     match — a 44px button beside a select reads as a mistake regardless of the
+     select's own final height. That height is 24px (see the consolidated
+     "SAME height" rule further down, which is what actually wins), so this is
+     too - a 36px button was still visibly taller once that rule landed. */
   .main-sort-mobile .icon-btn {
-    width: 36px;
-    height: 36px;
+    width: 24px;
+    height: 24px;
     min-height: 0;
+    flex-shrink: 0;
+  }
+
+  /* Fixed size and no wrapping, so it is the SELECT that gives way when the
+     row is tight (min-width: 0 further up is what lets it), not "Raw data"
+     breaking onto a second line inside its own button. */
+  #downloadRawDataBtn {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   /* ---- and all of them the SAME height ----

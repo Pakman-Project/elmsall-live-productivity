@@ -606,10 +606,4 @@
     // Shows demo data while the real data keeps loading in the background.
     maybeAutoStartTour_();
   });
-
-  var _searchDebounce = null;
-  $('search').addEventListener('input', function() {
-    clearTimeout(_searchDebounce);
-    _searchDebounce = setTimeout(function() { renderMainTablePak(currentMainRows); }, 200);
-  });
 </script>
