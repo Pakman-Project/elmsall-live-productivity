@@ -931,13 +931,14 @@
     <?!= include('Web - JsData'); ?>
     <?!= include('Web - JsCharts'); ?>
     <?!= include('Web - JsPageOs'); ?>
-    <!-- After JsPageOs too: the Claims page reads that file's spell walk, which
-         is what turns a logged Date + From + To into a real pair of clock
-         times under the 06:00-to-06:00 rule. -->
-    <?!= include('Web - JsPageFraud'); ?>
     <!-- After JsPageOs, not before: the NPL page is built on that file's
          range picker, spell walk, multi-select and bar animation. -->
     <?!= include('Web - JsPageNpl'); ?>
+    <!-- After BOTH: the Claims page reads JsPageOs's spell walk, which is what
+         turns a logged Date + From + To into a real pair of clock times under
+         the 06:00-to-06:00 rule, and JsPageNpl's Check chip, for its own
+         Status column on an NPL claim. -->
+    <?!= include('Web - JsPageFraud'); ?>
     <?!= include('Web - JsTables'); ?>
     <?!= include('Web - JsExport'); ?>
     <?!= include('Web - JsToast'); ?>

@@ -28,8 +28,10 @@ const ctx = { console, document: undefined };
 vm.createContext(ctx);
 vm.runInContext(strip(R('Web - JsHelpers.html')), ctx);
 vm.runInContext(strip(R('Web - JsState.html')).split('function applyConfigToCSSPak')[0], ctx);
-// In this order: the Claims page reads the OS page's spell walk.
+// In this order, matching Index.html: the Claims page reads the OS page's
+// spell walk AND the NPL page's Check chip.
 vm.runInContext(strip(R('Web - JsPageOs.html')), ctx);
+vm.runInContext(strip(R('Web - JsPageNpl.html')), ctx);
 vm.runInContext(strip(R('Web - JsPageFraud.html')), ctx);
 ctx.selectedBonuses = [];
 
@@ -112,10 +114,10 @@ head('[2] the window is a production day, not a calendar one');
 head('[3] any produced hours at all flags the claim');
 {
   check('the test is greater than zero, not the Front threshold',
-        /if \(std <= 0\) return;/.test(PAGE),
+        /if \(overlapStd <= 0\) return;/.test(PAGE),
         'the threshold is about whether a block counts as WORKED; this is not that question');
   check('the hours are summed over the covered blocks',
-        /std \+= Number\(hit\.value\) \|\| 0;/.test(PAGE));
+        /overlapStd \+= Number\(hit\.value\) \|\| 0;/.test(PAGE));
   check('a claim that cannot be placed on a clock is not judged',
         /var w = osSpellWindowPak_\(row\);\s*\n\s*if \(!w\) return;/.test(PAGE),
         'it has no blocks to check, and guessing at one would be an accusation from nothing');
@@ -123,9 +125,69 @@ head('[3] any produced hours at all flags the claim');
         /if \(w\.finish <= win\.start \|\| w\.start >= win\.finish\) return;/.test(PAGE));
   check('both logs are scanned',
         /fraudOsRows\[i\], 'OS'/.test(PAGE) && /fraudNplRows\[j\], 'NPL'/.test(PAGE));
-  check('the worst is listed first',
-        /return \(b\.std - a\.std\) \|\|/.test(PAGE),
-        'and the bonus number breaks ties, so the same data draws the same way twice');
+  check('the worst is listed first, by the OVERLAP figure',
+        /return \(b\.overlapStd - a\.overlapStd\) \|\|/.test(PAGE),
+        'the total-day figure is large for anyone who simply works a lot; it says nothing about THIS claim');
+}
+
+head('[3b] a claim already marked Rejected is left out - it was never paid');
+{
+  const considerAt = PAGE.indexOf('function consider');
+  check('the exclusion runs before the claim is even counted',
+        /if \(fraudIsRejectedPak_\(row, kind\)\) return;/.test(PAGE) &&
+        PAGE.indexOf('if (fraudIsRejectedPak_(row, kind)) return;', considerAt) <
+        PAGE.indexOf('claims++;', considerAt),
+        'a rejected claim was never paid, so it is not "checked and clean" - it is not in scope at all');
+  check('folded through the same band the OS page itself uses',
+        /osStatusBandPak_\(row\.status\) === OS_STATUS_REJECTED_PAK_/.test(PAGE),
+        '"Cancelled" or "Withdrawn" are folded to Rejected everywhere else on the dashboard; this should agree');
+  check('only ever fires for an OS row',
+        /function fraudIsRejectedPak_\(row, kind\) \{\s*return kind === 'OS' &&/.test(PAGE),
+        'NPL\'s Check column has no equivalent verdict to exclude on');
+  // Run it directly: OS in three verdicts, NPL regardless.
+  check('Rejected excludes', ctx.fraudIsRejectedPak_({ status: 'Rejected' }, 'OS') === true);
+  check('an unrecognised wording folds to Rejected too',
+        ctx.fraudIsRejectedPak_({ status: 'Withdrawn' }, 'OS') === true);
+  check('Approved does not exclude',
+        ctx.fraudIsRejectedPak_({ status: 'OK' }, 'OS') === false);
+  check('a BLANK verdict does not exclude - undecided is not rejected',
+        ctx.fraudIsRejectedPak_({ status: '' }, 'OS') === false);
+  check('NPL is never excluded by this, whatever Check says',
+        ctx.fraudIsRejectedPak_({ check: 'Rejected' }, 'NPL') === false);
+}
+
+head('[3c] Total Std Hrs is the whole day, independent of any one claim');
+// The figure a reader needs to tell "someone who works a lot, and happened to
+// overlap once" apart from "someone whose whole day is one big overlap".
+{
+  // "dd/mm/yyyy hh:mm - x", matching how every other suite fakes a
+  // timeRange - the START half is what parseDateTimePartPak actually reads.
+  ctx.allSideData = [
+    { bonus: 'AAA', timeRange: '09/09/2026 06:00 - x', value: 0.25 },
+    { bonus: 'AAA', timeRange: '09/09/2026 12:00 - x', value: 0.25 },
+    { bonus: 'AAA', timeRange: '09/09/2026 18:00 - x', value: 0.25 },
+    // Outside the window on the LOW side (before 06:00 on the 9th)...
+    { bonus: 'AAA', timeRange: '09/09/2026 00:00 - x', value: 9 },
+    // ...and on the HIGH side (at or after 06:00 on the 10th, where the
+    // window ends). Both must be excluded - a lower bound alone would pass
+    // this row straight through.
+    { bonus: 'AAA', timeRange: '10/09/2026 06:00 - x', value: 40 },
+    { bonus: 'bbb', timeRange: '09/09/2026 06:00 - x', value: 0.4 }
+  ];
+  const win = { start: new Date(2026, 8, 9, 6, 0), finish: new Date(2026, 8, 10, 6, 0) };
+  const totals = ctx.fraudTotalStdIndexPak_(win);
+  check('summed across the whole window, not per block',
+        Math.abs(totals.AAA - 0.75) < 1e-9, String(totals.AAA));
+  check('the out-of-window row is excluded',
+        Math.abs(totals.AAA - 0.75) < 1e-9,
+        'a value of 9.75 means the 00:00 row leaked in');
+  check('the key is upper-cased, matching how it is looked up',
+        totals.BBB === 0.4 && totals.bbb === undefined);
+  check('read off allSideData, with rawSideData as the only fallback',
+        /function fraudTotalStdIndexPak_\(win\) \{[\s\S]{0,300}allSideData\.length\)/.test(PAGE));
+  check('and the page reads it once per bonus, not once per block',
+        /var totals = fraudTotalStdIndexPak_\(win\);/.test(PAGE) &&
+        /totals\[String\(row\.bonus\)\.toUpperCase\(\)\] \|\| 0/.test(PAGE));
 }
 
 head('[4] work areas come from the one list that names them');
@@ -153,8 +215,8 @@ head('[5] the pivot is read whole, not through the Warehouse picker');
 // exactly the answer this page must not give.
 {
   check('allSideData, with rawSideData only as a fallback',
-        (PAGE.match(/allSideData\.length\)\s*\n\s*\? allSideData : rawSideData/g) || []).length === 2,
-        'in the index AND in the coverage line, or the two would disagree');
+        (PAGE.match(/allSideData\.length\)\s*\n\s*\? allSideData : rawSideData/g) || []).length === 3,
+        'in the block index, the TOTAL index, and the coverage line, or they would disagree');
   check('and the page says so on screen',
         /Both buildings, whatever the Warehouse picker says\./.test(PAGE));
   check('the index is keyed on bonus and block together',
@@ -188,14 +250,14 @@ head('[6] an empty table says WHICH kind of empty it is');
 head('[7] the table names every part of the case');
 {
   const cols = /var FRAUD_COLUMNS_ = \[([\s\S]*?)\];/.exec(PAGE);
-  check('the six columns, in order',
+  check('the nine columns, in order',
         !!cols && cols[1].replace(/['\s\n\r]/g, '') ===
-          'Bonus,WorkAreas,StdHours,Claim,ClaimTime,TMauthorised',
+          'Bonus,WorkAreas,TotalStdHrs,OverlapStdHrs,OverlapTime,Claim,ClaimTime,TMauthorised,Status',
         cols ? cols[1].replace(/\s+/g, ' ') : 'not declared');
   const w = /var FRAUD_COL_WIDTHS_ = \[([\d,\s]+)\];/.exec(PAGE);
   const nums = w ? w[1].split(',').map(Number) : [];
-  check('six widths summing to 100',
-        nums.length === 6 && nums.reduce((a, b) => a + b, 0) === 100,
+  check('nine widths summing to 100',
+        nums.length === 9 && nums.reduce((a, b) => a + b, 0) === 100,
         nums.join('+') + '=' + nums.reduce((a, b) => a + b, 0));
   check('every cell carries the label its phone card shows',
         (PAGE.slice(PAGE.indexOf('function fraudTableHtmlPak_'))
@@ -207,6 +269,8 @@ head('[7] the table names every part of the case');
   check('a finish past midnight is marked as such',
         /\(to\.getDate\(\) !== from\.getDate\(\)\) \? t \+ ' \(\+1\)' : t/.test(PAGE),
         'two bare clock times cannot say that a claim crossed a date');
+  check('the OVERLAP time range uses the same marker, not just Claim Time',
+        /fraudRangeTextPak_\(r\.overlapFrom, r\.overlapTo\)/.test(PAGE));
   check('the work areas wrap rather than being clipped',
         /\.fraud-areas-cell \{ line-height/.test(R('Web - Styles.html')),
         'which areas they were in is the evidence; half of it is no use');
@@ -215,6 +279,14 @@ head('[7] the table names every part of the case');
   check('and that chip is neutral, not a verdict colour',
         /\.fraud-kind \{[\s\S]{0,300}color: var\(--muted\)/.test(R('Web - Styles.html')),
         'green, amber and red already mean a decision elsewhere; nothing here is decided');
+  // Status IS a verdict colour, deliberately unlike Claim - it is the record's
+  // own chip, reused rather than redrawn.
+  check('Status reuses each page\'s own chip rather than redrawing it',
+        /function fraudStatusHtmlPak_\(row, kind\) \{\s*return \(kind === 'OS'\) \? osStatusChipPak_\(row\.status\) : nplCheckChipPak_\(row\.check\);/.test(PAGE),
+        'a colour or a wording must not read differently here than it does on the OS/NPL page itself');
+  check('...computed once per row and just printed, not rebuilt in the table function',
+        /statusHtml: fraudStatusHtmlPak_\(row, kind\)/.test(PAGE) &&
+        /<td data-label="Status">' \+ r\.statusHtml \+ '<\/td>/.test(PAGE));
   // The page is named for what it is: potential.
   check('the page does not call anybody a fraud',
         !/\bis fraud\b|confirmed|guilty/i.test(PAGE));
@@ -244,6 +316,10 @@ head('[8] fetched for the day, and dropped when the day can change');
         INDEX.indexOf("include('Web - JsPageFraud')") >
         INDEX.indexOf("include('Web - JsPageOs')"),
         'osSpellWindowPak_ would not be defined yet');
+  check('and after the NPL one, for its Check chip',
+        INDEX.indexOf("include('Web - JsPageFraud')") >
+        INDEX.indexOf("include('Web - JsPageNpl')"),
+        'nplCheckChipPak_ would not be defined yet');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

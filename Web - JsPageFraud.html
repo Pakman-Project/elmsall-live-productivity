@@ -18,7 +18,12 @@
   //     05:45 block started before the claim did, and the 06:30 block ends
   //     after it. A partly-covered block cannot tell you WHEN in it the work
   //     happened, so it cannot tell you whether it clashed;
-  //   - any standard hours at all in those blocks flags the claim.
+  //   - any standard hours at all in those blocks flags the claim;
+  //   - an OS claim already marked Rejected is left out. A rejected claim was
+  //     never paid, so there is nothing here for it to be fraudulent ABOUT -
+  //     the case this page exists for is time paid for and also worked, and a
+  //     rejected claim was not paid for. NPL has no equivalent verdict on its
+  //     Check column, so nothing is excluded there.
 
   var FRAUD_DAY_START_HOUR_ = 6;
   var FRAUD_BLOCK_MINUTES_ = 15;
@@ -112,6 +117,47 @@
     return idx;
   }
 
+  // bonus -> total standard hours that bonus number produced across the WHOLE
+  // window, not just the blocks a claim overlaps. A separate pass rather than
+  // a running total folded into fraudStdIndexPak_ above: that index is read
+  // per BLOCK, once per claim that happens to cover it, so a bonus worked by
+  // three overlapping claims would have this summed three times over if the
+  // two were combined.
+  function fraudTotalStdIndexPak_(win) {
+    var totals = {};
+    var src = (typeof allSideData !== 'undefined' && allSideData.length)
+      ? allSideData : rawSideData;
+    for (var i = 0; i < src.length; i++) {
+      var r = src[i];
+      var d = parseDateTimePartPak(extractRangePartsPak(r.timeRange).start);
+      if (!d) continue;
+      var t = d.getTime();
+      if (t < win.start.getTime() || t >= win.finish.getTime()) continue;
+      var key = String(r.bonus).toUpperCase();
+      totals[key] = (totals[key] || 0) + (Number(r.value) || 0);
+    }
+    return totals;
+  }
+
+  // An OS claim already marked Rejected. Folded through osStatusBandPak_
+  // rather than matched on the literal word: that is the same fold the OS
+  // page's own band and chart use, so "Cancelled" or "Withdrawn" - never
+  // paid either - count as rejected here too, and a blank cell (no verdict
+  // yet) does not, because osStatusBandPak_('') is '' and not the reject
+  // band. NPL's Check has no equivalent verdict, so this only ever fires
+  // for an OS row.
+  function fraudIsRejectedPak_(row, kind) {
+    return kind === 'OS' && osStatusBandPak_(row.status) === OS_STATUS_REJECTED_PAK_;
+  }
+
+  // The record's own verdict, as a chip - the OS Record Status chip for an OS
+  // claim, the NPL Check chip for an NPL one. Reused wholesale from the two
+  // pages' own tables rather than redrawn here, so a colour or a wording
+  // cannot read differently on this page than it does on theirs.
+  function fraudStatusHtmlPak_(row, kind) {
+    return (kind === 'OS') ? osStatusChipPak_(row.status) : nplCheckChipPak_(row.check);
+  }
+
   // The work areas a pivot row carries standard hours in, by their display
   // names - "OSR PiE", "ISPS Top Up". Read off VOLUME_TYPES so the wording is
   // the same one the Volume page's legend uses; a second list of names here
@@ -130,41 +176,55 @@
   // honestly how much was looked at.
   function fraudScanPak_(win) {
     var idx = fraudStdIndexPak_();
+    var totals = fraudTotalStdIndexPak_(win);
     var out = [];
     var claims = 0;
+    var ms = FRAUD_BLOCK_MINUTES_ * 60000;
 
     function consider(row, kind, auth, extra) {
       var w = osSpellWindowPak_(row);
       if (!w) return;                       // cannot be placed on a clock
       if (w.finish <= win.start || w.start >= win.finish) return;
+      if (fraudIsRejectedPak_(row, kind)) return;   // never paid; nothing to flag
       claims++;
 
       var blocks = fraudFullBlocksPak_(w.start, w.finish);
-      var std = 0;
+      var overlapStd = 0;
       var areas = {};
       var covered = 0;
+      // The bounds of the blocks that actually HIT the pivot, not of the
+      // claim's own from/to - "Claim Time" says what was logged; this says
+      // which part of it the produced hours were found in, and the two can
+      // differ whenever the claim only partly clashes.
+      var overlapFrom = null, overlapTo = null;
       for (var b = 0; b < blocks.length; b++) {
         var hit = idx[String(row.bonus).toUpperCase() + '||' + blocks[b]];
         if (!hit) continue;
         covered++;
-        std += Number(hit.value) || 0;
+        overlapStd += Number(hit.value) || 0;
         fraudAreasOfRowPak_(hit, areas);
+        if (overlapFrom === null) overlapFrom = new Date(blocks[b]);
+        overlapTo = new Date(blocks[b] + ms);
       }
       // "any standard hour produced", as asked - not the Front sheet's
       // threshold. That number is about whether a block counts as WORKED for
       // a productivity figure; this is about whether any work happened at all
       // while somebody was booked as not working, and the two questions do not
       // share an answer.
-      if (std <= 0) return;
+      if (overlapStd <= 0) return;
 
       out.push({
         bonus: row.bonus,
         kind: kind,
         from: w.start,
         to: w.finish,
-        std: std,
+        overlapFrom: overlapFrom,
+        overlapTo: overlapTo,
+        overlapStd: overlapStd,
+        totalStd: totals[String(row.bonus).toUpperCase()] || 0,
         areas: Object.keys(areas).sort(),
         auth: auth,
+        statusHtml: fraudStatusHtmlPak_(row, kind),
         blocks: blocks.length,
         covered: covered,
         extra: extra || ''
@@ -178,11 +238,12 @@
       consider(fraudNplRows[j], 'NPL', fraudNplRows[j].tmAuth, fraudNplRows[j].task);
     }
 
-    // Worst first: the biggest number of hours is the one to look at, and a
-    // table somebody scans top-down should put it there. Bonus number breaks
-    // ties, so the same data draws the same way twice.
+    // Worst first: the biggest number of OVERLAPPING hours is the one to look
+    // at - the total column can be large for someone who simply works a lot,
+    // and that says nothing about this claim. Bonus number breaks ties, so
+    // the same data draws the same way twice.
     out.sort(function (a, b) {
-      return (b.std - a.std) ||
+      return (b.overlapStd - a.overlapStd) ||
              (a.bonus < b.bonus ? -1 : a.bonus > b.bonus ? 1 : 0);
     });
     return { rows: out, claims: claims };
@@ -266,9 +327,9 @@
 
   // ── the table ──────────────────────────────────────────────────────────────
 
-  var FRAUD_COLUMNS_ = ['Bonus', 'Work Areas', 'Std Hours', 'Claim',
-                        'Claim Time', 'TM authorised'];
-  var FRAUD_COL_WIDTHS_ = [11, 27, 11, 9, 22, 20];
+  var FRAUD_COLUMNS_ = ['Bonus', 'Work Areas', 'Total Std Hrs', 'Overlap Std Hrs',
+                        'Overlap Time', 'Claim', 'Claim Time', 'TM authorised', 'Status'];
+  var FRAUD_COL_WIDTHS_ = [8, 18, 9, 10, 12, 6, 12, 15, 10];
 
   function fraudTimeTextPak_(d) {
     return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
@@ -321,13 +382,21 @@
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
       html += '<td data-label="Work Areas" class="fraud-areas-cell">' +
               fraudAreasCellPak_(r.areas) + '</td>';
-      html += '<td data-label="Std Hours" class="fraud-std-cell">' +
-              r.std.toFixed(2) + '</td>';
+      html += '<td data-label="Total Std Hrs" class="fraud-std-cell"' +
+              ' title="Standard hours this bonus number produced across the whole day">' +
+              r.totalStd.toFixed(2) + '</td>';
+      html += '<td data-label="Overlap Std Hrs" class="fraud-std-cell"' +
+              ' title="Standard hours produced inside the overlapping time only">' +
+              r.overlapStd.toFixed(2) + '</td>';
+      html += '<td data-label="Overlap Time" class="os-time-cell"' +
+              ' title="The part of the claim where produced hours were actually found">' +
+              escapeTextPak_(fraudRangeTextPak_(r.overlapFrom, r.overlapTo)) + '</td>';
       html += '<td data-label="Claim">' + fraudKindChipPak_(r.kind) + '</td>';
       html += '<td data-label="Claim Time" class="os-time-cell"' +
               (r.extra ? ' title="' + escapeAttrPak(r.extra) + '"' : '') + '>' +
               escapeTextPak_(fraudRangeTextPak_(r.from, r.to)) + '</td>';
       html += '<td data-label="TM authorised">' + osPersonCellPak_(r.auth) + '</td>';
+      html += '<td data-label="Status">' + r.statusHtml + '</td>';
       html += '</tr>';
     }
     html += '</tbody></table></div>';
@@ -371,10 +440,12 @@
     var scan = fraudScanPak_(win);
     var rows = scan.rows;
     var heads = {};
-    var totalStd = 0;
+    // The OVERLAP figure, not each bonus's total - the total is what they
+    // produced all day and this line is about the hours actually in question.
+    var sumOverlapStd = 0;
     for (var i = 0; i < rows.length; i++) {
       heads[rows[i].bonus] = true;
-      totalStd += rows[i].std;
+      sumOverlapStd += rows[i].overlapStd;
     }
     var headCount = Object.keys(heads).length;
 
@@ -386,8 +457,8 @@
             '<span class="breakdown-summary-label">bonus number' +
             (headCount === 1 ? '' : 's') + '</span>';
     html += '<span class="breakdown-summary-sep">&middot;</span>';
-    html += '<span class="breakdown-summary-num">' + totalStd.toFixed(2) + '</span>' +
-            '<span class="breakdown-summary-label">std hours</span>';
+    html += '<span class="breakdown-summary-num">' + sumOverlapStd.toFixed(2) + '</span>' +
+            '<span class="breakdown-summary-label">overlap std hours</span>';
     html += '</div>';
 
     // What was actually looked at. An empty table means one of two completely
