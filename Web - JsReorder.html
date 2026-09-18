@@ -447,11 +447,11 @@ function toggleReorderMode_() {
 // sees is their charts covered in bars they do not remember asking for.
 //
 // Closed on a countdown rather than immediately, because a swipe past a page is
-// not a decision: the Data Table sits directly after NPL, and getting to it
-// from Bonus crosses two pages the mode is dead on. Five seconds is long enough
-// to swipe through and back without losing the mode, and short enough that
-// nobody is left in it.
-var REORDER_LEAVE_SECONDS_ = 5;
+// not a decision: Claims, OS and NPL all sit between Bonus and the Data Table,
+// and getting from one chart page to the other can cross three pages the mode
+// is dead on. Ten seconds is long enough to make that crossing and come back
+// without losing the mode, and short enough that nobody is left in it.
+var REORDER_LEAVE_SECONDS_ = 10;
 var _reorderLeaveTimer = null;
 var _reorderLeaveLeft = 0;
 
@@ -479,6 +479,9 @@ function reorderLeaveTickPak_() {
 function showReorderLeaveToastPak_() {
   showToastPak(reorderLeaveMessagePak_(_reorderLeaveLeft), {
     icon: 'fa-triangle-exclamation',
+    // Red, same as the icon already was - this is a countdown to something
+    // happening without you, not a routine confirmation.
+    kind: 'warn',
     persist: true,
     onClose: function () { cancelReorderLeavePak_(); setReorderMode_(false); },
     actions: [

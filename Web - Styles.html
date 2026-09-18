@@ -2554,6 +2554,13 @@ canvas {
   color: var(--color-bad);
 }
 
+/* Red message, not just a red icon - for a warn toast that is a countdown to
+   something happening without the reader (rearrange mode closing itself), the
+   icon alone is easy to miss and the words are the part that matters. */
+.toast-warn .toast-text {
+  color: var(--color-bad);
+}
+
 .toast-text {
   flex: 1;
   line-height: 1.35;

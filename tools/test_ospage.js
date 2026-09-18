@@ -1500,12 +1500,16 @@ head('[28] Rearrange is inert where there is nothing to rearrange');
 }
 
 head('[29] leaving the charts mid-edit closes the mode on a countdown');
-// A swipe past a page is not a decision - the Data Table sits two pages after
-// Bonus, and getting there crosses two the mode is dead on.
+// A swipe past a page is not a decision - Claims, OS and NPL all sit between
+// Bonus and the Data Table, so crossing from one chart page to the other can
+// cross three the mode is dead on.
 {
   const ro = R('Web - JsReorder.html');
-  check('five seconds, named once',
-        /var REORDER_LEAVE_SECONDS_ = 5;/.test(ro));
+  check('ten seconds, named once',
+        /var REORDER_LEAVE_SECONDS_ = 10;/.test(ro));
+  check('the toast is red, being a countdown to something happening unwatched',
+        /kind: 'warn',/.test(ro) &&
+        /\.toast-warn \.toast-text \{\s*color: var\(--color-bad\);/.test(R('Web - Styles.html')));
   check('the count starts on leaving',
         /\} else \{\s*startReorderLeavePak_\(\);/.test(ro));
   check('and is cancelled by coming back before it ends',

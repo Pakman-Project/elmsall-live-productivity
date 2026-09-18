@@ -217,8 +217,10 @@ head('[7] the table names every part of the case');
         'green, amber and red already mean a decision elsewhere; nothing here is decided');
   // The page is named for what it is: potential.
   check('the page does not call anybody a fraud',
-        !/\bis fraud\b|confirmed|guilty/i.test(PAGE) &&
-        /Potential Fraudulent Claims/.test(INDEX));
+        !/\bis fraud\b|confirmed|guilty/i.test(PAGE));
+  check('and the on-screen heading says the full name, not a euphemism for it',
+        /<span>Potential Fraudulent Claims<\/span>/.test(INDEX),
+        '"Claims overlapping produced hours" told the reader what the page DOES, not what it is FOR');
 }
 
 head('[8] fetched for the day, and dropped when the day can change');
