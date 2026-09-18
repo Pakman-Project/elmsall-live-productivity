@@ -6,7 +6,7 @@ function include(filename) {
 // nothing straight off the URL is ever interpolated into the page. Each is
 // exposed to the template as its own plain string rather than as JSON, which
 // avoids any escaping question inside the <script> block.
-var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'os', 'npl', 'data'];
+var DEEP_LINK_PAGES_ = ['overall', 'volume', 'bonus', 'fraud', 'os', 'npl', 'data'];
 // Mirrors the <option> values on the Hours Range and Time Window dropdowns. A
 // link cannot request a setting the UI does not offer.
 var DEEP_LINK_HOURS_ = ['3', '6', '9', '12', '24'];

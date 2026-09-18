@@ -52,6 +52,7 @@ function handleControlChangePak(sourceElement, type) {
   // osMarkControlChangedPak_.
   if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
   if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
+  if (typeof fraudMarkControlChangedPak_ === 'function') { fraudMarkControlChangedPak_(); }
   applyLocalFiltersPak();
 }
 

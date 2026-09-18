@@ -109,20 +109,27 @@
             <i class="rail-icon fa-solid fa-hashtag" aria-hidden="true"></i>
             <span class="rail-label">Bonus</span>
           </button>
+          <!-- Potential Fraudulent Claims. Before OS and NPL because it is
+               about both at once - it says which claims are worth opening
+               those two pages to look at. -->
+          <button type="button" class="rail-item" onclick="goToPage(3)" title="Potential Fraudulent Claims">
+            <i class="rail-icon fa-solid fa-magnifying-glass-dollar" aria-hidden="true"></i>
+            <span class="rail-label">Claims</span>
+          </button>
           <!-- Operational Support. Sits next to Bonus because it answers the
                other half of the same question: Bonus is who produced what, OS
                is who was not producing and why. -->
-          <button type="button" class="rail-item" onclick="goToPage(3)" title="Operational Support">
+          <button type="button" class="rail-item" onclick="goToPage(4)" title="Operational Support">
             <i class="rail-icon fa-solid fa-people-carry-box" aria-hidden="true"></i>
             <span class="rail-label">OS</span>
           </button>
           <!-- Non-Productive Labour. The other half of the same question OS
                answers, off a second log, so it sits beside it. -->
-          <button type="button" class="rail-item" onclick="goToPage(4)" title="Non-Productive Labour">
+          <button type="button" class="rail-item" onclick="goToPage(5)" title="Non-Productive Labour">
             <i class="rail-icon fa-solid fa-hourglass-half" aria-hidden="true"></i>
             <span class="rail-label">NPL</span>
           </button>
-          <button type="button" class="rail-item" onclick="goToPage(5)" title="Data Table">
+          <button type="button" class="rail-item" onclick="goToPage(6)" title="Data Table">
             <i class="rail-icon fa-solid fa-table-list" aria-hidden="true"></i>
             <span class="rail-label">Data Table</span>
           </button>
@@ -456,6 +463,26 @@
                spell is included when it OVERLAPS the range, not when it fits
                inside it: a shift running from before the window into it is
                exactly the case this page exists for. -->
+          <!-- Potential Fraudulent Claims. A claim says "I was not producing
+               between these times"; the pivot says what was actually produced,
+               block by block. This page is where the two are put side by side.
+               No range picker of its own: the window IS the production day on
+               the date control, 06:00 to 06:00, which is why Hours Range and
+               Time Window grey out here too. -->
+          <div class="page">
+            <div class="fraud-head">
+              <div class="fraud-head-title">
+                <i class="fa-solid fa-magnifying-glass-dollar" aria-hidden="true"></i>
+                <span>Claims overlapping produced hours</span>
+              </div>
+              <span id="fraudRangeBadge" class="breakdown-range-badge fraud-range-badge">-</span>
+            </div>
+
+            <div class="card panel span-12">
+              <div id="fraudBody" class="os-body"></div>
+            </div>
+          </div>
+
           <div class="page">
             <!-- One row: the four filters left, the range right. The title and
                  subtitle that used to sit above this are gone - the rail tab
@@ -904,6 +931,10 @@
     <?!= include('Web - JsData'); ?>
     <?!= include('Web - JsCharts'); ?>
     <?!= include('Web - JsPageOs'); ?>
+    <!-- After JsPageOs too: the Claims page reads that file's spell walk, which
+         is what turns a logged Date + From + To into a real pair of clock
+         times under the 06:00-to-06:00 rule. -->
+    <?!= include('Web - JsPageFraud'); ?>
     <!-- After JsPageOs, not before: the NPL page is built on that file's
          range picker, spell walk, multi-select and bar animation. -->
     <?!= include('Web - JsPageNpl'); ?>

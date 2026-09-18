@@ -1,0 +1,425 @@
+<script>
+  // ── The Potential Fraudulent Claims page ───────────────────────────────────
+  // An OS or NPL claim says "I was not producing between these two times". The
+  // pivot says what each bonus number actually produced, block by block. Where
+  // those two disagree, somebody has been paid for time they were working.
+  //
+  // This page is the join. It is NOT an accusation: a block can carry standard
+  // hours for reasons a form cannot see - a claim typed with the wrong finish
+  // time, work booked to the wrong code, two people sharing a number. Hence
+  // "Potential", and hence a table naming every part of the case rather than a
+  // count: the whole point is that somebody can go and look.
+  //
+  // The rule, as asked for:
+  //   - a production day runs 06:00 to 06:00, so the day picked on the date
+  //     control means [that date 06:00, the next date 06:00);
+  //   - only the 15-minute blocks FULLY inside a claim count. A claim of
+  //     05:55-06:40 covers 06:00-06:15 and 06:15-06:30 and no others: the
+  //     05:45 block started before the claim did, and the 06:30 block ends
+  //     after it. A partly-covered block cannot tell you WHEN in it the work
+  //     happened, so it cannot tell you whether it clashed;
+  //   - any standard hours at all in those blocks flags the claim.
+
+  var FRAUD_DAY_START_HOUR_ = 6;
+  var FRAUD_BLOCK_MINUTES_ = 15;
+
+  // ── the window ─────────────────────────────────────────────────────────────
+
+  // The production day the date control is pointing at.
+  //
+  // Live means today, which is what the date control itself says - so between
+  // midnight and 06:00 this is the day that has not started yet, and the page
+  // is empty until it does. That is the literal reading of the rule and the
+  // predictable one: the window is always the date on the button, never a
+  // different date the page worked out for itself.
+  function fraudSelectedDayPak_() {
+    var sel = $('archiveSelect');
+    var name = (sel && sel.selectedIndex >= 0)
+      ? String(sel.options[sel.selectedIndex].textContent || '').trim() : '';
+    var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(name);
+    if (m) {
+      return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+    }
+    // Live. Taken from the newest block on the axis rather than from the
+    // browser's clock: that is the data's own idea of now, and it is what
+    // every other number on the dashboard is drawn against.
+    var newest = null;
+    for (var i = timeRanges.length - 1; i >= 0 && !newest; i--) {
+      newest = parseDateTimePartPak(extractRangePartsPak(timeRanges[i]).start);
+    }
+    var d = newest || new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function fraudWindowPak_() {
+    var day = fraudSelectedDayPak_();
+    var start = new Date(day.getFullYear(), day.getMonth(), day.getDate(),
+                         FRAUD_DAY_START_HOUR_, 0);
+    return { start: start, finish: new Date(start.getTime() + 86400000) };
+  }
+
+  // dd/mm/yyyy for the log rows, which key their Date column on the PRODUCTION
+  // day - so every row of the day this page is about carries this one date,
+  // whether its clock time lands before or after midnight.
+  function fraudDateKeyPak_(d) {
+    return ('0' + d.getDate()).slice(-2) + '/' +
+           ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  }
+
+  // ── the blocks a claim actually covers ─────────────────────────────────────
+
+  // The 15-minute blocks lying WHOLLY inside [start, finish). Aligned to the
+  // quarter hour, because that is what the pivot's rows are.
+  function fraudFullBlocksPak_(start, finish) {
+    var out = [];
+    // No 'finish <= start' clause: the loop below already covers it. Its
+    // first block is at or after start, and start >= finish means block + 15
+    // minutes is past finish on the very first test, so the body never runs.
+    // A guard that cannot fail is a line that reads as protection and is not.
+    if (!start || !finish) return out;
+    var ms = FRAUD_BLOCK_MINUTES_ * 60000;
+    // The first block boundary at or after the claim's start.
+    var b = new Date(start.getTime());
+    b.setSeconds(0, 0);
+    var rem = b.getMinutes() % FRAUD_BLOCK_MINUTES_;
+    if (rem !== 0 || b.getTime() < start.getTime()) {
+      b = new Date(b.getTime() - rem * 60000 + ms);
+    }
+    for (var t = b.getTime(); t + ms <= finish.getTime(); t += ms) {
+      out.push(t);
+    }
+    return out;
+  }
+
+  // ── what was produced, and where ───────────────────────────────────────────
+
+  // bonus||blockStartMs -> the pivot row for that person in that block.
+  //
+  // Built from allSideData, NOT the site-scoped rawSideData: the Warehouse
+  // picker is a way of looking at a shift, and a claim that only stops looking
+  // fraudulent because somebody switched building is exactly the answer this
+  // page must not give.
+  function fraudStdIndexPak_() {
+    var idx = {};
+    var src = (typeof allSideData !== 'undefined' && allSideData.length)
+      ? allSideData : rawSideData;
+    for (var i = 0; i < src.length; i++) {
+      var r = src[i];
+      var d = parseDateTimePartPak(extractRangePartsPak(r.timeRange).start);
+      if (!d) continue;
+      idx[String(r.bonus).toUpperCase() + '||' + d.getTime()] = r;
+    }
+    return idx;
+  }
+
+  // The work areas a pivot row carries standard hours in, by their display
+  // names - "OSR PiE", "ISPS Top Up". Read off VOLUME_TYPES so the wording is
+  // the same one the Volume page's legend uses; a second list of names here
+  // would drift from it the first time an area was renamed.
+  function fraudAreasOfRowPak_(row, into) {
+    for (var i = 0; i < VOLUME_TYPES.length; i++) {
+      var t = VOLUME_TYPES[i];
+      if ((Number(row[t.stdKey]) || 0) > 0) { into[t.label] = true; }
+    }
+  }
+
+  // ── the scan ───────────────────────────────────────────────────────────────
+
+  // Every claim of the day, flagged or not, with what the pivot says about the
+  // blocks it covers. Returns the flagged ones plus the counts needed to say
+  // honestly how much was looked at.
+  function fraudScanPak_(win) {
+    var idx = fraudStdIndexPak_();
+    var out = [];
+    var claims = 0;
+
+    function consider(row, kind, auth, extra) {
+      var w = osSpellWindowPak_(row);
+      if (!w) return;                       // cannot be placed on a clock
+      if (w.finish <= win.start || w.start >= win.finish) return;
+      claims++;
+
+      var blocks = fraudFullBlocksPak_(w.start, w.finish);
+      var std = 0;
+      var areas = {};
+      var covered = 0;
+      for (var b = 0; b < blocks.length; b++) {
+        var hit = idx[String(row.bonus).toUpperCase() + '||' + blocks[b]];
+        if (!hit) continue;
+        covered++;
+        std += Number(hit.value) || 0;
+        fraudAreasOfRowPak_(hit, areas);
+      }
+      // "any standard hour produced", as asked - not the Front sheet's
+      // threshold. That number is about whether a block counts as WORKED for
+      // a productivity figure; this is about whether any work happened at all
+      // while somebody was booked as not working, and the two questions do not
+      // share an answer.
+      if (std <= 0) return;
+
+      out.push({
+        bonus: row.bonus,
+        kind: kind,
+        from: w.start,
+        to: w.finish,
+        std: std,
+        areas: Object.keys(areas).sort(),
+        auth: auth,
+        blocks: blocks.length,
+        covered: covered,
+        extra: extra || ''
+      });
+    }
+
+    for (var i = 0; i < fraudOsRows.length; i++) {
+      consider(fraudOsRows[i], 'OS', fraudOsRows[i].auth, fraudOsRows[i].job);
+    }
+    for (var j = 0; j < fraudNplRows.length; j++) {
+      consider(fraudNplRows[j], 'NPL', fraudNplRows[j].tmAuth, fraudNplRows[j].task);
+    }
+
+    // Worst first: the biggest number of hours is the one to look at, and a
+    // table somebody scans top-down should put it there. Bonus number breaks
+    // ties, so the same data draws the same way twice.
+    out.sort(function (a, b) {
+      return (b.std - a.std) ||
+             (a.bonus < b.bonus ? -1 : a.bonus > b.bonus ? 1 : 0);
+    });
+    return { rows: out, claims: claims };
+  }
+
+  // How much of the day the pivot on hand can actually speak for. The dashboard
+  // holds a rolling 96 blocks, so a window reaching past them is not "clean",
+  // it is unchecked - and an empty table that cannot tell the reader which of
+  // those it is would be worse than no table.
+  function fraudCoveragePak_(win) {
+    var lo = null, hi = null;
+    var src = (typeof allSideData !== 'undefined' && allSideData.length)
+      ? allSideData : rawSideData;
+    for (var i = 0; i < src.length; i++) {
+      var d = parseDateTimePartPak(extractRangePartsPak(src[i].timeRange).start);
+      if (!d) continue;
+      var t = d.getTime();
+      if (lo === null || t < lo) lo = t;
+      if (hi === null || t > hi) hi = t;
+    }
+    if (lo === null) return null;
+    var ms = FRAUD_BLOCK_MINUTES_ * 60000;
+    var from = Math.max(lo, win.start.getTime());
+    var to = Math.min(hi + ms, win.finish.getTime());
+    return (to > from) ? { from: new Date(from), to: new Date(to) } : null;
+  }
+
+  // ── the fetch ──────────────────────────────────────────────────────────────
+  // Both logs, for the one production day. Its own copies rather than the OS
+  // and NPL pages' - those are fetched for the axis window, which is a rolling
+  // 24 hours and not the same thing as a production day, and a page that
+  // quietly scanned the wrong range would be the worst kind of wrong here.
+
+  function ensureFraudLogsPak_() {
+    if (fraudLogState === null) {
+      fraudLogState = 'loading';
+      renderFraudPagePak();
+      fraudFetchLogsPak_();
+    }
+  }
+
+  function fraudMarkControlChangedPak_() {
+    fraudLogState = null;
+  }
+
+  function fraudFetchLogsPak_() {
+    var key = fraudDateKeyPak_(fraudSelectedDayPak_());
+    var pending = 2;
+    var failed = '';
+
+    function done() {
+      if (--pending > 0) return;
+      fraudLogState = failed || 'ready';
+      renderFraudPagePak();
+    }
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        fraudOsRows = (res && res.rows) || [];
+        if (res && res.error) failed = res.error;
+        done();
+      })
+      .withFailureHandler(function (err) {
+        failed = (err && err.message) || 'The OS log could not be read';
+        done();
+      })
+      .getOsLogRows([key], currentArchiveUrl || null);
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        fraudNplRows = (res && res.rows) || [];
+        if (res && res.error) failed = res.error;
+        done();
+      })
+      .withFailureHandler(function (err) {
+        failed = (err && err.message) || 'The NPL log could not be read';
+        done();
+      })
+      .getNplLogRows([key], currentArchiveUrl || null);
+  }
+
+  // ── the table ──────────────────────────────────────────────────────────────
+
+  var FRAUD_COLUMNS_ = ['Bonus', 'Work Areas', 'Std Hours', 'Claim',
+                        'Claim Time', 'TM authorised'];
+  var FRAUD_COL_WIDTHS_ = [11, 27, 11, 9, 22, 20];
+
+  function fraudTimeTextPak_(d) {
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  // "22:40 - 01:10", with a marker on a finish that lands on the next date -
+  // a production day crosses midnight and two bare clock times cannot say so.
+  function fraudRangeTextPak_(from, to) {
+    var t = fraudTimeTextPak_(from) + ' - ' + fraudTimeTextPak_(to);
+    return (to.getDate() !== from.getDate()) ? t + ' (+1)' : t;
+  }
+
+  function fraudKindChipPak_(kind) {
+    return '<span class="fraud-kind fraud-kind-' + kind.toLowerCase() + '">' +
+           kind + '</span>';
+  }
+
+  function fraudAreasCellPak_(areas) {
+    if (!areas.length) {
+      // Standard hours with no area carrying them: the total column on the
+      // pivot moved but no single area's did. Worth saying rather than
+      // leaving the cell blank, which reads as "not looked at".
+      return '<span class="os-cell-none" title="Standard hours, but no single' +
+             ' work area carries them">&ndash;</span>';
+    }
+    return escapeTextPak_(areas.join(', '));
+  }
+
+  function fraudTableHtmlPak_(rows) {
+    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
+               '<colgroup>';
+    for (var w = 0; w < FRAUD_COL_WIDTHS_.length; w++) {
+      html += '<col style="width:' + FRAUD_COL_WIDTHS_[w] + '%">';
+    }
+    html += '</colgroup><thead><tr>';
+    for (var c = 0; c < FRAUD_COLUMNS_.length; c++) {
+      html += '<th>' + FRAUD_COLUMNS_[c] + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var esc = escapeAttrPak(r.bonus);
+      var picked = selectedBonuses.indexOf(r.bonus) !== -1;
+      html += '<tr>';
+      html += '<td data-label="Bonus"><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+              (picked ? ' selected' : '') + '"' +
+              ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
+              escapeTextPak_(r.bonus) +
+              '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
+              bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
+      html += '<td data-label="Work Areas" class="fraud-areas-cell">' +
+              fraudAreasCellPak_(r.areas) + '</td>';
+      html += '<td data-label="Std Hours" class="fraud-std-cell">' +
+              r.std.toFixed(2) + '</td>';
+      html += '<td data-label="Claim">' + fraudKindChipPak_(r.kind) + '</td>';
+      html += '<td data-label="Claim Time" class="os-time-cell"' +
+              (r.extra ? ' title="' + escapeAttrPak(r.extra) + '"' : '') + '>' +
+              escapeTextPak_(fraudRangeTextPak_(r.from, r.to)) + '</td>';
+      html += '<td data-label="TM authorised">' + osPersonCellPak_(r.auth) + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  // ── the page ───────────────────────────────────────────────────────────────
+
+  function renderFraudPagePak() {
+    var body = document.getElementById('fraudBody');
+    if (!body) return;
+
+    var win = fraudWindowPak_();
+    var badge = document.getElementById('fraudRangeBadge');
+    if (badge) {
+      // "to", not an arrow glyph: this badge is set in Roboto Mono, which has
+      // no U+2192 and drew a replacement box instead - and the one thing this
+      // line has to be is unambiguous about which direction the day runs.
+      badge.textContent = fraudDateKeyPak_(win.start) + ' 06:00  to  ' +
+                          fraudDateKeyPak_(win.finish) + ' 06:00';
+    }
+
+    if (fraudLogState === null) { ensureFraudLogsPak_(); return; }
+    if (fraudLogState === 'loading') {
+      if (!body.firstChild || !body.firstChild.classList ||
+          !body.firstChild.classList.contains('os-skeleton')) {
+        body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          '<div class="os-skel-summary"></div>' +
+          '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
+          '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+      }
+      return;
+    }
+    if (fraudLogState !== 'ready') {
+      body.innerHTML = '<div class="breakdown-empty">' +
+        '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
+        escapeTextPak_(fraudLogState) + '</div>';
+      return;
+    }
+
+    var scan = fraudScanPak_(win);
+    var rows = scan.rows;
+    var heads = {};
+    var totalStd = 0;
+    for (var i = 0; i < rows.length; i++) {
+      heads[rows[i].bonus] = true;
+      totalStd += rows[i].std;
+    }
+    var headCount = Object.keys(heads).length;
+
+    var html = '<div class="breakdown-summary">';
+    html += '<span class="breakdown-summary-num">' + rows.length + '</span>' +
+            '<span class="breakdown-summary-label">to check</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + headCount + '</span>' +
+            '<span class="breakdown-summary-label">bonus number' +
+            (headCount === 1 ? '' : 's') + '</span>';
+    html += '<span class="breakdown-summary-sep">&middot;</span>';
+    html += '<span class="breakdown-summary-num">' + totalStd.toFixed(2) + '</span>' +
+            '<span class="breakdown-summary-label">std hours</span>';
+    html += '</div>';
+
+    // What was actually looked at. An empty table means one of two completely
+    // different things - nothing found, or nothing loaded to look at - and the
+    // reader cannot tell them apart without this line.
+    var cov = fraudCoveragePak_(win);
+    html += '<div class="fraud-note">';
+    if (!cov) {
+      html += '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>' +
+              'None of this production day is loaded yet, so nothing has been ' +
+              'checked. ' + scan.claims + ' claim' + (scan.claims === 1 ? '' : 's') +
+              ' fall in the window.';
+    } else {
+      html += '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>' +
+              scan.claims + ' claim' + (scan.claims === 1 ? '' : 's') +
+              ' in this production day, checked against produced hours from ' +
+              fraudDateKeyPak_(cov.from) + ' ' + fraudTimeTextPak_(cov.from) +
+              ' to ' + fraudDateKeyPak_(cov.to) + ' ' + fraudTimeTextPak_(cov.to) +
+              '. Both buildings, whatever the Warehouse picker says.';
+    }
+    html += '</div>';
+
+    if (rows.length === 0) {
+      html += '<div class="breakdown-empty">' +
+              '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>' +
+              'No claim overlaps produced hours in the part of this day that ' +
+              'has been checked</div>';
+      body.innerHTML = html;
+      return;
+    }
+
+    html += fraudTableHtmlPak_(rows);
+    body.innerHTML = html;
+  }
+</script>

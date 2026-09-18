@@ -689,6 +689,9 @@
     if (changed && typeof nplMarkControlChangedPak_ === 'function') {
       nplMarkControlChangedPak_();
     }
+    if (changed && typeof fraudMarkControlChangedPak_ === 'function') {
+      fraudMarkControlChangedPak_();
+    }
     if (typeof applyLocalFiltersPak === 'function') applyLocalFiltersPak();
     if (changed && typeof saveUserPreferences === 'function') saveUserPreferences();
   }
@@ -1080,14 +1083,19 @@
     } else if (index === 2) {
       renderSideTablesPak(c.rowsLimit);
     } else if (index === 3) {
+      // Reads both logs and the pivot, and takes nothing from the render
+      // context - but it still goes through here so it is rebuilt on a refresh
+      // like every other page rather than holding yesterday.
+      renderFraudPagePak();
+    } else if (index === 4) {
       // Reads osLogRows and its own From / To, so it takes nothing from the
       // render context - but it still goes through here, so that it is rebuilt
       // on a refresh like every other page rather than holding yesterday.
       renderOsPagePak();
-    } else if (index === 4) {
+    } else if (index === 5) {
       // Same as the OS page above, off the other log.
       renderNplPagePak();
-    } else if (index === 5) {
+    } else if (index === 6) {
       renderMainTablePak(currentMainRows);
     }
     pageDirty[index] = false;
@@ -1097,8 +1105,10 @@
   }
 
   // Hours Range and Time Window shape the time axis that every chart is drawn
-  // on. Three pages read neither: Bonus, OS and NPL all have their own From /
-  // To, over the whole 24 hours, and all three ignore the window size.
+  // on. Four pages read neither: Bonus, OS and NPL all have their own From /
+  // To over the whole 24 hours, and Claims has a window it derives entirely
+  // from the date control - a production day, 06:00 to 06:00. All four ignore
+  // the window size.
   //
   // So there the pair is disabled and greyed rather than left looking live. A
   // control you can change that then changes nothing reads as the page being
@@ -1109,7 +1119,7 @@
   // not reflow every time you move between pages. (On a PHONE they are hidden
   // outright - see .hc-field-off in Styles - because there the row is two wide
   // and there is nothing beside them for the gap to hold open.)
-  var PAGES_WITH_OWN_RANGE_ = [2, 3, 4];
+  var PAGES_WITH_OWN_RANGE_ = [2, 3, 4, 5];
 
   // The Data Table is the odd one: it DOES read Time Window, which is what
   // aggregates its rows, and does NOT read Hours Range - it draws all 96
@@ -1117,7 +1127,7 @@
   // controls cannot be switched together any more, and each carries the list
   // of pages it is dead on.
   var PAGES_IGNORING_ = {
-    hoursRange: PAGES_WITH_OWN_RANGE_.concat([5]),
+    hoursRange: PAGES_WITH_OWN_RANGE_.concat([6]),
     timeWindow: PAGES_WITH_OWN_RANGE_
   };
 
@@ -1140,8 +1150,9 @@
       // untruth on the Data Table, which has no range picker of its own and
       // simply always draws the whole day.
       el.title = !off ? ''
-        : (index === 5 ? 'The Data Table always shows the whole day'
-                       : 'This page has its own From / To range');
+        : (index === 6 ? 'The Data Table always shows the whole day'
+        : (index === 3 ? 'This page covers one production day, 06:00 to 06:00'
+                       : 'This page has its own From / To range'));
     }
   }
 

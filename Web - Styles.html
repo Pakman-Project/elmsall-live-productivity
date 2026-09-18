@@ -3789,6 +3789,97 @@ body.page-scrolled-far .back-to-top {
   }
 }
 
+/* ── Potential Fraudulent Claims ──────────────────────────────────────────
+   One table, no filters, no range picker: the window IS the production day on
+   the date control. Everything here leans on the OS page classes - same table,
+   same chips, same phone cards - so this page has only what differs. */
+.fraud-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.fraud-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fraud-head-title i { color: var(--muted); }
+
+/* The window, spelled out in full rather than as a duration. "1440 min" says
+   nothing a reader can check a claim against; two dates and two 06:00s do. */
+.fraud-range-badge {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+/* What was actually checked. An empty table means one of two completely
+   different things - nothing found, or nothing loaded - and this is the line
+   that tells them apart. */
+.fraud-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--w4);
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.fraud-note i { margin-top: 2px; flex-shrink: 0; }
+
+/* OS or NPL, so the reader knows which log to open. Neutral - green, amber and
+   red already mean a VERDICT elsewhere on the dashboard, and nothing here has
+   been decided yet. */
+.fraud-kind {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--w4);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.fraud-std-cell {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* A string of work-area names, and the one cell here that can run long. It
+   wraps rather than being clipped: which areas they were in is the whole
+   evidence, and half of it is no use. */
+.fraud-areas-cell { line-height: 1.45; }
+
+@media (max-width: 700px) {
+  .fraud-head { margin-bottom: 8px; }
+  .fraud-head-title { font-size: 0.8125rem; }
+  /* Two classes, so this beats .breakdown-range-badge on specificity rather
+     than on source order - that rule hides the badge on a phone, and it is
+     right to, because next to two date/time selects there is no room for it.
+     Here there are no selects and the badge is the ONLY thing that says which
+     day is being shown, so it is the one place the hiding must not reach. */
+  .fraud-head .fraud-range-badge {
+    display: inline-block;
+    font-size: 0.625rem;
+    white-space: normal;
+  }
+}
+
 /* ── Loading the OS log ────────────────────────────────────────────────────
    This page fetches its own data on first open, so it has a loading moment the
    rest of the dashboard does not - and an empty card during it says "nobody was

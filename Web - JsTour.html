@@ -258,36 +258,36 @@ var TOUR_STEPS = [
   // ===== Part 6 — OS page ==================================================
   // A page the tour would otherwise swipe straight through on its way to the
   // Data Table, which is how a whole page ends up undiscovered.
-  { part: 6, page: 3, target: '.os-page-head',
+  { part: 6, page: 4, target: '.os-page-head',
     title: 'Operational Support',
     body: 'Who was NOT producing, and why. This page reads the OS log itself rather than the pivot, so it can show the department, the job, and who signed it off — none of which the productivity figures carry.' },
-  { part: 6, page: 3, target: '#osFrom',
+  { part: 6, page: 4, target: '#osFrom',
     title: 'Its own From / To',
     body: 'Like the Bonus page, this one has its own range over the whole 24 hours — which is why Hours Range and Time Window grey out while you are here. A spell counts if it OVERLAPS the range, so somebody who started before it and is still on OS still appears.' },
-  { part: 6, page: 3, target: '#osBody .breakdown-row',
+  { part: 6, page: 4, target: '#osBody .breakdown-row',
     interactive: { sel: '#osBody .breakdown-row', type: 'click' },
     title: 'A bar per zone',
     body: 'Each bar is a zone, and its length is how many people were on OS there — people, not forms, so somebody logged for two jobs counts once. Bars are scaled within their own site. Click one to open it.' },
-  { part: 6, page: 3, target: '#osFilters',
+  { part: 6, page: 4, target: '#osFilters',
     title: 'Three filters',
     body: 'Type narrows to people who did nothing but OS, or only those who did both. Zones and Departments are multi-select, and they offer what is actually in range — a zone nobody worked is not on the list. The Warehouse picker up in the control panel narrows the sites too.' },
-  { part: 6, page: 3, target: '#osBody .os-dept-row',
+  { part: 6, page: 4, target: '#osBody .os-dept-row',
     interactive: { sel: '#osBody .os-dept-row', type: 'click' },
     action: function () { tourOpenOsZone_(); },
     cleanup: function () { tourCloseOsNodes_(); },
     title: 'A bar per department',
     body: 'A zone opens onto its departments, as bars of their own — scaled within the zone, the way the zones are scaled within their site. Click one of those to reach the records.' },
-  { part: 6, page: 3, target: '#osBody .os-dept-detail .os-job-table',
+  { part: 6, page: 4, target: '#osBody .os-dept-detail .os-job-table',
     action: function () { tourOpenOsZone_(); tourOpenOsDept_(); },
     cleanup: function () { tourCloseOsNodes_(); },
     title: 'Records, grouped by job type',
     body: 'One row per logged record: the real start and finish, who authorised it, who deployed them, who they report to, and where the record stands. The bonus number is clickable, like everywhere else on the dashboard.' },
 
   // ===== Part 7 — Data Table page ==========================================
-  { part: 7, page: 5, target: '.span-12 .mini-table-title',
+  { part: 7, page: 6, target: '.span-12 .mini-table-title',
     title: 'Data Table page',
     body: 'The raw numbers behind everything — one row per time block. You can search, sort, expand, and export it.' },
-  { part: 7, page: 5,
+  { part: 7, page: 6,
     interactive: function (isMobile) {
       return isMobile
         ? { sel: '#mainSortSelect', type: 'change', changeValue: 'performance' }
@@ -295,7 +295,7 @@ var TOUR_STEPS = [
     },
     title: 'Sort any column',
     body: 'A column header sorts by that column (on mobile, the sort dropdown does the same) — here it sorts by Productivity %.' },
-  { part: 7, page: 5,
+  { part: 7, page: 6,
     interactive: function (isMobile) {
       // Desktop rows are clickable anywhere; mobile cards only toggle from their header.
       return isMobile
@@ -304,22 +304,22 @@ var TOUR_STEPS = [
     },
     title: 'Expand a row',
     body: 'A row expands to show the per-operator detail behind that time block — tap its header on mobile.' },
-  { part: 7, page: 5, target: '.main-detail-row.open .main-detail-content',
+  { part: 7, page: 6, target: '.main-detail-row.open .main-detail-content',
     action: function () { tourEnsureExpandedRow_(); },
     title: 'Per-operator detail',
     body: 'Each expanded row lists every operator in that block with their volumes and productivity. The bonus numbers in here are clickable too.' },
-  { part: 7, page: 5, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
+  { part: 7, page: 6, target: '.main-detail-row.open .main-detail-content .clickable-bonus',
     interactive: { sel: '.main-detail-row.open .main-detail-content .clickable-bonus', type: 'click' },
     action: function () { tourEnsureExpandedRow_(); },
     title: 'Filter from the detail',
     body: 'Just like on the Bonus page, an operator here filters the whole dashboard to them.' },
-  { part: 7, page: 5, target: '#activeFilterBanner',
+  { part: 7, page: 6, target: '#activeFilterBanner',
     interactive: { sel: '.active-filter-clear-btn', type: 'click' },
     action: function () { tourEnsureExpandedRow_(); tourEnsureFilter_(); },
     cleanup: function () { expandedRowKey = null; },
     title: 'Filtered again',
     body: 'Same site-wide filter, reached from the data table. “Clear all” removes it.' },
-  { part: 7, page: 5, target: '#downloadRawDataBtn',
+  { part: 7, page: 6, target: '#downloadRawDataBtn',
     title: 'Export to CSV',
     body: 'Clicking “Raw data” exports every individual entry as a CSV — handy for pivoting in Excel.' },
 
@@ -660,6 +660,13 @@ function startTour(isAuto, startIndex) {
   nplLogSkipped = 0;
   nplLogState = 'ready';
 
+  // Claims, on the same terms: no chapter of its own, stepped past on the way
+  // to the Data Table, and parked as already-read so it cannot fire a request
+  // for two real logs in the middle of demo data.
+  fraudOsRows = [];
+  fraudNplRows = [];
+  fraudLogState = 'ready';
+
   // Clear BOTH loading indicators. The tour renders its own demo data, so the
   // cold-load skeleton must come off too — otherwise an auto-started tour on a
   // first visit spends its opening steps pointing at shimmer placeholders and
@@ -720,6 +727,9 @@ function endTour_() {
   nplLogRows = [];
   nplLogSkipped = 0;
   nplLogState = null;
+  fraudOsRows = [];
+  fraudNplRows = [];
+  fraudLogState = null;
 
   var payload = pendingRealData || lastRealPayload;
   pendingRealData = null;

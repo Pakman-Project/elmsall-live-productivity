@@ -244,6 +244,14 @@
       osLogSkipped = 0;
       osLogState = null;
     }
+    // The Claims page holds its logs for a PRODUCTION DAY, not for the axis,
+    // so "the window moved on" does not apply to it the way it does to the two
+    // pages below - but the day itself can change under it, and a refresh is
+    // the only moment that shows. Dropped outright rather than marked: it has
+    // no silent-refresh path, because unlike OS and NPL there is nothing on
+    // its screen worth protecting from a flash - it is one table, not a tree
+    // somebody is part-way through opening.
+    fraudLogState = null;
     // The NPL page, on exactly the same terms and for the same reasons.
     if (nplLogEverLoaded) {
       nplLogNeedsRefresh = true;

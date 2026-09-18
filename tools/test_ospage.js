@@ -867,7 +867,7 @@ head('[17] the wording is Records, not spells');
         'the comments still discuss spells; the page does not');
 }
 
-head('[10] the page is wired in at index 3, with NPL at 4 and the Data Table at 5');
+head('[10] Claims at 3, OS at 4, NPL at 5, the Data Table at 6');
 // The rail order IS the page order - the swipe and the arrow keys move by
 // index - so inserting a tab renumbers everything after it. Every list that
 // counts pages has to move together or a tab navigates somewhere else.
@@ -878,29 +878,33 @@ head('[10] the page is wired in at index 3, with NPL at 4 and the Data Table at 
   const tour = R('Web - JsTour.html');
   const init = R('Web - JsInit.html');
 
-  check('six pages', /var totalPages = 6;/.test(state) &&
-        /var pageDirty = \[true, true, true, true, true, true\];/.test(state));
+  check('seven pages', /var totalPages = 7;/.test(state) &&
+        /var pageDirty = \[true, true, true, true, true, true, true\];/.test(state));
   const rail = (index.match(/onclick="goToPage\((\d)\)"/g) || []).map(s => s.replace(/\D/g, ''));
-  check('six rail tabs, in order', rail.join() === '0,1,2,3,4,5', rail.join());
-  check('the OS tab is the fourth', /goToPage\(3\)" title="Operational Support"/.test(index));
-  check('the NPL tab is the fifth', /goToPage\(4\)" title="Non-Productive Labour"/.test(index));
-  check('and the Data Table the sixth', /goToPage\(5\)" title="Data Table"/.test(index));
-  // Five in the markup plus the Overall page, which is its own include.
+  check('seven rail tabs, in order', rail.join() === '0,1,2,3,4,5,6', rail.join());
+  check('the Claims tab is the fourth',
+        /goToPage\(3\)" title="Potential Fraudulent Claims"/.test(index));
+  check('the OS tab is the fifth', /goToPage\(4\)" title="Operational Support"/.test(index));
+  check('the NPL tab is the sixth', /goToPage\(5\)" title="Non-Productive Labour"/.test(index));
+  check('and the Data Table the seventh', /goToPage\(6\)" title="Data Table"/.test(index));
+  // Six in the markup plus the Overall page, which is its own include.
   const pageDivs = (index.match(/<div class="page">/g) || []).length +
                    (R('Web - PageOverall.html').match(/<div class="page">/g) || []).length;
-  check('there are six .page containers, one per tab', pageDivs === 6, String(pageDivs));
+  check('there are seven .page containers, one per tab', pageDivs === 7, String(pageDivs));
 
-  check('the dispatcher builds the OS page at 3',
-        /index === 3\) \{[\s\S]{0,400}renderOsPagePak\(\)/.test(ui));
-  check('the NPL page at 4',
-        /index === 4\) \{[\s\S]{0,400}renderNplPagePak\(\)/.test(ui));
-  check('and the main table at 5',
-        /index === 5\) \{\s*renderMainTablePak/.test(ui));
+  check('the dispatcher builds the Claims page at 3',
+        /index === 3\) \{[\s\S]{0,400}renderFraudPagePak\(\)/.test(ui));
+  check('the OS page at 4',
+        /index === 4\) \{[\s\S]{0,400}renderOsPagePak\(\)/.test(ui));
+  check('the NPL page at 5',
+        /index === 5\) \{[\s\S]{0,400}renderNplPagePak\(\)/.test(ui));
+  check('and the main table at 6',
+        /index === 6\) \{\s*renderMainTablePak/.test(ui));
 
   // One list of page names, read by the deep link on both sides.
   check('the deep-link names agree across the two files',
-        /DEEP_LINK_PAGES_ = \['overall', 'volume', 'bonus', 'os', 'npl', 'data'\]/.test(CODE) &&
-        /DEEP_LINK_PAGES_PAK_ = \['overall', 'volume', 'bonus', 'os', 'npl', 'data'\]/.test(state),
+        /DEEP_LINK_PAGES_ = \['overall', 'volume', 'bonus', 'fraud', 'os', 'npl', 'data'\]/.test(CODE) &&
+        /DEEP_LINK_PAGES_PAK_ = \['overall', 'volume', 'bonus', 'fraud', 'os', 'npl', 'data'\]/.test(state),
         '?page=data would otherwise open the OS page');
   check('and JsInit reads the list rather than keeping a third copy',
         /DEEP_LINK_PAGES_PAK_\.indexOf\(DEEP_PAGE\)/.test(init),
@@ -909,9 +913,9 @@ head('[10] the page is wired in at index 3, with NPL at 4 and the Data Table at 
   // The tour walks pages by index too, and it has a chapter of its own for
   // this page - a tour that swipes straight through one on its way to the next
   // is how a whole page ends up undiscovered.
-  check('the tour follows the Data Table to page 5',
-        (tour.match(/page: 5,/g) || []).length === 7,
-        (tour.match(/page: 5,/g) || []).length + ' step(s)');
+  check('the tour follows the Data Table to page 6',
+        (tour.match(/page: 6,/g) || []).length === 7,
+        (tour.match(/page: 6,/g) || []).length + ' step(s)');
   // NPL has no chapter, so the tour steps straight past it - which would fire
   // a REAL request for the real log in the middle of demo data unless the page
   // is parked as already-read first.
@@ -920,7 +924,7 @@ head('[10] the page is wired in at index 3, with NPL at 4 and the Data Table at 
         tour.indexOf('nplLogState = null;') > tour.indexOf("nplLogState = 'ready';"),
         'or the real NPL log would never be fetched afterwards');
   check('and has a chapter on the OS page',
-        (tour.match(/part: 6, page: 3,/g) || []).length >= 3 &&
+        (tour.match(/part: 6, page: 4,/g) || []).length >= 3 &&
         /6: 'OS page'/.test(tour),
         (tour.match(/part: 6, page: 3,/g) || []).length + ' step(s)');
   // It walks BOTH levels, and opens them through toggleOsNode - a class set
@@ -1053,8 +1057,8 @@ head('[11] Hours Range and Time Window are inert where they do nothing');
 {
   const ui = R('Web - JsUi.html');
   const tables = R('Web - JsTables.html');
-  check('the Bonus, OS and NPL pages are the three',
-        /var PAGES_WITH_OWN_RANGE_ = \[2, 3, 4\];/.test(ui));
+  check('Bonus, Claims, OS and NPL are the four',
+        /var PAGES_WITH_OWN_RANGE_ = \[2, 3, 4, 5\];/.test(ui));
   check('and goToPage syncs it', /syncTimeAxisControlsPak_\(index\);/.test(ui));
   check('both controls are disabled, not hidden',
         /\['hoursRange', 'timeWindow'\]/.test(ui) && /el\.disabled = off;/.test(ui),
@@ -1456,15 +1460,16 @@ head('[27] Hours Range is dead on the Data Table, but Time Window is not');
 {
   const ui = R('Web - JsUi.html');
   check('the two lists are separate',
-        /hoursRange: PAGES_WITH_OWN_RANGE_\.concat\(\[5\]\)/.test(ui) &&
+        /hoursRange: PAGES_WITH_OWN_RANGE_\.concat\(\[6\]\)/.test(ui) &&
         /timeWindow: PAGES_WITH_OWN_RANGE_(?!\.concat)/.test(ui),
         'Time Window must stay live on the Data Table - it is what aggregates it');
   check('and each control is judged against its own',
         /var off = PAGES_IGNORING_\[ids\[i\]\]\.indexOf\(index\) !== -1;/.test(ui),
         'one `off` for both is what made them inseparable');
   check('the tooltip does not claim a range picker the page has not got',
-        /index === 5 \? 'The Data Table always shows the whole day'/.test(ui),
-        '"this page has its own From / To" is a plain untruth there');
+        /index === 6 \? 'The Data Table always shows the whole day'/.test(ui) &&
+        /index === 3 \? 'This page covers one production day, 06:00 to 06:00'/.test(ui),
+        '"this page has its own From / To" is a plain untruth on either');
 }
 
 head('[28] Rearrange is inert where there is nothing to rearrange');
@@ -1526,11 +1531,11 @@ head('[30] the share export knows which page it is on');
   const sh = R('Web - JsShare.html');
   check('the slugs are the deep-link list, not a copy of it',
         /var PAGE_SLUGS = \(typeof DEEP_LINK_PAGES_PAK_ !== 'undefined'\)\s*\?\s*DEEP_LINK_PAGES_PAK_/.test(sh));
-  check('the caption has a name for all six pages',
+  check('the caption has a name for all seven pages',
         (/PAGE_TITLES_ = \[([\s\S]*?)\];/.exec(sh) || [0, ''])[1]
-          .split(',').length === 6);
-  check('OS and NPL are among them',
-        /'Operational Support', 'Non-Productive Labour'/.test(sh));
+          .split(',').length === 7);
+  check('Claims, OS and NPL are among them',
+        /'Potential Fraudulent Claims', 'Operational Support',\s*\n\s*'Non-Productive Labour'/.test(sh));
   check('and the caption reads that list rather than one of its own',
         /var pageName = PAGE_TITLES_\[currentPage\] \|\| '';/.test(sh));
   // The capture was being cut off mid-card with a band of empty panel below.

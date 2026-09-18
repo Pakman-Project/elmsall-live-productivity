@@ -761,6 +761,15 @@ var nplCheckFilter = {};
 // so a department of the same name on both pages cannot share a slot. One map
 // rather than two, because the keys already carry which page they belong to.
 
+// ── Potential Fraudulent Claims page ──────────────────────────────────────
+// Its own copies of both logs, fetched for one PRODUCTION day rather than for
+// the axis window the OS and NPL pages use - a rolling 24 hours and a 06:00-to-
+// 06:00 day are not the same range, and a page that quietly scanned the wrong
+// one would be the worst kind of wrong here.
+var fraudOsRows = [];
+var fraudNplRows = [];
+var fraudLogState = null;      // null | 'loading' | 'ready' | an error message
+
 var selectedBonuses = [];
 var currentThreshold = 0;
 var currentMainRows = [];
@@ -833,20 +842,21 @@ var syncAreaChips = true;
 // Deferred per-page rendering: inputs from the last applyLocalFiltersPak() pass,
 // plus which pages still need building. Pages are rendered on first view.
 var pageRenderCtx = null;
-// Overall, Volume, Bonus, OS, NPL, Data Table. OS and NPL were INSERTED at 3
-// and 4 rather than appended, because the rail order IS the page order - the
-// swipe and the arrow keys move by index - so a tab out of place would
-// navigate backwards. NPL sits next to OS because it answers the same question
-// about the other log.
+// Overall, Volume, Bonus, Claims, OS, NPL, Data Table. Each of the three
+// middle pages was INSERTED rather than appended, because the rail order IS
+// the page order - the swipe and the arrow keys move by index - so a tab out
+// of place would navigate backwards. Claims sits before OS and NPL because it
+// is about both of them at once: it is the question you ask first, and the two
+// pages after it are where you go to answer it.
 //
 // The same order, by name, as Code.js's DEEP_LINK_PAGES_. A deep link resolves
 // to an INDEX in this list, so the two have to agree or ?page=data opens the
 // OS page. Declared here rather than written out at the point of use, where a
 // second copy sat and was missed when this page was inserted.
-var DEEP_LINK_PAGES_PAK_ = ['overall', 'volume', 'bonus', 'os', 'npl', 'data'];
-var pageDirty = [true, true, true, true, true, true];
+var DEEP_LINK_PAGES_PAK_ = ['overall', 'volume', 'bonus', 'fraud', 'os', 'npl', 'data'];
+var pageDirty = [true, true, true, true, true, true, true];
 var currentPage = 0;
-var totalPages = 6;
+var totalPages = 7;
 var startX = 0;
 var startY = 0;
 var currentTranslate = 0;
