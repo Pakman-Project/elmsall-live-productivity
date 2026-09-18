@@ -1096,24 +1096,35 @@
     setTimeout(refreshScrollEdgesAll_, 0);
   }
 
-  // Hours Range and Time Window shape the time axis that every chart and the
-  // Data Table are drawn on. The Bonus, OS and NPL pages do not read either:
-  // all three have their own From / To, over the whole 24 hours, and all three
-  // ignore the window size entirely.
+  // Hours Range and Time Window shape the time axis that every chart is drawn
+  // on. Three pages read neither: Bonus, OS and NPL all have their own From /
+  // To, over the whole 24 hours, and all three ignore the window size.
   //
-  // So on those two the pair is disabled and greyed rather than left looking
-  // live. A control you can change that then changes nothing reads as the page
-  // being broken; one that is plainly not yours to change on this page reads as
-  // the page having its own range, which is what the row below it is.
+  // So there the pair is disabled and greyed rather than left looking live. A
+  // control you can change that then changes nothing reads as the page being
+  // broken; one that is plainly not yours to change on this page reads as the
+  // page having its own range, which is what the row below it is.
   //
   // Disabled, not hidden: they keep their place in the row, so the panel does
-  // not reflow every time you move between pages.
+  // not reflow every time you move between pages. (On a PHONE they are hidden
+  // outright - see .hc-field-off in Styles - because there the row is two wide
+  // and there is nothing beside them for the gap to hold open.)
   var PAGES_WITH_OWN_RANGE_ = [2, 3, 4];
 
+  // The Data Table is the odd one: it DOES read Time Window, which is what
+  // aggregates its rows, and does NOT read Hours Range - it draws all 96
+  // blocks of the day whatever that says (see generateMainRows_). So the two
+  // controls cannot be switched together any more, and each carries the list
+  // of pages it is dead on.
+  var PAGES_IGNORING_ = {
+    hoursRange: PAGES_WITH_OWN_RANGE_.concat([5]),
+    timeWindow: PAGES_WITH_OWN_RANGE_
+  };
+
   function syncTimeAxisControlsPak_(index) {
-    var off = PAGES_WITH_OWN_RANGE_.indexOf(index) !== -1;
     var ids = ['hoursRange', 'timeWindow'];
     for (var i = 0; i < ids.length; i++) {
+      var off = PAGES_IGNORING_[ids[i]].indexOf(index) !== -1;
       var el = document.getElementById(ids[i]);
       if (!el) continue;
       el.disabled = off;
@@ -1124,7 +1135,13 @@
         field = field.parentNode;
       }
       if (field && field.classList) field.classList.toggle('hc-field-off', off);
-      el.title = off ? 'This page has its own From / To range' : '';
+      // Two different reasons to be inert, and the tooltip is the only place
+      // that can say which - "this page has its own range" would be a plain
+      // untruth on the Data Table, which has no range picker of its own and
+      // simply always draws the whole day.
+      el.title = !off ? ''
+        : (index === 5 ? 'The Data Table always shows the whole day'
+                       : 'This page has its own From / To range');
     }
   }
 
@@ -1132,6 +1149,10 @@
     if (index < 0 || index >= totalPages) return;
     currentPage = index;
     syncTimeAxisControlsPak_(index);
+    // Every page change - tab, swipe and arrow key - comes through here, so
+    // this is the only place the rearrange button and its leaving-countdown
+    // need hooking. See syncReorderForPagePak_.
+    if (typeof syncReorderForPagePak_ === 'function') syncReorderForPagePak_(index);
     currentTranslate = currentPage * -getSwipeWidth();
     prevTranslate = currentTranslate;
     setSliderPosition();

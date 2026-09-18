@@ -211,6 +211,19 @@
   // ── the record table ──────────────────────────────────────────────────────
 
   var NPL_TASK_COLUMNS_ = ['Bonus', 'Time', 'Site Transfer', 'TM authorised', 'Check'];
+
+  // Site Transfer answers a question only one task asks. On the DESKTOP table
+  // the column stays whatever the task is - a table with a column missing from
+  // some of its copies and not others is a table nobody can read down - but on
+  // a phone each record is a card, there is no column to keep, and a line
+  // reading "SITE TRANSFER  -" on every record of every other task is four
+  // words of nothing on the screen with the least room for it.
+  var NPL_SITE_TRANSFER_TASK_ = 'site transfer';
+
+  function nplIsSiteTransferTaskPak_(task) {
+    return String(task == null ? '' : task).trim().toLowerCase() ===
+           NPL_SITE_TRANSFER_TASK_;
+  }
   // A percentage per column, summing to 100, so every task table down the page
   // lines its columns up with every other one - the bare `table` rule would
   // give five equal fifths and spend as much on the bonus chip as on a name.
@@ -239,7 +252,9 @@
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
       html += '<td class="os-time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
-      html += '<td data-label="Site Transfer">' + osPersonCellPak_(r.siteTransfer) + '</td>';
+      html += '<td data-label="Site Transfer"' +
+              (nplIsSiteTransferTaskPak_(r.task) ? '' : ' class="npl-task-only"') +
+              '>' + osPersonCellPak_(r.siteTransfer) + '</td>';
       html += '<td data-label="TM authorised">' + osPersonCellPak_(r.tmAuth) + '</td>';
       html += '<td data-label="Check">' + nplCheckChipPak_(r.check) + '</td>';
       html += '</tr>';
@@ -447,7 +462,7 @@
         '<i class="fa-solid fa-chevron-down hc-select-caret" aria-hidden="true"></i>' +
         '</div></div>' +
         osMultiSelectHtmlPak_('nplDeptMenu', 'Departments', deptValues, nplDeptFilter,
-                              'toggleNplDeptFilter', 'clearNplDeptFilter') +
+                              'toggleNplDeptFilter', 'clearNplDeptFilter', 'Depts.') +
         osMultiSelectHtmlPak_('nplTaskMenu', 'Tasks', taskValues, nplTaskFilter,
                               'toggleNplTaskFilter', 'clearNplTaskFilter') +
         osMultiSelectHtmlPak_('nplCheckMenu', 'Checks', checkValues, nplCheckFilter,

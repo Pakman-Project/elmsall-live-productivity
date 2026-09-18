@@ -8,7 +8,21 @@
 // hands it over. WEB_APP_URL is supplied by doGet() for the same reason.
 // ============================================================================
 
-var PAGE_SLUGS = ['overall', 'volume', 'bonus', 'data'];
+// NOT a list of its own. It was one, and it still said
+// ['overall','volume','bonus','data'] two pages after OS and NPL were
+// inserted - so sharing from the OS page built ?page=data, named the file
+// e3-data-..., and captioned the screenshot "Data Table". Three wrong
+// answers from one stale copy of something the app already knows.
+var PAGE_SLUGS = (typeof DEEP_LINK_PAGES_PAK_ !== 'undefined')
+  ? DEEP_LINK_PAGES_PAK_
+  : ['overall', 'volume', 'bonus', 'os', 'npl', 'data'];
+
+// What the caption calls each page, in the same order. This one cannot be
+// derived - 'overall' is not what anybody would want written across the top of
+// a screenshot - so it is a second list, pinned against the first by length in
+// tools/test_share.js rather than by hoping.
+var PAGE_TITLES_ = ['Overall Productivity', 'Volume', 'Bonus Numbers',
+                    'Operational Support', 'Non-Productive Labour', 'Data Table'];
 
 // dd/MM/yyyy (as the archive dropdown labels them) -> yyyy-MM-dd for the URL,
 // because slashes need escaping and get mangled when links are pasted into
@@ -162,6 +176,23 @@ function captureCurrentPageCanvas_() {
     var savedScroll = page.scrollTop;
     page.scrollTop = 0;
 
+    // An OPEN breakdown detail is sized by a CSS animation whose last keyframe
+    // is max-height: 300px, over overflow: hidden. On screen that never shows,
+    // because the animation's fill-mode is `none` and the property falls back
+    // to its un-animated value the instant it finishes. html2canvas renders a
+    // CLONE of the document, and in that clone the animation starts again from
+    // the top - so anything past 300px was cut off mid-table with a band of
+    // empty card below it, which is exactly what the export was showing.
+    //
+    // Every one of them is pinned open for the capture and put back after, by
+    // the same relax/restore the ancestors use.
+    var opened = page.querySelectorAll('.breakdown-detail.open');
+    for (var d = 0; d < opened.length; d++) {
+      relax(opened[d], {
+        animation: 'none', maxHeight: 'none', overflow: 'visible', opacity: '1'
+      });
+    }
+
     var node = page.parentElement;
     while (node && node !== document.body) {
       relax(node, { height: 'auto', maxHeight: 'none', overflow: 'visible' });
@@ -221,7 +252,7 @@ function stampCaption_(src) {
     ctx.fillStyle = isLight ? '#ffffff' : '#121212';
     ctx.fillRect(0, 0, out.width, out.height);
 
-    var pageName = ['Overall Productivity', 'Volume', 'Bonus Numbers', 'Data Table'][currentPage] || '';
+    var pageName = PAGE_TITLES_[currentPage] || '';
     var stamp = ($('lastUpdateText') && $('lastUpdateText').textContent) || '';
     var fontPx = Math.max(13, Math.round(barH * 0.42));
 

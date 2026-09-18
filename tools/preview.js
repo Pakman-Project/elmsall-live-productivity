@@ -178,8 +178,12 @@ const STUB = `
   // NPL's own vocabulary. Check is a free cell, so the not-OK wordings are
   // deliberately several different ones rather than a single "Not OK" - the
   // page shows them verbatim, and a preview with only one would not show that.
-  var NPL_DEMO_TASKS_ = ['Cleaning', 'Waiting for work', 'Toolbox talk',
-                         'Breakdown', 'Meeting'];
+  // 'Site Transfer' is in here deliberately: it is the one task whose Site
+  // Transfer cell means anything, and the phone card drops that line on every
+  // other one - so without it in the demo data only HALF that rule is ever on
+  // screen to look at. See nplIsSiteTransferTaskPak_.
+  var NPL_DEMO_TASKS_ = ['Cleaning', 'Waiting for work', 'Site Transfer',
+                         'Toolbox talk', 'Breakdown', 'Meeting'];
   var NPL_DEMO_CHECKS_ = ['OK', 'OK', 'OK', 'Needs review', 'Adjusted', ''];
   var NPL_DEMO_TRANSFER_ = ['No', 'Yes', 'No', 'No', ''];
 

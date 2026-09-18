@@ -449,13 +449,21 @@
     osOpenFilterMenu = opening ? id : null;
   }
 
-  function osMultiSelectHtmlPak_(id, title, values, chosen, handler, clearHandler) {
+  // `short`: what the little heading says on a phone, where the label now sits
+  // BESIDE its control rather than over it and every character it takes is a
+  // character the control does not get. Only the heading shortens - the button
+  // still reads "All Departments" and the menu's aria-label is still the full
+  // word, because those are read in isolation where an abbreviation has
+  // nothing next to it to be understood from.
+  function osMultiSelectHtmlPak_(id, title, values, chosen, handler, clearHandler, short) {
     var picked = values.filter(function (v) { return chosen[v]; });
     var label = picked.length === 0 ? 'All ' + title
               : picked.length === 1 ? picked[0]
               : picked.length + ' of ' + values.length;
     var html = '<div class="os-filter">';
-    html += '<span class="breakdown-time-label">' + title + '</span>';
+    html += '<span class="breakdown-time-label"' +
+            (short ? ' data-short="' + escapeAttrPak(short) + '"' : '') +
+            '>' + title + '</span>';
     html += '<div class="os-multi">';
     // A narrowed filter has to be visible without opening it: the button reads
     // "All Zones" or a name either way, and at a glance across four controls
@@ -958,9 +966,9 @@
         osMultiSelectHtmlPak_('osZoneMenu', 'Zones', zoneValues, osZoneFilter,
                               'toggleOsZoneFilter', 'clearOsZoneFilter') +
         osMultiSelectHtmlPak_('osDeptMenu', 'Departments', deptValues, osDeptFilter,
-                              'toggleOsDeptFilter', 'clearOsDeptFilter') +
+                              'toggleOsDeptFilter', 'clearOsDeptFilter', 'Depts.') +
         osMultiSelectHtmlPak_('osStatusMenu', 'Record Status', statusValues, osStatusFilter,
-                              'toggleOsStatusFilter', 'clearOsStatusFilter');
+                              'toggleOsStatusFilter', 'clearOsStatusFilter', 'Rec. Stat.');
       // The filter row is rebuilt from scratch on every change - including a
       // selection made INSIDE an open menu - so whichever one was open has to
       // be told to open again, or ticking a single box would close the very

@@ -23,16 +23,30 @@
 
 // Which containers can be rearranged. The Data Table is deliberately absent:
 // it is a single table, with nothing to reorder against.
+// `page` is the index the zone lives on, so "does this page have anything to
+// rearrange" is answered from the same list that says what CAN be rearranged,
+// rather than from a second one that would have to be remembered every time a
+// page is inserted - which is exactly how PAGE_SLUGS in JsShare came to be two
+// pages out of date.
 var REORDER_ZONES_ = [
-  { zoneKey: 'overall', containerId: 'page1Charts' },
-  { zoneKey: 'volume',  containerId: 'volumeChartsContainer' },
+  { zoneKey: 'overall', containerId: 'page1Charts', page: 0 },
+  { zoneKey: 'volume',  containerId: 'volumeChartsContainer', page: 1 },
   // The Bonus page's panels are generated per work area and rebuilt on every
   // render, so unlike the other two zones its members come and go: an area with
   // no activity in the selected window produces no panel at all. applyChartOrder_
   // copes with that already — it only moves keys that are present, and appends
   // anything the saved order does not mention.
-  { zoneKey: 'bonus',   containerId: 'bonusTablesContainer' }
+  { zoneKey: 'bonus',   containerId: 'bonusTablesContainer', page: 2 }
 ];
+
+// The pages any of that is on: [0, 1, 2]. OS, NPL and the Data Table have no
+// panels, so the mode has nothing to offer there.
+var REORDER_PAGES_ = REORDER_ZONES_.map(function (z) { return z.page; })
+  .filter(function (p, i, all) { return all.indexOf(p) === i; });
+
+function reorderPageHasPanelsPak_(index) {
+  return REORDER_PAGES_.indexOf(index) !== -1;
+}
 
 // { overall: ['overviewVol','perf',...], volume: ['vol0','vol3',...] }
 var chartOrderState = {};
@@ -419,7 +433,110 @@ function refreshReorderBars_() {
 }
 
 function toggleReorderMode_() {
+  // The button is disabled off the chart pages, so this is the belt to that
+  // brace: the tour drives it directly, and a keyboard shortcut or a stale
+  // click could still arrive on a page with no panels on it.
+  if (!_reorderMode && !reorderPageHasPanelsPak_(currentPage)) return;
   setReorderMode_(!_reorderMode);
+}
+
+// ---- Walking off the charts with the mode still on ------------------------
+// Rearrange mode covers every panel in an edit bar and puts a persistent toast
+// on screen. Both are invisible on a page with no panels, so the mode would sit
+// there switched on with nothing to show for it, and the next thing the user
+// sees is their charts covered in bars they do not remember asking for.
+//
+// Closed on a countdown rather than immediately, because a swipe past a page is
+// not a decision: the Data Table sits directly after NPL, and getting to it
+// from Bonus crosses two pages the mode is dead on. Five seconds is long enough
+// to swipe through and back without losing the mode, and short enough that
+// nobody is left in it.
+var REORDER_LEAVE_SECONDS_ = 5;
+var _reorderLeaveTimer = null;
+var _reorderLeaveLeft = 0;
+
+function cancelReorderLeavePak_() {
+  if (_reorderLeaveTimer) { clearInterval(_reorderLeaveTimer); }
+  _reorderLeaveTimer = null;
+  _reorderLeaveLeft = 0;
+}
+
+function reorderLeaveMessagePak_(left) {
+  return 'You have left the charts. Rearrange mode closes and your order is ' +
+         'saved in ' + left + 's - go back to a chart page to keep editing.';
+}
+
+// The toast is replaced wholesale only once; every tick after that rewrites the
+// text in place. Re-showing it each second would restart its slide-in
+// animation, which reads as five separate toasts rather than one counting down.
+function reorderLeaveTickPak_() {
+  var host = document.getElementById('toastHost');
+  var text = host && host.querySelector('.toast-text');
+  if (text) { text.textContent = reorderLeaveMessagePak_(_reorderLeaveLeft); }
+  else { showReorderLeaveToastPak_(); }
+}
+
+function showReorderLeaveToastPak_() {
+  showToastPak(reorderLeaveMessagePak_(_reorderLeaveLeft), {
+    icon: 'fa-triangle-exclamation',
+    persist: true,
+    onClose: function () { cancelReorderLeavePak_(); setReorderMode_(false); },
+    actions: [
+      { label: 'Save now', primary: true,
+        onClick: function () { cancelReorderLeavePak_(); setReorderMode_(false); } }
+    ]
+  });
+}
+
+function startReorderLeavePak_() {
+  if (_reorderLeaveTimer) return;   // already counting; do not restart it
+  _reorderLeaveLeft = REORDER_LEAVE_SECONDS_;
+  showReorderLeaveToastPak_();
+  _reorderLeaveTimer = setInterval(function () {
+    _reorderLeaveLeft--;
+    if (_reorderLeaveLeft <= 0) {
+      cancelReorderLeavePak_();
+      // setReorderMode_(false) dismisses the toast and calls
+      // captureChartOrder_, which is the save.
+      setReorderMode_(false);
+      return;
+    }
+    reorderLeaveTickPak_();
+  }, 1000);
+}
+
+// Called by goToPage, after currentPage has moved.
+function syncReorderForPagePak_(index) {
+  var has = reorderPageHasPanelsPak_(index);
+
+  var btn = document.getElementById('reorderBtn');
+  if (btn && !_reorderMode) {
+    // Only while the mode is OFF. Disabling the button that says "Done" would
+    // strand somebody who is mid-edit on a page where they cannot leave the
+    // mode - which is the one place the button matters most.
+    btn.disabled = !has;
+    if (!has) {
+      btn.setAttribute('title', 'Nothing to rearrange on this page');
+      btn.setAttribute('aria-label', 'Nothing to rearrange on this page');
+    } else {
+      btn.setAttribute('title', 'Rearrange charts');
+      btn.setAttribute('aria-label', 'Rearrange charts');
+    }
+  } else if (btn) {
+    btn.disabled = false;
+  }
+
+  if (!_reorderMode) { cancelReorderLeavePak_(); return; }
+
+  if (has) {
+    // Back before the count ran out: the mode was never actually left.
+    if (_reorderLeaveTimer) {
+      cancelReorderLeavePak_();
+      showRearrangeToast_('Back to the charts.');
+    }
+  } else {
+    startReorderLeavePak_();
+  }
 }
 
 function setReorderMode_(on) {

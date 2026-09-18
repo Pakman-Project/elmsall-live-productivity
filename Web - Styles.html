@@ -690,6 +690,17 @@ body.loading-skeleton #mainTableWrapper::after {
   flex: 0 0 auto;
 }
 .header-icon-btn:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* Rearrange, on a page with no panels on it. Dimmed and inert rather than
+   hidden, for the same reason Hours Range is on the pages that ignore it: a
+   button that vanishes and comes back as you move between pages reads as the
+   header being broken, and one that is plainly not for this page reads as the
+   page not having any. */
+.header-icon-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .header-icon-btn i { font-size: 19px; }
 
 .app-body {
@@ -3377,10 +3388,15 @@ body.page-scrolled-far .back-to-top {
   color: var(--muted);
 }
 
-.os-job { margin-top: 8px; }
+/* The task name is a heading over its own table and sits directly under the
+   PREVIOUS task's table, with nothing but these two margins keeping the three
+   apart. At 8/4 it read as belonging to the table above it rather than the one
+   below, which is the opposite of what a heading is for. */
+.os-job { margin-top: 18px; }
+.os-job:first-child { margin-top: 4px; }
 
 .os-job-head {
-  margin-bottom: 4px;
+  margin-bottom: 9px;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -3706,6 +3722,11 @@ body.page-scrolled-far .back-to-top {
     white-space: normal;
   }
   .os-job-table td:last-child { border-bottom: none; }
+  /* A cell whose column only means anything on one task - see
+     nplIsSiteTransferTaskPak_. Written into the table either way so the
+     DESKTOP column stays whole, and dropped only here, where there is no
+     column left to keep and the line would be four words of nothing. */
+  .os-job-table td.npl-task-only { display: none; }
   .os-job-table td::before {
     content: attr(data-label);
     flex: 0 0 auto;
@@ -3726,10 +3747,38 @@ body.page-scrolled-far .back-to-top {
      rhythm, as the Bonus page. */
   .os-filters { display: contents; }
   .os-filter { width: auto; min-width: 0; }
+
+  /* Label BESIDE its control rather than over it, which buys back a whole row
+     of height per pair of filters - and on a page whose point is the list
+     underneath them, the filters are not what the screen is for.
+     --mob-label-w is shared with the Bonus page's own controls and with From /
+     To (see the .bonus-page-controls block far below) so that every control on
+     the page, whatever builds it, starts at the same x. Without one number in
+     one place they drift apart the moment any label changes. */
+  .os-filter {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
   .os-filter .breakdown-time-label {
     font-size: 11px;
     font-weight: 500;
     color: var(--muted);
+    flex: 0 0 var(--mob-label-w);
+    min-width: var(--mob-label-w);
+  }
+
+  /* "Departments" and "Record Status" do not fit beside a control in half a
+     phone's width, and the pair of them is what sets --mob-label-w for
+     everything else. The full word stays in the DOM - it is what a screen
+     reader reads, and what the button below still says - and is swapped for
+     the short one visually only. */
+  .breakdown-time-label[data-short] { font-size: 0; }
+  .breakdown-time-label[data-short]::before {
+    content: attr(data-short);
+    font-size: 11px;
+    font-weight: 500;
   }
   .os-filter .os-type-select,
   .os-filter .os-multi,
@@ -5119,12 +5168,14 @@ body.page-scrolled-far .back-to-top {
     font-size: 11px;
     font-weight: 500;
     margin-right: 0;
+    flex: 0 0 var(--mob-label-w);
+    min-width: var(--mob-label-w);
   }
   .vol-control-group {
     flex: 1 1 calc(50% - 4px);
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
   }
   .vol-control-group select {
     flex: 1;
@@ -6339,10 +6390,17 @@ kbd {
 }
 
 @media (max-width: 700px) {
-  /* Bonus page controls laid out like the Volume page: label above its
-     dropdown, same label size, and the four dropdowns aligned 2 x 2. The two
-     wrappers collapse with display:contents so their children become direct
-     grid items. */
+  /* How much room every filter label on a phone gets, on every page. One
+     number, because the point of it is that the CONTROLS line up: Type,
+     Zones, Depts., Rec. Stat., Display Mode, Rows, Areas, From and To are
+     built by four different bits of code, and the only thing that makes their
+     dropdowns share an edge is that they all start after the same gap.
+     Sized to "Rec. Stat.", the longest of them once abbreviated. */
+  :root { --mob-label-w: 56px; }
+
+  /* Bonus page controls: label beside its dropdown, and the dropdowns aligned
+     2 x 2. The two wrappers collapse with display:contents so their children
+     become direct grid items. */
   .bonus-page-controls {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -6361,9 +6419,9 @@ kbd {
   }
   .bonus-control-group {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 3px;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
     width: auto;
     min-width: 0;
     flex: initial;
@@ -6376,13 +6434,14 @@ kbd {
     font-weight: 500;
     color: var(--muted);
     margin: 0;
-    min-width: 0;
+    flex: 0 0 var(--mob-label-w);
+    min-width: var(--mob-label-w);
   }
   .bonus-control-group > .row-select {
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
     max-width: none;
-    flex: initial;
   }
   /* Areas stands on its own full-width row. It is the last item before the
      time bar in the merged grid, so the auto-flow used to pair it with
@@ -6414,8 +6473,8 @@ kbd {
     font-weight: 500;
     color: var(--muted);
     margin: 0;
-    min-width: 30px;
-    flex-shrink: 0;
+    flex: 0 0 var(--mob-label-w);
+    min-width: var(--mob-label-w);
   }
   .bonus-page-controls .time-row .breakdown-time-select {
     flex: 1 1 0;

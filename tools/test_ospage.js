@@ -1352,35 +1352,83 @@ head('[24] a filter that is narrowing something says so');
         'green/amber/red already mean a verdict on this page');
 }
 
-head('[25] From/To: label inline with its own select, both on one row');
-// The Bonus page's twin was label-above-select stacked, same as every other
-// control there - which meant TWO grid rows per time-row (a label row, then a
-// select row), so the auto-flow put To a full row below From with Areas
-// paired against From's label the whole time. Shared with OS and NPL through
-// the same .bonus-page-controls .time-row selector, which is how those two
-// already had From and To on one row - four filters is an even count, so
-// nothing was ever left over to pair against them the way Areas was.
+head('[25] every filter label sits beside its control, and they all line up');
+// These were stacked, label over control, on every page - which cost a row of
+// height per pair and, on the Bonus page, split each time-row across TWO grid
+// rows so To landed a full row below From with Areas paired against From's
+// label. All of them are inline now, and the alignment claim is the whole
+// point: Type, Zones, Depts., Rec. Stat., Display Mode, Rows, Areas, From and
+// To are built by four separate bits of code, and the only thing that makes
+// their dropdowns share an edge is that every label reserves the same width.
 {
   const css = R('Web - Styles.html');
   const mob = mediaBlockFor(css, '.bonus-page-controls .time-row {');
-  check('the time-row is a horizontal flex row, not a stacked column',
+
+  check('one width, declared once, for all of them',
+        /:root \{ --mob-label-w: \d+px; \}/.test(mob) &&
+        (css.match(/--mob-label-w:\s*\d+px/g) || []).length === 1,
+        'two numbers in two places is how they drift apart');
+  // Each of the four families that draws a filter label. Matched against the
+  // whole stylesheet rather than a extracted block: every one of these
+  // selectors ALSO has a desktop rule earlier in the file, and the property
+  // being looked for exists only in the mobile one - so the search cannot
+  // land on the wrong copy, and does not depend on picking the right block
+  // out first.
+  [['the OS/NPL filters', '\\.os-filter \\.breakdown-time-label'],
+   ['From and To', '\\.bonus-page-controls \\.time-row \\.breakdown-time-label'],
+   ['Display Mode, Rows and Areas', '\\.bonus-control-group > label'],
+   ['the Volume control', '\\.volume-controls label']
+  ].forEach(([what, sel]) => {
+    check(what + ' reserve that same width',
+          new RegExp(sel + ' \\{[\\s\\S]{0,220}flex: 0 0 var\\(--mob-label-w\\);').test(css),
+          'or its dropdown starts at an x of its own');
+  });
+
+  // Inline, not stacked - the three wrappers that used to be columns.
+  check('the OS/NPL filter is a row now',
+        /\.os-filter \{\s*display: flex;\s*flex-direction: row;/.test(css),
+        'the desktop rule above it is the same selector set to column');
+  check('so is the Bonus control group',
+        /\.bonus-control-group \{\s*display: flex;\s*flex-direction: row;/.test(mob));
+  check('and the time-row',
         /\.bonus-page-controls \.time-row \{[\s\S]{0,120}flex-direction: row;/.test(mob));
-  check('the label keeps a FIXED width rather than its own text width',
-        /\.bonus-page-controls \.time-row \.breakdown-time-label \{[\s\S]{0,160}min-width: 30px;/.test(mob),
-        '"From" and "To" are not the same length; without this the two selects step apart');
-  check('the select fills whatever the label left, not a fixed width of its own',
-        /\.bonus-page-controls \.time-row \.breakdown-time-select \{[\s\S]{0,120}flex: 1 1 0;/.test(mob));
+  check('the select fills whatever the label left, not a width of its own',
+        /\.bonus-page-controls \.time-row \.breakdown-time-select \{[\s\S]{0,120}flex: 1 1 0;/.test(mob) &&
+        /\.bonus-control-group > \.row-select \{\s*flex: 1 1 0;/.test(mob));
   // Areas, the odd one out among Display Mode / Rows / Areas, is what used to
   // land beside From's label. Pushed onto a row of its own so the grid's next
   // pair is From and To rather than Areas and whichever came first.
   check('Areas is pushed onto a full-width row of its own',
         /\.bonus-control-group:has\(#bonusAreaCount\) \{\s*grid-column: 1 \/ -1;/.test(mob),
         'the item before From/To in the markup, and the one the auto-flow used to pair with it');
-  // The plain three controls are UNCHANGED - this is only about the time-row.
-  check('Display Mode and Rows are still label-above-select, untouched',
-        /\.bonus-control-group \{[\s\S]{0,140}flex-direction: column;/.test(mob) &&
-        !/\.bonus-control-group,\s*\n\s*\.bonus-page-controls \.time-row/.test(mob),
-        'the two selectors used to share one rule; they must not still');
+}
+
+head('[25b] the two long filter names abbreviate, visually only');
+// "Departments" and "Record Status" do not fit beside a control in half a
+// phone's width. The full word has to stay in the DOM: it is the accessible
+// name, and it is still what the button underneath says when nothing is
+// picked ("All Departments"), where an abbreviation would have nothing beside
+// it to be understood from.
+{
+  const css = R('Web - Styles.html');
+  const mob = mediaBlockFor(css, '.breakdown-time-label[data-short]');
+  const page = R('Web - JsPageOs.html');
+  const npl = R('Web - JsPageNpl.html');
+
+  check('the short form rides on an attribute, not in the text',
+        /\.breakdown-time-label\[data-short\] \{ font-size: 0; \}/.test(mob) &&
+        /\.breakdown-time-label\[data-short\]::before \{\s*content: attr\(data-short\);/.test(mob));
+  check('Departments abbreviates on both pages',
+        /'toggleOsDeptFilter', 'clearOsDeptFilter', 'Depts\.'/.test(page) &&
+        /'toggleNplDeptFilter', 'clearNplDeptFilter', 'Depts\.'/.test(npl));
+  check('and Record Status on the one that has it',
+        /'toggleOsStatusFilter', 'clearOsStatusFilter', 'Rec\. Stat\.'/.test(page));
+  check('the full word is still what the markup carries',
+        /'<span class="breakdown-time-label"' \+\s*\n\s*\(short \? ' data-short="' \+ escapeAttrPak\(short\)/.test(page) &&
+        /'>' \+ title \+ '<\/span>'/.test(page),
+        'the abbreviation is a display swap; the DOM text is the real name');
+  check('and the button below it still says the full one',
+        /var label = picked\.length === 0 \? 'All ' \+ title/.test(page));
 }
 
 head('[26] Display Mode reads the same weight on Volume as it does on Bonus');
@@ -1398,6 +1446,101 @@ head('[26] Display Mode reads the same weight on Volume as it does on Bonus');
   check('matching the weight Bonus already carries there',
         /\.bonus-control-group > label \{[\s\S]{0,80}font-weight: 500;/.test(css),
         'the two rules should read the same number, not merely both be non-default');
+}
+
+head('[27] Hours Range is dead on the Data Table, but Time Window is not');
+// The Data Table draws all 96 blocks of the day whatever Hours Range says (see
+// generateMainRows_), and DOES read Time Window, which is what aggregates its
+// rows. So the two controls stopped being switchable together: each carries
+// its own list of the pages it is dead on.
+{
+  const ui = R('Web - JsUi.html');
+  check('the two lists are separate',
+        /hoursRange: PAGES_WITH_OWN_RANGE_\.concat\(\[5\]\)/.test(ui) &&
+        /timeWindow: PAGES_WITH_OWN_RANGE_(?!\.concat)/.test(ui),
+        'Time Window must stay live on the Data Table - it is what aggregates it');
+  check('and each control is judged against its own',
+        /var off = PAGES_IGNORING_\[ids\[i\]\]\.indexOf\(index\) !== -1;/.test(ui),
+        'one `off` for both is what made them inseparable');
+  check('the tooltip does not claim a range picker the page has not got',
+        /index === 5 \? 'The Data Table always shows the whole day'/.test(ui),
+        '"this page has its own From / To" is a plain untruth there');
+}
+
+head('[28] Rearrange is inert where there is nothing to rearrange');
+// The mode covers every panel in an edit bar and puts a persistent toast up.
+// Both are invisible on a page with no panels, so it would sit switched on
+// with nothing to show for it.
+{
+  const ro = R('Web - JsReorder.html');
+  const ui = R('Web - JsUi.html');
+  const css = R('Web - Styles.html');
+
+  check('the pages are DERIVED from the zones, not listed again',
+        /page: 0 \}/.test(ro) && /page: 1 \}/.test(ro) && /page: 2 \}/.test(ro) &&
+        /REORDER_PAGES_ = REORDER_ZONES_\.map/.test(ro),
+        'a second list is how PAGE_SLUGS came to be two pages out of date');
+  check('the button goes disabled off them',
+        /btn\.disabled = !has;/.test(ro) &&
+        /\.header-icon-btn\[disabled\] \{[\s\S]{0,120}pointer-events: none;/.test(css));
+  check('...but never while the mode is ON',
+        /if \(btn && !_reorderMode\) \{/.test(ro),
+        'disabling Done would strand somebody mid-edit where they cannot leave');
+  check('and the mode refuses to open there anyway',
+        /if \(!_reorderMode && !reorderPageHasPanelsPak_\(currentPage\)\) return;/.test(ro),
+        'the tour drives the toggle directly, past the button');
+  check('one hook, on the one path every page change takes',
+        /syncReorderForPagePak_\(index\);/.test(ui) &&
+        (ui.match(/syncReorderForPagePak_\(/g) || []).length === 1);
+}
+
+head('[29] leaving the charts mid-edit closes the mode on a countdown');
+// A swipe past a page is not a decision - the Data Table sits two pages after
+// Bonus, and getting there crosses two the mode is dead on.
+{
+  const ro = R('Web - JsReorder.html');
+  check('five seconds, named once',
+        /var REORDER_LEAVE_SECONDS_ = 5;/.test(ro));
+  check('the count starts on leaving',
+        /\} else \{\s*startReorderLeavePak_\(\);/.test(ro));
+  check('and is cancelled by coming back before it ends',
+        /if \(has\) \{[\s\S]{0,220}cancelReorderLeavePak_\(\);\s*showRearrangeToast_\('Back to the charts\.'\)/.test(ro),
+        'and says so, rather than silently swapping the toast back');
+  check('a second page change does not restart it',
+        /if \(_reorderLeaveTimer\) return;\s*\/\/ already counting/.test(ro),
+        'crossing OS then NPL would otherwise give five fresh seconds each');
+  check('the end of the count is what saves',
+        /cancelReorderLeavePak_\(\);[\s\S]{0,200}setReorderMode_\(false\);/.test(ro) &&
+        /captureChartOrder_\(\);/.test(ro));
+  check('the text counts down in place rather than re-showing the toast',
+        /text\.textContent = reorderLeaveMessagePak_\(_reorderLeaveLeft\);/.test(ro),
+        'five slide-ins reads as five toasts, not one counting down');
+  check('and the toast offers the same exit its countdown would reach',
+        /label: 'Save now'/.test(ro));
+}
+
+head('[30] the share export knows which page it is on');
+// One stale four-entry list gave three wrong answers at once: ?page=data from
+// the OS page, a file named e3-data-..., and "Data Table" across the caption.
+{
+  const sh = R('Web - JsShare.html');
+  check('the slugs are the deep-link list, not a copy of it',
+        /var PAGE_SLUGS = \(typeof DEEP_LINK_PAGES_PAK_ !== 'undefined'\)\s*\?\s*DEEP_LINK_PAGES_PAK_/.test(sh));
+  check('the caption has a name for all six pages',
+        (/PAGE_TITLES_ = \[([\s\S]*?)\];/.exec(sh) || [0, ''])[1]
+          .split(',').length === 6);
+  check('OS and NPL are among them',
+        /'Operational Support', 'Non-Productive Labour'/.test(sh));
+  check('and the caption reads that list rather than one of its own',
+        /var pageName = PAGE_TITLES_\[currentPage\] \|\| '';/.test(sh));
+  // The capture was being cut off mid-card with a band of empty panel below.
+  check('an open breakdown is pinned open for the capture',
+        /page\.querySelectorAll\('\.breakdown-detail\.open'\)/.test(sh) &&
+        /animation: 'none', maxHeight: 'none', overflow: 'visible'/.test(sh),
+        'html2canvas clones the document, and the clone re-runs the 300px animation');
+  check('and put back by the same restore the ancestors use',
+        /relax\(opened\[d\], \{/.test(sh),
+        'a capture that throws must not leave the page pinned open');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
