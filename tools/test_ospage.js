@@ -1137,21 +1137,29 @@ head('[19] only one filter menu can be open at a time');
 {
   check('one shared slot, not a flag per menu',
         /var osOpenFilterMenu = null;/.test(R('Web - JsState.html')));
-  // Both pages' menus in the one list, and the one open slot. Only one page
-  // is on screen at a time, so a slot per page would buy nothing and the
-  // click-away handler would need to know which page it was closing for.
-  check('every menu id is declared once and reused',
-        /var OS_FILTER_MENU_IDS_ = \['osZoneMenu', 'osDeptMenu', 'osStatusMenu',\s*'nplDeptMenu', 'nplTaskMenu', 'nplCheckMenu'\];/.test(PAGE));
-  check('opening one force-closes the other two, in the same pass',
-        /function osFilterMenuClick_\(id\) \{[\s\S]{0,220}for \(var i = 0; i < OS_FILTER_MENU_IDS_\.length; i\+\+\) \{[\s\S]{0,120}toggleOsMenu_\(OS_FILTER_MENU_IDS_\[i\], OS_FILTER_MENU_IDS_\[i\] === id && opening\);/
+  // The menus are FOUND, not listed. This was a hand-kept array of ids, and
+  // the Claims page's five were added to the page without being added to it -
+  // so all five dropdowns were dead on arrival, because osFilterMenuClick_
+  // only ever opens a menu whose id it is holding. Reading the DOM means a new
+  // filter works the moment it is drawn.
+  check('the menus are found in the DOM, not kept in a list',
+        /function osFilterMenuIdsPak_\(\) \{[\s\S]{0,260}querySelectorAll\('\.os-multi-menu'\)/.test(PAGE) &&
+        !/OS_FILTER_MENU_IDS_/.test(PAGE),
+        'a list is a second place to remember, and it was already one page out of date');
+  check('opening one force-closes every other, in the same pass',
+        /function osFilterMenuClick_\(id\) \{[\s\S]{0,260}var ids = osFilterMenuIdsPak_\(\);[\s\S]{0,160}toggleOsMenu_\(ids\[i\], ids\[i\] === id && opening\);/
           .test(PAGE));
   check('the buttons call the exclusive opener, not the bare painter',
         /onclick="osFilterMenuClick_\(\\'' \+ id \+ '\\'\)"/.test(PAGE) &&
         !/onclick="toggleOsMenu_\(\\'' \+ id \+ '\\'\)"/.test(PAGE));
-  check('click-away closes all three now, Record Status included',
-        /for \(var i = 0; i < OS_FILTER_MENU_IDS_\.length; i\+\+\) \{\s*\n\s*toggleOsMenu_\(OS_FILTER_MENU_IDS_\[i\], false\);/
-          .test(PAGE),
-        'the old handler only knew about Zones and Departments');
+  check('click-away closes whatever is open, on any page',
+        /var ids = osFilterMenuIdsPak_\(\);\s*\n\s*for \(var i = 0; i < ids\.length; i\+\+\) \{\s*\n\s*toggleOsMenu_\(ids\[i\], false\);/
+          .test(PAGE));
+  // The one class every multi-select menu carries, which is what makes the
+  // lookup above work. If the builder stopped writing it, every menu on every
+  // page would go back to being unopenable.
+  check('and the builder gives every menu that class',
+        /class="warehouse-menu os-multi-menu" id="' \+ id \+ '"/.test(PAGE));
 
   // Item 2: a selection inside an open menu rebuilds the whole filter row -
   // every toggle/clear handler calls renderOsPagePak - and used to lose the
@@ -1626,6 +1634,140 @@ head('[31] a bonus filter opens and marks the rows holding that person');
   check('the NPL page shares the rule rather than copying it',
         /nodeOpenStatePak_\(dKey, dept\.heads\)/.test(npl) &&
         !/function nodeOpenStatePak_/.test(npl));
+}
+
+head('[32] a bonus filter widens the range to cover that person');
+// Opening the rows that hold somebody is no use if the From / To they are
+// outside of has already dropped them: a filter on, a highlight promised, and
+// an empty card.
+{
+  // A pair of selects over four quarter-hours, the way the real ones are
+  // filled: the value IS the block, and both ends are read off it.
+  function selects(n) {
+    const mk = (i) => {
+      const h = 8 + Math.floor(i / 4), m = (i % 4) * 15;
+      const e = (m === 45) ? [h + 1, 0] : [h, m + 15];
+      const p = (x) => String(x).padStart(2, '0');
+      return '09/09/2026 ' + p(h) + ':' + p(m) + ' - 09/09/2026 ' + p(e[0]) + ':' + p(e[1]);
+    };
+    const opts = [];
+    for (let i = 0; i < n; i++) opts.push({ value: mk(i) });
+    return { options: opts, selectedIndex: 0, get value() { return this.options[this.selectedIndex].value; } };
+  }
+  const from = selects(8), to = selects(8);
+  to.selectedIndex = 1;
+  ctx.$ = (id) => (id === 'osFrom' ? from : id === 'osTo' ? to : null);
+  ctx.selectedBonuses = [];
+  ctx._bonusRangePak_ = {};
+
+  const row = (b, f, t) => ({ bonus: b, date: '09/09/2026', from: f, to: t });
+  const rows = [row('AAA', '08:20', '09:10'), row('BBB', '08:00', '08:10')];
+
+  // Nothing picked: the pickers are left exactly alone.
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('with nothing picked the range is untouched',
+        from.selectedIndex === 0 && to.selectedIndex === 1);
+
+  ctx.selectedBonuses = ['AAA'];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('picking someone widens From to the block their first record starts in',
+        from.options[from.selectedIndex].value.indexOf('08:15') !== -1,
+        from.options[from.selectedIndex].value);
+  check('...and To to the block their last record ends in',
+        to.options[to.selectedIndex].value.indexOf('09:00 - 09/09/2026 09:15') !== -1,
+        to.options[to.selectedIndex].value);
+
+  // Re-running while the SAME person is picked must not fight a manual change.
+  from.selectedIndex = 0;
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('a manual change while filtered survives the next draw',
+        from.selectedIndex === 0,
+        'a range re-imposed every render would make the pickers unusable');
+
+  // Clearing gives back what the reader had, not what the filter left.
+  ctx.selectedBonuses = [];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('clearing restores the reader\'s own range',
+        from.options[from.selectedIndex].value.indexOf('08:00') !== -1 &&
+        to.selectedIndex === 1,
+        from.options[from.selectedIndex].value + ' / ' + to.selectedIndex);
+  check('and forgets it, so the next filter saves afresh',
+        !ctx._bonusRangePak_.os);
+
+  // Picking a SECOND person must not "restore" to the first pick's widening.
+  ctx.selectedBonuses = ['AAA'];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  ctx.selectedBonuses = ['AAA', 'BBB'];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('a second pick widens again without re-saving',
+        from.options[from.selectedIndex].value.indexOf('08:00') !== -1,
+        'BBB starts at 08:00, so the pair has to reach back to it');
+  ctx.selectedBonuses = [];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('...and clearing still gives back the ORIGINAL range',
+        to.selectedIndex === 1,
+        'saving on every pick would have restored to the first widening');
+
+  check('a picked bonus that cannot be placed on a clock moves nothing',
+        (function () {
+          ctx.selectedBonuses = ['NOPE'];
+          const a = from.selectedIndex, b = to.selectedIndex;
+          ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', [row('NOPE', 'zz', 'zz')]);
+          const same = from.selectedIndex === a && to.selectedIndex === b;
+          ctx.selectedBonuses = [];
+          ctx._bonusRangePak_ = {};
+          return same;
+        })(),
+        'widening to a span that does not exist would be worse than not widening');
+
+  check('OS and NPL keep their own saved range',
+        /applyBonusRangePak_\('os', 'osFrom', 'osTo'/.test(PAGE) &&
+        /applyBonusRangePak_\('npl', 'nplFrom', 'nplTo'/.test(R('Web - JsPageNpl.html')));
+  check('and it runs after the options exist, before the window is read',
+        /ensureOsTimeSelects_\(\);[\s\S]{0,140}applyBonusRangePak_\('os'[\s\S]{0,120}var win = osSelectedWindowPak_\(\);/.test(PAGE));
+  delete ctx.$;
+}
+
+head('[33] the sort control is the sixth filter, and the carets line up');
+{
+  const css = R('Web - Styles.html');
+  const INDEX = R('Web - Index.html');
+  check('the Claims sort sits in the grid as a filter, not a strip of its own',
+        /<div class="os-filter fraud-sort-filter">/.test(INDEX) &&
+        !/\.fraud-sort-mobile \{ grid-column: 1 \/ -1; \}/.test(css));
+  check('and it is named, like the five above it',
+        /<span class="breakdown-time-label">Sort by<\/span>/.test(INDEX));
+  check('hidden where the column headings do the sorting',
+        /\.fraud-sort-filter \{ display: none; \}/.test(css));
+  check('the Data Table\'s sort is named too',
+        /<span class="main-sort-label">Sort by<\/span>/.test(INDEX) &&
+        /\.main-sort-label \{/.test(css));
+  // One number for every caret in the control panel. They were at 27px, 9px
+  // and 12px - three values in one row of six controls.
+  check('one inset, declared once',
+        /:root \{ --caret-inset: 9px; \}/.test(css) &&
+        (css.match(/--caret-inset:\s*\d+px/g) || []).length === 1);
+  check('the overlaid carets are moved to it',
+        /\.hc-select-caret \{[\s\S]{0,120}right: var\(--caret-inset\);/.test(css),
+        'the <select> overlay is the only one of the four that CAN be moved');
+  // The Date button was grouped with #bonusSearch for its SIZING and took
+  // that field's 26px of right padding with it - room for a search icon it
+  // has not got, which is what pushed its caret 27px in while the rest sat
+  // at 9. Four !important rules set that padding, so the fix is to stop
+  // asking for it rather than to out-rank them.
+  // Scanned per RULE - split on the closing brace - rather than with a window
+  // wide enough to cover one, which reaches into the rule after it and reads
+  // that rule's padding as this one's. That mistake has been made twice in
+  // this file already.
+  const rulesWithBoth = css.split('}').filter(
+    r => r.indexOf('#datePickerBtn') !== -1 && r.indexOf('padding-right: 26px') !== -1);
+  check('and the Date button no longer takes the search field\'s padding',
+        rulesWithBoth.length === 0,
+        'that padding is the search icon\'s, and the Date button has no icon on that side');
+  const searchKeeps = css.split('}').filter(
+    r => r.indexOf('#bonusSearch') !== -1 && r.indexOf('padding-right: 26px') !== -1);
+  check('...while the search field keeps it', searchKeeps.length === 3,
+        'the normal size, the scrolled one and the phone - was ' + searchKeeps.length);
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

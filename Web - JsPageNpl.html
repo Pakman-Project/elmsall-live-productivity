@@ -350,6 +350,8 @@
     var body = document.getElementById('nplBody');
     if (!body) return;
     ensureTimeSelectsPak_('nplFrom', 'nplTo');
+    // Same rule, same function, its own saved range - see applyBonusRangePak_.
+    applyBonusRangePak_('npl', 'nplFrom', 'nplTo', nplLogRows);
 
     var win = selectedWindowPak_('nplFrom', 'nplTo');
     var badge = document.getElementById('nplRangeBadge');

@@ -432,12 +432,26 @@
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
-  // Both pages' menus, in one list. There is one open slot for all of them,
-  // which is right rather than merely convenient: only one page is on screen at
-  // a time, and the click-away handler below has to close whichever is open
-  // without caring which page it belonged to.
-  var OS_FILTER_MENU_IDS_ = ['osZoneMenu', 'osDeptMenu', 'osStatusMenu',
-                             'nplDeptMenu', 'nplTaskMenu', 'nplCheckMenu'];
+  // Every multi-select menu currently in the document, found rather than
+  // listed. There is one open slot for all of them, which is right rather than
+  // merely convenient: only one page is on screen at a time, and the click-away
+  // handler below has to close whichever is open without caring which page it
+  // belonged to.
+  //
+  // This WAS a hand-kept array of ids, and the Claims page's five were added
+  // to the page without being added to it - so every one of those dropdowns
+  // was dead on arrival. osFilterMenuClick_ only ever opens a menu whose id is
+  // in this list, and a menu that is not in it can never be opened at all.
+  // Reading the DOM means a new filter works the moment it is drawn, and the
+  // whole class of bug goes with the list.
+  function osFilterMenuIdsPak_() {
+    var out = [];
+    var menus = document.querySelectorAll('.os-multi-menu');
+    for (var i = 0; i < menus.length; i++) {
+      if (menus[i].id) out.push(menus[i].id);
+    }
+    return out;
+  }
 
   // The button's own onclick - as opposed to a re-render restoring state, this
   // is the user actually asking for a menu to open or close. One open slot for
@@ -445,8 +459,9 @@
   // them can never be on screen fighting for the same space at once.
   function osFilterMenuClick_(id) {
     var opening = !document.getElementById(id).classList.contains('open');
-    for (var i = 0; i < OS_FILTER_MENU_IDS_.length; i++) {
-      toggleOsMenu_(OS_FILTER_MENU_IDS_[i], OS_FILTER_MENU_IDS_[i] === id && opening);
+    var ids = osFilterMenuIdsPak_();
+    for (var i = 0; i < ids.length; i++) {
+      toggleOsMenu_(ids[i], ids[i] === id && opening);
     }
     osOpenFilterMenu = opening ? id : null;
   }
@@ -621,6 +636,94 @@
     }
     var hit = hasPickedBonusPak_(bonuses);
     return { open: hit, hit: hit };
+  }
+
+  // ── a bonus filter widens the range to cover them ──────────────────────────
+  // Opening the rows that hold somebody is no use if the From / To they are
+  // outside of has already dropped them: the page would show a filter on, a
+  // highlight promised, and an empty card. So the range moves to take them in.
+  //
+  // What the reader had is put back on clearing. Saved rather than derived,
+  // unlike the open/closed state - a range is not recomputable from the filter,
+  // it is a choice they made, and the only way to give it back is to have kept
+  // it.
+  //
+  // Applied on the TRANSITION only, keyed on which bonuses are picked. A range
+  // re-imposed on every render would make the pickers unusable while a filter
+  // is on: every manual change would be undone by the next draw.
+  var _bonusRangePak_ = {};
+
+  function bonusPickSigPak_() {
+    return (typeof selectedBonuses === 'undefined') ? '' : selectedBonuses.join(',');
+  }
+
+  // The widest { start, finish } over the rows belonging to a picked bonus,
+  // or null when none of them can be placed on a clock.
+  function pickedSpanPak_(rows) {
+    var lo = null, hi = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (selectedBonuses.indexOf(rows[i].bonus) === -1) continue;
+      var w = osSpellWindowPak_(rows[i]);
+      if (!w) continue;
+      if (lo === null || w.start < lo) lo = w.start;
+      if (hi === null || w.finish > hi) hi = w.finish;
+    }
+    return (lo && hi) ? { start: lo, finish: hi } : null;
+  }
+
+  // The narrowest pair of option indices whose blocks cover [start, finish).
+  function coveringIndicesPak_(fromSel, toSel, span) {
+    var a = -1, b = -1;
+    for (var i = 0; i < fromSel.options.length; i++) {
+      var parts = extractRangePartsPak(fromSel.options[i].value);
+      var bStart = parseDateTimePartPak(parts.start);
+      var bEnd = parseDateTimePartPak(parts.end);
+      if (!bStart || !bEnd) continue;
+      // The block the span STARTS in: the first whose end is past it.
+      if (a === -1 && bEnd > span.start) a = i;
+      // The block it ENDS in: the last whose start is before it.
+      if (bStart < span.finish) b = i;
+    }
+    return (a !== -1 && b !== -1 && b >= a) ? { a: a, b: b } : null;
+  }
+
+  // key: which page's pair this is, so OS and NPL keep their own saved range.
+  function applyBonusRangePak_(key, fromId, toId, rows) {
+    var fromSel = $(fromId), toSel = $(toId);
+    if (!fromSel || !toSel || !fromSel.options.length) return;
+    var state = _bonusRangePak_[key];
+    var sig = bonusPickSigPak_();
+
+    if (!bonusFilterOnPak_()) {
+      // Cleared. Put back exactly what was there, if anything was taken.
+      if (state) {
+        for (var i = 0; i < fromSel.options.length; i++) {
+          if (fromSel.options[i].value === state.from) fromSel.selectedIndex = i;
+          if (toSel.options[i].value === state.to) toSel.selectedIndex = i;
+        }
+        delete _bonusRangePak_[key];
+      }
+      return;
+    }
+
+    // On, and already applied for this exact set of bonuses: leave the pickers
+    // alone, so a manual change while filtered survives the next draw.
+    if (state && state.sig === sig) return;
+
+    var span = pickedSpanPak_(rows);
+    if (!span) return;                    // nothing placeable; leave the range
+    var idx = coveringIndicesPak_(fromSel, toSel, span);
+    if (!idx) return;
+
+    // Saved once, on the way in - not re-saved on every change of pick, or the
+    // second pick would "restore" to the first pick's widened range.
+    if (!state) {
+      state = { from: fromSel.value, to: toSel.value };
+      _bonusRangePak_[key] = state;
+    }
+    state.sig = sig;
+    fromSel.selectedIndex = idx.a;
+    toSel.selectedIndex = idx.b;
   }
 
   // ── open/closed, kept across a re-render ──────────────────────────────────
@@ -849,6 +952,8 @@
     var body = document.getElementById('osBody');
     if (!body) return;
     ensureOsTimeSelects_();
+    // After the options exist and before the window is read off them.
+    applyBonusRangePak_('os', 'osFrom', 'osTo', osLogRows);
 
     var win = osSelectedWindowPak_();
     var badge = document.getElementById('osRangeBadge');
@@ -1185,8 +1290,9 @@
     document.addEventListener('click', function (e) {
       if (!e.target || !e.target.closest) return;
       if (e.target.closest('.os-multi')) return;
-      for (var i = 0; i < OS_FILTER_MENU_IDS_.length; i++) {
-        toggleOsMenu_(OS_FILTER_MENU_IDS_[i], false);
+      var ids = osFilterMenuIdsPak_();
+      for (var i = 0; i < ids.length; i++) {
+        toggleOsMenu_(ids[i], false);
       }
       osOpenFilterMenu = null;
     });

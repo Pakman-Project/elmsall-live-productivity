@@ -488,13 +488,21 @@
                  rather than a hand-kept list. -->
             <div class="bonus-page-controls os-controls fraud-controls">
               <div id="fraudFilters" class="os-filters"></div>
-              <div class="main-sort-mobile fraud-sort-mobile">
-                <select id="fraudSortSelect" class="row-select"
-                        aria-label="Sort the claims by"></select>
-                <button class="btn icon-btn" id="fraudSortDirBtn" type="button"
-                        title="Toggle sort direction" aria-label="Toggle sort direction">
-                  <i class="fa-solid fa-arrow-down-wide-short"></i>
-                </button>
+              <!-- #fraudFilters is display:contents on a phone, so its five
+                   children are grid items 1-5 and this is item 6: the sort
+                   control reads as one more filter, in the same shape, rather
+                   than as a strip of its own below them. Hidden on a desktop,
+                   where the column headings are what sorts. -->
+              <div class="os-filter fraud-sort-filter">
+                <span class="breakdown-time-label">Sort by</span>
+                <div class="main-sort-mobile fraud-sort-mobile">
+                  <select id="fraudSortSelect" class="row-select"
+                          aria-label="Sort the claims by"></select>
+                  <button class="btn icon-btn" id="fraudSortDirBtn" type="button"
+                          title="Toggle sort direction" aria-label="Toggle sort direction">
+                    <i class="fa-solid fa-arrow-down-wide-short"></i>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -599,6 +607,10 @@
                        and is what puts the dropdown, the direction icon and the
                        button on one row, in that order, on a phone. -->
                   <div class="main-sort-mobile">
+                    <!-- Named, like the Claims page's. A bare dropdown reading
+                         "Date Time" beside a table is as easily a filter as a
+                         sort, and the arrow beside it does not say which. -->
+                    <span class="main-sort-label">Sort by</span>
                     <select id="mainSortSelect" class="row-select"></select>
                     <button class="btn icon-btn" id="mainSortDirBtn" type="button" title="Toggle sort direction">
                       <i class="fa-solid fa-arrow-down-wide-short"></i>

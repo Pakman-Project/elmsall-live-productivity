@@ -925,6 +925,17 @@ body.loading-skeleton #mainTableWrapper::after {
    shrinking it just made it hard to see. */
 :root { --caret-size: 11px; }
 
+/* How far every caret sits from its control's right edge. They were at three
+   different distances in one row of six controls - 27px on Date, 9px on
+   Warehouse, 12px on the two native selects - and the Date one was visibly
+   out of line.
+   9px, because that is where the two BUTTONS put theirs and they are the ones
+   that cannot be moved: their caret is a flex child, so its inset is their
+   padding-right, and that is set with !important in four separate rules for
+   the sizing regime they share with #bonusSearch. The <select> overlay is
+   positioned, so it is the one that can be told where to go. */
+:root { --caret-inset: 9px; }
+
 .date-picker-caret,
 .warehouse-caret,
 .hc-select-caret { font-size: var(--caret-size); }
@@ -935,7 +946,7 @@ body.loading-skeleton #mainTableWrapper::after {
 
 .hc-select-caret {
   position: absolute;
-  right: 12px;
+  right: var(--caret-inset);
   top: 50%;
   transform: translateY(-50%);
   color: var(--muted);
@@ -3884,10 +3895,32 @@ body.page-scrolled-far .back-to-top {
 
 .fraud-th.active-sort.desc::after { content: '\25BC'; }
 
-/* The headings are what sorts on a desktop, so the phone's dropdown is not
-   needed there - and the dropdown is what sorts on a phone, where the
-   headings are not drawn at all (each row is a card). */
-.fraud-sort-mobile { grid-column: 1 / -1; }
+/* The headings are what sorts on a desktop, so this is not needed there - and
+   it is what sorts on a phone, where the headings are not drawn at all (each
+   row is a card). .os-filter sets display:flex; this is the same specificity
+   and later, so it wins. */
+.fraud-sort-filter { display: none; }
+
+@media (max-width: 700px) {
+  /* Shown, and taking its turn in the grid as the sixth filter rather than
+     claiming a row of its own. The inner pair fills whatever the label left,
+     exactly as a dropdown does in the five above it. */
+  .fraud-sort-filter { display: flex; }
+  .fraud-sort-filter .fraud-sort-mobile {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .fraud-sort-filter .row-select { flex: 1 1 0; min-width: 0; }
+}
+
+/* The Data Table's own sort, named for the same reason. */
+.main-sort-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
 
 /* ── The loading percentage ───────────────────────────────────────────────
    An elapsed-time estimate, not real progress - see Web - JsProgress. Drawn
@@ -7691,6 +7724,12 @@ body.page-scrolled .hc-field #bonusSearch {
   height: 28px !important;
   min-height: 28px !important;
   font-size: 0.75rem !important;
+}
+/* 26px is the room the SEARCH ICON needs. The Date button is grouped with
+   this field for its sizing only - it has no icon on that side, just a caret,
+   and taking the search field's padding is what pushed that caret 27px in
+   while every other control's sat at 9. */
+body.page-scrolled .hc-field #bonusSearch {
   padding-right: 26px !important;
 }
 body.page-scrolled .hc-field .date-picker-label,
@@ -7832,6 +7871,8 @@ body.header-menu-open .next-rail .rail-burger { color: var(--accent); }
   height: 24px !important;
   min-height: 24px !important;
   font-size: 0.72rem !important;
+}
+.hc-field #bonusSearch {
   padding-right: 26px !important;
 }
 .hc-field .date-picker-label,
