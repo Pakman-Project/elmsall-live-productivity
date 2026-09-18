@@ -1352,5 +1352,53 @@ head('[24] a filter that is narrowing something says so');
         'green/amber/red already mean a verdict on this page');
 }
 
+head('[25] From/To: label inline with its own select, both on one row');
+// The Bonus page's twin was label-above-select stacked, same as every other
+// control there - which meant TWO grid rows per time-row (a label row, then a
+// select row), so the auto-flow put To a full row below From with Areas
+// paired against From's label the whole time. Shared with OS and NPL through
+// the same .bonus-page-controls .time-row selector, which is how those two
+// already had From and To on one row - four filters is an even count, so
+// nothing was ever left over to pair against them the way Areas was.
+{
+  const css = R('Web - Styles.html');
+  const mob = mediaBlockFor(css, '.bonus-page-controls .time-row {');
+  check('the time-row is a horizontal flex row, not a stacked column',
+        /\.bonus-page-controls \.time-row \{[\s\S]{0,120}flex-direction: row;/.test(mob));
+  check('the label keeps a FIXED width rather than its own text width',
+        /\.bonus-page-controls \.time-row \.breakdown-time-label \{[\s\S]{0,160}min-width: 30px;/.test(mob),
+        '"From" and "To" are not the same length; without this the two selects step apart');
+  check('the select fills whatever the label left, not a fixed width of its own',
+        /\.bonus-page-controls \.time-row \.breakdown-time-select \{[\s\S]{0,120}flex: 1 1 0;/.test(mob));
+  // Areas, the odd one out among Display Mode / Rows / Areas, is what used to
+  // land beside From's label. Pushed onto a row of its own so the grid's next
+  // pair is From and To rather than Areas and whichever came first.
+  check('Areas is pushed onto a full-width row of its own',
+        /\.bonus-control-group:has\(#bonusAreaCount\) \{\s*grid-column: 1 \/ -1;/.test(mob),
+        'the item before From/To in the markup, and the one the auto-flow used to pair with it');
+  // The plain three controls are UNCHANGED - this is only about the time-row.
+  check('Display Mode and Rows are still label-above-select, untouched',
+        /\.bonus-control-group \{[\s\S]{0,140}flex-direction: column;/.test(mob) &&
+        !/\.bonus-control-group,\s*\n\s*\.bonus-page-controls \.time-row/.test(mob),
+        'the two selectors used to share one rule; they must not still');
+}
+
+head('[26] Display Mode reads the same weight on Volume as it does on Bonus');
+// Same text everywhere already - "Display Mode:", capital M, both pages - so
+// what differed was never the wording, it was the WEIGHT: Bonus goes medium
+// at phone width and Volume stayed at the browser default, which is visibly
+// lighter once the two are on screen one after another.
+{
+  const css = R('Web - Styles.html');
+  // Anchored on font-weight AND margin-right:0 close together, which only the
+  // MOBILE rule has - the desktop one carries margin-right:8px and no
+  // font-weight at all, so this cannot match that occurrence by accident.
+  check('Volume label is medium weight at phone width',
+        /\.volume-controls label \{[\s\S]{0,80}font-weight: 500;[\s\S]{0,40}margin-right: 0;/.test(css));
+  check('matching the weight Bonus already carries there',
+        /\.bonus-control-group > label \{[\s\S]{0,80}font-weight: 500;/.test(css),
+        'the two rules should read the same number, not merely both be non-default');
+}
+
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
 process.exit(fail ? 1 : 0);

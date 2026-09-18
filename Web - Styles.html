@@ -5117,6 +5117,7 @@ body.page-scrolled-far .back-to-top {
   }
   .volume-controls label {
     font-size: 11px;
+    font-weight: 500;
     margin-right: 0;
   }
   .vol-control-group {
@@ -6358,8 +6359,7 @@ kbd {
     border: 0;
     padding: 0;
   }
-  .bonus-control-group,
-  .bonus-page-controls .time-row {
+  .bonus-control-group {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -6371,20 +6371,57 @@ kbd {
   .bonus-rows-label {
     display: block;
   }
-  .bonus-control-group > label,
-  .bonus-page-controls .time-row .breakdown-time-label {
+  .bonus-control-group > label {
     font-size: 11px;
     font-weight: 500;
     color: var(--muted);
     margin: 0;
     min-width: 0;
   }
-  .bonus-control-group > .row-select,
-  .bonus-page-controls .time-row .breakdown-time-select {
+  .bonus-control-group > .row-select {
     width: 100%;
     min-width: 0;
     max-width: none;
     flex: initial;
+  }
+  /* Areas stands on its own full-width row. It is the last item before the
+     time bar in the merged grid, so the auto-flow used to pair it with
+     whichever half of From/To landed beside it - two controls with nothing
+     to do with each other sharing a row because of where they sat in the
+     markup, not because they belonged together. */
+  .bonus-control-group:has(#bonusAreaCount) {
+    grid-column: 1 / -1;
+  }
+  /* From and To: label INLINE with its own select, not stacked over it as
+     the plain controls above are - and each is now ONE grid cell rather
+     than a label-row over a select-row, so the two sit side by side on a
+     single grid row once Areas has been pushed off it.
+     The label gets a FIXED width rather than its own text width, which is
+     what keeps the two SELECTS starting at the same x - "From" and "To" are
+     not the same length, and without it the selects would step left and
+     right of each other depending on which label is wider. */
+  .bonus-page-controls .time-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    min-width: 0;
+    flex: initial;
+  }
+  .bonus-page-controls .time-row .breakdown-time-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin: 0;
+    min-width: 30px;
+    flex-shrink: 0;
+  }
+  .bonus-page-controls .time-row .breakdown-time-select {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    max-width: none;
   }
   /* Match the Volume page's gap between the controls and the chips. Volume sits
      in a 14px grid with the chips pulled up 4px, giving 10px; this grid's row
