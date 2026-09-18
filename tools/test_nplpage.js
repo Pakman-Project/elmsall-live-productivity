@@ -413,6 +413,12 @@ head('[12] the warehouse picker is not silently ignored');
   check('but a building switch still re-reads the log',
         /nplMarkControlChangedPak_\(\);/.test(R('Web - JsUi.html')),
         'the window it was read for can still have moved');
+  // The card sits flush against the breakdown above it otherwise - the page
+  // has no grid gap of its own here - and read as part of the same box rather
+  // than as its own, separately-expandable card. The OS page's twin already
+  // carries this; it was missed when this one was built from it.
+  check('the dropped-record card is separated from the breakdown above it',
+        /#osBadCard, #nplBadCard \{ margin-top: 16px; \}/.test(R('Web - Styles.html')));
 }
 
 head('[13] the page summary counts what the page is about');

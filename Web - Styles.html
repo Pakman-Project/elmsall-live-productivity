@@ -3313,7 +3313,7 @@ body.page-scrolled-far .back-to-top {
 /* The bad-records card sits directly under the breakdown card - the page has
    no grid gap of its own here, unlike the charts grid most span-12 cards live
    in, so the two would otherwise sit flush against each other. */
-#osBadCard { margin-top: 16px; }
+#osBadCard, #nplBadCard { margin-top: 16px; }
 
 /* One site, its zones under it. Bars are scaled within their own site, so the
    rule and the count say which set a length is relative to. */
@@ -6970,6 +6970,14 @@ textarea:focus-visible {
   .hc-field .row-select { min-width: 0; width: 100%; }
   .hc-field-grow { flex: 1 1 100%; }
   .rail-spacer { display: none; }
+
+  /* Desktop keeps a disabled field in its column - see .hc-field-off below -
+     so the row does not reflow as you move between pages that share a row
+     with an active control. At this width the row is already down to two
+     fields with nothing beside Hours Range or Time Window for hiding them to
+     displace, so that trade buys nothing here and just spends a thumb's worth
+     of scroll on a control that cannot be touched. */
+  .hc-field-off { display: none; }
 
   /* The actions are hidden and revealed by the EXISTING header-compact
      machinery (body.header-compact .next-header-actions), which already builds

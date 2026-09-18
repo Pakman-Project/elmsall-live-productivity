@@ -775,7 +775,7 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
         !/body\.innerHTML = html \+ badHtml/.test(PAGE),
         'the old in-card placement');
   check('separated from the card above it',
-        /#osBadCard \{ margin-top: 16px; \}/.test(R('Web - Styles.html')),
+        /#osBadCard, #nplBadCard \{ margin-top: 16px; \}/.test(R('Web - Styles.html')),
         'the page has no grid gap of its own here; the two cards would sit flush');
   // It has no bar and no count - there is nothing to measure it against - so
   // the label took the full width instead of wrapping onto two lines beside an
@@ -1061,6 +1061,11 @@ head('[11] Hours Range and Time Window are inert where they do nothing');
         'hidden, the row would reflow every time you change page');
   check('the field greys with them',
         /hc-field-off/.test(ui) && R('Web - Styles.html').indexOf('.hc-field-off {') !== -1);
+  // Desktop keeps the disabled field in its column so the row does not
+  // reflow; at phone width there is nothing beside it for hiding it to
+  // displace, and a control a thumb cannot use is not worth its row.
+  check('but at phone width it is hidden outright, not just greyed',
+        /@media \(max-width: 700px\) \{[\s\S]{0,2000}\.hc-field-off \{ display: none; \}/.test(R('Web - Styles.html')));
   // The claim being made: the Bonus page really does read neither.
   check('the Bonus page reads neither, which is why this is true',
         !/\$\('hoursRange'\)/.test(tables) &&
