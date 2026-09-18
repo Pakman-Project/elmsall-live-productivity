@@ -34,6 +34,15 @@ vm.runInContext(strip(R('Web - JsPageOs.html')), ctx);
 vm.runInContext(strip(R('Web - JsPageNpl.html')), ctx);
 vm.runInContext(strip(R('Web - JsPageFraud.html')), ctx);
 ctx.selectedBonuses = [];
+// Declared past the point JsState is split at above, and fraudPassesPak_ reads
+// all five on every call - so one of them missing is a ReferenceError, not a
+// wrong answer.
+ctx.fraudBonusFilter = {};
+ctx.fraudAreaFilter = {};
+ctx.fraudKindFilter = {};
+ctx.fraudAuthFilter = {};
+ctx.fraudStatusFilter = {};
+ctx.fraudSort = { key: 'overlapStd', dir: 'desc' };
 
 const PAGE = R('Web - JsPageFraud.html');
 const INDEX = R('Web - Index.html');
@@ -239,8 +248,11 @@ head('[6] an empty table says WHICH kind of empty it is');
   check('nothing loaded is said outright',
         /None of this production day is loaded yet/.test(PAGE));
   check('and the empty state is careful about what it claims',
-        /No claim overlaps produced hours in the part of this day that/.test(PAGE),
+        /No claim overlaps produced hours in the part of this day/.test(PAGE),
         'not "no fraud" - only that none was found in what was checked');
+  check('...and says so differently when the FILTERS are what emptied it',
+        /All ' \+ scan\.rows\.length \+ ' of them are filtered out/.test(PAGE),
+        '"nothing was found" and "you hid it" need opposite reactions from the reader');
   check('the claim count is shown either way',
         /scan\.claims \+ ' claim'/.test(PAGE) &&
         (PAGE.match(/scan\.claims/g) || []).length >= 2,
@@ -249,16 +261,21 @@ head('[6] an empty table says WHICH kind of empty it is');
 
 head('[7] the table names every part of the case');
 {
-  const cols = /var FRAUD_COLUMNS_ = \[([\s\S]*?)\];/.exec(PAGE);
+  // ONE list now - heading, width, the row field it reads and how that field
+  // sorts. It was two, and sorting was about to make it three: three things
+  // kept in the same order by hand is how a column ends up labelled as its
+  // neighbour.
+  const cols = ctx.FRAUD_COLUMNS_;
   check('the nine columns, in order',
-        !!cols && cols[1].replace(/['\s\n\r]/g, '') ===
-          'Bonus,WorkAreas,TotalStdHrs,OverlapStdHrs,OverlapTime,Claim,ClaimTime,TMauthorised,Status',
-        cols ? cols[1].replace(/\s+/g, ' ') : 'not declared');
-  const w = /var FRAUD_COL_WIDTHS_ = \[([\d,\s]+)\];/.exec(PAGE);
-  const nums = w ? w[1].split(',').map(Number) : [];
+        cols.map(c => c.label).join() ===
+          'Bonus,Work Areas,Total Std Hrs,Overlap Std Hrs,Overlap Time,Claim,Claim Time,TM authorised,Status',
+        cols.map(c => c.label).join());
   check('nine widths summing to 100',
-        nums.length === 9 && nums.reduce((a, b) => a + b, 0) === 100,
-        nums.join('+') + '=' + nums.reduce((a, b) => a + b, 0));
+        cols.length === 9 && cols.reduce((a, c) => a + c.width, 0) === 100,
+        cols.map(c => c.width).join('+') + '=' + cols.reduce((a, c) => a + c.width, 0));
+  check('every column names the row field it reads, and how it sorts',
+        cols.every(c => c.key && c.sort),
+        'a heading with no key is a heading that cannot be sorted by');
   check('every cell carries the label its phone card shows',
         (PAGE.slice(PAGE.indexOf('function fraudTableHtmlPak_'))
              .match(/<td[^>]*>/g) || []).length ===
@@ -320,6 +337,147 @@ head('[8] fetched for the day, and dropped when the day can change');
         INDEX.indexOf("include('Web - JsPageFraud')") >
         INDEX.indexOf("include('Web - JsPageNpl')"),
         'nplCheckChipPak_ would not be defined yet');
+}
+
+head('[9] five filters, each narrowing the same flat list');
+{
+  const row = (o) => Object.assign({
+    bonus: 'AAA', areas: ['OSR PiE'], kind: 'OS', auth: 'J Ashworth',
+    statusText: 'Approved'
+  }, o || {});
+
+  // Independent, not cascading: five facets over one flat list is a different
+  // shape from OS's zone -> department -> status tree.
+  check('each filter is its own set',
+        /var fraudBonusFilter = \{\};/.test(R('Web - JsState.html')) &&
+        /var fraudAreaFilter = \{\};/.test(R('Web - JsState.html')) &&
+        /var fraudKindFilter = \{\};/.test(R('Web - JsState.html')) &&
+        /var fraudAuthFilter = \{\};/.test(R('Web - JsState.html')) &&
+        /var fraudStatusFilter = \{\};/.test(R('Web - JsState.html')));
+  // Sliced to the toggle's OWN body: a windowed regex wide enough to cover it
+  // also reaches into clearFraudFilterPak_ right below, where emptying a set
+  // is the entire job.
+  const toggleBody = PAGE.slice(
+    PAGE.indexOf('function toggleFraudFilterPak_'),
+    PAGE.indexOf('function clearFraudFilterPak_'));
+  check('and none of them clears another',
+        !/Filter = \{\}/.test(toggleBody),
+        'that is the cascade OS needs and this page does not');
+
+  // Empty means no filter, not nothing - the whole-page-empties trap.
+  ctx.fraudBonusFilter = {};
+  check('an empty set admits everything', ctx.fraudPassesPak_(row()) === true);
+
+  ctx.fraudBonusFilter = { BBB: true };
+  check('a chosen set is a whitelist', ctx.fraudPassesPak_(row()) === false);
+  ctx.fraudBonusFilter = { AAA: true };
+  check('...and admits what is in it', ctx.fraudPassesPak_(row()) === true);
+  ctx.fraudBonusFilter = {};
+
+  // Work Areas is the one matching against a LIST: a claim spanning three
+  // areas has to be found by picking any one of them.
+  ctx.fraudAreaFilter = { 'ISPS Top Up': true };
+  check('Work Areas matches ANY of a row\'s areas',
+        ctx.fraudPassesPak_(row({ areas: ['OSR PiE', 'ISPS Top Up'] })) === true,
+        'a claim over three areas is found by picking one of them');
+  check('...and rejects a row carrying none of them',
+        ctx.fraudPassesPak_(row({ areas: ['OSR PiE'] })) === false);
+  check('a row with NO areas is rejected once something is picked',
+        ctx.fraudPassesPak_(row({ areas: [] })) === false);
+  ctx.fraudAreaFilter = {};
+  check('but an empty Work Areas filter still admits it',
+        ctx.fraudPassesPak_(row({ areas: [] })) === true);
+
+  ctx.fraudKindFilter = { NPL: true };
+  check('Claim type filters OS from NPL',
+        ctx.fraudPassesPak_(row({ kind: 'OS' })) === false &&
+        ctx.fraudPassesPak_(row({ kind: 'NPL' })) === true);
+  ctx.fraudKindFilter = {};
+
+  ctx.fraudStatusFilter = { 'No verdict': true };
+  check('Status filters on the plain text, not the chip HTML',
+        ctx.fraudPassesPak_(row({ statusText: 'No verdict' })) === true &&
+        ctx.fraudPassesPak_(row({ statusText: 'Approved' })) === false);
+  ctx.fraudStatusFilter = {};
+
+  check('a blank TM is a named option, not a dropped row',
+        ctx.fraudAuthValuePak_({ auth: '' }) === '(no TM)',
+        'somebody logged a claim nobody has put their name to - that IS the finding');
+
+  // The values offered come from the rows, and a multi-valued field is
+  // flattened rather than listed as "OSR PiE, ISPS Top Up".
+  const vals = ctx.fraudUniquePak_(
+    [row({ areas: ['OSR PiE', 'RSPS Pick'] }), row({ areas: ['OSR PiE'] })],
+    function (r) { return r.areas; });
+  check('the Work Areas list is flattened and de-duplicated',
+        vals.join(' | ') === 'OSR PiE | RSPS Pick', vals.join(' | '));
+}
+
+head('[10] the columns sort, by header on a desktop and by dropdown on a phone');
+{
+  const mk = (o) => Object.assign({
+    bonus: 'AAA', areas: ['B'], totalStd: 1, overlapStd: 1,
+    overlapFrom: new Date(2026, 8, 18, 8, 0), kind: 'OS',
+    from: new Date(2026, 8, 18, 8, 0), auth: 'A', statusText: 'Approved'
+  }, o || {});
+
+  ctx.fraudSort = { key: 'overlapStd', dir: 'desc' };
+  const byOverlap = ctx.fraudSortRowsPak_(
+    [mk({ bonus: 'LOW', overlapStd: 0.1 }), mk({ bonus: 'HIGH', overlapStd: 9 })]);
+  check('numbers sort as numbers, biggest first by default',
+        byOverlap[0].bonus === 'HIGH', byOverlap.map(r => r.bonus).join());
+
+  ctx.fraudSort = { key: 'totalStd', dir: 'asc' };
+  const asc = ctx.fraudSortRowsPak_(
+    [mk({ bonus: 'BIG', totalStd: 9 }), mk({ bonus: 'SMALL', totalStd: 1 })]);
+  check('and the other way when asked', asc[0].bonus === 'SMALL');
+
+  ctx.fraudSort = { key: 'statusText', dir: 'asc' };
+  const caseless = ctx.fraudSortRowsPak_(
+    [mk({ bonus: 'B', statusText: 'approved' }), mk({ bonus: 'A', statusText: 'Adjusted' })]);
+  check('text sorts case-insensitively',
+        caseless[0].statusText === 'Adjusted',
+        'or Approved and approved land in two different places');
+
+  ctx.fraudSort = { key: 'overlapFrom', dir: 'asc' };
+  const byTime = ctx.fraudSortRowsPak_([
+    mk({ bonus: 'LATE', overlapFrom: new Date(2026, 8, 18, 20, 0) }),
+    mk({ bonus: 'EARLY', overlapFrom: new Date(2026, 8, 18, 7, 0) })]);
+  check('times sort as times, not as their printed text',
+        byTime[0].bonus === 'EARLY', byTime.map(r => r.bonus).join());
+
+  ctx.fraudSort = { key: 'areas', dir: 'asc' };
+  const byArea = ctx.fraudSortRowsPak_([
+    mk({ bonus: 'Z', areas: ['Zulu'] }), mk({ bonus: 'A', areas: ['Alpha', 'Bravo'] })]);
+  check('a list column sorts on its joined text', byArea[0].bonus === 'A');
+
+  // A stable order matters on a page somebody reads top-down twice.
+  ctx.fraudSort = { key: 'overlapStd', dir: 'desc' };
+  const tied = ctx.fraudSortRowsPak_(
+    [mk({ bonus: 'ZZZ' }), mk({ bonus: 'AAA' }), mk({ bonus: 'MMM' })]);
+  check('the bonus number breaks every tie',
+        tied.map(r => r.bonus).join() === 'AAA,MMM,ZZZ',
+        tied.map(r => r.bonus).join());
+
+  check('sorting does not mutate the list it was given',
+        /return rows\.slice\(\)\.sort\(/.test(PAGE),
+        'an in-place sort would reorder the scan behind the filters');
+
+  check('a new column starts descending, the same one flips',
+        /fraudSort\.dir = \(fraudSort\.key === key\)\s*\n\s*\? \(fraudSort\.dir === 'asc' \? 'desc' : 'asc'\) : 'desc';/.test(PAGE));
+  check('the headers are clickable and say which way they are sorting',
+        /onclick="fraudSortByPak_\(/.test(PAGE) &&
+        /active-sort ' \+ fraudSort\.dir/.test(PAGE) &&
+        /\.fraud-th\.active-sort::after/.test(R('Web - Styles.html')));
+  check('the phone gets the Data Table\'s own sort control, not a second design',
+        /class="main-sort-mobile fraud-sort-mobile"/.test(INDEX) &&
+        /id="fraudSortSelect"/.test(INDEX) && /id="fraudSortDirBtn"/.test(INDEX));
+  check('and it is filled from the SAME list the headers are',
+        /FRAUD_COLUMNS_\.map\(function \(c\) \{[\s\S]{0,200}escapeAttrPak\(c\.key\)/.test(PAGE),
+        'two lists would let the dropdown offer a column the table has not got');
+  check('its listeners are bound once, not on every render',
+        /addEventListener\('DOMContentLoaded', function \(\) \{[\s\S]{0,600}fraudSortSelect/.test(PAGE),
+        'binding inside the renderer would stack a listener per draw');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

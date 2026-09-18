@@ -225,6 +225,11 @@
         areas: Object.keys(areas).sort(),
         auth: auth,
         statusHtml: fraudStatusHtmlPak_(row, kind),
+        // The same verdict as plain text, for the filter list and the sort.
+        // Read off each page's own reader rather than stripped back out of
+        // the chip's HTML, which would be a parser where a function already
+        // exists.
+        statusText: (kind === 'OS') ? osRecordStatusPak_(row) : nplCheckValuePak_(row),
         blocks: blocks.length,
         covered: covered,
         extra: extra || ''
@@ -295,7 +300,8 @@
     var failed = '';
 
     function done() {
-      if (--pending > 0) return;
+      if (--pending > 0) return;   // the other log is still in the air
+      progressEndPak_('claims');
       fraudLogState = failed || 'ready';
       renderFraudPagePak();
     }
@@ -327,9 +333,143 @@
 
   // ── the table ──────────────────────────────────────────────────────────────
 
-  var FRAUD_COLUMNS_ = ['Bonus', 'Work Areas', 'Total Std Hrs', 'Overlap Std Hrs',
-                        'Overlap Time', 'Claim', 'Claim Time', 'TM authorised', 'Status'];
-  var FRAUD_COL_WIDTHS_ = [8, 18, 9, 10, 12, 6, 12, 15, 10];
+  // ONE list: the heading, the column width, the row field it reads and how
+  // that field sorts. It was two lists - labels and widths - and a third was
+  // about to be added for sorting, which is three things to keep in the same
+  // order by hand. The widths still have to sum to 100; test_fraudpage checks
+  // that, because a colgroup that does not is a table that drifts.
+  var FRAUD_COLUMNS_ = [
+    { key: 'bonus',       label: 'Bonus',           width: 8,  sort: 'text' },
+    { key: 'areas',       label: 'Work Areas',      width: 18, sort: 'text' },
+    { key: 'totalStd',    label: 'Total Std Hrs',   width: 9,  sort: 'num'  },
+    { key: 'overlapStd',  label: 'Overlap Std Hrs', width: 10, sort: 'num'  },
+    { key: 'overlapFrom', label: 'Overlap Time',    width: 12, sort: 'time' },
+    { key: 'kind',        label: 'Claim',           width: 6,  sort: 'text' },
+    { key: 'from',        label: 'Claim Time',      width: 12, sort: 'time' },
+    { key: 'auth',        label: 'TM authorised',   width: 15, sort: 'text' },
+    { key: 'statusText',  label: 'Status',          width: 10, sort: 'text' }
+  ];
+
+  // ── the five filters ───────────────────────────────────────────────────
+
+  // A blank TM cell is a real state - somebody logged a claim nobody has put
+  // their name to - so it gets a name rather than being dropped from the list.
+  function fraudAuthValuePak_(row) {
+    return osLabelPak_(row.auth, 'TM');
+  }
+
+  // Work Areas is the one filter matching against a LIST rather than a value:
+  // a claim can span three areas, and picking one of them has to find it.
+  function fraudPassesAreasPak_(chosen, areas) {
+    for (var k in chosen) {
+      if (!chosen.hasOwnProperty(k)) continue;
+      // Something is picked, so from here it is a whitelist.
+      for (var i = 0; i < areas.length; i++) {
+        if (chosen[areas[i]]) return true;
+      }
+      return false;
+    }
+    return true;      // nothing picked: no filter
+  }
+
+  function fraudPassesPak_(r) {
+    return osPassesSetPak_(fraudBonusFilter, r.bonus) &&
+           fraudPassesAreasPak_(fraudAreaFilter, r.areas) &&
+           osPassesSetPak_(fraudKindFilter, r.kind) &&
+           osPassesSetPak_(fraudAuthFilter, fraudAuthValuePak_(r)) &&
+           osPassesSetPak_(fraudStatusFilter, r.statusText);
+  }
+
+  function toggleFraudFilterPak_(which, value) {
+    var set = { bonus: fraudBonusFilter, area: fraudAreaFilter, kind: fraudKindFilter,
+                auth: fraudAuthFilter, status: fraudStatusFilter }[which];
+    if (!set) return;
+    if (set[value]) { delete set[value]; } else { set[value] = true; }
+    renderFraudPagePak();
+  }
+  function clearFraudFilterPak_(which) {
+    if (which === 'bonus') fraudBonusFilter = {};
+    else if (which === 'area') fraudAreaFilter = {};
+    else if (which === 'kind') fraudKindFilter = {};
+    else if (which === 'auth') fraudAuthFilter = {};
+    else if (which === 'status') fraudStatusFilter = {};
+    renderFraudPagePak();
+  }
+  // Named wrappers, because the multi-select builder writes the handler into
+  // an onclick attribute as a bare function name.
+  function toggleFraudBonus(v) { toggleFraudFilterPak_('bonus', v); }
+  function toggleFraudArea(v) { toggleFraudFilterPak_('area', v); }
+  function toggleFraudKind(v) { toggleFraudFilterPak_('kind', v); }
+  function toggleFraudAuth(v) { toggleFraudFilterPak_('auth', v); }
+  function toggleFraudStatus(v) { toggleFraudFilterPak_('status', v); }
+  function clearFraudBonus() { clearFraudFilterPak_('bonus'); }
+  function clearFraudArea() { clearFraudFilterPak_('area'); }
+  function clearFraudKind() { clearFraudFilterPak_('kind'); }
+  function clearFraudAuth() { clearFraudFilterPak_('auth'); }
+  function clearFraudStatus() { clearFraudFilterPak_('status'); }
+
+  function fraudUniquePak_(rows, get) {
+    var seen = {}, out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var v = get(rows[i]);
+      // Array.isArray, not instanceof: instanceof asks whether the value came
+      // from THIS realm's Array, and a row built anywhere else - another
+      // frame, a test harness - answers no to an array that plainly is one.
+      var list = Array.isArray(v) ? v : [v];
+      for (var j = 0; j < list.length; j++) {
+        if (list[j] !== '' && !seen[list[j]]) { seen[list[j]] = true; out.push(list[j]); }
+      }
+    }
+    out.sort();
+    return out;
+  }
+
+  // ── sorting ────────────────────────────────────────────────────────────
+
+  function fraudColumnPak_(key) {
+    for (var i = 0; i < FRAUD_COLUMNS_.length; i++) {
+      if (FRAUD_COLUMNS_[i].key === key) return FRAUD_COLUMNS_[i];
+    }
+    return FRAUD_COLUMNS_[3];   // the overlap hours, which is the default
+  }
+
+  function fraudSortValuePak_(r, col) {
+    var v = r[col.key];
+    if (col.sort === 'num') return Number(v) || 0;
+    // A Date sorts as its number; everything else as lower-cased text, so
+    // "Approved" and "approved" do not land in two different places.
+    if (col.sort === 'time') return v ? v.getTime() : 0;
+    if (Array.isArray(v)) return v.join(', ').toLowerCase();
+    return String(v == null ? '' : v).toLowerCase();
+  }
+
+  function fraudSortRowsPak_(rows) {
+    var col = fraudColumnPak_(fraudSort.key);
+    var dir = fraudSort.dir === 'asc' ? 1 : -1;
+    return rows.slice().sort(function (a, b) {
+      var av = fraudSortValuePak_(a, col), bv = fraudSortValuePak_(b, col);
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      // The bonus number breaks every tie, so the same data draws the same
+      // way twice however it is sorted.
+      return a.bonus < b.bonus ? -1 : a.bonus > b.bonus ? 1 : 0;
+    });
+  }
+
+  function fraudSortByPak_(key) {
+    // A new column starts descending - biggest, latest, last alphabetically -
+    // which is what somebody clicking a column for the first time is nearly
+    // always after. Clicking the one already sorted flips it.
+    fraudSort.dir = (fraudSort.key === key)
+      ? (fraudSort.dir === 'asc' ? 'desc' : 'asc') : 'desc';
+    fraudSort.key = key;
+    renderFraudPagePak();
+  }
+
+  function fraudToggleSortDirPak_() {
+    fraudSort.dir = fraudSort.dir === 'asc' ? 'desc' : 'asc';
+    renderFraudPagePak();
+  }
 
   function fraudTimeTextPak_(d) {
     return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
@@ -359,14 +499,19 @@
   }
 
   function fraudTableHtmlPak_(rows) {
-    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
-               '<colgroup>';
-    for (var w = 0; w < FRAUD_COL_WIDTHS_.length; w++) {
-      html += '<col style="width:' + FRAUD_COL_WIDTHS_[w] + '%">';
+    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table' +
+               ' fraud-table"><colgroup>';
+    for (var w = 0; w < FRAUD_COLUMNS_.length; w++) {
+      html += '<col style="width:' + FRAUD_COLUMNS_[w].width + '%">';
     }
     html += '</colgroup><thead><tr>';
     for (var c = 0; c < FRAUD_COLUMNS_.length; c++) {
-      html += '<th>' + FRAUD_COLUMNS_[c] + '</th>';
+      var col = FRAUD_COLUMNS_[c];
+      var on = (fraudSort.key === col.key);
+      html += '<th class="fraud-th' + (on ? ' active-sort ' + fraudSort.dir : '') + '"' +
+              ' onclick="fraudSortByPak_(\'' + escapeAttrPak(col.key) + '\')"' +
+              ' title="Sort by ' + escapeAttrPak(col.label) + '">' +
+              escapeTextPak_(col.label) + '</th>';
     }
     html += '</tr></thead><tbody>';
     for (var i = 0; i < rows.length; i++) {
@@ -403,6 +548,65 @@
     return html;
   }
 
+  // The five dropdowns and the phone's sort control. Rebuilt on every render,
+  // like the OS page's row, which is why the open menu has to be put back.
+  function fraudRenderControlsPak_(all) {
+    var host = document.getElementById('fraudFilters');
+    if (host) {
+      host.innerHTML =
+        osMultiSelectHtmlPak_('fraudBonusMenu', 'Bonuses',
+          fraudUniquePak_(all, function (r) { return r.bonus; }),
+          fraudBonusFilter, 'toggleFraudBonus', 'clearFraudBonus', 'Bonus') +
+        osMultiSelectHtmlPak_('fraudAreaMenu', 'Work Areas',
+          fraudUniquePak_(all, function (r) { return r.areas; }),
+          fraudAreaFilter, 'toggleFraudArea', 'clearFraudArea', 'Areas') +
+        osMultiSelectHtmlPak_('fraudKindMenu', 'Claims',
+          fraudUniquePak_(all, function (r) { return r.kind; }),
+          fraudKindFilter, 'toggleFraudKind', 'clearFraudKind', 'Claim') +
+        osMultiSelectHtmlPak_('fraudAuthMenu', 'TMs',
+          fraudUniquePak_(all, fraudAuthValuePak_),
+          fraudAuthFilter, 'toggleFraudAuth', 'clearFraudAuth', 'TM auth.') +
+        osMultiSelectHtmlPak_('fraudStatusMenu', 'Statuses',
+          fraudUniquePak_(all, function (r) { return r.statusText; }),
+          fraudStatusFilter, 'toggleFraudStatus', 'clearFraudStatus', 'Status');
+      if (osOpenFilterMenu) { toggleOsMenu_(osOpenFilterMenu, true); }
+    }
+
+    // The phone's stand-in for the clickable headers, filled from the same one
+    // list of columns so the two can never offer different things to sort by.
+    var sel = document.getElementById('fraudSortSelect');
+    if (sel) {
+      var want = FRAUD_COLUMNS_.map(function (c) {
+        return '<option value="' + escapeAttrPak(c.key) + '">' +
+               escapeTextPak_(c.label) + '</option>';
+      }).join('');
+      if (sel.innerHTML !== want) { sel.innerHTML = want; }
+      if (sel.value !== fraudSort.key) sel.value = fraudSort.key;
+    }
+    var dirBtn = document.getElementById('fraudSortDirBtn');
+    if (dirBtn) dirBtn.classList.toggle('desc', fraudSort.dir === 'desc');
+  }
+
+  // Wired once, not on every render: the two controls live in the static
+  // markup, so re-binding them each time would stack listeners.
+  if (typeof document !== 'undefined' && document && document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var sel = document.getElementById('fraudSortSelect');
+      if (sel) {
+        sel.addEventListener('change', function () {
+          // Same as clicking a header: a different column starts descending,
+          // so the dropdown and the direction button never disagree about
+          // what the table is actually sorted by.
+          if (sel.value !== fraudSort.key) fraudSort.dir = 'desc';
+          fraudSort.key = sel.value;
+          renderFraudPagePak();
+        });
+      }
+      var dirBtn = document.getElementById('fraudSortDirBtn');
+      if (dirBtn) dirBtn.addEventListener('click', fraudToggleSortDirPak_);
+    });
+  }
+
   // ── the page ───────────────────────────────────────────────────────────────
 
   function renderFraudPagePak() {
@@ -424,9 +628,11 @@
       if (!body.firstChild || !body.firstChild.classList ||
           !body.firstChild.classList.contains('os-skeleton')) {
         body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          progressBarHtmlPak_('claims') +
           '<div class="os-skel-summary"></div>' +
           '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
           '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+        progressStartPak_('claims');
       }
       return;
     }
@@ -438,7 +644,10 @@
     }
 
     var scan = fraudScanPak_(win);
-    var rows = scan.rows;
+    // The filters offer what is in the whole day's flagged claims, not what
+    // survived the OTHER filters - see the note on the state, above.
+    fraudRenderControlsPak_(scan.rows);
+    var rows = fraudSortRowsPak_(scan.rows.filter(fraudPassesPak_));
     var heads = {};
     // The OVERLAP figure, not each bonus's total - the total is what they
     // produced all day and this line is about the hours actually in question.
@@ -482,10 +691,16 @@
     html += '</div>';
 
     if (rows.length === 0) {
+      // Two very different empties, and the reader cannot act on either
+      // without being told which one this is.
+      var filtered = scan.rows.length > 0;
       html += '<div class="breakdown-empty">' +
-              '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>' +
-              'No claim overlaps produced hours in the part of this day that ' +
-              'has been checked</div>';
+              '<i class="fa-solid fa-' + (filtered ? 'filter' : 'circle-check') +
+              '" aria-hidden="true"></i>' +
+              (filtered
+                ? ('All ' + scan.rows.length + ' of them are filtered out')
+                : ('No claim overlaps produced hours in the part of this day ' +
+                   'that has been checked')) + '</div>';
       body.innerHTML = html;
       return;
     }

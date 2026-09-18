@@ -397,6 +397,12 @@
 
   function loadDataPak(archiveUrl, silent) {
     var overlay = $('loadingOverlay');
+    // Not on a silent refresh: nothing is covered, there is nothing to wait
+    // in front of, and a bar appearing over a populated dashboard would be
+    // an interruption rather than an answer.
+    if (!silent && !tourActive && typeof progressStartPak_ === 'function') {
+      progressStartPak_('dashboard');
+    }
 
     if (!silent && !tourActive) {
       // Skeleton placeholders instead of a full-screen blocking spinner: the
@@ -476,6 +482,7 @@
       }
 
       // GUARANTEE overlay/skeleton removal outside the try/catch so they NEVER get stuck
+      if (typeof progressEndPak_ === 'function') progressEndPak_('dashboard');
       document.body.classList.remove('loading-skeleton');
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
 
@@ -486,6 +493,9 @@
         $('status').innerHTML = '<span class="bad">Error: ' + escapeAttrPak(msg) + '</span>' +
           ' <button type="button" class="status-retry-btn" onclick="retryLoadPak()">Retry</button>';
       }
+      // Ended, not left running: a failed load must not leave a bar creeping
+      // toward 95% over a page that has stopped trying.
+      if (typeof progressEndPak_ === 'function') progressEndPak_('dashboard');
       document.body.classList.remove('loading-skeleton');
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
     }).getDashboardData(urlToFetch);
@@ -577,9 +587,22 @@
     $('archiveSelect').addEventListener('change', function() {
       currentArchiveUrl = this.value;
       // A different day is different data, not a newer read of the same
-      // window - so the OS page starts from nothing rather than silently
-      // swapping yesterday's spells for today's under the reader.
+      // window - so these start from nothing rather than silently swapping
+      // yesterday's spells for today's under the reader.
+      //
+      // All THREE of them, and then a re-render of whatever is on screen. The
+      // page state used to be cleared inside renderDashboardPayload_, which
+      // does not run until the new day has come back from the server - so the
+      // page a reader was looking at when they picked the date went on showing
+      // the OLD day's rows for the whole round trip, with nothing to say it was
+      // out of date. Marking them here and drawing immediately puts the
+      // skeleton up at the moment of the click, which is when the reader asked
+      // the question.
       if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
+      if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
+      if (typeof fraudMarkControlChangedPak_ === 'function') { fraudMarkControlChangedPak_(); }
+      if (typeof renderPageIfNeeded_ === 'function') { markAllPagesDirty_(); }
+      if (typeof redrawCurrentPagePak_ === 'function') { redrawCurrentPagePak_(); }
       if (currentArchiveUrl) {
         var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
         for (var i = 0; i < syncedHours.length; i++) { syncedHours[i].value = '24'; }

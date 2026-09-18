@@ -350,6 +350,7 @@
     }
   }
 
+
   function renderBonusChips() {
     var banner = $('activeFilterBanner');
     var chipsEl = $('activeFilterChips');
@@ -1131,6 +1132,25 @@
     timeWindow: PAGES_WITH_OWN_RANGE_
   };
 
+  // The Warehouse picker, on the one page that deliberately ignores it. The
+  // Claims page reads allSideData - both buildings, always - because a claim
+  // that stops looking fraudulent when somebody switches building is the one
+  // answer it must not give. So the picker cannot narrow it, and a control
+  // that plainly is not yours to change reads better than one that changes
+  // nothing.
+  var PAGES_IGNORING_SITE_ = [3];
+
+  function syncSiteControlPak_(index) {
+    var btn = document.getElementById('warehouseBtn');
+    if (!btn) return;
+    var off = PAGES_IGNORING_SITE_.indexOf(index) !== -1;
+    btn.disabled = off;
+    var field = btn.closest ? btn.closest('.hc-field') : null;
+    if (field) field.classList.toggle('hc-field-off', off);
+    btn.title = off ? 'This page covers both buildings'
+                    : 'Choose which buildings to show';
+  }
+
   function syncTimeAxisControlsPak_(index) {
     var ids = ['hoursRange', 'timeWindow'];
     for (var i = 0; i < ids.length; i++) {
@@ -1156,10 +1176,21 @@
     }
   }
 
+  // Draw whichever of the pages that fetch their own data is on screen, right
+  // now, without waiting for the dashboard payload. Only those three: every
+  // other page is drawn from the payload and has nothing to show until it
+  // lands, so a redraw there would replace real rows with an empty card.
+  function redrawCurrentPagePak_() {
+    if (currentPage === 3 && typeof renderFraudPagePak === 'function') renderFraudPagePak();
+    else if (currentPage === 4 && typeof renderOsPagePak === 'function') renderOsPagePak();
+    else if (currentPage === 5 && typeof renderNplPagePak === 'function') renderNplPagePak();
+  }
+
   function goToPage(index) {
     if (index < 0 || index >= totalPages) return;
     currentPage = index;
     syncTimeAxisControlsPak_(index);
+    syncSiteControlPak_(index);
     // Every page change - tab, swipe and arrow key - comes through here, so
     // this is the only place the rearrange button and its leaving-countdown
     // need hooking. See syncReorderForPagePak_.

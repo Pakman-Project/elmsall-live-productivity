@@ -67,9 +67,11 @@
           nplLogEverLoaded = true;
         }
         if (res && res.timing) { console.info(res.timing); }
+        progressEndPak_('npllog');
         renderNplPagePak();
       })
       .withFailureHandler(function (err) {
+        progressEndPak_('npllog');
         var message = (err && err.message) || 'The NPL log could not be read';
         if (silent) { console.warn('NPL log background refresh failed: ' + message); return; }
         nplLogState = message;
@@ -202,7 +204,10 @@
         });
       });
       tasks.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
-      out.push({ name: d.name, tasks: tasks, count: Object.keys(d.heads).length });
+      // `heads` out as well as its count - see the OS page's twin: the count
+      // draws the bar, the list answers a bonus filter.
+      out.push({ name: d.name, tasks: tasks, heads: Object.keys(d.heads),
+                 count: Object.keys(d.heads).length });
     });
     out.sort(osByCountThenNamePak_);
     return out;
@@ -368,9 +373,11 @@
       if (!body.firstChild || !body.firstChild.classList ||
           !body.firstChild.classList.contains('os-skeleton')) {
         body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          progressBarHtmlPak_('npllog') +
           '<div class="os-skel-summary"></div>' +
           '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
           '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+        progressStartPak_('npllog');
       }
       return;
     }
@@ -501,7 +508,10 @@
       // The key carries an 'npl' segment so it cannot collide with an OS node
       // of the same department name in the shared osOpenNodes map.
       var dKey = osNodeKeyPak_('npl', dept.name);
-      var dOpen = !!osOpenNodes[dKey];
+      // Same rule as the OS page, same function - a filter opens what holds
+      // the person and closes the rest, without touching what the reader had.
+      var dState = nodeOpenStatePak_(dKey, dept.heads);
+      var dOpen = dState.open;
       // A share of the OVERALL total - headCount, the same number the summary
       // line above calls "N on NPL" - not of the largest department. Scaled
       // against the largest instead, the biggest one always fills the track
@@ -511,7 +521,8 @@
       // and one overall, so the parts can legitimately sum past the whole.
       var dPct = headCount > 0 ? Math.min(100, dept.count / headCount * 100) : 0;
 
-      html += '<div class="breakdown-row clickable-row' + (dOpen ? ' expanded' : '') + '"' +
+      html += '<div class="breakdown-row clickable-row' + (dOpen ? ' expanded' : '') +
+              (dState.hit ? ' bonus-hit-row' : '') + '"' +
               ' data-os-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
       html += '<div class="breakdown-label">' + escapeTextPak_(dept.name) +
               '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';

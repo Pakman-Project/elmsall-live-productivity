@@ -1,0 +1,123 @@
+<script>
+  // ── Loading progress ───────────────────────────────────────────────────────
+  // A percentage on every skeleton, so a wait has a number on it rather than
+  // just a shimmer that could mean five seconds or fifty.
+  //
+  // READ THIS BEFORE TRUSTING THE NUMBER. google.script.run gives no progress
+  // events - there is no "40% of the rows have arrived", because nothing
+  // arrives until everything does. So this is an ELAPSED-TIME ESTIMATE: how
+  // far through a NORMAL load for this page we are, measured against how long
+  // that load actually took the last few times.
+  //
+  // Which means it is honest about the thing it can be honest about - "this is
+  // taking about as long as usual" versus "this is taking much longer than
+  // usual" - and it is deliberately built so it can never lie in the one way
+  // that matters:
+  //
+  //   - it stops at 95% and stays there. A bar that sits at 100% while the
+  //     page is still blank is the worst version of this, because it says the
+  //     work is done when it is not. Reaching 100% means the data is HERE;
+  //   - past that point it says "still going" rather than counting up into a
+  //     number it has no basis for;
+  //   - the first ever load on a device has no history to measure against, so
+  //     it uses a default and starts learning from that load onward.
+  var PROGRESS_CAP_PCT_ = 95;
+  var PROGRESS_TICK_MS_ = 100;
+  var PROGRESS_STORE_KEY_ = 'e3_load_ms_v1';
+  // What a load is assumed to take before this device has seen one. Roughly
+  // the measured cold load; being wrong here only makes the early ticks of a
+  // first-ever load paced oddly, and the cap still protects the end of it.
+  var PROGRESS_DEFAULT_MS_ = { dashboard: 4000, oslog: 1200, npllog: 1200, claims: 2000 };
+  // How many past loads are averaged. Short, because what a load costs changes
+  // with the day's size and the network, and a long memory would keep pacing
+  // today's loads against a fortnight ago.
+  var PROGRESS_SAMPLES_ = 5;
+
+  var _progressRuns = {};
+
+  function progressHistoryPak_() {
+    try {
+      return JSON.parse(localStorage.getItem(PROGRESS_STORE_KEY_) || '{}') || {};
+    } catch (e) { return {}; }
+  }
+
+  function progressExpectedPak_(key) {
+    var all = progressHistoryPak_();
+    var list = all[key];
+    if (!list || !list.length) return PROGRESS_DEFAULT_MS_[key] || 3000;
+    var sum = 0;
+    for (var i = 0; i < list.length; i++) sum += list[i];
+    return Math.max(300, sum / list.length);
+  }
+
+  function progressRememberPak_(key, ms) {
+    // A wildly long load - a dropped connection, a laptop lid closed mid-fetch
+    // - would drag the average up and make every later load look fast for
+    // minutes. Anything past a minute is not a measurement of the normal case.
+    if (!(ms > 0) || ms > 60000) return;
+    try {
+      var all = progressHistoryPak_();
+      var list = all[key] || [];
+      list.push(Math.round(ms));
+      while (list.length > PROGRESS_SAMPLES_) list.shift();
+      all[key] = list;
+      localStorage.setItem(PROGRESS_STORE_KEY_, JSON.stringify(all));
+    } catch (e) {}   // private window, blocked storage: the estimate is a nicety
+  }
+
+  // The markup a skeleton carries. Written by the pages themselves so it sits
+  // where each one wants it, and found again by its key.
+  function progressBarHtmlPak_(key) {
+    return '<div class="skel-progress" data-progress="' + escapeAttrPak(key) + '">' +
+           '<div class="skel-progress-track"><div class="skel-progress-fill"></div></div>' +
+           '<span class="skel-progress-text">0%</span></div>';
+  }
+
+  function progressPaintPak_(key) {
+    var run = _progressRuns[key];
+    if (!run) return;
+    var pct = Math.min(PROGRESS_CAP_PCT_,
+                       (Date.now() - run.startedAt) / run.expected * PROGRESS_CAP_PCT_);
+    var hosts = document.querySelectorAll('[data-progress="' + key + '"]');
+    for (var i = 0; i < hosts.length; i++) {
+      var fill = hosts[i].querySelector('.skel-progress-fill');
+      var text = hosts[i].querySelector('.skel-progress-text');
+      if (fill) fill.style.width = pct.toFixed(1) + '%';
+      if (text) {
+        // At the cap the honest thing to say is not a number.
+        text.textContent = (pct >= PROGRESS_CAP_PCT_ - 0.05)
+          ? 'Still loading…' : Math.floor(pct) + '%';
+      }
+    }
+  }
+
+  function progressStartPak_(key) {
+    // Restarting an already-running key keeps its original start time: two
+    // fetches for one screen (the Claims page asks for both logs) must not
+    // send the bar back to zero when the second one begins.
+    if (_progressRuns[key]) return;
+    _progressRuns[key] = {
+      startedAt: Date.now(),
+      expected: progressExpectedPak_(key),
+      timer: setInterval(function () { progressPaintPak_(key); }, PROGRESS_TICK_MS_)
+    };
+    progressPaintPak_(key);
+  }
+
+  function progressEndPak_(key) {
+    var run = _progressRuns[key];
+    if (!run) return;
+    clearInterval(run.timer);
+    delete _progressRuns[key];
+    progressRememberPak_(key, Date.now() - run.startedAt);
+    // 100% only now, when the data really is here. The element is usually
+    // about to be replaced by the real content, which is the point.
+    var hosts = document.querySelectorAll('[data-progress="' + key + '"]');
+    for (var i = 0; i < hosts.length; i++) {
+      var fill = hosts[i].querySelector('.skel-progress-fill');
+      var text = hosts[i].querySelector('.skel-progress-text');
+      if (fill) fill.style.width = '100%';
+      if (text) text.textContent = '100%';
+    }
+  }
+</script>

@@ -832,12 +832,20 @@ head('[16] a refresh does not collapse what you were reading');
         /osNodeKeyPak_\(site\.name, zone\.name\)/.test(PAGE) &&
         /osNodeKeyPak_\(site\.name, zone\.name, dept\.name\)/.test(PAGE),
         'an index would move the moment the rows re-sort');
+  // Read through nodeOpenStatePak_ rather than straight off the map: with a
+  // bonus filter on, what is open is whatever holds that person instead. The
+  // map is still the answer when nothing is picked, which is the case this
+  // section is about.
   check('the render re-applies them',
-        /var zOpen = !!osOpenNodes\[zKey\]/.test(PAGE) &&
+        /var zState = nodeOpenStatePak_\(zKey, zone\.heads\);/.test(PAGE) &&
+        /var zOpen = zState\.open;/.test(PAGE) &&
         /\(zOpen \? ' expanded' : ''\)/.test(PAGE) &&
         /\(zOpen \? ' open' : ''\)/.test(PAGE));
   check('and a department too',
-        /var dOpen = !!osOpenNodes\[dKey\]/.test(PAGE));
+        /var dState = nodeOpenStatePak_\(dKey, dept\.heads\);/.test(PAGE) &&
+        /var dOpen = dState\.open;/.test(PAGE));
+  check('...and with nothing picked that IS the map',
+        /if \(!bonusFilterOnPak_\(\)\) \{\s*\n\s*return \{ open: !!osOpenNodes\[key\], hit: false \};/.test(PAGE));
   check('the toggle writes to that state',
         /function toggleOsNode\(el\)/.test(PAGE) &&
         /osOpenNodes\[key\] = true/.test(PAGE));
@@ -1292,9 +1300,20 @@ head('[22] a control the USER moved skeletons; the clock ticking does not');
   check('the Warehouse picker too, but only when it actually changed',
         /if \(changed && typeof osMarkControlChangedPak_ === 'function'\)/.test(ui));
   check('and the date picker, since another day is other data entirely',
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,400}osMarkControlChangedPak_\(\);/
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,1400}osMarkControlChangedPak_\(\);/
           .test(init),
         'otherwise yesterday spells swap for today under the reader, silently');
+  // All three pages that hold their own logs, not just OS. The other two were
+  // cleared inside renderDashboardPayload_ instead - which does not run until
+  // the new day comes BACK from the server, so the page a reader was looking
+  // at when they picked the date showed the old day for the whole round trip.
+  check('...and so do the NPL and Claims pages',
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,1600}nplMarkControlChangedPak_\(\);/.test(init) &&
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,1600}fraudMarkControlChangedPak_\(\);/.test(init));
+  check('and the page on screen is redrawn at once, not when the data lands',
+        /redrawCurrentPagePak_\(\);/.test(init) &&
+        /function redrawCurrentPagePak_\(\)/.test(ui),
+        'that redraw is what puts the skeleton up at the moment of the click');
   check('all three call sites are guarded, the OS page being a separate file',
         (init + data + ui).split('osMarkControlChangedPak_').length - 1 >= 6,
         'each is a typeof test plus a call');
@@ -1550,6 +1569,63 @@ head('[30] the share export knows which page it is on');
   check('and put back by the same restore the ancestors use',
         /relax\(opened\[d\], \{/.test(sh),
         'a capture that throws must not leave the page pinned open');
+}
+
+head('[31] a bonus filter opens and marks the rows holding that person');
+// With a filter on, these pages are being read for one question - where is
+// that person - and leaving the reader to open zones one at a time hunting
+// for a row four levels down is the page refusing to answer it.
+{
+  ctx.selectedBonuses = [];
+  ctx.osOpenNodes = {};
+  check('with nothing picked, the reader\'s own state is what is open',
+        ctx.bonusFilterOnPak_() === false &&
+        ctx.nodeOpenStatePak_('k', ['AAA']).open === false);
+  ctx.osOpenNodes = { k: true };
+  check('...including what they had opened',
+        ctx.nodeOpenStatePak_('k', ['AAA']).open === true);
+
+  ctx.selectedBonuses = ['BBB'];
+  check('with one picked, a branch holding them opens',
+        ctx.nodeOpenStatePak_('other', ['AAA', 'BBB']).open === true);
+  check('and is marked as the reason it opened',
+        ctx.nodeOpenStatePak_('other', ['AAA', 'BBB']).hit === true,
+        'opened-and-unmarked is ambiguous once more than one row is open');
+  check('a branch without them closes, whatever the reader had done',
+        ctx.nodeOpenStatePak_('k', ['AAA']).open === false,
+        'k is in osOpenNodes, and the filter still wins');
+  check('...and is not marked',
+        ctx.nodeOpenStatePak_('k', ['AAA']).hit === false);
+  check('an empty branch never counts as a hit',
+        ctx.hasPickedBonusPak_([]) === false &&
+        ctx.hasPickedBonusPak_(null) === false);
+
+  // The undo. This is the whole reason the state is DERIVED, not written.
+  ctx.selectedBonuses = [];
+  check('clearing the filter restores exactly what the reader had',
+        ctx.nodeOpenStatePak_('k', ['AAA']).open === true &&
+        ctx.nodeOpenStatePak_('other', ['AAA', 'BBB']).open === false,
+        'nothing to restore - osOpenNodes was never written to');
+  check('and the filter path never writes that map',
+        !/function nodeOpenStatePak_[\s\S]{0,400}osOpenNodes\[[^\]]+\] =/.test(PAGE),
+        'writing it would make the filter impossible to undo');
+  ctx.osOpenNodes = {};
+
+  check('both levels carry their head list out of the grouping',
+        /heads: Object\.keys\(z\.heads\)/.test(PAGE) &&
+        /heads: Object\.keys\(d\.heads\)/.test(PAGE),
+        'the count draws the bar; the list is what answers the filter');
+  check('the row says so in a class of its own',
+        /\(zState\.hit \? ' bonus-hit-row' : ''\)/.test(PAGE) &&
+        /\(dState\.hit \? ' bonus-hit-row' : ''\)/.test(PAGE) &&
+        /\.breakdown-row\.bonus-hit-row \{/.test(R('Web - Styles.html')));
+  check('marked in the accent, not a verdict colour',
+        /\.breakdown-row\.bonus-hit-row \{[\s\S]{0,160}var\(--accent-8\)/.test(R('Web - Styles.html')),
+        'green, amber and red already mean a decision on both those pages');
+  const npl = R('Web - JsPageNpl.html');
+  check('the NPL page shares the rule rather than copying it',
+        /nodeOpenStatePak_\(dKey, dept\.heads\)/.test(npl) &&
+        !/function nodeOpenStatePak_/.test(npl));
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

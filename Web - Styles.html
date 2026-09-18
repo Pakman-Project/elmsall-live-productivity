@@ -691,6 +691,15 @@ body.loading-skeleton #mainTableWrapper::after {
 }
 .header-icon-btn:hover { background: rgba(255, 255, 255, 0.14); }
 
+/* The Warehouse picker on a page that reads both buildings whatever it says.
+   Matches .hc-field-off, which cannot be used here: that class greys a whole
+   FIELD in the control panel, and this is the button inside one. */
+.warehouse-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Rearrange, on a page with no panels on it. Dimmed and inert rather than
    hidden, for the same reason Hours Range is on the pages that ignore it: a
    button that vanishes and comes back as you move between pages reads as the
@@ -824,8 +833,38 @@ body.loading-skeleton #mainTableWrapper::after {
     padding: 6px 0;
     box-shadow: inset 0 -1px 0 var(--border);
   }
-  .next-rail .rail-item { width: auto; font-size: 0.64rem; }
-  .next-rail .rail-item .rail-icon { width: 46px; height: 28px; font-size: 20px; }
+  /* Eight tabs now, and at 390px they came to 396px - so the burger sat off
+     the right edge with no way to reach it. Sharing the width rather than
+     each taking a fixed 46px means the strip fits whatever the screen is,
+     and "Data Table" (the one label wide enough to cause it) shortens
+     rather than pushing its neighbours out. */
+  .next-rail { gap: 0; padding: 6px 2px; justify-content: space-between; }
+  .next-rail .rail-item,
+  .next-rail .rail-burger {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 0.64rem;
+  }
+  .next-rail .rail-item .rail-icon {
+    width: 100%;
+    max-width: 46px;
+    height: 28px;
+    font-size: 20px;
+  }
+  .next-rail .rail-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Same display-only swap the filter headings use: the full name stays in
+     the DOM as the accessible one, and only what is DRAWN shortens. */
+  .next-rail .rail-label[data-short] { font-size: 0; }
+  .next-rail .rail-label[data-short]::before {
+    content: attr(data-short);
+    font-size: 0.64rem;
+  }
 }
 
 /* The native control the picker writes through to. Kept in the DOM (it is
@@ -3729,6 +3768,20 @@ body.page-scrolled-far .back-to-top {
     white-space: normal;
   }
   .os-job-table td:last-child { border-bottom: none; }
+
+  /* The desktop rule `.os-job-table tr:last-child td { border-bottom: none }`
+     means "no line under the final ROW of the table". Here a <tr> IS a card
+     and its <td>s are that card's field rows, so it read as "no lines
+     anywhere in the last card" - which is exactly how it drew: every record
+     but the last one had separators, and the last one had none.
+     Put back for the last card, then taken off its own final field again,
+     which needs the extra specificity to beat the rule above it. */
+  .os-job-table tbody tr:last-child td {
+    border-bottom: 1px solid var(--border);
+  }
+  .os-job-table tbody tr:last-child td:last-child {
+    border-bottom: none;
+  }
   /* A cell whose column only means anything on one task - see
      nplIsSiteTransferTaskPak_. Written into the table either way so the
      DESKTOP column stays whole, and dropped only here, where there is no
@@ -3794,6 +3847,92 @@ body.page-scrolled-far .back-to-top {
     min-width: 0;
     max-width: none;
   }
+}
+
+/* A row holding a bonus number the reader has filtered to, on the OS and NPL
+   pages. Opened by the filter (see nodeOpenStatePak_) and marked here, because
+   opened-and-unmarked is ambiguous the moment more than one row is open: the
+   reader cannot tell which of them the filter actually found.
+   The accent, not a status colour - green, amber and red mean a verdict on
+   both those pages, and this is not one. */
+.breakdown-row.bonus-hit-row {
+  background: var(--accent-8);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.breakdown-row.bonus-hit-row .breakdown-label { color: var(--accent); font-weight: 600; }
+
+/* A sortable column heading. The arrow is drawn on the active one only -
+   nine headings each carrying a permanent up/down pair is nine pieces of
+   furniture for one piece of information. */
+.fraud-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.fraud-th:hover { color: var(--text); }
+
+.fraud-th.active-sort { color: var(--accent); }
+
+.fraud-th.active-sort::after {
+  content: '\25B2';
+  font-size: 0.5rem;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.fraud-th.active-sort.desc::after { content: '\25BC'; }
+
+/* The headings are what sorts on a desktop, so the phone's dropdown is not
+   needed there - and the dropdown is what sorts on a phone, where the
+   headings are not drawn at all (each row is a card). */
+.fraud-sort-mobile { grid-column: 1 / -1; }
+
+/* ── The loading percentage ───────────────────────────────────────────────
+   An elapsed-time estimate, not real progress - see Web - JsProgress. Drawn
+   small and quiet: it is there to answer "is this normal or is it stuck",
+   which is a glance, not something to be read. */
+.skel-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.skel-progress-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--w6);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.skel-progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  /* Matched to the tick so the bar creeps rather than stepping. */
+  transition: width 0.1s linear;
+}
+
+.skel-progress-text {
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* In the cold-load overlay the bar sits under the spinner and its wording,
+   which are centred, and it needs a width of its own to be visible at all. */
+#loadingOverlay .skel-progress {
+  width: min(260px, 70vw);
+  margin: 12px 0 0;
 }
 
 /* ── Potential Fraudulent Claims ──────────────────────────────────────────

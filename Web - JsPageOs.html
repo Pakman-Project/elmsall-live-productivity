@@ -249,9 +249,11 @@
           osLogEverLoaded = true;
         }
         if (res && res.timing) { console.info(res.timing); }
+        progressEndPak_('oslog');
         renderOsPagePak();
       })
       .withFailureHandler(function (err) {
+        progressEndPak_('oslog');
         var message = (err && err.message) || 'The OS log could not be read';
         if (silent) { console.warn('OS log background refresh failed: ' + message); return; }
         // Named rather than left as an empty page: "nobody was on OS" and
@@ -568,16 +570,57 @@
             });
           });
           jobs.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
-          depts.push({ name: d.name, jobs: jobs, count: Object.keys(d.heads).length });
+          // `heads` out as well as its count: the count draws the bar, and the
+          // list is what a bonus filter asks "is anybody picked in here".
+          depts.push({ name: d.name, jobs: jobs, heads: Object.keys(d.heads),
+                       count: Object.keys(d.heads).length });
         });
         depts.sort(osByCountThenNamePak_);
-        zones.push({ name: z.name, depts: depts, count: Object.keys(z.heads).length });
+        zones.push({ name: z.name, depts: depts, heads: Object.keys(z.heads),
+                     count: Object.keys(z.heads).length });
       });
       zones.sort(osByCountThenNamePak_);
-      out.push({ name: s.name, zones: zones, count: Object.keys(s.heads).length });
+      out.push({ name: s.name, zones: zones, heads: Object.keys(s.heads),
+                 count: Object.keys(s.heads).length });
     });
     out.sort(osByCountThenNamePak_);
     return out;
+  }
+
+  // ── a bonus filter drives what is open ────────────────────────────────────
+  // With a filter on, these pages are being read for one question: where is
+  // that person. Leaving the reader to open zones one at a time hunting for a
+  // row that may be four levels down is the page refusing to answer it.
+  //
+  // Derived at render time rather than written into osOpenNodes. That map is
+  // the reader's OWN open/closed state, and overwriting it to answer a filter
+  // would mean the filter could never be undone - clearing it would leave
+  // whatever the filter had opened, not what they had. Computing instead
+  // means "back to how it was" needs no restoring: it is what the map still
+  // says the moment nothing is picked.
+  function bonusFilterOnPak_() {
+    return typeof selectedBonuses !== 'undefined' && selectedBonuses.length > 0;
+  }
+
+  // Does this branch hold anybody who is picked? Takes the bonus numbers
+  // rather than the rows, so every level can ask it: the grouped objects
+  // carry their own head list for exactly this.
+  function hasPickedBonusPak_(bonuses) {
+    if (!bonuses || !bonuses.length) return false;
+    for (var i = 0; i < bonuses.length; i++) {
+      if (selectedBonuses.indexOf(bonuses[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  // Open, and why. With no filter on it is whatever the reader last did; with
+  // one on it is whether this branch holds them, and nothing else.
+  function nodeOpenStatePak_(key, bonuses) {
+    if (!bonusFilterOnPak_()) {
+      return { open: !!osOpenNodes[key], hit: false };
+    }
+    var hit = hasPickedBonusPak_(bonuses);
+    return { open: hit, hit: hit };
   }
 
   // ── open/closed, kept across a re-render ──────────────────────────────────
@@ -835,9 +878,11 @@
       if (!body.firstChild || !body.firstChild.classList ||
           !body.firstChild.classList.contains('os-skeleton')) {
         body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          progressBarHtmlPak_('oslog') +
           '<div class="os-skel-summary"></div>' +
           '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
           '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+        progressStartPak_('oslog');
       }
       return;
     }
@@ -1024,7 +1069,8 @@
       for (var zi = 0; zi < site.zones.length; zi++) {
         var zone = site.zones[zi];
         var zKey = osNodeKeyPak_(site.name, zone.name);
-        var zOpen = !!osOpenNodes[zKey];
+        var zState = nodeOpenStatePak_(zKey, zone.heads);
+        var zOpen = zState.open;
         // A share of the OVERALL total - headCount, the same number the
         // summary line above calls "N on OS" - not of the largest zone at its
         // own site. Scaled per site, which this did, a 56-strong zone at a
@@ -1034,7 +1080,8 @@
         // confident about the smaller one.
         var zPct = headCount > 0 ? Math.min(100, zone.count / headCount * 100) : 0;
 
-        html += '<div class="breakdown-row clickable-row' + (zOpen ? ' expanded' : '') + '"' +
+        html += '<div class="breakdown-row clickable-row' + (zOpen ? ' expanded' : '') +
+                (zState.hit ? ' bonus-hit-row' : '') + '"' +
                 ' data-os-key="' + escapeAttrPak(zKey) + '" onclick="toggleOsNode(this)">';
         html += '<div class="breakdown-label">' + escapeTextPak_(zone.name) +
                 '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
@@ -1062,12 +1109,13 @@
         for (var di = 0; di < zone.depts.length; di++) {
           var dept = zone.depts[di];
           var dKey = osNodeKeyPak_(site.name, zone.name, dept.name);
-          var dOpen = !!osOpenNodes[dKey];
+          var dState = nodeOpenStatePak_(dKey, dept.heads);
+          var dOpen = dState.open;
           var dPct = zone.count > 0
             ? Math.min(100, dept.count / zone.count * 100) : 0;
 
           html += '<div class="breakdown-row clickable-row os-dept-row' +
-                  (dOpen ? ' expanded' : '') + '"' +
+                  (dOpen ? ' expanded' : '') + (dState.hit ? ' bonus-hit-row' : '') + '"' +
                   ' data-os-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
           html += '<div class="breakdown-label">' + escapeTextPak_(dept.name) +
                   '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';

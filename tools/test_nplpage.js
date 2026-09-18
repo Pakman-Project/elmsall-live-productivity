@@ -395,7 +395,8 @@ head('[11] the open/closed rows survive a re-render, and cannot collide with OS'
         'or a department of the same name on both pages would share a slot');
   check('which is what lets one map serve both',
         ctx.osNodeKeyPak_('npl', 'Inbound') !== ctx.osNodeKeyPak_('os', 'Inbound') &&
-        /osOpenNodes\[dKey\]/.test(PAGE));
+        /nodeOpenStatePak_\(dKey, dept\.heads\)/.test(PAGE),
+        'read through the OS page\'s state helper, which falls back to that map');
   check('and the shared toggle is the one on the rows',
         /onclick="toggleOsNode\(this\)"/.test(PAGE) &&
         !/function toggleNplNode/.test(PAGE));

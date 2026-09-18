@@ -769,6 +769,22 @@ var nplCheckFilter = {};
 var fraudOsRows = [];
 var fraudNplRows = [];
 var fraudLogState = null;      // null | 'loading' | 'ready' | an error message
+// The five filters. Each is a whitelist and an EMPTY one means no filter, not
+// nothing - same bargain as the OS page's, for the same reason: the first
+// click on a fresh dropdown emptying the page reads as the page being broken.
+//
+// Independent of each other rather than cascading, unlike OS and NPL. Five
+// facets that each narrow the same flat list is a different shape from a tree
+// of zone -> department -> status, and a dropdown whose options moved every
+// time a different one was touched would be harder to use, not easier.
+var fraudBonusFilter = {};
+var fraudAreaFilter = {};
+var fraudKindFilter = {};
+var fraudAuthFilter = {};
+var fraudStatusFilter = {};
+// Which column the table is sorted by. Starts on the overlap hours, worst
+// first, which is the order the page was built to be read in.
+var fraudSort = { key: 'overlapStd', dir: 'desc' };
 
 var selectedBonuses = [];
 var currentThreshold = 0;
