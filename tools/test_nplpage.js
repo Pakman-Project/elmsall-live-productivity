@@ -192,19 +192,19 @@ head('[5] Check is shown as logged, and only OK is signed off');
 // wording is the whole content of the column, and folding it would rename
 // somebody's answer to something they did not write.
 {
-  check('OK is green', /nplCheckIsOkPak_\(raw\) \? 'os-status-good' : 'os-status-bad'/.test(PAGE));
+  check('OK is green', /nplCheckIsOkPak_\(raw\) \? 'status-chip-good' : 'status-chip-bad'/.test(PAGE));
   const chip = w => ctx.nplCheckChipPak_(w);
   check('...and says OK', chip('OK').indexOf('>OK<') !== -1);
   check('anything else is red, verbatim',
-        chip('Needs review').indexOf('os-status-bad') !== -1 &&
+        chip('Needs review').indexOf('status-chip-bad') !== -1 &&
         chip('Needs review').indexOf('>Needs review<') !== -1,
         chip('Needs review'));
   check('including a wording that merely contains ok',
-        chip('not ok').indexOf('os-status-bad') !== -1, chip('not ok'));
+        chip('not ok').indexOf('status-chip-bad') !== -1, chip('not ok'));
   check('case and padding do not change the verdict',
-        chip('  ok  ').indexOf('os-status-good') !== -1);
+        chip('  ok  ').indexOf('status-chip-good') !== -1);
   check('a blank is a dash, not an accusation',
-        chip('').indexOf('os-status-none') !== -1 &&
+        chip('').indexOf('status-chip-none') !== -1 &&
         chip('').indexOf('&ndash;') !== -1,
         'calling an unchecked record failed is a claim the data does not support');
   check('the chart band shares the same test',
@@ -304,12 +304,12 @@ head('[8] the record table');
         /osPersonCellPak_\(r\.siteTransfer\)/.test(PAGE) &&
         /osPersonCellPak_\(r\.tmAuth\)/.test(PAGE));
 
-  // The table becomes a stack of cards on a phone - one .os-job-table CSS rule
+  // The table becomes a stack of cards on a phone - one .record-table CSS rule
   // in Web - Styles.html covers both pages, which is only true if this table
   // is built with the SAME class and the SAME data-label convention the OS
   // page's cells use. Not redeclared here; borrowed.
   check('built with the class the shared mobile card CSS targets',
-        /<table class="os-job-table">/.test(PAGE));
+        /<table class="record-table">/.test(PAGE));
   check('every task cell carries the label the hidden header used to show',
         cellsAndLabels(PAGE.slice(PAGE.indexOf('function nplTaskTableHtmlPak_'),
                                    PAGE.indexOf('function nplBadRowsHtmlPak_'))));
@@ -372,7 +372,7 @@ head('[10] fetch once, refresh silently');
         /nplMarkControlChangedPak_\(\);/.test(R('Web - JsData.html')),
         'a page that sits still for a second looks like it ignored the click');
   check('the skeleton is written once, not on every render',
-        /!body\.firstChild\.classList\.contains\('os-skeleton'\)/.test(PAGE),
+        /!body\.firstChild\.classList\.contains\('page-skeleton'\)/.test(PAGE),
         'or every shimmer restarts from the left');
   check('an error is named rather than left as an empty page',
         /escapeTextPak_\(nplLogState\)/.test(PAGE));

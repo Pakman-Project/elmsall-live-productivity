@@ -486,14 +486,14 @@
                  column headers stand in for on a desktop. Rendered from JS
                  because every one of them offers what is actually in the day
                  rather than a hand-kept list. -->
-            <div class="bonus-page-controls os-controls fraud-controls">
-              <div id="fraudFilters" class="os-filters"></div>
+            <div class="bonus-page-controls page-controls fraud-controls">
+              <div id="fraudFilters" class="page-filters"></div>
               <!-- #fraudFilters is display:contents on a phone, so its five
                    children are grid items 1-5 and this is item 6: the sort
                    control reads as one more filter, in the same shape, rather
                    than as a strip of its own below them. Hidden on a desktop,
                    where the column headings are what sorts. -->
-              <div class="os-filter fraud-sort-filter">
+              <div class="page-filter fraud-sort-filter">
                 <span class="breakdown-time-label">Sort by</span>
                 <div class="main-sort-mobile fraud-sort-mobile">
                   <select id="fraudSortSelect" class="row-select"
@@ -507,7 +507,7 @@
             </div>
 
             <div class="card panel span-12">
-              <div id="fraudBody" class="os-body"></div>
+              <div id="fraudBody" class="page-body"></div>
             </div>
           </div>
 
@@ -516,13 +516,13 @@
                  subtitle that used to sit above this are gone - the rail tab
                  already says OS, and a page that explains itself in a
                  paragraph is a paragraph everybody reads once. -->
-            <div class="bonus-page-controls os-controls">
+            <div class="bonus-page-controls page-controls">
               <!-- Type, Zones, Departments, Record Status. Rendered from JS
                    rather than written out here, because the three multi-selects
                    offer what is actually in range - a zone nobody worked has no
                    business on the list. -->
-              <div id="osFilters" class="os-filters"></div>
-              <div class="breakdown-time-bar bonus-time-bar os-time-bar">
+              <div id="osFilters" class="page-filters"></div>
+              <div class="breakdown-time-bar bonus-time-bar page-time-bar">
                 <div class="time-row time-row-from">
                   <label class="breakdown-time-label">From</label>
                   <select id="osFrom" class="breakdown-time-select" onchange="onOsRangeChange()"></select>
@@ -547,7 +547,7 @@
             </div>
 
             <div class="card panel span-12">
-              <div id="osBody" class="os-body"></div>
+              <div id="osBody" class="page-body"></div>
             </div>
 
             <!-- Its own card, not a row inside the breakdown above: these
@@ -565,11 +565,11 @@
                the whole 24 hours, like OS and Bonus, which is why Hours Range
                and Time Window grey out here too. -->
           <div class="page">
-            <div class="bonus-page-controls os-controls">
+            <div class="bonus-page-controls page-controls">
               <!-- Type, Departments, Tasks, Checks. Rendered from JS, because
                    the three multi-selects offer what is actually in range. -->
-              <div id="nplFilters" class="os-filters"></div>
-              <div class="breakdown-time-bar bonus-time-bar os-time-bar">
+              <div id="nplFilters" class="page-filters"></div>
+              <div class="breakdown-time-bar bonus-time-bar page-time-bar">
                 <div class="time-row time-row-from">
                   <label class="breakdown-time-label">From</label>
                   <select id="nplFrom" class="breakdown-time-select" onchange="onNplRangeChange()"></select>
@@ -584,7 +584,7 @@
             </div>
 
             <div class="card panel span-12">
-              <div id="nplBody" class="os-body"></div>
+              <div id="nplBody" class="page-body"></div>
             </div>
 
             <!-- Its own card, not a row inside the breakdown above: these

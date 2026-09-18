@@ -164,10 +164,10 @@
     var raw = String(check == null ? '' : check).trim();
     if (!raw) {
       // Logged with the cell empty. Not a verdict, so it is not given one.
-      return '<span class="os-status os-status-none" title="Logged without a check against it">&ndash;</span>';
+      return '<span class="status-chip status-chip-none" title="Logged without a check against it">&ndash;</span>';
     }
-    var cls = nplCheckIsOkPak_(raw) ? 'os-status-good' : 'os-status-bad';
-    return '<span class="os-status ' + cls + '">' + escapeTextPak_(raw) + '</span>';
+    var cls = nplCheckIsOkPak_(raw) ? 'status-chip-good' : 'status-chip-bad';
+    return '<span class="status-chip ' + cls + '">' + escapeTextPak_(raw) + '</span>';
   }
 
   // ── grouping ───────────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@
   var NPL_TASK_COL_WIDTHS_ = [14, 18, 24, 24, 20];
 
   function nplTaskTableHtmlPak_(records) {
-    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
+    var html = '<div class="table-wrap record-table-wrap"><table class="record-table">' +
                '<colgroup>';
     for (var w = 0; w < NPL_TASK_COL_WIDTHS_.length; w++) {
       html += '<col style="width:' + NPL_TASK_COL_WIDTHS_[w] + '%">';
@@ -250,13 +250,13 @@
       var esc = escapeAttrPak(r.bonus);
       var picked = selectedBonuses.indexOf(r.bonus) !== -1;
       html += '<tr>';
-      html += '<td data-label="Bonus"><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+      html += '<td data-label="Bonus"><span class="bonus-chip bonus-tip-host clickable-bonus' +
               (picked ? ' selected' : '') + '"' +
               ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
               escapeTextPak_(r.bonus) +
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
-      html += '<td class="os-time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
+      html += '<td class="time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
       html += '<td data-label="Site Transfer"' +
               (nplIsSiteTransferTaskPak_(r.task) ? '' : ' class="npl-task-only"') +
               '>' + osPersonCellPak_(r.siteTransfer) + '</td>';
@@ -285,24 +285,24 @@
     var key = osNodeKeyPak_('npl', '__bad');
     var open = !!osOpenNodes[key];
 
-    var html = '<div class="breakdown-row clickable-row os-dropped-row' +
+    var html = '<div class="breakdown-row clickable-row dropped-row' +
                (open ? ' expanded' : '') + '"' +
-               ' data-os-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
-    html += '<div class="breakdown-label os-dropped-label">' +
+               ' data-node-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
+    html += '<div class="breakdown-label dropped-label">' +
             '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
             total + ' record' + (total === 1 ? '' : 's') +
             ' that cannot be placed on a clock' +
             '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div></div>';
 
     html += '<div class="breakdown-detail' + (open ? ' open' : '') + '">' +
-            '<div class="os-zone-detail">';
-    html += '<div class="os-bad-intro">These are on the NPL log and could not be ' +
+            '<div class="node-detail">';
+    html += '<div class="bad-record-intro">These are on the NPL log and could not be ' +
             'placed on a clock, so they are in none of the figures above. Hover a ' +
             'row to see what is wrong with it.</div>';
 
     if (bad && bad.length) {
-      html += '<div class="table-wrap os-job-table-wrap">' +
-              '<table class="os-job-table os-bad-table"><thead><tr>';
+      html += '<div class="table-wrap record-table-wrap">' +
+              '<table class="record-table bad-record-table"><thead><tr>';
       for (var c = 0; c < NPL_BAD_COLUMNS_.length; c++) {
         html += '<th>' + NPL_BAD_COLUMNS_[c] + '</th>';
       }
@@ -314,16 +314,16 @@
         // paragraph-wide last column pushes the cells somebody reads first off
         // the side of the table.
         html += '<tr' + (b.why ? ' title="' + escapeAttrPak(b.why) + '"' : '') +
-                ' class="os-bad-row">';
+                ' class="bad-record-row">';
         html += '<td data-label="Bonus">' + (String(b.bonus || '').trim()
-          ? '<span class="os-bonus-chip bonus-tip-host clickable-bonus"' +
+          ? '<span class="bonus-chip bonus-tip-host clickable-bonus"' +
             ' onclick="event.stopPropagation();toggleBonusFilter(\'' +
             escapeAttrPak(b.bonus) + '\');">' + escapeTextPak_(b.bonus) +
             bonusTipHtmlPak_(b.bonus, selectedBonuses.indexOf(b.bonus) !== -1) + '</span>'
-          : '<span class="os-cell-none">&ndash;</span>') + '</td>';
-        html += '<td class="os-bad-cell" data-label="Date">' + osPersonCellPak_(b.date) + '</td>';
-        html += '<td class="os-bad-cell" data-label="Start">' + osPersonCellPak_(b.from) + '</td>';
-        html += '<td class="os-bad-cell" data-label="Finish">' + osPersonCellPak_(b.to) + '</td>';
+          : '<span class="cell-none">&ndash;</span>') + '</td>';
+        html += '<td class="bad-record-cell" data-label="Date">' + osPersonCellPak_(b.date) + '</td>';
+        html += '<td class="bad-record-cell" data-label="Start">' + osPersonCellPak_(b.from) + '</td>';
+        html += '<td class="bad-record-cell" data-label="Finish">' + osPersonCellPak_(b.to) + '</td>';
         html += '<td data-label="Department">' + osPersonCellPak_(b.dept) + '</td>';
         html += '<td data-label="Task">' + osPersonCellPak_(b.task) + '</td>';
         html += '<td data-label="TM authorised">' + osPersonCellPak_(b.tmAuth) + '</td>';
@@ -337,7 +337,7 @@
     // it could name them. Counted separately from the table above so the two
     // cannot double up.
     if (unnamed) {
-      html += '<div class="os-bad-intro">' + unnamed + ' more could not be read, past ' +
+      html += '<div class="bad-record-intro">' + unnamed + ' more could not be read, past ' +
               'the limit on how many the server will name in one go.</div>';
     }
     html += '</div></div>';
@@ -373,12 +373,12 @@
     // a re-render while still loading would restart every shimmer from the left.
     if (nplLogState === 'loading') {
       if (!body.firstChild || !body.firstChild.classList ||
-          !body.firstChild.classList.contains('os-skeleton')) {
-        body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          !body.firstChild.classList.contains('page-skeleton')) {
+        body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
           progressBarHtmlPak_('npllog') +
-          '<div class="os-skel-summary"></div>' +
-          '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
-          '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+          '<div class="skel-summary"></div>' +
+          '<div class="skel-row"></div><div class="skel-row"></div>' +
+          '<div class="skel-row"></div><div class="skel-row"></div></div>';
         progressStartPak_('npllog');
       }
       return;
@@ -455,13 +455,13 @@
     var controls = document.getElementById('nplFilters');
     if (controls) {
       controls.innerHTML =
-        // Wrapped in .os-multi purely for the positioning context a native
+        // Wrapped in .filter-multi purely for the positioning context a native
         // <select> cannot provide for itself, so the same chevron the three
         // real multi-selects use sits on top of this one too.
-        '<div class="os-filter"><span class="breakdown-time-label">Type</span>' +
-        '<div class="os-multi os-type-wrap select-caret-wrap">' +
-        '<select class="hc-control fa-caret-select os-type-select' +
-        (nplTypeFilter === 'all' ? '' : ' os-filter-on') +
+        '<div class="page-filter"><span class="breakdown-time-label">Type</span>' +
+        '<div class="filter-multi filter-type-wrap select-caret-wrap">' +
+        '<select class="hc-control fa-caret-select filter-type-select' +
+        (nplTypeFilter === 'all' ? '' : ' page-filter-on') +
         '" onchange="setNplTypeFilter(this.value)"' +
         ' title="Everyone on NPL, only those who did nothing else, or only those who did both">' +
         Object.keys(NPL_TYPE_LABELS_).map(function (k) {
@@ -525,20 +525,20 @@
 
       html += '<div class="breakdown-row clickable-row' + (dOpen ? ' expanded' : '') +
               (dState.hit ? ' bonus-hit-row' : '') + '"' +
-              ' data-os-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
+              ' data-node-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
       html += '<div class="breakdown-label">' + escapeTextPak_(dept.name) +
               '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
-      html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar os-zone-bar"' +
+      html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar node-bar"' +
               ' style="width:0%;" data-target="' + dPct + '"></div></div>';
       html += '<div class="breakdown-count">' + dept.count + '</div></div>';
 
       html += '<div class="breakdown-detail' + (dOpen ? ' open' : '') + '">' +
-              '<div class="os-dept-detail">';
+              '<div class="node-subdetail">';
       for (var ti = 0; ti < dept.tasks.length; ti++) {
         var task = dept.tasks[ti];
-        html += '<div class="os-job">';
-        html += '<div class="os-job-head">' + escapeTextPak_(task.name) +
-                '<span class="os-job-count">' + task.records.length + '</span></div>';
+        html += '<div class="record-group">';
+        html += '<div class="record-group-head">' + escapeTextPak_(task.name) +
+                '<span class="record-group-count">' + task.records.length + '</span></div>';
         html += nplTaskTableHtmlPak_(task.records);
         html += '</div>';
       }

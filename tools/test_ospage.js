@@ -232,11 +232,11 @@ head('[6] the status is worded and coloured as the chart bands word it');
 {
   const chip = s => ctx.osStatusChipPak_(s);
   check('OK reads Approved, in the good colour',
-        /os-status-good/.test(chip('OK')) && />Approved</.test(chip('OK')), chip('OK'));
+        /status-chip-good/.test(chip('OK')) && />Approved</.test(chip('OK')), chip('OK'));
   check('authorise or reject reads Awaiting Approval, amber',
-        /os-status-warn/.test(chip('authorise or reject')) &&
+        /status-chip-warn/.test(chip('authorise or reject')) &&
         />Awaiting Approval</.test(chip('authorise or reject')));
-  check('Rejected is red', /os-status-bad/.test(chip('Rejected')));
+  check('Rejected is red', /status-chip-bad/.test(chip('Rejected')));
   // De-grouped, on this page only. The chart's fold sends everything that is
   // neither approved nor pending to "Rejected", which is right for a band - one
   // label, full height of the plot - and wrong for a cell per record. A spell
@@ -247,8 +247,8 @@ head('[6] the status is worded and coloured as the chart bands word it');
         !/>Rejected</.test(chip('Escalated to Ops')),
         chip('Escalated to Ops'));
   check('but keeps the red, because it still did not get its hours',
-        /os-status-bad/.test(chip('Escalated to Ops')) &&
-        /os-status-bad/.test(chip('Cancelled')),
+        /status-chip-bad/.test(chip('Escalated to Ops')) &&
+        /status-chip-bad/.test(chip('Cancelled')),
         'the colour is the three-state fold; only the word is de-grouped');
   check('the two known translations still fold',
         />Approved</.test(chip('OK')) &&
@@ -260,7 +260,7 @@ head('[6] the status is worded and coloured as the chart bands word it');
   check('while a folded one still carries the raw wording for an audit',
         /title="Logged as: OK"/.test(chip('OK')), chip('OK'));
   check('an empty status is not given a verdict',
-        /os-status-none/.test(chip('')) && !/Rejected/.test(chip('')),
+        /status-chip-none/.test(chip('')) && !/Rejected/.test(chip('')),
         'calling an undecided spell rejected is an accusation the data cannot support');
   check('and it does not claim to be one in the title either',
         /without a verdict/.test(chip('')), chip(''));
@@ -285,11 +285,11 @@ head('[7] the record row shows the six things it was asked for');
   check('the chip filters the main view',
         /onclick="event\.stopPropagation\(\);toggleBonusFilter\('AAA'\);"/.test(html), html.slice(0, 200));
   check('and hosts the manager card',
-        /class="os-bonus-chip bonus-tip-host clickable-bonus/.test(html) &&
+        /class="bonus-chip bonus-tip-host clickable-bonus/.test(html) &&
         html.indexOf('bonus-tip') !== -1,
         'this page is often where a manager first meets a code they do not know');
   check('a blank person reads as a dash, not as an empty cell',
-        /os-cell-none/.test(ctx.osJobTableHtmlPak_([rec({ auth: '' })])));
+        /cell-none/.test(ctx.osJobTableHtmlPak_([rec({ auth: '' })])));
   // The OS log is the dashboard's first source of genuinely free-typed text -
   // three people and a job name per record, straight out of a form - and
   // safeTextPak, despite the name, is a String() coercion that escapes
@@ -303,7 +303,7 @@ head('[7] the record row shows the six things it was asked for');
         'not one call left on this page');
 
   const css = R('Web - Styles.html');
-  ['os-bonus-chip', 'os-status', 'os-job-table', 'os-site-head', 'os-dept', 'os-job']
+  ['bonus-chip', 'status-chip', 'record-table', 'os-site-head', 'os-dept', 'record-group']
     .forEach(c => check('.' + c + ' is styled', css.indexOf('.' + c + ' {') !== -1));
 }
 
@@ -405,9 +405,9 @@ head('[9] records that could not be read are NAMED, not just counted');
         /bad: bad/.test(CODE));
   check('and the page renders them as an expandable row',
         /function osBadRowsHtmlPak_/.test(PAGE) &&
-        PAGE.indexOf('os-dropped-row') !== -1 &&
+        PAGE.indexOf('dropped-row') !== -1 &&
         /key: '__bad'/.test(PAGE) && /osNodeKeyPak_\(kind\.key\)/.test(PAGE) &&
-        R('Web - Styles.html').indexOf('.os-dropped-row .breakdown-label') !== -1);
+        R('Web - Styles.html').indexOf('.dropped-row .breakdown-label') !== -1);
   // Not a warning to be tidied away. An impossible date is a real form filled
   // in wrongly, and the page exists to make the abnormal visible - so the
   // section says what the record was and who there is to ask about it.
@@ -425,7 +425,7 @@ head('[9] records that could not be read are NAMED, not just counted');
         'a dead column and its stylesheet rule both go, or the next reader finds half of it');
   check('but the reason still rides on the row',
         /title="' \+ escapeAttrPak\(b\.why\)/.test(PAGE) &&
-        R('Web - Styles.html').indexOf('.os-bad-row { cursor: help; }') !== -1,
+        R('Web - Styles.html').indexOf('.bad-record-row { cursor: help; }') !== -1,
         'it is the most useful thing here, just not the widest column');
   // Both halves have to carry the new cells or the table is a column of
   // dashes: the server's own rejects, and the ones the client could not place.
@@ -447,7 +447,7 @@ head('[9] records that could not be read are NAMED, not just counted');
         /-hour cap'/.test(PAGE) &&
         /'the date is not a date'/.test(PAGE));
   check('the bonus number there is clickable like any other',
-        /os-bonus-chip bonus-tip-host clickable-bonus[\s\S]{0,200}toggleBonusFilter/
+        /bonus-chip bonus-tip-host clickable-bonus[\s\S]{0,200}toggleBonusFilter/
           .test(PAGE.slice(PAGE.indexOf('function osBadRowsHtmlPak_'))),
         'often the fastest way to find out whose record it is');
 
@@ -562,7 +562,7 @@ head('[14] the three filters');
         ctx.osPassesSetPak_({ 'Goods In': true }, 'OSR') === false);
   check('there is a way back to All in one click',
         /function clearOsZoneFilter\(\)/.test(PAGE) &&
-        /os-multi-all/.test(PAGE),
+        /filter-multi-all/.test(PAGE),
         'rather than un-ticking six things');
 
   // Pure OS is about the PERSON over the whole window, so it is judged before
@@ -584,12 +584,12 @@ head('[15] a zone opens onto DEPARTMENT bars, and those onto records');
         /class="breakdown-row clickable-row os-dept-row/.test(PAGE) &&
         /class="breakdown-bar os-dept-bar"/.test(PAGE));
   check('nested inside the zone it belongs to',
-        PAGE.indexOf('os-zone-detail') < PAGE.indexOf('os-dept-row'));
+        PAGE.indexOf('node-detail') < PAGE.indexOf('os-dept-row'));
   check('and it opens onto the records, grouped by job type',
-        /class="os-dept-detail"/.test(PAGE) &&
-        PAGE.indexOf('os-dept-detail') < PAGE.indexOf('osJobTableHtmlPak_(job.records)'));
+        /class="node-subdetail"/.test(PAGE) &&
+        PAGE.indexOf('node-subdetail') < PAGE.indexOf('osJobTableHtmlPak_(job.records)'));
   check('the job type heading carries its record count',
-        /class="os-job-count"/.test(PAGE));
+        /class="record-group-count"/.test(PAGE));
   // A department bar is a SHARE OF ITS ZONE - 9 of 33 is a third of the track.
   // Scaled against the largest department instead, which this did, the biggest
   // always filled the track whatever it was: 9, 9, 9 and 6 drew three full-width
@@ -627,11 +627,11 @@ head('[15b] four filters left, the range right, one row');
         index.indexOf('id="osFilters"') < index.indexOf('id="osFrom"'),
         'which is what puts them left of it');
   check('and the range is pushed hard right',
-        /\.os-controls \.os-time-bar \{[^}]*margin-left: auto/.test(css),
+        /\.page-controls \.page-time-bar \{[^}]*margin-left: auto/.test(css),
         'auto margin, so it survives the row wrapping on a narrow window');
   check('one row, same baseline',
-        /\.os-controls \{[^}]*align-items: flex-end/.test(css) &&
-        /\.os-controls \{[^}]*justify-content: space-between/.test(css));
+        /\.page-controls \{[^}]*align-items: flex-end/.test(css) &&
+        /\.page-controls \{[^}]*justify-content: space-between/.test(css));
 
   // The fourth filter.
   check('Record Status is a multi-select of its own',
@@ -687,7 +687,7 @@ head('[15e] the OS page on a phone');
 {
   const css = R('Web - Styles.html');
   const mob = (css.split('@media (max-width: 700px)')
-                  .filter(s => s.indexOf('.os-job-table-wrap') !== -1)[0] || '');
+                  .filter(s => s.indexOf('.record-table-wrap') !== -1)[0] || '');
 
   // Scrolling the table sideways to fit six-to-nine columns on a phone used to
   // need pan-x to keep that gesture off the page swipe, and even then a finger
@@ -696,17 +696,17 @@ head('[15e] the OS page on a phone');
   // does. Cards side-step the trade instead of picking a side of it: nothing
   // inside a card scrolls, so there is no gesture left to fight over.
   check('the wrapper no longer captures the gesture at all',
-        /\.table-wrap\.os-job-table-wrap \{/.test(mob) &&
+        /\.table-wrap\.record-table-wrap \{/.test(mob) &&
         /overflow: visible; touch-action: auto;/.test(mob),
         'a vertical drag over a record table has to reach the page');
   check('...beating the LATER rule that puts overflow-x back for other tables',
-        mob.indexOf('.table-wrap.os-job-table-wrap') !== -1,
+        mob.indexOf('.table-wrap.record-table-wrap') !== -1,
         'a single-class selector here would lose the tie to source order');
   check('the table lays out as blocks, one row one card',
-        /\.os-job-table, \.os-job-table tbody, \.os-job-table tr \{ display: block; width: 100%; \}/.test(mob) &&
-        /\.os-job-table thead \{ display: none; \}/.test(mob));
+        /\.record-table, \.record-table tbody, \.record-table tr \{ display: block; width: 100%; \}/.test(mob) &&
+        /\.record-table thead \{ display: none; \}/.test(mob));
   check('each cell shows the label the hidden header used to carry',
-        /\.os-job-table td::before \{\s*content: attr\(data-label\);/.test(mob),
+        /\.record-table td::before \{\s*content: attr\(data-label\);/.test(mob),
         'so the value is still identifiable once the header is gone');
 
   // The CSS reads the attribute; this is the other half - that every <td> in
@@ -728,15 +728,15 @@ head('[15e] the OS page on a phone');
   // two-column grid. display:contents dissolves the wrapper so each filter is a
   // grid item in its own right, and the six controls lay out three rows of two.
   check('the filter wrapper dissolves into the Bonus page grid',
-        /\.os-filters \{ display: contents; \}/.test(mob),
+        /\.page-filters \{ display: contents; \}/.test(mob),
         'or all four stack down one half of the row');
   check('the page uses that grid in the first place',
-        R('Web - Index.html').indexOf('class="bonus-page-controls os-controls"') !== -1 &&
+        R('Web - Index.html').indexOf('class="bonus-page-controls page-controls"') !== -1 &&
         /\.bonus-page-controls \{\s*display: grid;\s*grid-template-columns: 1fr 1fr;/
           .test(css));
   check('and each filter fills its cell, label above control',
-        /\.os-filter \.os-type-select,[\s\S]{0,120}width: 100%/.test(mob) &&
-        /\.os-filter \.breakdown-time-label \{[\s\S]{0,120}font-size: 11px/.test(mob),
+        /\.page-filter \.filter-type-select,[\s\S]{0,120}width: 100%/.test(mob) &&
+        /\.page-filter \.breakdown-time-label \{[\s\S]{0,120}font-size: 11px/.test(mob),
         'the same shape as the Bonus page, which is what was asked for');
 }
 
@@ -781,15 +781,15 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
   // the label took the full width instead of wrapping onto two lines beside an
   // empty bar track.
   check('the empty bar track and count cell are gone',
-        !/os-dropped-row[\s\S]{0,400}breakdown-bar-wrap/.test(PAGE) &&
-        !/os-dropped-row[\s\S]{0,400}breakdown-count/.test(PAGE));
+        !/dropped-row[\s\S]{0,400}breakdown-bar-wrap/.test(PAGE) &&
+        !/dropped-row[\s\S]{0,400}breakdown-count/.test(PAGE));
   check('and the label IS the bar, at the bar\'s own height',
-        /\.os-dropped-row \.breakdown-label \{[^}]*flex: 1 1 auto/.test(css) &&
-        /\.os-dropped-row \.breakdown-label \{[^}]*height: 30px/.test(css) &&
-        /\.os-dropped-row \.breakdown-label \{[^}]*background: var\(--status-warn-soft\)/.test(css),
+        /\.dropped-row \.breakdown-label \{[^}]*flex: 1 1 auto/.test(css) &&
+        /\.dropped-row \.breakdown-label \{[^}]*height: 30px/.test(css) &&
+        /\.dropped-row \.breakdown-label \{[^}]*background: var\(--status-warn-soft\)/.test(css),
         'so the row still lines up with the zone bars under it');
   check('with the chevron at the far end, like every other expandable row',
-        /\.os-dropped-row \.breakdown-chevron \{ margin-left: auto; \}/.test(css));
+        /\.dropped-row \.breakdown-chevron \{ margin-left: auto; \}/.test(css));
 
   // The bare `table` rule is table-layout: fixed, which is right for the Data
   // Table - a column per work area, sharing the width evenly - and wrong here.
@@ -797,7 +797,7 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
   // so it sizes to its own content: a fixed equal split clipped
   // "Cover - Team Manager" and "15/09/2026" to "Cov..." and "15/...".
   check('the bad-records table sizes its columns to what is IN them',
-        /\.os-bad-table \{ table-layout: auto; \}/.test(css),
+        /\.bad-record-table \{ table-layout: auto; \}/.test(css),
         'nine equal columns clipped every name and every date');
   check('and the global fixed layout is still there for the Data Table',
         /\ntable \{\s*\n\s*width: 100%;\s*\n\s*border-collapse: collapse;\s*\n\s*table-layout: fixed;/
@@ -808,7 +808,7 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
   // zone can hold a dozen down the page, so it has to agree with every other
   // job table on where its columns sit rather than read well on its own.
   check('the records table is fixed, with shares spent on what needs them',
-        /\.os-job-table:not\(\.os-bad-table\) \{ table-layout: fixed; \}/.test(css),
+        /\.record-table:not\(\.bad-record-table\) \{ table-layout: fixed; \}/.test(css),
         'auto would size each table from its own content and misalign the next one down');
   check('a colgroup carries those shares, not a blind six-way split',
         /var OS_JOB_COL_WIDTHS_ = \[10, 13, 19, 19, 19, 20\];/.test(PAGE) &&
@@ -940,7 +940,7 @@ head('[10] Claims at 3, OS at 4, NPL at 5, the Data Table at 6');
   // the open-state tracking exists to fix.
   check('the chapter reaches the department bars and the records',
         /target: '#osBody \.os-dept-row'/.test(tour) &&
-        /target: '#osBody \.os-dept-detail \.os-job-table'/.test(tour));
+        /target: '#osBody \.node-subdetail \.record-table'/.test(tour));
   // Scoped to this chapter: the head breakdown's own steps still use
   // toggleBreakdownDetail, and legitimately - that page IS an accordion.
   const ch6 = tour.slice(tour.indexOf('===== Part 6'), tour.indexOf('===== Part 7'));
@@ -1002,23 +1002,23 @@ head('[12] the log is fetched by the page, not by every dashboard load');
   // to land on top of whatever somebody was already reading. This page fetches
   // the log on first open, so without one the first thing a new arrival sees is
   // an empty card, which reads as "nobody was on OS".
-  // The markup, not just the name: os-skeleton also appears in the guard that
+  // The markup, not just the name: page-skeleton also appears in the guard that
   // stops it being rewritten, so a looser check passed against a loading branch
   // that had stopped rendering one.
   check('it shows a skeleton while the log is on its way',
         !/fa-spin/.test(PAGE) && /osLogState === 'loading'/.test(PAGE) &&
-        /'<div class="os-skeleton"/.test(PAGE),
+        /'<div class="page-skeleton"/.test(PAGE),
         'an empty card and "nobody on OS" look identical otherwise');
   check('shaped like what is coming, so the page does not jump',
-        PAGE.indexOf('os-skel-summary') !== -1 && PAGE.indexOf('os-skel-row') !== -1 &&
-        R('Web - Styles.html').indexOf('.os-skel-row') !== -1);
+        PAGE.indexOf('skel-summary') !== -1 && PAGE.indexOf('skel-row') !== -1 &&
+        R('Web - Styles.html').indexOf('.skel-row') !== -1);
   check('and it uses the same shimmer as every other skeleton',
-        /\.os-skel-summary,[\s\S]{0,200}animation: skelShimmer/.test(R('Web - Styles.html')),
+        /\.skel-summary,[\s\S]{0,200}animation: skelShimmer/.test(R('Web - Styles.html')),
         'a second animation would run at its own speed beside the first');
   // Written once. A re-render while still loading - and this page re-renders on
   // every filter change - would restart every shimmer from the left.
   check('the skeleton is not rewritten on every re-render',
-        /classList\.contains\('os-skeleton'\)/.test(PAGE));
+        /classList\.contains\('page-skeleton'\)/.test(PAGE));
 
   // The client works out the window, so the server needs no read to do it.
   check('the client sends the dates it wants',
@@ -1143,7 +1143,7 @@ head('[19] only one filter menu can be open at a time');
   // only ever opens a menu whose id it is holding. Reading the DOM means a new
   // filter works the moment it is drawn.
   check('the menus are found in the DOM, not kept in a list',
-        /function osFilterMenuIdsPak_\(\) \{[\s\S]{0,260}querySelectorAll\('\.os-multi-menu'\)/.test(PAGE) &&
+        /function osFilterMenuIdsPak_\(\) \{[\s\S]{0,260}querySelectorAll\('\.filter-multi-menu'\)/.test(PAGE) &&
         !/OS_FILTER_MENU_IDS_/.test(PAGE),
         'a list is a second place to remember, and it was already one page out of date');
   check('opening one force-closes every other, in the same pass',
@@ -1159,7 +1159,7 @@ head('[19] only one filter menu can be open at a time');
   // lookup above work. If the builder stopped writing it, every menu on every
   // page would go back to being unopenable.
   check('and the builder gives every menu that class',
-        /class="warehouse-menu os-multi-menu" id="' \+ id \+ '"/.test(PAGE));
+        /class="warehouse-menu filter-multi-menu" id="' \+ id \+ '"/.test(PAGE));
 
   // Item 2: a selection inside an open menu rebuilds the whole filter row -
   // every toggle/clear handler calls renderOsPagePak - and used to lose the
@@ -1173,16 +1173,16 @@ head('[20] the four filter controls match: width, and the Type chevron');
 {
   const css = R('Web - Styles.html');
   check('one fixed column width for all four, not four different min-widths',
-        /\.os-filter \{ width: 170px; flex: 0 0 170px; \}/.test(css),
+        /\.page-filter \{ width: 170px; flex: 0 0 170px; \}/.test(css),
         'Type was 120px and the three multi-selects 150px');
   check('at the SAME specificity as the mobile override, deliberately',
-        !/\.os-filters \.os-filter \{ width:/.test(css),
+        !/\.page-filters \.page-filter \{ width:/.test(css),
         'an ancestor-qualified selector would have outranked the phone grid rule regardless of source order');
   check('Type is wrapped for a caret the same way the other three are',
-        /<div class="os-multi os-type-wrap select-caret-wrap">/.test(PAGE));
+        /<div class="filter-multi filter-type-wrap select-caret-wrap">/.test(PAGE));
   check('its native caret is switched off in favour of the FA chevron',
         /select\.hc-control\.fa-caret-select \{[\s\S]{0,200}background-image: none;/.test(css) &&
-        /class="hc-control fa-caret-select os-type-select/.test(PAGE));
+        /class="hc-control fa-caret-select filter-type-select/.test(PAGE));
   check('and the chevron is the one shared class, positioned over the select',
         /fa-solid fa-chevron-down hc-select-caret/.test(PAGE) &&
         /\.hc-select-caret \{\s*\n\s*position: absolute;/.test(css));
@@ -1374,12 +1374,12 @@ head('[24] a filter that is narrowing something says so');
 {
   const css = R('Web - Styles.html');
   check('the three multi-selects light up when anything is picked',
-        /\(picked\.length \? ' os-filter-on' : ''\)/.test(PAGE));
+        /\(picked\.length \? ' page-filter-on' : ''\)/.test(PAGE));
   check('and Type when it is not on All',
-        /\(osTypeFilter === 'all' \? '' : ' os-filter-on'\)/.test(PAGE));
+        /\(osTypeFilter === 'all' \? '' : ' page-filter-on'\)/.test(PAGE));
   check('the tint is the accent, not another status colour',
-        /\.hc-control\.os-filter-on \{[\s\S]{0,140}border-color: var\(--accent\)/.test(css) &&
-        /\.hc-control\.os-filter-on \{[\s\S]{0,140}background: var\(--accent-8\)/.test(css),
+        /\.hc-control\.page-filter-on \{[\s\S]{0,140}border-color: var\(--accent\)/.test(css) &&
+        /\.hc-control\.page-filter-on \{[\s\S]{0,140}background: var\(--accent-8\)/.test(css),
         'green/amber/red already mean a verdict on this page');
 }
 
@@ -1405,7 +1405,7 @@ head('[25] every filter label sits beside its control, and they all line up');
   // being looked for exists only in the mobile one - so the search cannot
   // land on the wrong copy, and does not depend on picking the right block
   // out first.
-  [['the OS/NPL filters', '\\.os-filter \\.breakdown-time-label'],
+  [['the OS/NPL filters', '\\.page-filter \\.breakdown-time-label'],
    ['From and To', '\\.bonus-page-controls \\.time-row \\.breakdown-time-label'],
    ['Display Mode, Rows and Areas', '\\.bonus-control-group > label'],
    ['the Volume control', '\\.volume-controls label']
@@ -1417,7 +1417,7 @@ head('[25] every filter label sits beside its control, and they all line up');
 
   // Inline, not stacked - the three wrappers that used to be columns.
   check('the OS/NPL filter is a row now',
-        /\.os-filter \{\s*display: flex;\s*flex-direction: row;/.test(css),
+        /\.page-filter \{\s*display: flex;\s*flex-direction: row;/.test(css),
         'the desktop rule above it is the same selector set to column');
   check('so is the Bonus control group',
         /\.bonus-control-group \{\s*display: flex;\s*flex-direction: row;/.test(mob));
@@ -1733,7 +1733,7 @@ head('[33] the sort control is the sixth filter, and the carets line up');
   const css = R('Web - Styles.html');
   const INDEX = R('Web - Index.html');
   check('the Claims sort sits in the grid as a filter, not a strip of its own',
-        /<div class="os-filter fraud-sort-filter">/.test(INDEX) &&
+        /<div class="page-filter fraud-sort-filter">/.test(INDEX) &&
         !/\.fraud-sort-mobile \{ grid-column: 1 \/ -1; \}/.test(css));
   check('and it is named, like the five above it',
         /<span class="breakdown-time-label">Sort by<\/span>/.test(INDEX));
@@ -1768,6 +1768,55 @@ head('[33] the sort control is the sixth filter, and the carets line up');
     r => r.indexOf('#bonusSearch') !== -1 && r.indexOf('padding-right: 26px') !== -1);
   check('...while the search field keeps it', searchKeeps.length === 3,
         'the normal size, the scrolled one and the phone - was ' + searchKeeps.length);
+}
+
+head('[34] a class is named for what it IS, not for where it was born');
+// Every one of these components started on the OS page and was then reused -
+// by NPL, by Claims, or by all three - and kept the os- prefix it was born
+// with. A Claims dropdown reading `os-multi` in the inspector is a lie about
+// what the thing is, and the next person to touch it pays for that.
+{
+  const npl = R('Web - JsPageNpl.html');
+  const fraud = R('Web - JsPageFraud.html');
+  const index = R('Web - Index.html');
+  const css = R('Web - Styles.html');
+  const everything = PAGE + npl + fraud + index + css;
+  const tok = (hay, t) =>
+    (hay.match(new RegExp('(?<![A-Za-z0-9-])' + t + '(?![A-Za-z0-9-])', 'g')) || []).length;
+
+  // The shared ones, by their new names. Each has to exist and be styled.
+  [['filter-multi', 'the multi-select'],
+   ['page-filter', 'the filter column'],
+   ['record-table', 'the record table'],
+   ['status-chip', 'the verdict chip'],
+   ['bonus-chip', 'the bonus chip'],
+   ['page-skeleton', 'the loading skeleton'],
+   ['node-detail', 'an expanded node'],
+   ['bad-record-table', 'the unreadable records']
+  ].forEach(([cls, what]) => {
+    check(what + ' is called ' + cls,
+          tok(css, '\\.' + cls) > 0 && tok(PAGE + npl + fraud + index, cls) > 0,
+          'a rule and at least one user');
+  });
+
+  // And none of them answers to the old name any more, anywhere.
+  const gone = ['os-multi', 'os-filter', 'os-filters', 'os-job-table', 'os-job',
+                'os-status', 'os-bonus-chip', 'os-body', 'os-skeleton',
+                'os-skel-row', 'os-cell-none', 'os-time-cell', 'os-controls',
+                'os-zone-detail', 'os-dept-detail', 'os-zone-bar', 'os-bad-table',
+                'os-dropped-row', 'data-os-key'];
+  gone.forEach(cls => {
+    check('nothing is called ' + cls + ' any more', tok(everything, cls) === 0,
+          tok(everything, cls) + ' left');
+  });
+
+  // The OS page's OWN furniture keeps the prefix, because there it is true.
+  ['os-site', 'os-open-card', 'os-tag', 'os-dept-row'].forEach(cls => {
+    check(cls + ' keeps it, being genuinely the OS page\'s', tok(everything, cls) > 0);
+  });
+  check('...and none of those leaked onto another page',
+        tok(npl + fraud, 'os-site') === 0 && tok(npl + fraud, 'os-open-card') === 0,
+        'a page-specific class on another page is the same lie the other way round');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

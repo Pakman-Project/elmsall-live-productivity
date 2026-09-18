@@ -492,14 +492,14 @@
       // Standard hours with no area carrying them: the total column on the
       // pivot moved but no single area's did. Worth saying rather than
       // leaving the cell blank, which reads as "not looked at".
-      return '<span class="os-cell-none" title="Standard hours, but no single' +
+      return '<span class="cell-none" title="Standard hours, but no single' +
              ' work area carries them">&ndash;</span>';
     }
     return escapeTextPak_(areas.join(', '));
   }
 
   function fraudTableHtmlPak_(rows) {
-    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table' +
+    var html = '<div class="table-wrap record-table-wrap"><table class="record-table' +
                ' fraud-table"><colgroup>';
     for (var w = 0; w < FRAUD_COLUMNS_.length; w++) {
       html += '<col style="width:' + FRAUD_COLUMNS_[w].width + '%">';
@@ -519,7 +519,7 @@
       var esc = escapeAttrPak(r.bonus);
       var picked = selectedBonuses.indexOf(r.bonus) !== -1;
       html += '<tr>';
-      html += '<td data-label="Bonus"><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+      html += '<td data-label="Bonus"><span class="bonus-chip bonus-tip-host clickable-bonus' +
               (picked ? ' selected' : '') + '"' +
               ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
               escapeTextPak_(r.bonus) +
@@ -533,11 +533,11 @@
       html += '<td data-label="Overlap Std Hrs" class="fraud-std-cell"' +
               ' title="Standard hours produced inside the overlapping time only">' +
               r.overlapStd.toFixed(2) + '</td>';
-      html += '<td data-label="Overlap Time" class="os-time-cell"' +
+      html += '<td data-label="Overlap Time" class="time-cell"' +
               ' title="The part of the claim where produced hours were actually found">' +
               escapeTextPak_(fraudRangeTextPak_(r.overlapFrom, r.overlapTo)) + '</td>';
       html += '<td data-label="Claim">' + fraudKindChipPak_(r.kind) + '</td>';
-      html += '<td data-label="Claim Time" class="os-time-cell"' +
+      html += '<td data-label="Claim Time" class="time-cell"' +
               (r.extra ? ' title="' + escapeAttrPak(r.extra) + '"' : '') + '>' +
               escapeTextPak_(fraudRangeTextPak_(r.from, r.to)) + '</td>';
       html += '<td data-label="TM authorised">' + osPersonCellPak_(r.auth) + '</td>';
@@ -626,12 +626,12 @@
     if (fraudLogState === null) { ensureFraudLogsPak_(); return; }
     if (fraudLogState === 'loading') {
       if (!body.firstChild || !body.firstChild.classList ||
-          !body.firstChild.classList.contains('os-skeleton')) {
-        body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          !body.firstChild.classList.contains('page-skeleton')) {
+        body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
           progressBarHtmlPak_('claims') +
-          '<div class="os-skel-summary"></div>' +
-          '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
-          '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+          '<div class="skel-summary"></div>' +
+          '<div class="skel-row"></div><div class="skel-row"></div>' +
+          '<div class="skel-row"></div><div class="skel-row"></div></div>';
         progressStartPak_('claims');
       }
       return;

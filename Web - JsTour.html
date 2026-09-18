@@ -277,7 +277,7 @@ var TOUR_STEPS = [
     cleanup: function () { tourCloseOsNodes_(); },
     title: 'A bar per department',
     body: 'A zone opens onto its departments, as bars of their own — scaled within the zone, the way the zones are scaled within their site. Click one of those to reach the records.' },
-  { part: 6, page: 4, target: '#osBody .os-dept-detail .os-job-table',
+  { part: 6, page: 4, target: '#osBody .node-subdetail .record-table',
     action: function () { tourOpenOsZone_(); tourOpenOsDept_(); },
     cleanup: function () { tourCloseOsNodes_(); },
     title: 'Records, grouped by job type',
@@ -413,7 +413,7 @@ var TOUR_STEPS = [
 // class set behind its back is undone by the next render - which is the very
 // bug the open-state tracking was added to fix.
 function tourOpenOsZone_() {
-  var row = document.querySelector('#osBody .breakdown-row:not(.os-dept-row):not(.os-dropped-row)');
+  var row = document.querySelector('#osBody .breakdown-row:not(.os-dept-row):not(.dropped-row)');
   if (row && !row.classList.contains('expanded') && typeof toggleOsNode === 'function') {
     toggleOsNode(row);
   }

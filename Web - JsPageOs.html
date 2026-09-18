@@ -446,7 +446,7 @@
   // whole class of bug goes with the list.
   function osFilterMenuIdsPak_() {
     var out = [];
-    var menus = document.querySelectorAll('.os-multi-menu');
+    var menus = document.querySelectorAll('.filter-multi-menu');
     for (var i = 0; i < menus.length; i++) {
       if (menus[i].id) out.push(menus[i].id);
     }
@@ -477,29 +477,29 @@
     var label = picked.length === 0 ? 'All ' + title
               : picked.length === 1 ? picked[0]
               : picked.length + ' of ' + values.length;
-    var html = '<div class="os-filter">';
+    var html = '<div class="page-filter">';
     html += '<span class="breakdown-time-label"' +
             (short ? ' data-short="' + escapeAttrPak(short) + '"' : '') +
             '>' + title + '</span>';
-    html += '<div class="os-multi">';
+    html += '<div class="filter-multi">';
     // A narrowed filter has to be visible without opening it: the button reads
     // "All Zones" or a name either way, and at a glance across four controls
     // that difference is easy to miss entirely.
-    html += '<button type="button" class="hc-control os-multi-btn' +
-            (picked.length ? ' os-filter-on' : '') + '" id="' + id + 'Btn"' +
+    html += '<button type="button" class="hc-control filter-multi-btn' +
+            (picked.length ? ' page-filter-on' : '') + '" id="' + id + 'Btn"' +
             ' onclick="osFilterMenuClick_(\'' + id + '\')" aria-haspopup="listbox"' +
             ' aria-expanded="false" aria-controls="' + id + '">' +
-            '<span class="os-multi-label">' + escapeTextPak_(label) + '</span>' +
+            '<span class="filter-multi-label">' + escapeTextPak_(label) + '</span>' +
             '<i class="fa-solid fa-chevron-down warehouse-caret" aria-hidden="true"></i>' +
             '</button>';
-    html += '<div class="warehouse-menu os-multi-menu" id="' + id + '" role="listbox"' +
+    html += '<div class="warehouse-menu filter-multi-menu" id="' + id + '" role="listbox"' +
             ' aria-multiselectable="true" aria-label="' + title + '">';
     if (values.length === 0) {
-      html += '<span class="os-multi-empty">Nothing in range</span>';
+      html += '<span class="filter-multi-empty">Nothing in range</span>';
     } else {
       // "All" first, so getting back out of a narrow selection is one click
       // rather than un-ticking six things.
-      html += '<button type="button" class="warehouse-item os-multi-all" role="option"' +
+      html += '<button type="button" class="warehouse-item filter-multi-all" role="option"' +
               ' aria-selected="' + (picked.length === 0 ? 'true' : 'false') + '"' +
               ' onclick="' + clearHandler + '()">' +
               '<span class="warehouse-check' + (picked.length === 0 ? ' on' : '') + '"' +
@@ -737,7 +737,7 @@
 
   function toggleOsNode(el) {
     if (!el) return;
-    var key = el.getAttribute('data-os-key');
+    var key = el.getAttribute('data-node-key');
     if (!key) return;
     if (osOpenNodes[key]) { delete osOpenNodes[key]; } else { osOpenNodes[key] = true; }
     // Toggled in place rather than re-rendered: re-rendering on every click
@@ -771,19 +771,19 @@
       // Logged with the status cell empty. Not a verdict, so it is not given
       // one - calling an undecided record rejected would be an accusation the
       // data does not support.
-      return '<span class="os-status os-status-none" title="Logged without a verdict against it">&ndash;</span>';
+      return '<span class="status-chip status-chip-none" title="Logged without a verdict against it">&ndash;</span>';
     }
-    var cls = band === OS_STATUS_APPROVED_PAK_ ? 'os-status-good'
-            : band === OS_STATUS_AWAITING_PAK_ ? 'os-status-warn' : 'os-status-bad';
+    var cls = band === OS_STATUS_APPROVED_PAK_ ? 'status-chip-good'
+            : band === OS_STATUS_AWAITING_PAK_ ? 'status-chip-warn' : 'status-chip-bad';
     var raw = String(status == null ? '' : status).trim();
     var title = (raw && raw.toLowerCase() !== text.toLowerCase())
       ? ' title="Logged as: ' + escapeAttrPak(raw) + '"' : '';
-    return '<span class="os-status ' + cls + '"' + title + '>' + escapeTextPak_(text) + '</span>';
+    return '<span class="status-chip ' + cls + '"' + title + '>' + escapeTextPak_(text) + '</span>';
   }
 
   function osPersonCellPak_(v) {
     var s = String(v == null ? '' : v).trim();
-    return s ? escapeTextPak_(s) : '<span class="os-cell-none">&ndash;</span>';
+    return s ? escapeTextPak_(s) : '<span class="cell-none">&ndash;</span>';
   }
 
   var OS_JOB_COLUMNS_ = ['Bonus', 'Time', 'TM Authorising', 'Deployed by',
@@ -798,7 +798,7 @@
   var OS_JOB_COL_WIDTHS_ = [10, 13, 19, 19, 19, 20];
 
   function osJobTableHtmlPak_(records) {
-    var html = '<div class="table-wrap os-job-table-wrap"><table class="os-job-table">' +
+    var html = '<div class="table-wrap record-table-wrap"><table class="record-table">' +
                '<colgroup>';
     for (var w = 0; w < OS_JOB_COL_WIDTHS_.length; w++) {
       html += '<col style="width:' + OS_JOB_COL_WIDTHS_[w] + '%">';
@@ -813,13 +813,13 @@
       var esc = escapeAttrPak(r.bonus);
       var picked = selectedBonuses.indexOf(r.bonus) !== -1;
       html += '<tr>';
-      html += '<td data-label="Bonus"><span class="os-bonus-chip bonus-tip-host clickable-bonus' +
+      html += '<td data-label="Bonus"><span class="bonus-chip bonus-tip-host clickable-bonus' +
               (picked ? ' selected' : '') + '"' +
               ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
               escapeTextPak_(r.bonus) +
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
-      html += '<td class="os-time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
+      html += '<td class="time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
       html += '<td data-label="TM Authorising">' + osPersonCellPak_(r.auth) + '</td>';
       html += '<td data-label="Deployed by">' + osPersonCellPak_(r.deployedBy) + '</td>';
       html += '<td data-label="Reports to">' + osPersonCellPak_(r.reportsTo) + '</td>';
@@ -885,20 +885,20 @@
     var key = osNodeKeyPak_(kind.key);
     var open = !!osOpenNodes[key];
 
-    var html = '<div class="breakdown-row clickable-row os-dropped-row' + kind.rowClass +
+    var html = '<div class="breakdown-row clickable-row dropped-row' + kind.rowClass +
                (open ? ' expanded' : '') + '"' +
-               ' data-os-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
-    html += '<div class="breakdown-label os-dropped-label">' +
+               ' data-node-key="' + escapeAttrPak(key) + '" onclick="toggleOsNode(this)">';
+    html += '<div class="breakdown-label dropped-label">' +
             '<i class="fa-solid ' + kind.icon + '" aria-hidden="true"></i>' +
             kind.heading(total) +
             '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div></div>';
 
     html += '<div class="breakdown-detail' + (open ? ' open' : '') + '">' +
-            '<div class="os-zone-detail">';
-    html += '<div class="os-bad-intro">' + kind.intro + '</div>';
+            '<div class="node-detail">';
+    html += '<div class="bad-record-intro">' + kind.intro + '</div>';
 
     if (bad && bad.length) {
-      html += '<div class="table-wrap os-job-table-wrap"><table class="os-job-table os-bad-table"><thead><tr>';
+      html += '<div class="table-wrap record-table-wrap"><table class="record-table bad-record-table"><thead><tr>';
       for (var c = 0; c < OS_BAD_COLUMNS_.length; c++) {
         html += '<th>' + OS_BAD_COLUMNS_[c] + '</th>';
       }
@@ -912,18 +912,18 @@
         // a phone a paragraph-wide last column pushed the eight cells somebody
         // reads first off the side of the table.
         html += '<tr' + (b.why ? ' title="' + escapeAttrPak(b.why) + '"' : '') +
-                ' class="os-bad-row">';
+                ' class="bad-record-row">';
         // Clickable like every other bonus number on the dashboard: the code is
         // often the fastest way to find out whose record this is.
         html += '<td data-label="Bonus">' + (String(b.bonus || '').trim()
-          ? '<span class="os-bonus-chip bonus-tip-host clickable-bonus"' +
+          ? '<span class="bonus-chip bonus-tip-host clickable-bonus"' +
             ' onclick="event.stopPropagation();toggleBonusFilter(\'' +
             escapeAttrPak(b.bonus) + '\');">' + escapeTextPak_(b.bonus) +
             bonusTipHtmlPak_(b.bonus, selectedBonuses.indexOf(b.bonus) !== -1) + '</span>'
-          : '<span class="os-cell-none">&ndash;</span>') + '</td>';
-        html += '<td class="os-bad-cell" data-label="Date">' + osPersonCellPak_(b.date) + '</td>';
-        html += '<td class="os-bad-cell" data-label="Start">' + osPersonCellPak_(b.from) + '</td>';
-        html += '<td class="os-bad-cell" data-label="Finish">' + osPersonCellPak_(b.to) + '</td>';
+          : '<span class="cell-none">&ndash;</span>') + '</td>';
+        html += '<td class="bad-record-cell" data-label="Date">' + osPersonCellPak_(b.date) + '</td>';
+        html += '<td class="bad-record-cell" data-label="Start">' + osPersonCellPak_(b.from) + '</td>';
+        html += '<td class="bad-record-cell" data-label="Finish">' + osPersonCellPak_(b.to) + '</td>';
         html += '<td data-label="Site / Zone">' + osPersonCellPak_(zone) + '</td>';
         html += '<td data-label="Task">' + osPersonCellPak_(b.job) + '</td>';
         html += '<td data-label="TM Authorising">' + osPersonCellPak_(b.auth) + '</td>';
@@ -939,7 +939,7 @@
     // the table above so the two cannot double up - the heading used to say
     // eight and this line say "8 more", which read as sixteen.
     if (unnamed) {
-      html += '<div class="os-bad-intro">' + unnamed + ' more could not be read, past ' +
+      html += '<div class="bad-record-intro">' + unnamed + ' more could not be read, past ' +
               'the limit on how many the server will name in one go.</div>';
     }
     html += '</div></div>';
@@ -981,12 +981,12 @@
     // still loading would restart every shimmer from the left.
     if (osLogState === 'loading') {
       if (!body.firstChild || !body.firstChild.classList ||
-          !body.firstChild.classList.contains('os-skeleton')) {
-        body.innerHTML = '<div class="os-skeleton" aria-label="Loading">' +
+          !body.firstChild.classList.contains('page-skeleton')) {
+        body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
           progressBarHtmlPak_('oslog') +
-          '<div class="os-skel-summary"></div>' +
-          '<div class="os-skel-row"></div><div class="os-skel-row"></div>' +
-          '<div class="os-skel-row"></div><div class="os-skel-row"></div></div>';
+          '<div class="skel-summary"></div>' +
+          '<div class="skel-row"></div><div class="skel-row"></div>' +
+          '<div class="skel-row"></div><div class="skel-row"></div></div>';
         progressStartPak_('oslog');
       }
       return;
@@ -1095,16 +1095,16 @@
     var controls = document.getElementById('osFilters');
     if (controls) {
       controls.innerHTML =
-        // Wrapped in .os-multi too, purely for the positioning context a
+        // Wrapped in .filter-multi too, purely for the positioning context a
         // native <select> cannot provide for itself - it is what lets the
         // same chevron the three real multi-selects use sit on top of this
         // one instead of the thin caret select.hc-control draws by default,
         // so all four controls carry the same icon rather than three matching
         // and one looking unfinished.
-        '<div class="os-filter"><span class="breakdown-time-label">Type</span>' +
-        '<div class="os-multi os-type-wrap select-caret-wrap">' +
-        '<select class="hc-control fa-caret-select os-type-select' +
-        (osTypeFilter === 'all' ? '' : ' os-filter-on') +
+        '<div class="page-filter"><span class="breakdown-time-label">Type</span>' +
+        '<div class="filter-multi filter-type-wrap select-caret-wrap">' +
+        '<select class="hc-control fa-caret-select filter-type-select' +
+        (osTypeFilter === 'all' ? '' : ' page-filter-on') +
         '" onchange="setOsTypeFilter(this.value)"' +
         ' title="Everyone on OS, only those who did nothing else, or only those who did both">' +
         Object.keys(OS_TYPE_LABELS_).map(function (k) {
@@ -1187,15 +1187,15 @@
 
         html += '<div class="breakdown-row clickable-row' + (zOpen ? ' expanded' : '') +
                 (zState.hit ? ' bonus-hit-row' : '') + '"' +
-                ' data-os-key="' + escapeAttrPak(zKey) + '" onclick="toggleOsNode(this)">';
+                ' data-node-key="' + escapeAttrPak(zKey) + '" onclick="toggleOsNode(this)">';
         html += '<div class="breakdown-label">' + escapeTextPak_(zone.name) +
                 '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
-        html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar os-zone-bar"' +
+        html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar node-bar"' +
                 ' style="width:0%;" data-target="' + zPct + '"></div></div>';
         html += '<div class="breakdown-count">' + zone.count + '</div></div>';
 
         html += '<div class="breakdown-detail' + (zOpen ? ' open' : '') + '">' +
-                '<div class="os-zone-detail">';
+                '<div class="node-detail">';
 
         // A zone opens onto its departments as bars of their own, as a SHARE OF
         // THE ZONE above them - 9 of 33 is a bar a third of the way across.
@@ -1221,7 +1221,7 @@
 
           html += '<div class="breakdown-row clickable-row os-dept-row' +
                   (dOpen ? ' expanded' : '') + (dState.hit ? ' bonus-hit-row' : '') + '"' +
-                  ' data-os-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
+                  ' data-node-key="' + escapeAttrPak(dKey) + '" onclick="toggleOsNode(this)">';
           html += '<div class="breakdown-label">' + escapeTextPak_(dept.name) +
                   '<i class="fa-solid fa-chevron-down breakdown-chevron"></i></div>';
           html += '<div class="breakdown-bar-wrap"><div class="breakdown-bar os-dept-bar"' +
@@ -1229,12 +1229,12 @@
           html += '<div class="breakdown-count">' + dept.count + '</div></div>';
 
           html += '<div class="breakdown-detail' + (dOpen ? ' open' : '') + '">' +
-                  '<div class="os-dept-detail">';
+                  '<div class="node-subdetail">';
           for (var ji = 0; ji < dept.jobs.length; ji++) {
             var job = dept.jobs[ji];
-            html += '<div class="os-job">';
-            html += '<div class="os-job-head">' + escapeTextPak_(job.name) +
-                    '<span class="os-job-count">' + job.records.length + '</span></div>';
+            html += '<div class="record-group">';
+            html += '<div class="record-group-head">' + escapeTextPak_(job.name) +
+                    '<span class="record-group-count">' + job.records.length + '</span></div>';
             html += osJobTableHtmlPak_(job.records);
             html += '</div>';
           }
@@ -1289,7 +1289,7 @@
   if (typeof document !== 'undefined' && document && document.addEventListener) {
     document.addEventListener('click', function (e) {
       if (!e.target || !e.target.closest) return;
-      if (e.target.closest('.os-multi')) return;
+      if (e.target.closest('.filter-multi')) return;
       var ids = osFilterMenuIdsPak_();
       for (var i = 0; i < ids.length; i++) {
         toggleOsMenu_(ids[i], false);

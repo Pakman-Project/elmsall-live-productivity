@@ -3361,7 +3361,7 @@ body.page-scrolled-far .back-to-top {
 /* One row: the four filters left, the range right, everything on the same
    baseline. The title and subtitle that used to sit above this are gone - the
    rail tab already says OS. */
-.os-controls {
+.page-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -3371,12 +3371,12 @@ body.page-scrolled-far .back-to-top {
 
 /* margin-left: auto is what puts From / To hard right, and it survives the
    row wrapping on a narrow window - a float or a fixed width would not. */
-.os-controls .os-time-bar {
+.page-controls .page-time-bar {
   margin-left: auto;
   margin-top: 0;
 }
 
-.os-body { display: block; }
+.page-body { display: block; }
 
 /* The bad-records card sits directly under the breakdown card - the page has
    no grid gap of its own here, unlike the charts grid most span-12 cards live
@@ -3414,12 +3414,12 @@ body.page-scrolled-far .back-to-top {
 
 /* The zone bar is neutral, not an area colour: a zone is not a work area and
    borrowing the area palette would imply a mapping that does not exist. */
-.breakdown-bar.os-zone-bar {
+.breakdown-bar.node-bar {
   background: var(--accent-25);
   border: 1px solid var(--accent-25);
 }
 
-.os-zone-detail { padding: 8px 2px 2px; }
+.node-detail { padding: 8px 2px 2px; }
 
 .os-dept + .os-dept {
   margin-top: 12px;
@@ -3449,10 +3449,10 @@ body.page-scrolled-far .back-to-top {
    PREVIOUS task's table, with nothing but these two margins keeping the three
    apart. At 8/4 it read as belonging to the table above it rather than the one
    below, which is the opposite of what a heading is for. */
-.os-job { margin-top: 18px; }
-.os-job:first-child { margin-top: 4px; }
+.record-group { margin-top: 18px; }
+.record-group:first-child { margin-top: 4px; }
 
-.os-job-head {
+.record-group-head {
   margin-bottom: 9px;
   font-size: 0.6875rem;
   font-weight: 600;
@@ -3461,7 +3461,7 @@ body.page-scrolled-far .back-to-top {
   color: var(--muted);
 }
 
-.os-job-table {
+.record-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.75rem;
@@ -3476,16 +3476,16 @@ body.page-scrolled-far .back-to-top {
    osJobTableHtmlPak_ writes - not an equal split six ways, which is what the
    bare `table` rule gives by default and crushes the bonus chip to the width
    of "TM Authorising". */
-.os-job-table:not(.os-bad-table) { table-layout: fixed; }
+.record-table:not(.bad-record-table) { table-layout: fixed; }
 
 /* The BAD-RECORDS table appears once, is not a column of anything else, and
    holds a real date and a real name in most of its nine cells - a fixed equal
    split clipped "Cover - Team Manager" and "15/09/2026" to "Cov..." and
    "15/...". Sized to its own content instead, which is right precisely
    because there is nothing else on the page for it to line up against. */
-.os-bad-table { table-layout: auto; }
+.bad-record-table { table-layout: auto; }
 
-.os-job-table th {
+.record-table th {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
   text-align: left;
@@ -3497,24 +3497,24 @@ body.page-scrolled-far .back-to-top {
   white-space: nowrap;
 }
 
-.os-job-table td {
+.record-table td {
   padding: 5px 8px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
   vertical-align: middle;
 }
 
-.os-job-table tr:last-child td { border-bottom: none; }
+.record-table tr:last-child td { border-bottom: none; }
 
-.os-time-cell {
+.time-cell {
   font-family: 'Roboto Mono', ui-monospace, monospace;
   white-space: nowrap;
 }
 
-.os-cell-none { color: var(--muted); opacity: 0.6; }
+.cell-none { color: var(--muted); opacity: 0.6; }
 
 /* The bonus number, clickable like every other one on the dashboard. */
-.os-bonus-chip {
+.bonus-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -3528,13 +3528,13 @@ body.page-scrolled-far .back-to-top {
   white-space: nowrap;
 }
 
-.os-bonus-chip:hover { border-color: var(--accent); }
-.os-bonus-chip.selected {
+.bonus-chip:hover { border-color: var(--accent); }
+.bonus-chip.selected {
   border-color: var(--accent);
   background: var(--accent-8);
 }
 
-.os-bonus-chip .chip-filter-icon {
+.bonus-chip .chip-filter-icon {
   font-size: 8px;
   opacity: 0.45;
 }
@@ -3542,7 +3542,7 @@ body.page-scrolled-far .back-to-top {
 /* The three display states, worded and coloured exactly as the chart band
    words and colours them - see osStatusBandPak_. A record reading Approved
    here and amber on a chart would be the same fact told two ways. */
-.os-status {
+.status-chip {
   display: inline-block;
   padding: 1px 7px;
   border-radius: 8px;
@@ -3552,26 +3552,26 @@ body.page-scrolled-far .back-to-top {
   white-space: nowrap;
 }
 
-.os-status-good {
+.status-chip-good {
   color: var(--status-good-solid);
   background: var(--status-good-soft);
 }
-.os-status-warn {
+.status-chip-warn {
   color: var(--status-warn-solid);
   background: var(--status-warn-soft);
 }
-.os-status-bad {
+.status-chip-bad {
   color: var(--status-bad-solid);
   background: var(--status-bad-soft);
 }
-.os-status-none {
+.status-chip-none {
   border-color: transparent;
   color: var(--muted);
   opacity: 0.6;
 }
 
 /* The four OS filters: Type, Zones, Departments, Record Status. */
-.os-filters {
+.page-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -3584,15 +3584,15 @@ body.page-scrolled-far .back-to-top {
    row not quite lining up. All four controls stretch to fill their column
    (native block/flex-stretch behaviour, since neither sets its own width), so
    fixing the column is the one place this has to be said.
-   Same specificity as the mobile override below (both are plain .os-filter),
+   Same specificity as the mobile override below (both are plain .page-filter),
    which is deliberate: the mobile rule wins there on SOURCE ORDER alone, and
    an ancestor-qualified selector here would have outranked it regardless of
    order and broken the phone grid this was already built for. */
-.os-filter { width: 170px; flex: 0 0 170px; }
-.os-filter { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.os-filter .breakdown-time-label { white-space: nowrap; }
+.page-filter { width: 170px; flex: 0 0 170px; }
+.page-filter { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.page-filter .breakdown-time-label { white-space: nowrap; }
 
-/* The Type control's wrapper is .os-multi as well as .select-caret-wrap (see
+/* The Type control's wrapper is .filter-multi as well as .select-caret-wrap (see
    the markup), which is what gives it the same fixed column width as the three
    real multi-selects beside it with no rule of its own. */
 
@@ -3600,20 +3600,20 @@ body.page-scrolled-far .back-to-top {
    panel - it is the same gesture, so it should look the same - which is why
    this reuses .warehouse-menu and .warehouse-item wholesale and only adds the
    button and the positioning. */
-.os-multi { position: relative; min-width: 0; }
+.filter-multi { position: relative; min-width: 0; }
 
-.os-multi-btn {
+.filter-multi-btn {
   justify-content: space-between;
   cursor: pointer;
 }
 
-.os-multi-label {
+.filter-multi-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.os-multi-menu {
+.filter-multi-menu {
   min-width: 100%;
   max-height: 320px;
   overflow-y: auto;
@@ -3621,9 +3621,9 @@ body.page-scrolled-far .back-to-top {
 
 /* "All" sits above the list, so getting back out of a narrow selection is one
    click rather than un-ticking six things. */
-.os-multi-all { border-bottom: 1px solid var(--border); }
+.filter-multi-all { border-bottom: 1px solid var(--border); }
 
-.os-multi-empty {
+.filter-multi-empty {
   display: block;
   padding: 8px 10px;
   color: var(--muted);
@@ -3638,9 +3638,9 @@ body.page-scrolled-far .back-to-top {
   background: var(--w6);
   border: 1px solid var(--border);
 }
-.os-dept-detail { padding: 6px 0 2px 10px; }
+.node-subdetail { padding: 6px 0 2px 10px; }
 
-.os-job-count {
+.record-group-count {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 8px;
@@ -3658,7 +3658,7 @@ body.page-scrolled-far .back-to-top {
    into the fixed label column and wrapping onto two lines beside an empty bar
    track. The chevron then sits at the right-hand end of the row, where every
    other expandable thing on the dashboard puts it. */
-.os-dropped-row .breakdown-label {
+.dropped-row .breakdown-label {
   color: var(--status-warn-solid);
   width: auto;
   min-width: 0;
@@ -3673,11 +3673,11 @@ body.page-scrolled-far .back-to-top {
   border-radius: 8px;
   background: var(--status-warn-soft);
 }
-.os-dropped-row .breakdown-chevron { margin-left: auto; }
-.os-dropped-label i:first-child { margin-right: 6px; }
+.dropped-row .breakdown-chevron { margin-left: auto; }
+.dropped-label i:first-child { margin-right: 6px; }
 
 /* The reason is the row's title, so say so. */
-.os-bad-row { cursor: help; }
+.bad-record-row { cursor: help; }
 
 /* ── Spells nobody has closed ──────────────────────────────────────────────
    Same card, same table, same everything as the faults below the sites - the
@@ -3695,7 +3695,7 @@ body.page-scrolled-far .back-to-top {
    anything - "All Zones" and "OST OSR" are both just words in a box - so a
    view that had been cut down to one zone looked identical to the whole
    floor at a glance. The accent border and tint say which ones are on. */
-.hc-control.os-filter-on {
+.hc-control.page-filter-on {
   border-color: var(--accent) !important;
   background: var(--accent-8) !important;
 }
@@ -3704,35 +3704,20 @@ body.page-scrolled-far .back-to-top {
    record with an impossible date or a nineteen-hour shift is a real form
    somebody filled in wrongly, and seeing the abnormal is what the page is for.
    So it reads as a section of the page rather than as an error. */
-.os-bad-intro {
+.bad-record-intro {
   margin: 0 0 8px;
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.5;
 }
 
-.os-bad-table th { white-space: nowrap; }
+.bad-record-table th { white-space: nowrap; }
 
 /* The three cells that are actually wrong, in the same monospace as a time so
    a stray character is visible. */
-.os-bad-cell {
+.bad-record-cell {
   font-family: 'Roboto Mono', ui-monospace, monospace;
   white-space: nowrap;
-}
-
-/* Records the page could not place on a clock. Said out loud, because a page
-   quietly one row short is the worst of the options. */
-.os-dropped {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--status-warn-solid);
-  color: var(--status-warn-solid);
-  background: var(--status-warn-soft);
-  font-size: 0.75rem;
 }
 
 @media (max-width: 700px) {
@@ -3755,20 +3740,20 @@ body.page-scrolled-far .back-to-top {
      .table-wrap's own overflow-x back to auto (for the tables that still
      need to scroll), and a single-class selector here would lose to it on
      source order once the two ties on specificity - see test_ospage.js. */
-  .table-wrap.os-job-table-wrap {
+  .table-wrap.record-table-wrap {
     overflow: visible; touch-action: auto; border: none; border-radius: 0;
   }
-  .os-job-table, .os-job-table tbody, .os-job-table tr { display: block; width: 100%; }
-  .os-job-table { min-width: 0; }
-  .os-job-table thead { display: none; }
-  .os-job-table tr {
+  .record-table, .record-table tbody, .record-table tr { display: block; width: 100%; }
+  .record-table { min-width: 0; }
+  .record-table thead { display: none; }
+  .record-table tr {
     margin-bottom: 8px;
     padding: 4px 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
   }
-  .os-job-table tbody tr:last-child { margin-bottom: 0; }
-  .os-job-table td {
+  .record-table tbody tr:last-child { margin-bottom: 0; }
+  .record-table td {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3778,27 +3763,27 @@ body.page-scrolled-far .back-to-top {
     text-align: right;
     white-space: normal;
   }
-  .os-job-table td:last-child { border-bottom: none; }
+  .record-table td:last-child { border-bottom: none; }
 
-  /* The desktop rule `.os-job-table tr:last-child td { border-bottom: none }`
+  /* The desktop rule `.record-table tr:last-child td { border-bottom: none }`
      means "no line under the final ROW of the table". Here a <tr> IS a card
      and its <td>s are that card's field rows, so it read as "no lines
      anywhere in the last card" - which is exactly how it drew: every record
      but the last one had separators, and the last one had none.
      Put back for the last card, then taken off its own final field again,
      which needs the extra specificity to beat the rule above it. */
-  .os-job-table tbody tr:last-child td {
+  .record-table tbody tr:last-child td {
     border-bottom: 1px solid var(--border);
   }
-  .os-job-table tbody tr:last-child td:last-child {
+  .record-table tbody tr:last-child td:last-child {
     border-bottom: none;
   }
   /* A cell whose column only means anything on one task - see
      nplIsSiteTransferTaskPak_. Written into the table either way so the
      DESKTOP column stays whole, and dropped only here, where there is no
      column left to keep and the line would be four words of nothing. */
-  .os-job-table td.npl-task-only { display: none; }
-  .os-job-table td::before {
+  .record-table td.npl-task-only { display: none; }
+  .record-table td::before {
     content: attr(data-label);
     flex: 0 0 auto;
     color: var(--muted);
@@ -3808,7 +3793,7 @@ body.page-scrolled-far .back-to-top {
     text-transform: uppercase;
     text-align: left;
   }
-  .os-zone-detail { padding-left: 0; padding-right: 0; }
+  .node-detail { padding-left: 0; padding-right: 0; }
 
   /* The four filters were one flex column inside a single cell of the Bonus
      page's two-column grid, which stacked them down the left and left From /
@@ -3816,8 +3801,8 @@ body.page-scrolled-far .back-to-top {
      filter becomes a grid item in its own right, and the six controls lay out
      three rows of two - the same shape, and the same label-above-control
      rhythm, as the Bonus page. */
-  .os-filters { display: contents; }
-  .os-filter { width: auto; min-width: 0; }
+  .page-filters { display: contents; }
+  .page-filter { width: auto; min-width: 0; }
 
   /* Label BESIDE its control rather than over it, which buys back a whole row
      of height per pair of filters - and on a page whose point is the list
@@ -3826,13 +3811,13 @@ body.page-scrolled-far .back-to-top {
      To (see the .bonus-page-controls block far below) so that every control on
      the page, whatever builds it, starts at the same x. Without one number in
      one place they drift apart the moment any label changes. */
-  .os-filter {
+  .page-filter {
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 6px;
   }
-  .os-filter .breakdown-time-label {
+  .page-filter .breakdown-time-label {
     font-size: 11px;
     font-weight: 500;
     color: var(--muted);
@@ -3851,9 +3836,9 @@ body.page-scrolled-far .back-to-top {
     font-size: 11px;
     font-weight: 500;
   }
-  .os-filter .os-type-select,
-  .os-filter .os-multi,
-  .os-filter .os-multi-btn {
+  .page-filter .filter-type-select,
+  .page-filter .filter-multi,
+  .page-filter .filter-multi-btn {
     width: 100%;
     min-width: 0;
     max-width: none;
@@ -3897,7 +3882,7 @@ body.page-scrolled-far .back-to-top {
 
 /* The headings are what sorts on a desktop, so this is not needed there - and
    it is what sorts on a phone, where the headings are not drawn at all (each
-   row is a card). .os-filter sets display:flex; this is the same specificity
+   row is a card). .page-filter sets display:flex; this is the same specificity
    and later, so it wins. */
 .fraud-sort-filter { display: none; }
 
@@ -4064,31 +4049,31 @@ body.page-scrolled-far .back-to-top {
    rest of the dashboard does not - and an empty card during it says "nobody was
    on OS" rather than "not here yet". Shaped like what is coming: a summary
    line, then bars. Same shimmer as every other skeleton. */
-.os-skeleton { display: block; }
+.page-skeleton { display: block; }
 
-.os-skel-summary,
-.os-skel-row {
+.skel-summary,
+.skel-row {
   border-radius: 8px;
   background-image: linear-gradient(90deg, var(--w6) 25%, var(--w12) 37%, var(--w6) 63%);
   background-size: 200% 100%;
   animation: skelShimmer 1.4s ease-in-out infinite;
 }
 
-.os-skel-summary {
+.skel-summary {
   height: 22px;
   width: 210px;
   margin-bottom: 18px;
 }
 
-.os-skel-row {
+.skel-row {
   height: 30px;
   margin-bottom: 12px;
 }
-.os-skel-row:last-child { margin-bottom: 0; }
+.skel-row:last-child { margin-bottom: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .os-skel-summary,
-  .os-skel-row { animation: none; }
+  .skel-summary,
+  .skel-row { animation: none; }
 }
 
 .breakdown-btn {
