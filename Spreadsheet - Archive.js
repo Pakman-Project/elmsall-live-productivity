@@ -234,6 +234,23 @@ function createArchivesClearRows_(
 
     setArchiveB2_(archiveSS, dateObj);
 
+    // The OS and NPL logs trace the live file for eight days rather than being
+    // frozen now: approvals keep arriving after the day itself, and a copy
+    // taken at 03:00 holds only what had been typed by 03:00. See
+    // 'Spreadsheet - Archive Live Links.js' - including why it imports the
+    // LIVE tabs rather than reaching past them to the source workbooks.
+    //
+    // Last, deliberately. It rewrites two ranges and calls out to the network,
+    // and everything above it is what makes the archive an archive; a failure
+    // here should cost the tracing, not the file.
+    try {
+      const linked = archiveApplyLiveLinks_(archiveSS, liveSS, dateObj, tz);
+      archiveAuthoriseImportrange_(archiveSS.getId(), linked.donorId);
+      logDebug_(`Live links applied: ${linked.applied}`);
+    } catch (err) {
+      log_(`Live links FAILED for ${archiveName}: ${err?.message || err}`);
+    }
+
     log_(`Done: ${archiveName}`);
   }
 }

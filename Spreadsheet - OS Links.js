@@ -39,7 +39,7 @@ function refreshOSLinks() {
     ],
   ];
 
-  scanFolderTree_(rootFolder, rootFolder.getName(), data);
+  osLinksScanFolderTree_(rootFolder, rootFolder.getName(), data);
 
   const lastRow = sheet.getLastRow();
   if (lastRow > 0) {
@@ -47,13 +47,18 @@ function refreshOSLinks() {
   }
   sheet.getRange(1, 1, data.length, 8).setValues(data);
 
-  logLinks_(`Imported ${data.length - 1} files`);
+  osLinksLog_(`Imported ${data.length - 1} files`);
 }
 
 /************************************************************
  * ITERATIVE FOLDER SCAN
  ************************************************************/
-function scanFolderTree_(rootFolder, rootPath, out) {
+// Named apart from the identical function in 'Spreadsheet - Archive.js'.
+// Apps Script shares one global scope across every file in the project, so two
+// functions of one name are not two functions - the second to load replaces the
+// first, and nothing says so. tools/test_archivelinks.js now fails on any
+// duplicate global rather than leaving it to be found by behaviour.
+function osLinksScanFolderTree_(rootFolder, rootPath, out) {
   const stack = [{ f: rootFolder, p: rootPath }];
 
   while (stack.length > 0) {
@@ -87,6 +92,9 @@ function scanFolderTree_(rootFolder, rootPath, out) {
 /************************************************************
  * LINKS LOGGING
  ************************************************************/
-function logLinks_(msg) {
+// Was logLinks_, which 'Spreadsheet - Archive.js' also defines - with a
+// DIFFERENT prefix. One of the two modules was logging under the other's name,
+// depending on file order.
+function osLinksLog_(msg) {
   Logger.log(OSLINKS_CFG.LOG_PREFIX + msg);
 }
