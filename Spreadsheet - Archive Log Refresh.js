@@ -48,8 +48,19 @@ const ARCHIVE_LOG_CFG = {
   LOG_PREFIX: '[ARCHIVE-LOGS] ',
 };
 
-function refreshRecentArchiveLogs() {
-  const started = Date.now();
+/**
+ * `startedAt` is when the CURRENT EXECUTION began, not when this function did.
+ * Apps Script's six-minute limit covers the whole execution, so when this runs
+ * at the tail of runDailyAutomation the budget has to count the archiving that
+ * came before it - measuring from here would let the two overrun together and
+ * be killed mid-write.
+ *
+ * Defaults to now, so running this on its own (from the editor, or from a
+ * trigger of its own if the combined daily run ever gets tight) still gets a
+ * sensible budget.
+ */
+function refreshRecentArchiveLogs(startedAt) {
+  const started = startedAt || Date.now();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const targets = recentArchiveTargets_(ss, ARCHIVE_LOG_CFG.WINDOW_DAYS);
 

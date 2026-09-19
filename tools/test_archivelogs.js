@@ -91,6 +91,24 @@ head('[4] discovery: the Links sheet, the name\'s own date, the window');
         /catch \(e\) \{[\s\S]{0,300}failed\+\+;/.test(REF));
 }
 
+head('[4b] it is actually CALLED - no new trigger to forget');
+// It sat as dead code for one commit: the existing triggers call updateOSLog /
+// updateNPLLog, which are live-file-only, so nothing reached the archives.
+{
+  const ARCH = R('Spreadsheet - Archive.js');
+  check('runDailyAutomation calls it',
+        /refreshRecentArchiveLogs\(started\);/.test(ARCH),
+        'otherwise it is a function nothing runs');
+  check('after refreshArchiveLinks, which it reads to find the archives',
+        ARCH.indexOf('refreshArchiveLinks()') < ARCH.indexOf('refreshRecentArchiveLogs(started)'),
+        "a brand-new archive is not on the Links tab until that call");
+  check('and it is given the EXECUTION start, not its own',
+        /const started = Date\.now\(\);/.test(ARCH) &&
+        /function refreshRecentArchiveLogs\(startedAt\)/.test(REF) &&
+        /const started = startedAt \|\| Date\.now\(\);/.test(REF),
+        'the 6-minute limit covers the archiving above it too');
+}
+
 head('[5] archiveDateFromName_, run for real');
 {
   // Run the parser itself. The window is the whole point of this file, and an

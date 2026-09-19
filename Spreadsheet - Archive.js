@@ -52,6 +52,7 @@ const ARCHIVE_CFG = {
  ************************************************************/
 function runDailyAutomation() {
   const lock = LockService.getScriptLock();
+  const started = Date.now();
   log_('START');
 
   if (!lock.tryLock(60000)) {
@@ -60,6 +61,18 @@ function runDailyAutomation() {
 
   try {
     archivePastDatesAndTrimLive_();
+
+    // The archives' own OS/NPL logs, refreshed against their source workbooks.
+    // Runs here rather than on a trigger of its own so there is nothing new to
+    // schedule, and so it is guaranteed to come after refreshArchiveLinks()
+    // above - that tab is what it reads to find the recent archives, and a
+    // brand-new archive is not in it until that call.
+    //
+    // Handed this execution's start time, not its own: the six-minute limit
+    // covers everything above as well, so a budget measured from here would
+    // let the pair overrun together.
+    refreshRecentArchiveLogs(started);
+
     log_('DONE');
   } catch (err) {
     log_('ERROR: ' + (err?.message || err));
