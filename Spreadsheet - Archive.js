@@ -234,8 +234,76 @@ function createArchivesClearRows_(
 
     setArchiveB2_(archiveSS, dateObj);
 
+    shareArchiveLikeLiveFile_(sourceFile, liveSS, archiveFile, archiveSS);
+
     log_(`Done: ${archiveName}`);
   }
+}
+
+/************************************************************
+ * SHARE THE ARCHIVE LIKE THE LIVE FILE
+ *
+ * A fresh copy is NOT shared with anyone the live file is shared with — Drive
+ * sharing does not carry over to a makeCopy(), and a protected range/sheet's
+ * editor list resets to whoever ran the copy rather than keeping the live
+ * file's list. Both have to be reapplied by hand, every time.
+ *
+ * Deliberately reads WHO already has access on the live file rather than
+ * naming anyone here: the Databricks service account and the handful of
+ * people with the same standing access are a fact about the live file, not
+ * a fact this script should have its own opinion about. Add someone to the
+ * live file and every archive created after that inherits it automatically.
+ *
+ * Matched by POSITION, not by range/coordinates: a protection on the archive
+ * is the copy of the live protection at the same index in the same sheet
+ * (same creation order, same count, straight out of makeCopy()), so there is
+ * no need to compare what each one actually protects.
+ ************************************************************/
+function shareArchiveLikeLiveFile_(sourceFile, liveSS, archiveFile, archiveSS) {
+  try {
+    sourceFile.getEditors().forEach((user) => {
+      const email = user.getEmail();
+      if (!email) return;
+      try {
+        archiveFile.addEditor(email);
+      } catch (e) {
+        logDebug_(`Could not add ${email} as a file editor: ${e}`);
+      }
+    });
+  } catch (e) {
+    logDebug_(`Could not read the live file's editors: ${e}`);
+  }
+
+  let granted = 0;
+  let failed = 0;
+  liveSS.getSheets().forEach((liveSheet) => {
+    const archiveSheet = archiveSS.getSheetByName(liveSheet.getName());
+    if (!archiveSheet) return;
+    [SpreadsheetApp.ProtectionType.SHEET, SpreadsheetApp.ProtectionType.RANGE].forEach((type) => {
+      const liveProts = liveSheet.getProtections(type);
+      const archiveProts = archiveSheet.getProtections(type);
+      const n = Math.min(liveProts.length, archiveProts.length);
+      if (liveProts.length !== archiveProts.length) {
+        logDebug_(`${liveSheet.getName()}: ${liveProts.length} ${type} protection(s) live, ` +
+                  `${archiveProts.length} on the copy - only the first ${n} matched`);
+      }
+      for (let i = 0; i < n; i++) {
+        liveProts[i].getEditors().forEach((user) => {
+          const email = user.getEmail();
+          if (!email) return;
+          try {
+            archiveProts[i].addEditor(email);
+            granted++;
+          } catch (e) {
+            failed++;
+            logDebug_(`Could not add ${email} to a ${type} protection on ` +
+                      `${liveSheet.getName()}: ${e}`);
+          }
+        });
+      }
+    });
+  });
+  logDebug_(`Protection editors carried over: ${granted}` + (failed ? `, ${failed} failed` : ''));
 }
 
 /************************************************************
