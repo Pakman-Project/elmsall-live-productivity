@@ -2,17 +2,41 @@
  * MASTER AUTOMATION — DAILY ARCHIVE
  *
  * Entry point:
- *   runDailyAutomation()
+ *   runDailyAutomation()          the only thing on a trigger
  *
  * Strategy:
  * 1. Sort Data!A2:<used width> by Column J (Date Time Range)
  * 2. Read only Data!A:A to get row date keys
- * 3. For each past date:
- *    - make archive copy
- *    - clear every row that is not that date
- *    - set Front!B2
- * 4. Live file keeps ONLY today by clear all other rows, sort Data again by Column J
- * 5. Refresh the Links sheet with current archive files
+ * 3. For each past date with no archive yet:
+ *    - copy the whole live file into the archive folder
+ *    - clear every Data row that is not that date
+ *    - trim 'Processed Data (15mins)' AND 'Backend' to that date, together
+ *    - set Front!B2 to the archive's own date
+ *    - reapply the live file's access: Drive sharing and every protection
+ * 4. Live file keeps ONLY today by clearing all other rows, then sorts again
+ * 5. Reopen any of today's windows the trim erased, so Databricks refills them
+ * 6. Refresh the Links sheet with current archive files
+ * 7. Refresh the OS/NPL logs on every archive inside the 8-day window
+ *
+ * WHY 3 AND 7 EXIST
+ * An archive is a frozen copy, but three things about it keep moving:
+ *
+ *   - Its ACCESS does not survive the copy. Drive sharing is not inherited by
+ *     a makeCopy, and each protected range/sheet's editor list resets to
+ *     whoever ran it - so without step 3's reapply, the Databricks service
+ *     account cannot write to the archive at all.
+ *   - Its LOGS come from forms people keep correcting for days afterwards.
+ *     Step 7 rebuilds them from the source workbooks, using the live file's
+ *     own builders (see 'Spreadsheet - Archive Log Refresh.js').
+ *   - Its PIVOT is rebuilt from those logs, overnight, by the Databricks
+ *     archive-sweep notebook - which reads what step 7 wrote, so step 7 has
+ *     to have run first. This job must finish before that sweep starts.
+ *
+ * Past eight days a date is settled and its archive is never touched again.
+ *
+ * This file also owns the Links sheet (refreshArchiveLinks, at the foot),
+ * which is the index both step 7 and the Databricks sweep read to find out
+ * which archives exist and how recent they are.
  ************************************************************/
 
 const ARCHIVE_CFG = {
@@ -247,7 +271,7 @@ function createArchivesClearRows_(
 
     setArchiveB2_(archiveSS, dateObj);
 
-    shareArchiveLikeLiveFile_(sourceFile, liveSS, archiveFile, archiveSS);
+    shareArchiveLikeLiveFile_(sourceFile, archiveFile, archiveSS);
 
     log_(`Done: ${archiveName}`);
   }
@@ -259,64 +283,126 @@ function createArchivesClearRows_(
  * A fresh copy is NOT shared with anyone the live file is shared with — Drive
  * sharing does not carry over to a makeCopy(), and a protected range/sheet's
  * editor list resets to whoever ran the copy rather than keeping the live
- * file's list. Both have to be reapplied by hand, every time.
+ * file's list. Both have to be reapplied, every time, or the Databricks
+ * service account cannot rebuild that archive's Processed Data/Backend and
+ * the daily sweep quietly fails on it.
  *
- * Deliberately reads WHO already has access on the live file rather than
- * naming anyone here: the Databricks service account and the handful of
- * people with the same standing access are a fact about the live file, not
- * a fact this script should have its own opinion about. Add someone to the
- * live file and every archive created after that inherits it automatically.
+ * Nobody is named here. The list is read off the LIVE file's own permissions,
+ * so the service account and the handful of people with the same standing
+ * access are a fact about that file rather than an opinion held by this
+ * script - add someone there and every archive made afterwards inherits it.
  *
- * Matched by POSITION, not by range/coordinates: a protection on the archive
- * is the copy of the live protection at the same index in the same sheet
- * (same creation order, same count, straight out of makeCopy()), so there is
- * no need to compare what each one actually protects.
+ * SILENTLY, via the Drive advanced service rather than DriveApp.addEditor:
+ * DriveApp emails every person it adds. One archive a day times everyone on
+ * that list is a mail-out nobody asked for, so permissions are created with
+ * sendNotificationEmail false. This is why Drive API v3 is declared in
+ * appsscript.json - clasp push overwrites that manifest, so enabling the
+ * service in the editor alone does not survive a deploy.
+ *
+ * Every non-warning-only protection gets the whole list, rather than each
+ * archive protection being paired with the live one it was copied from.
+ * Pairing means matching copies by position and betting that makeCopy kept
+ * the order; getting that bet wrong under-grants, and an under-granted
+ * protection is exactly the silent failure this exists to prevent. A
+ * warning-only protection is skipped because it has no editor list at all -
+ * it only warns on edit.
  ************************************************************/
-function shareArchiveLikeLiveFile_(sourceFile, liveSS, archiveFile, archiveSS) {
-  try {
-    sourceFile.getEditors().forEach((user) => {
-      const email = user.getEmail();
-      if (!email) return;
-      try {
-        archiveFile.addEditor(email);
-      } catch (e) {
-        logDebug_(`Could not add ${email} as a file editor: ${e}`);
-      }
-    });
-  } catch (e) {
-    logDebug_(`Could not read the live file's editors: ${e}`);
+function shareArchiveLikeLiveFile_(sourceFile, archiveFile, archiveSS) {
+  const grantees = liveAccessGrantees_(sourceFile.getId());
+  if (grantees.length === 0) {
+    logDebug_('No editors found on the live file - archive left as copied');
+    return;
   }
+
+  let shared = 0;
+  const emails = [];
+  grantees.forEach((grantee) => {
+    emails.push(grantee.email);
+    try {
+      // role is always 'writer', never 'owner': an archive's owner is whoever
+      // ran the copy, and handing ownership away here would take this script's
+      // own access to it with it.
+      Drive.Permissions.create(
+        { type: grantee.type, role: 'writer', emailAddress: grantee.email },
+        archiveFile.getId(),
+        { supportsAllDrives: true, sendNotificationEmail: false }
+      );
+      shared++;
+    } catch (e) {
+      // Already an editor, or the owner being re-added as a writer. Neither is
+      // a problem, and neither should stop the rest of the list.
+      logDebug_(`Could not share with ${grantee.email}: ${e}`);
+    }
+  });
 
   let granted = 0;
   let failed = 0;
-  liveSS.getSheets().forEach((liveSheet) => {
-    const archiveSheet = archiveSS.getSheetByName(liveSheet.getName());
-    if (!archiveSheet) return;
-    [SpreadsheetApp.ProtectionType.SHEET, SpreadsheetApp.ProtectionType.RANGE].forEach((type) => {
-      const liveProts = liveSheet.getProtections(type);
-      const archiveProts = archiveSheet.getProtections(type);
-      const n = Math.min(liveProts.length, archiveProts.length);
-      if (liveProts.length !== archiveProts.length) {
-        logDebug_(`${liveSheet.getName()}: ${liveProts.length} ${type} protection(s) live, ` +
-                  `${archiveProts.length} on the copy - only the first ${n} matched`);
-      }
-      for (let i = 0; i < n; i++) {
-        liveProts[i].getEditors().forEach((user) => {
-          const email = user.getEmail();
-          if (!email) return;
-          try {
-            archiveProts[i].addEditor(email);
-            granted++;
-          } catch (e) {
-            failed++;
-            logDebug_(`Could not add ${email} to a ${type} protection on ` +
-                      `${liveSheet.getName()}: ${e}`);
-          }
-        });
+  archiveSS.getSheets().forEach((sheet) => {
+    const protections = sheet
+      .getProtections(SpreadsheetApp.ProtectionType.SHEET)
+      .concat(sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE));
+
+    protections.forEach((protection) => {
+      if (protection.isWarningOnly()) return;
+      try {
+        // addEditors, not addEditor in a loop: one call per protection rather
+        // than one per person, which matters at a dozen protections times a
+        // list of people, inside a run that also has to archive a day's data.
+        protection.addEditors(emails);
+        granted++;
+      } catch (e) {
+        failed++;
+        logDebug_(`Could not grant on a protection in ${sheet.getName()}: ${e}`);
       }
     });
   });
-  logDebug_(`Protection editors carried over: ${granted}` + (failed ? `, ${failed} failed` : ''));
+
+  log_(`Shared with ${shared}/${emails.length}, ${granted} protection(s) granted` +
+       (failed ? `, ${failed} failed` : ''));
+}
+
+/**
+ * Everyone who can EDIT the given file, as {email, type} pairs.
+ *
+ * Drive v3 rather than DriveApp.getEditors() for two reasons: it is the same
+ * service the grant above uses, and it reports permissions on shared drives,
+ * which getEditors() does not always do.
+ *
+ * Owners are included - they are carried onto the archive as writers - and
+ * readers/commenters are not, since the point is to reproduce who can WRITE.
+ */
+function liveAccessGrantees_(fileId) {
+  const EDIT_ROLES = { owner: true, organizer: true, fileOrganizer: true, writer: true };
+  const out = [];
+  const seen = {};
+  let pageToken = null;
+
+  try {
+    do {
+      const res = Drive.Permissions.list(fileId, {
+        supportsAllDrives: true,
+        pageSize: 100,
+        pageToken: pageToken,
+        fields: 'nextPageToken,permissions(emailAddress,role,type)',
+      });
+      (res.permissions || []).forEach((p) => {
+        if (p.type !== 'user' && p.type !== 'group') return;
+        if (!EDIT_ROLES[p.role]) return;
+        const email = p.emailAddress;
+        if (!email || seen[email]) return;
+        seen[email] = true;
+        out.push({ email: email, type: p.type });
+      });
+      pageToken = res.nextPageToken;
+    } while (pageToken);
+  } catch (e) {
+    // Never fail the archive run over sharing. A missing grant costs that
+    // archive its next sweep, which is recoverable; a thrown error here costs
+    // the archive itself.
+    logDebug_(`Could not read permissions on ${fileId}: ${e}`);
+  }
+
+  return out;
 }
 
 /************************************************************
