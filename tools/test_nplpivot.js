@@ -242,5 +242,27 @@ head('[8] the tag, beside the OS one');
         /title="On non-productive labour in this period"/.test(HELP));
 }
 
+head('[9] a pure-NPL block synthesizes a row too, same as a pure-OS one');
+// The pivot only ever sees BonusHub events; someone on NPL (or OS) all shift
+// leaves it with no row at all unless this loop puts one there.
+{
+  check('both notebooks loop OS_STATUS and NPL_STATUS the same way',
+        /for _status_map in \(OS_STATUS, NPL_STATUS\):/.test(nb) &&
+        /for _status_map in \(OS_STATUS, NPL_STATUS\):/.test(nbBack),
+        'a lone OS_STATUS loop leaves a pure-NPL block invisible');
+  check('the old OS-only loop is gone, not just supplemented',
+        !/for _os_dtr, _os_bonus in sorted\(OS_STATUS\):/.test(nb) &&
+        !/for _os_dtr, _os_bonus in sorted\(OS_STATUS\):/.test(nbBack));
+  check('NPL_STATUS/NPL_SPAN get the same cell-order guard as the OS pair',
+        /NPL_STATUS = NPL_STATUS if "NPL_STATUS" in globals\(\) else \{\}/.test(nb) &&
+        /NPL_SPAN = NPL_SPAN if "NPL_SPAN" in globals\(\) else \{\}/.test(nb) &&
+        /NPL_STATUS = NPL_STATUS if "NPL_STATUS" in globals\(\) else \{\}/.test(nbBack) &&
+        /NPL_SPAN = NPL_SPAN if "NPL_SPAN" in globals\(\) else \{\}/.test(nbBack),
+        'without it, running just this cell after only the OS log ran raises NameError');
+  check('a synthesized row is still marked seen, so OS and NPL cannot both insert it',
+        /_have\.add\(\(_dtr, _bonus\)\)/.test(nb) && /_have\.add\(\(_dtr, _bonus\)\)/.test(nbBack),
+        'without this, a bonus pure on both logs would get two zero rows for one block');
+}
+
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
 process.exit(fail ? 1 : 0);
