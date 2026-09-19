@@ -171,15 +171,22 @@ head('[6b] the OS log bonus column gets the same treatment');
         os.indexOf("setNumberFormat('@')") < os.indexOf('.setValues(combinedResults)'),
         'the other order undoes every correction as it makes it');
   check('then repairs what earlier runs already damaged',
-        os.indexOf('correctOsLogNames()') !== -1 &&
-        SRC.indexOf('function correctOsLogNames()') !== -1);
+        os.indexOf('correctOsLogNames(ss)') !== -1 &&
+        SRC.indexOf('function correctOsLogNames(ss)') !== -1);
+  // Corrects the file it just WROTE, not whichever file happens to be active -
+  // an archive rebuild would otherwise repair the live file's column and leave
+  // the archive's mangled codes exactly where they were.
+  check('and it corrects the file that was just written',
+        os.indexOf('correctOsLogNames(ss)') !== -1 &&
+        /ss = ss \|\| SpreadsheetApp\.getActiveSpreadsheet\(\);/.test(SRC),
+        'passing no file would correct the live one during an archive rebuild');
   // In one execution, in order. A scheduled correction could land mid-rewrite.
   check('called from the rebuild rather than put on its own trigger',
-        os.indexOf('correctOsLogNames()') > os.indexOf('.setValues(combinedResults)'),
+        os.indexOf('correctOsLogNames(ss)') > os.indexOf('.setValues(combinedResults)'),
         'one execution, in order, is the only ordering guarantee available');
   check('and a failure there cannot cost the whole log',
         os.indexOf('OS log name correction failed') !== -1 &&
-        os.indexOf('try {') < os.indexOf('correctOsLogNames()'),
+        os.indexOf('try {') < os.indexOf('correctOsLogNames(ss)'),
         'a mangled code costs one band; an exception costs the whole log');
 
   // Column B, row 7 down - the layout the script actually writes.

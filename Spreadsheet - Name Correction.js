@@ -322,9 +322,14 @@ function formatColumnCPeriodically() {
  *
  * Resolved case-insensitively: the tab is "OS log" in the script and "OS Log"
  * in conversation, and getSheetByName matches exactly.
+ *
+ * `ss` defaults to the active file. It is passed explicitly when an ARCHIVE's
+ * log is rebuilt - correcting the live file's column while the archive's is
+ * the one just written would repair the wrong file and leave the mangled
+ * codes exactly where they were.
  */
-function correctOsLogNames() {
-  return correctLogBonusColumn_(OS_LOG_SHEET_NAME_NC_, OS_LOG_FIRST_ROW_NC_);
+function correctOsLogNames(ss) {
+  return correctLogBonusColumn_(OS_LOG_SHEET_NAME_NC_, OS_LOG_FIRST_ROW_NC_, ss);
 }
 
 /**
@@ -334,8 +339,8 @@ function correctOsLogNames() {
  * reason correctOsLogNames is called from updateOSLog: the two run in one
  * execution, in order, and a scheduled correction could land mid-rewrite.
  */
-function correctNplLogNames() {
-  return correctLogBonusColumn_(NPL_LOG_SHEET_NAME_NC_, NPL_LOG_FIRST_ROW_NC_);
+function correctNplLogNames(ss) {
+  return correctLogBonusColumn_(NPL_LOG_SHEET_NAME_NC_, NPL_LOG_FIRST_ROW_NC_, ss);
 }
 
 /**
@@ -346,8 +351,8 @@ function correctNplLogNames() {
  *
  * Returns how many cells it changed.
  */
-function correctLogBonusColumn_(sheetName, firstRow) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+function correctLogBonusColumn_(sheetName, firstRow, ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheets = ss.getSheets();
   var sheet = null;
   for (var s = 0; s < sheets.length; s++) {

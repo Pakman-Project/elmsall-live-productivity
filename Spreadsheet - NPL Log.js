@@ -52,8 +52,27 @@ var NPL_SELECT_ = [0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 // filter reads the same cell that becomes output column A.
 var NPL_SOURCE_DATE_IDX_ = 0;
 
+/**
+ * The live file's NPL log. Unchanged entry point - this is what the trigger
+ * and the menu call.
+ */
 function updateNPLLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  updateNPLLogFor_(SpreadsheetApp.getActiveSpreadsheet());
+}
+
+/**
+ * The same rebuild, against any file that has the same control cells.
+ *
+ * Split out so an ARCHIVE's NPL log can be rebuilt by this code rather than
+ * by a second implementation of NPL_SELECT_ - see the reasoning on
+ * updateOSLogFor_, which this mirrors.
+ *
+ * No date argument: B1:C4 are link/date formulas relative to Front!B2, and an
+ * archive's Front!B2 is pinned to its own date by setArchiveB2_ when the copy
+ * is made - so an archive's control cells already name that day's workbooks
+ * AND the dates its two weekly links should be filtered to.
+ */
+function updateNPLLogFor_(ss) {
   var sheet = nplLogSheet_(ss);
 
   if (!sheet) {
@@ -246,7 +265,10 @@ function nplWriteRowsPak_(sheet, rows) {
   // which is the only ordering guarantee available - a scheduled correction
   // could land mid-rewrite.
   try {
-    var fixed = correctNplLogNames();
+    // getParent() rather than the active file: when an archive's log is the
+    // one just written, the active file is still the live one, and correcting
+    // that would repair the wrong file's column.
+    var fixed = correctNplLogNames(sheet.getParent());
     if (fixed) Logger.log('NPL Log: ' + fixed + ' bonus code(s) corrected');
   } catch (e) {
     // Never fail the rebuild for the correction: a mangled code costs one

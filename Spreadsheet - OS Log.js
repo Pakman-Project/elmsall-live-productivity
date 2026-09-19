@@ -1,12 +1,35 @@
+/**
+ * The live file's OS log. Unchanged entry point - this is what the trigger
+ * and the menu call.
+ */
 function updateOSLog() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  updateOSLogFor_(SpreadsheetApp.getActiveSpreadsheet());
+}
+
+/**
+ * The same rebuild, against any file that has the same control cells.
+ *
+ * Split out so an ARCHIVE's OS log can be rebuilt by exactly this code rather
+ * than by a second implementation of the mapping below. SHEET_CONFIGS is the
+ * most fragile thing in this pipeline - its own comment records that the
+ * indices "moved once already", and that a wrong one reads a populated cell
+ * rather than an empty one, so the failure is every row silently rejected. A
+ * second copy of it, in an archive or in a formula, is a second copy to get
+ * wrong.
+ *
+ * It needs no date argument: B1/B2 are link formulas relative to Front!B2, and
+ * an archive's Front!B2 is pinned to its own date when the copy is made (see
+ * setArchiveB2_), so the control cells of an archive already point at that
+ * day's source workbooks.
+ */
+function updateOSLogFor_(ss) {
   const osLogSheet = ss.getSheetByName('OS log');
-  
+
   if (!osLogSheet) {
-    SpreadsheetApp.getUi().alert("Sheet 'OS log' was not found.");
+    Logger.log("Sheet 'OS log' was not found in " + ss.getName() + ".");
     return;
   }
-  
+
   const rawUrl1 = osLogSheet.getRange('B1').getValue();
   const rawUrl2 = osLogSheet.getRange('B2').getValue();
   
@@ -158,7 +181,7 @@ function updateOSLog() {
     // order, which is the only ordering guarantee available - a scheduled
     // correction could land mid-rewrite.
     try {
-      var fixed = correctOsLogNames();
+      var fixed = correctOsLogNames(ss);
       if (fixed) Logger.log('OS log: ' + fixed + ' bonus code(s) corrected');
     } catch (e) {
       // Never fail the rebuild for the correction: a mangled code costs one

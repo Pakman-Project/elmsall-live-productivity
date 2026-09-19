@@ -175,20 +175,31 @@ head('[5] the bonus column is formatted before it is written');
   check('and it is column B, the bonus code',
         /getRange\(NPL_LOG_DATA_ROW_, 2, rows\.length, 1\)\.setNumberFormat\('@'\)/.test(write));
   check('the repair runs in the SAME execution as the write',
-        /correctNplLogNames\(\)/.test(write),
+        /correctNplLogNames\(sheet\.getParent\(\)\)/.test(write),
         'a scheduled correction could land mid-rewrite');
+  // getParent(), not the active file: during an archive rebuild the active
+  // file is still the live one, and correcting that repairs the wrong column.
+  check('and it repairs the file the rows were just written to',
+        /correctNplLogNames\(sheet\.getParent\(\)\)/.test(write),
+        'the archive is not the active spreadsheet when its log is rebuilt');
   check('and cannot fail the rebuild',
         /catch \(e\) \{[\s\S]{0,160}NPL log name correction failed/.test(write));
 
   // One implementation for both logs, not two agreeing about the ordering.
   check('correctNplLogNames shares its body with the OS one',
-        /function correctNplLogNames\(\) \{\s*\n\s*return correctLogBonusColumn_\(NPL_LOG_SHEET_NAME_NC_, NPL_LOG_FIRST_ROW_NC_\);/
+        /function correctNplLogNames\(ss\) \{\s*\n\s*return correctLogBonusColumn_\(NPL_LOG_SHEET_NAME_NC_, NPL_LOG_FIRST_ROW_NC_, ss\);/
           .test(NC) &&
-        /function correctOsLogNames\(\) \{\s*\n\s*return correctLogBonusColumn_\(OS_LOG_SHEET_NAME_NC_, OS_LOG_FIRST_ROW_NC_\);/
+        /function correctOsLogNames\(ss\) \{\s*\n\s*return correctLogBonusColumn_\(OS_LOG_SHEET_NAME_NC_, OS_LOG_FIRST_ROW_NC_, ss\);/
           .test(NC),
         'the ordering above is the easy thing to get wrong in a copy');
+  check('and both still default to the active file when given none',
+        /ss = ss \|\| SpreadsheetApp\.getActiveSpreadsheet\(\);/.test(NC),
+        'the live file calls these with nothing, exactly as it always did');
+  // Window kept well clear of the real distance (~940 chars). At {0,900} this
+  // failed the moment a line was added to the function - a passing assertion
+  // that measures nothing is worse than none.
   check('and that shared body still formats before writing',
-        /function correctLogBonusColumn_[\s\S]{0,900}range\.setNumberFormat\('@'\);\s*\n\s*range\.setValues\(corrected\);/
+        /function correctLogBonusColumn_[\s\S]{0,1600}range\.setNumberFormat\('@'\);\s*\n\s*range\.setValues\(corrected\);/
           .test(NC));
   check('the NPL sheet and first row are declared beside the OS ones',
         /var NPL_LOG_SHEET_NAME_NC_ = 'NPL Log';/.test(NC) &&
