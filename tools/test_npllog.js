@@ -45,7 +45,7 @@ head('[1] the column mapping: B:S with C and D dropped');
   check('and it starts at row 5 of the source tab',
         ctx.NPL_SOURCE_FIRST_ROW_ === 5);
   check('writing from row 7, under the control cells and headings',
-        ctx.NPL_LOG_FIRST_ROW_ === 7);
+        ctx.NPL_LOG_DATA_ROW_ === 7);
 
   // Spelled out as letters, because that is how the mapping was specified and
   // how anybody checking it against the sheet will read it.
@@ -173,7 +173,7 @@ head('[5] the bonus column is formatted before it is written');
         write.indexOf("setNumberFormat('@')") < write.indexOf('.setValues(rows)'),
         'the other order undoes every correction as it makes it');
   check('and it is column B, the bonus code',
-        /getRange\(NPL_LOG_FIRST_ROW_, 2, rows\.length, 1\)\.setNumberFormat\('@'\)/.test(write));
+        /getRange\(NPL_LOG_DATA_ROW_, 2, rows\.length, 1\)\.setNumberFormat\('@'\)/.test(write));
   check('the repair runs in the SAME execution as the write',
         /correctNplLogNames\(\)/.test(write),
         'a scheduled correction could land mid-rewrite');
@@ -207,7 +207,7 @@ head('[6] a run with nothing to write empties the log');
         /clearContent\(\)/.test(write) && /NPL_SELECT_\.length\)\.clearContent/.test(write));
   check('the sheet is resolved case-insensitively',
         /function nplLogSheet_\(ss\)/.test(SRC) &&
-        /getName\(\)\.trim\(\)\.toLowerCase\(\) === NPL_LOG_SHEET_NAME_\.toLowerCase\(\)/.test(SRC),
+        /getName\(\)\.trim\(\)\.toLowerCase\(\) === NPL_LOG_TAB_NAME_\.toLowerCase\(\)/.test(SRC),
         'getSheetByName matches exactly, and the tab is spelled both ways');
 }
 

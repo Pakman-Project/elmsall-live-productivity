@@ -20,8 +20,18 @@
  * different questions.
  ************************************************************/
 
-var NPL_LOG_SHEET_NAME_ = 'NPL Log';
-var NPL_LOG_FIRST_ROW_ = 7;        // 1-6 are the control cells and headings
+// Named apart from Web - Code.js's NPL_LOG_SHEET_NAME_ / NPL_LOG_FIRST_ROW_,
+// which are the DASHBOARD's constants for the same tab. Apps Script evaluates
+// every file in the project into one global scope, so the two pairs were one
+// pair, and the last file to load won.
+//
+// They did not agree. This one is 'NPL Log' as the tab is actually named; the
+// dashboard's is 'npl log', because it compares lower-cased. Had this one won,
+// findSheetLower_ would have tested 'npl log' === 'NPL Log', found no sheet,
+// and returned no rows - the NPL page and the Claims page's NPL half would
+// have gone quietly empty, with nothing on screen to say why.
+var NPL_LOG_TAB_NAME_ = 'NPL Log';
+var NPL_LOG_DATA_ROW_ = 7;        // 1-6 are the control cells and headings
 var NPL_WEEKLY_TAB_ = 'NPL';
 var NPL_SOURCE_FIRST_ROW_ = 5;     // every source tab starts its data at row 5
 var NPL_SOURCE_FIRST_COL_ = 2;     // B
@@ -47,7 +57,7 @@ function updateNPLLog() {
   var sheet = nplLogSheet_(ss);
 
   if (!sheet) {
-    Logger.log("Sheet '" + NPL_LOG_SHEET_NAME_ + "' was not found.");
+    Logger.log("Sheet '" + NPL_LOG_TAB_NAME_ + "' was not found.");
     return;
   }
 
@@ -75,7 +85,7 @@ function updateNPLLog() {
   }
 
   if (jobs.length === 0) {
-    Logger.log('No usable link/tab pairs in ' + NPL_LOG_SHEET_NAME_ + '!B1:C4.');
+    Logger.log('No usable link/tab pairs in ' + NPL_LOG_TAB_NAME_ + '!B1:C4.');
     return;
   }
 
@@ -124,7 +134,7 @@ function nplLogSheet_(ss) {
   // getSheetByName matches exactly.
   var sheets = ss.getSheets();
   for (var s = 0; s < sheets.length; s++) {
-    if (sheets[s].getName().trim().toLowerCase() === NPL_LOG_SHEET_NAME_.toLowerCase()) {
+    if (sheets[s].getName().trim().toLowerCase() === NPL_LOG_TAB_NAME_.toLowerCase()) {
       return sheets[s];
     }
   }
@@ -210,9 +220,9 @@ function nplWriteRowsPak_(sheet, rows) {
   // put back, so a day with no records empties the log rather than leaving
   // yesterday's on screen.
   var lastRow = sheet.getLastRow();
-  if (lastRow >= NPL_LOG_FIRST_ROW_) {
-    sheet.getRange(NPL_LOG_FIRST_ROW_, 1,
-                   lastRow - NPL_LOG_FIRST_ROW_ + 1, NPL_SELECT_.length).clearContent();
+  if (lastRow >= NPL_LOG_DATA_ROW_) {
+    sheet.getRange(NPL_LOG_DATA_ROW_, 1,
+                   lastRow - NPL_LOG_DATA_ROW_ + 1, NPL_SELECT_.length).clearContent();
   }
   if (rows.length === 0) {
     Logger.log('NPL Log: no rows matched.');
@@ -228,8 +238,8 @@ function nplWriteRowsPak_(sheet, rows) {
   //
   // Formatted FIRST, so nothing new is mangled. The same fix, for the same
   // reason, as correctNameColumn_ in 'Spreadsheet - Name Correction.js'.
-  sheet.getRange(NPL_LOG_FIRST_ROW_, 2, rows.length, 1).setNumberFormat('@');
-  sheet.getRange(NPL_LOG_FIRST_ROW_, 1, rows.length, NPL_SELECT_.length).setValues(rows);
+  sheet.getRange(NPL_LOG_DATA_ROW_, 2, rows.length, 1).setNumberFormat('@');
+  sheet.getRange(NPL_LOG_DATA_ROW_, 1, rows.length, NPL_SELECT_.length).setValues(rows);
 
   // And repair what earlier runs already damaged. Called here rather than put
   // on a trigger of its own: this way the two run in one execution, in order,
