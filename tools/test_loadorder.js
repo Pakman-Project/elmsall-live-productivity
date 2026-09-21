@@ -145,28 +145,77 @@ head('[5] generateMainRows_ groups once instead of scanning per block');
         'a plain {} would have resolved this to Object.prototype and thrown');
 }
 
-head('[6] the last warehouse cannot be unticked away');
+head('[6] the last warehouse hands over to the OTHER one, whichever it is');
+// A fixed fallback is right exactly half the time. It was 'e1e2', so unticking
+// the last E1/E2 "fell back" to E1/E2: the tick never moved and the toast
+// announced a switch to the warehouse being removed. The regex test that used
+// to live here passed throughout, which is why both directions now RUN.
 {
-  check('an empty selection falls back rather than refusing the click',
-        /if \(sel\.length === 0\) \{\s*\n\s*sel = \[WAREHOUSE_FALLBACK_\];/.test(UI),
-        'refusing left the tick where the reader had just tried to remove it');
-  check('the fallback is named once, not spelled inline',
-        /var WAREHOUSE_FALLBACK_ = 'e1e2';/.test(UI));
+  check('the fallback is chosen relative to what was just unticked',
+        /var fallback = warehouseFallbackFor_\(key\);/.test(UI) &&
+        /function warehouseFallbackFor_\(removedKey\)/.test(UI));
+  check('no fixed fallback constant survives',
+        !/WAREHOUSE_FALLBACK_/.test(UI),
+        'a named one cannot be right for both warehouses');
   check('and it still says what happened',
         /At least one warehouse stays selected/.test(UI));
   check('the toggle no longer has an early return that skips the commit',
         !/showToastPak\('Pick at least one warehouse'\);\s*\n\s*return;/.test(UI));
 
-  // Run the projection helpers for real.
-  const ctx = { siteFilter: 'e3', document: { getElementById: () => null } };
-  vm.createContext(ctx);
-  const from = UI.indexOf('var WAREHOUSE_OPTIONS_');
-  vm.runInContext(UI.slice(from, UI.indexOf('function renderWarehouseMenu_')), ctx);
-  check('E3 alone is a legal selection',
-        ctx.warehouseSelection_().join() === 'e3');
-  check('and the fallback names a real option',
-        ctx.warehouseLabelFor_(ctx.WAREHOUSE_FALLBACK_) === 'E1/E2',
-        ctx.warehouseLabelFor_(ctx.WAREHOUSE_FALLBACK_));
+  // Run the real thing, both ways round. `toggleWarehouse_` commits through
+  // setSiteFilter_, so that is stubbed to record what it was asked for.
+  function harness(startAt) {
+    const ctx = {
+      siteFilter: startAt,
+      toasts: [],
+      showToastPak: function (m) { ctx.toasts.push(m); },
+      setSiteFilter_: function (v) { ctx.siteFilter = v; },
+      renderWarehouseMenu_: function () {},
+      document: { getElementById: () => null }
+    };
+    vm.createContext(ctx);
+    vm.runInContext(UI.slice(UI.indexOf('var WAREHOUSE_OPTIONS_'),
+                             UI.indexOf('function renderWarehouseMenu_')), ctx);
+    vm.runInContext(UI.slice(UI.indexOf('function toggleWarehouse_'),
+                             UI.indexOf('function toggleWarehouseMenu_')), ctx);
+    return ctx;
+  }
+
+  const fromE3 = harness('e3');
+  fromE3.toggleWarehouse_('e3');
+  check('unticking the last E3 switches to E1/E2',
+        fromE3.siteFilter === 'e1e2', fromE3.siteFilter);
+  check('and the toast names E1/E2',
+        /switched to E1\/E2/.test(fromE3.toasts.join('|')), fromE3.toasts.join('|'));
+
+  // The direction that was broken.
+  const fromE1E2 = harness('e1e2');
+  fromE1E2.toggleWarehouse_('e1e2');
+  check('unticking the last E1/E2 switches to E3',
+        fromE1E2.siteFilter === 'e3', fromE1E2.siteFilter);
+  check('and the toast names E3, not the one just removed',
+        /switched to E3/.test(fromE1E2.toasts.join('|')), fromE1E2.toasts.join('|'));
+
+  // Neither direction may ever land back on what was unticked.
+  ['e3', 'e1e2'].forEach(function (k) {
+    const h = harness(k);
+    h.toggleWarehouse_(k);
+    check('unticking ' + k + ' never lands back on ' + k, h.siteFilter !== k, h.siteFilter);
+  });
+
+  // And the ordinary narrowing case still just narrows, with no toast at all.
+  const both = harness('all');
+  both.toggleWarehouse_('e3');
+  check('unticking one of two still just narrows',
+        both.siteFilter === 'e1e2' && both.toasts.length === 0,
+        both.siteFilter + ' toasts=' + both.toasts.length);
+  const both2 = harness('all');
+  both2.toggleWarehouse_('e1e2');
+  check('...in the other direction too',
+        both2.siteFilter === 'e3' && both2.toasts.length === 0,
+        both2.siteFilter + ' toasts=' + both2.toasts.length);
+
+  const ctx = harness('e3');
   check('both ticked still reads as "all"',
         ctx.warehouseKeyFor_(['e1e2', 'e3']) === 'all');
 }

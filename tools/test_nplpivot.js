@@ -259,9 +259,17 @@ head('[9] a pure-NPL block synthesizes a row too, same as a pure-OS one');
         /NPL_STATUS = NPL_STATUS if "NPL_STATUS" in globals\(\) else \{\}/.test(nbBack) &&
         /NPL_SPAN = NPL_SPAN if "NPL_SPAN" in globals\(\) else \{\}/.test(nbBack),
         'without it, running just this cell after only the OS log ran raises NameError');
+  // _syn_ prefixed, and it matters: these were _dtr/_bonus, and _dtr is also
+  // the window formatter _os_windows calls. Harmless in a notebook whose cells
+  // run once in order; fatal in the archive sweep, where both live inside one
+  // loop - see tools/test_archivesweep_run.py.
   check('a synthesized row is still marked seen, so OS and NPL cannot both insert it',
-        /_have\.add\(\(_dtr, _bonus\)\)/.test(nb) && /_have\.add\(\(_dtr, _bonus\)\)/.test(nbBack),
+        /_have\.add\(\(_syn_dtr, _syn_bonus\)\)/.test(nb) &&
+        /_have\.add\(\(_syn_dtr, _syn_bonus\)\)/.test(nbBack),
         'without this, a bonus pure on both logs would get two zero rows for one block');
+  check('and the loop variables cannot shadow a function name',
+        !/for _dtr, _bonus in sorted/.test(nb) && !/for _dtr, _bonus in sorted/.test(nbBack),
+        '_dtr is the window formatter; rebinding it to a string breaks _os_windows');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

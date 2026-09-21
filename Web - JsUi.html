@@ -2180,15 +2180,26 @@
 // combinations. Nothing downstream of siteFilter changed.
 //
 // Both ticked means Elmsall. An empty selection describes nothing, so unticking
-// the last one falls back to WAREHOUSE_FALLBACK_ instead - see toggleWarehouse_
-// for why that beats refusing the click.
+// the last one hands the selection to the OTHER warehouse - see
+// toggleWarehouse_ for why that beats refusing the click.
 var WAREHOUSE_OPTIONS_ = [
   { key: 'e1e2', label: 'E1/E2' },
   { key: 'e3',   label: 'E3' }
 ];
 
-// Where the selection lands when the reader unticks the last warehouse.
-var WAREHOUSE_FALLBACK_ = 'e1e2';
+// Where the selection lands when the reader unticks the last warehouse: the
+// one they did NOT just untick.
+//
+// This was a fixed 'e1e2', which is right exactly half the time. Unticking the
+// last E1/E2 "fell back" to E1/E2 - the tick never moved, and the toast
+// announced a switch to the warehouse being removed. The fallback is only
+// meaningful relative to what was just taken away.
+function warehouseFallbackFor_(removedKey) {
+  for (var i = 0; i < WAREHOUSE_OPTIONS_.length; i++) {
+    if (WAREHOUSE_OPTIONS_[i].key !== removedKey) return WAREHOUSE_OPTIONS_[i].key;
+  }
+  return removedKey;   // a one-warehouse site: nothing else to offer
+}
 
 function warehouseLabelFor_(key) {
   for (var i = 0; i < WAREHOUSE_OPTIONS_.length; i++) {
@@ -2238,16 +2249,20 @@ function toggleWarehouse_(key) {
   if (i === -1) sel.push(key);
   else sel.splice(i, 1);
 
-  // Unchecking the last one hands the selection to E1/E2 rather than refusing
-  // the click. Refusing left the tick sitting where the reader had just tried
-  // to remove it, which reads as the control being broken - there is no state
-  // in which no warehouse is selected, so the only question is which one it
-  // falls back to.
+  // Unchecking the last one hands the selection to the other warehouse rather
+  // than refusing the click. Refusing left the tick sitting where the reader
+  // had just tried to remove it, which reads as the control being broken -
+  // there is no state in which no warehouse is selected, so the only question
+  // is which one it falls back to.
+  //
+  // `key` is necessarily the one just removed: sel only empties when it held
+  // nothing else. So the fallback is the other option, never a fixed one.
   if (sel.length === 0) {
-    sel = [WAREHOUSE_FALLBACK_];
+    var fallback = warehouseFallbackFor_(key);
+    sel = [fallback];
     if (typeof showToastPak === 'function') {
       showToastPak('At least one warehouse stays selected - switched to ' +
-                   warehouseLabelFor_(WAREHOUSE_FALLBACK_));
+                   warehouseLabelFor_(fallback));
     }
   }
   // Keep the declared order, so 'all' is recognised by length alone and the
