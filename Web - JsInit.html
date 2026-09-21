@@ -58,7 +58,37 @@
   // has no field for it, and renderCachedPayload_ paints from this before the
   // fresh data lands - so that area shows zero on arrival with nothing to say
   // why. Adding an area changes the count and retires the old payload.
-  var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v2_' + VOLUME_TYPES.length;
+  // Rebuilds the row objects from the positional wire format - see sideSchema_
+  // in Code.js for why they travel that way. The names come from the schema
+  // rather than from anything known here, so adding or renaming an area needs
+  // no change on this side.
+  //
+  // Each field is restored exactly as buildSideEntry_ made it: an absent
+  // optional stays ABSENT rather than becoming '', because the client tests
+  // these with `if (entry.osStatus)` and a present-but-empty field would read
+  // as a status nobody set.
+  //
+  // A payload with no schema is already-built objects: a localStorage copy
+  // saved before this format existed, or the tour's demo data, which is
+  // written as plain rows by hand.
+  function decodeSideRowsPak_(rows, schema) {
+    rows = rows || [];
+    if (!schema || !schema.num) return rows;
+    var t = schema.text, b = schema.bool, n = schema.num;
+    var out = new Array(rows.length);
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r];
+      var e = {};
+      var c = 0;
+      for (var i = 0; i < t.length; i++, c++) { if (row[c]) e[t[i]] = row[c]; }
+      for (var j = 0; j < b.length; j++, c++) { e[b[j]] = row[c] === 1; }
+      for (var k = 0; k < n.length; k++, c++) { e[n[k]] = row[c] || 0; }
+      out[r] = e;
+    }
+    return out;
+  }
+
+  var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v3_' + VOLUME_TYPES.length;
   var PAYLOAD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;  // 6h: older than a shift is not worth showing
   var PAYLOAD_CACHE_MAX_CHARS = 3000000;              // stay well clear of the ~5MB localStorage quota
 
@@ -226,7 +256,7 @@
     // narrowed to the chosen building. Everything downstream reads rawSideData,
     // so with no filter set the two are the same and nothing behaves
     // differently from before.
-    allSideData = data.rawSideData || [];
+    allSideData = decodeSideRowsPak_(data.rawSideData, data.sideSchema);
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
     // The OS log no longer travels in the payload - the OS page fetches it

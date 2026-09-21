@@ -1028,6 +1028,62 @@ function readNplLogRows_(ss, want) {
   }
 }
 
+// ── The wire format for rawSideData ─────────────────────────────────────────
+//
+// buildSideEntry_ below produces one OBJECT per bonus per 15-minute block, and
+// those objects used to travel to the client as they are. Measured on a real
+// row with 24 areas: 1,117 bytes, of which 939 - EIGHTY-FOUR PER CENT - is
+// field names. `"sorter6ParcelInductStd":0,"onlinePickingDrive":0,` repeated
+// for 48 mostly-zero columns, on every one of ~20,000 rows, twice in live mode
+// because yesterday's archive comes too. That is the 33.7MB recorded further
+// down this file, and why the client's 3MB localStorage cache has never once
+// populated.
+//
+// Sent positionally instead, with the names stated ONCE in a schema beside the
+// rows: ~178 bytes a row, about six times smaller.
+//
+// The schema is self-describing - three ordered lists, and a row is those
+// lists' values concatenated in that order. The client assigns by the NAMES it
+// is given rather than by any position it knows for itself, which is the same
+// discipline the header-name column mapping keeps on the sheet side; and the
+// kinds are carried so the decoder can restore each field exactly as
+// buildSideEntry_ made it, rather than guessing from the value it happens to
+// see. A blank optional field decodes back to ABSENT, not to '', because that
+// is what buildSideEntry_ produces and what the client tests for.
+//
+// Derived from PROC_AREA_COLUMNS_, the same canonical list buildProcColumnMap_
+// builds map.areas from, so the two cannot disagree about which areas exist.
+function sideSchema_() {
+  var num = ['value'];
+  for (var i = 0; i < PROC_AREA_COLUMNS_.length; i++) {
+    num.push(PROC_AREA_COLUMNS_[i].key + 'Std');
+    num.push(PROC_AREA_COLUMNS_[i].key);
+  }
+  return {
+    text: ['timeRange', 'bonus', 'osStatus', 'osFrom', 'osTo',
+           'nplStatus', 'nplFrom', 'nplTo'],
+    bool: ['os', 'npl'],
+    num: num
+  };
+}
+
+function encodeSideRows_(entries, schema) {
+  var t = schema.text, b = schema.bool, n = schema.num;
+  var out = new Array(entries.length);
+  for (var r = 0; r < entries.length; r++) {
+    var e = entries[r];
+    var row = [];
+    // '' rather than null for an absent optional: two bytes against four, on
+    // six fields that are absent on almost every row.
+    for (var i = 0; i < t.length; i++) row.push(e[t[i]] || '');
+    // 1/0 rather than true/false, for the same reason.
+    for (var j = 0; j < b.length; j++) row.push(e[b[j]] ? 1 : 0);
+    for (var k = 0; k < n.length; k++) row.push(e[n[k]] || 0);
+    out[r] = row;
+  }
+  return out;
+}
+
 function buildSideEntry_(valsRow, dispsRow, map) {
   var osStatus = map.os >= 0 ? procOsStatus_(valsRow[map.os]) : '';
   var entry = {
@@ -1410,12 +1466,19 @@ function getDashboardData(archiveUrl) {
   // nothing on screen needs - so the OS page fetches it itself, once, on
   // first open. See getOsLogRows.
 
+  // Positional on the wire - see sideSchema_. The rows are built as objects
+  // above, by ONE builder, and flattened only here on the way out; the client
+  // rebuilds the same objects from the schema. Nothing between the two knows
+  // or cares about the format.
+  var sideSchema = sideSchema_();
+
   var payload = {
     threshold: threshold,
     lastRefresh: displayTime || Utilities.formatDate(lastRefresh, Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"),
     archiveBaseTime: lastRefresh.getTime(),
     timeRanges: timeRanges,
-    rawSideData: rawSideData,
+    sideSchema: sideSchema,
+    rawSideData: encodeSideRows_(rawSideData, sideSchema),
     bonusList: Object.keys(bonusSet).sort(),
     currentTimestamp: (b2Val instanceof Date) ? b2Val.getTime() : null,
     note: noteVal,
