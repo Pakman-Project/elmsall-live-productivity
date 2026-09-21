@@ -526,6 +526,10 @@
       return '<span class="cell-none" title="Standard hours, but no single' +
              ' work area carries them">&ndash;</span>';
     }
+    // One area carries the whole overlap by definition, so its figure is the
+    // Overlap Std Hrs column repeated a cell to the left. The hours are here
+    // to SPLIT a total between areas; with nothing to split they are noise.
+    if (areas.length === 1) return escapeTextPak_(areas[0]);
     // Ordered by hours, largest first, so the area that actually explains the
     // overlap reads first rather than whichever happens to sort alphabetically.
     // Falls back to the plain names if the hours are not there - an archive

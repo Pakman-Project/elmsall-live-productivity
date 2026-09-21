@@ -238,6 +238,15 @@ head('[4] work areas come from the one list that names them');
   check('a row with no hours map falls back to the plain names',
         ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'], null)
           .indexOf('OSR PiE, RSPS Pick') !== -1);
+  // One area carries the whole overlap, so its figure IS the Overlap Std Hrs
+  // column one cell to the left. The hours exist to split a total between
+  // areas; with nothing to split they are the same number printed twice.
+  check('one area shows no hours - they would repeat the Overlap column',
+        ctx.fraudAreasCellPak_(['Forward TPA'], { 'Forward TPA': 1.53 }) === 'Forward TPA',
+        ctx.fraudAreasCellPak_(['Forward TPA'], { 'Forward TPA': 1.53 }));
+  check('but two areas still split it',
+        /0\.10/.test(ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
+                                            { 'OSR PiE': 0.1, 'RSPS Pick': 0.4 })));
   check('and with one, the biggest area reads first',
         ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
                                { 'OSR PiE': 0.1, 'RSPS Pick': 0.4 })
