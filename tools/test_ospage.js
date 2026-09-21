@@ -1106,15 +1106,22 @@ head('[18] a dashboard refresh updates the log SILENTLY after the first load');
         'clearing the rows would blank the page for the seconds the fetch takes');
 
   check('ensureOsLogPak_ treats null and ready+needsRefresh as two different jobs',
-        /if \(osLogState === null\) \{[\s\S]{0,120}osFetchLogPak_\(false\);/.test(PAGE) &&
-        /if \(osLogState === 'ready' && osLogNeedsRefresh\) \{[\s\S]{0,400}osFetchLogPak_\(true\);/
+        /if \(osLogState === null\) \{[\s\S]{0,500}osFetchLogPak_\(false\);/.test(PAGE) &&
+        /if \(osLogState === 'ready' && osLogNeedsRefresh && !logFetchesHeldPak_\) \{[\s\S]{0,400}osFetchLogPak_\(true\);/
           .test(PAGE),
         'only the first is allowed to show loading state');
   check('the flag is cleared before the fetch starts, not after it lands',
         /osLogNeedsRefresh = false;\s*\n\s*osFetchLogPak_\(true\);/.test(PAGE),
         'a second refresh arriving mid-fetch must not queue a duplicate request');
+  // Both fetches are behind the date-change hold: until the payload lands,
+  // osLogWantDates_ is still reading the PREVIOUS day's timeRanges.
+  check('and neither fetch runs while a date change is still in flight',
+        /if \(!logFetchesHeldPak_\) osFetchLogPak_\(false\);/.test(PAGE) &&
+        /osLogNeedsRefresh && !logFetchesHeldPak_/.test(PAGE),
+        'fetching now asks the server for the day the reader just left');
   check('the render dispatch kicks it off, once the ready branch is confirmed',
-        /if \(osLogState !== 'ready'\) \{[\s\S]{0,700}ensureOsLogPak_\(\);/.test(PAGE));
+        /if \(osLogState !== 'ready' && osLogState !== 'loading'\) \{[\s\S]{0,700}ensureOsLogPak_\(\);/.test(PAGE),
+        "'loading' reaches that line on a re-read that kept its rows, and is not an error");
 
   // A silent fetch changes osLogState only on real success, or on failure it
   // is silently a no-op that keeps the old good data rather than replacing it
@@ -1308,7 +1315,7 @@ head('[22] a control the USER moved skeletons; the clock ticking does not');
   check('the Warehouse picker too, but only when it actually changed',
         /if \(changed && typeof osMarkControlChangedPak_ === 'function'\)/.test(ui));
   check('and the date picker, since another day is other data entirely',
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,1400}osMarkControlChangedPak_\(\);/
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,2600}osMarkControlChangedPak_\(\);/
           .test(init),
         'otherwise yesterday spells swap for today under the reader, silently');
   // All three pages that hold their own logs, not just OS. The other two were
@@ -1316,8 +1323,8 @@ head('[22] a control the USER moved skeletons; the clock ticking does not');
   // the new day comes BACK from the server, so the page a reader was looking
   // at when they picked the date showed the old day for the whole round trip.
   check('...and so do the NPL and Claims pages',
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,1600}nplMarkControlChangedPak_\(\);/.test(init) &&
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,1600}fraudMarkControlChangedPak_\(\);/.test(init));
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,2800}nplMarkControlChangedPak_\(\);/.test(init) &&
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,2800}fraudMarkControlChangedPak_\(\);/.test(init));
   check('and the page on screen is redrawn at once, not when the data lands',
         /redrawCurrentPagePak_\(\);/.test(init) &&
         /function redrawCurrentPagePak_\(\)/.test(ui),

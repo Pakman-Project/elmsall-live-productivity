@@ -119,5 +119,43 @@
       if (fill) fill.style.width = '100%';
       if (text) text.textContent = '100%';
     }
+    progressDetachBarPak_(key);
+  }
+
+  // ── a bar with no skeleton under it ────────────────────────────────────────
+  // A skeleton is honest on a FIRST paint, when there is nothing on screen to
+  // protect. On every re-read after that it is a downgrade: it throws away rows
+  // the reader is looking at, and replaces a page that is merely a little out
+  // of date with grey blocks that say less. So a re-read keeps its rows and
+  // gets one of these instead - a bar above the content, saying only that more
+  // is coming.
+  //
+  // Inserted as a SIBLING before the content element rather than inside it:
+  // each page rewrites its own body.innerHTML from several different places,
+  // and a bar living inside that would have to be re-added by every one of
+  // them, forever.
+  var _progressBarHosts = {};
+
+  function progressAttachBarPak_(contentId, key) {
+    var host = document.getElementById(contentId);
+    if (!host || !host.parentNode) return;
+    var barId = contentId + 'ProgressBar';
+    if (!document.getElementById(barId)) {
+      var wrap = document.createElement('div');
+      wrap.id = barId;
+      wrap.className = 'page-refresh-bar';
+      wrap.innerHTML = progressBarHtmlPak_(key);
+      host.parentNode.insertBefore(wrap, host);
+    }
+    _progressBarHosts[key] = barId;
+    progressStartPak_(key);
+  }
+
+  function progressDetachBarPak_(key) {
+    var barId = _progressBarHosts[key];
+    if (!barId) return;
+    delete _progressBarHosts[key];
+    var el = document.getElementById(barId);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
   }
 </script>

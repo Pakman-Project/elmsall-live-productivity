@@ -39,10 +39,11 @@
     if (nplLogState === null) {
       nplLogState = 'loading';
       renderNplPagePak();
-      nplFetchLogPak_(false);
+      // Held during a date change - see ensureOsLogPak_, which this mirrors.
+      if (!logFetchesHeldPak_) nplFetchLogPak_(false);
       return;
     }
-    if (nplLogState === 'ready' && nplLogNeedsRefresh) {
+    if (nplLogState === 'ready' && nplLogNeedsRefresh && !logFetchesHeldPak_) {
       nplLogNeedsRefresh = false;
       nplFetchLogPak_(true);
     }
@@ -372,18 +373,24 @@
     // A skeleton while it loads, shaped like what is coming, and written once -
     // a re-render while still loading would restart every shimmer from the left.
     if (nplLogState === 'loading') {
-      if (!body.firstChild || !body.firstChild.classList ||
-          !body.firstChild.classList.contains('page-skeleton')) {
-        body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
-          progressBarHtmlPak_('npllog') +
-          '<div class="skel-summary"></div>' +
-          '<div class="skel-row"></div><div class="skel-row"></div>' +
-          '<div class="skel-row"></div><div class="skel-row"></div></div>';
-        progressStartPak_('npllog');
+      // First paint only - see renderOsPagePak, which this mirrors.
+      if (nplLogEverLoaded) {
+        progressAttachBarPak_('nplBody', 'npllog');
+        // and fall through to draw the rows already held
+      } else {
+        if (!body.firstChild || !body.firstChild.classList ||
+            !body.firstChild.classList.contains('page-skeleton')) {
+          body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
+            progressBarHtmlPak_('npllog') +
+            '<div class="skel-summary"></div>' +
+            '<div class="skel-row"></div><div class="skel-row"></div>' +
+            '<div class="skel-row"></div><div class="skel-row"></div></div>';
+          progressStartPak_('npllog');
+        }
+        return;
       }
-      return;
     }
-    if (nplLogState !== 'ready') {
+    if (nplLogState !== 'ready' && nplLogState !== 'loading') {
       body.innerHTML = '<div class="breakdown-empty">' +
         '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
         escapeTextPak_(nplLogState) + '</div>';

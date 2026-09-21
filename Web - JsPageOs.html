@@ -204,10 +204,14 @@
     if (osLogState === null) {
       osLogState = 'loading';
       renderOsPagePak();
-      osFetchLogPak_(false);
+      // Held during a date change: osLogWantDates_() reads timeRanges, which is
+      // still the PREVIOUS day until the payload lands, so fetching now asks
+      // for the wrong dates. releaseLogFetchesPak_ puts this back to null and
+      // comes round again once the new day is really here.
+      if (!logFetchesHeldPak_) osFetchLogPak_(false);
       return;
     }
-    if (osLogState === 'ready' && osLogNeedsRefresh) {
+    if (osLogState === 'ready' && osLogNeedsRefresh && !logFetchesHeldPak_) {
       // Cleared before the fetch starts, not after it lands: a second
       // dashboard refresh arriving while this one is still in flight must not
       // queue a duplicate request for the same window.
@@ -980,18 +984,30 @@
     // not visibly jump when the rows land. Written once: a re-render while
     // still loading would restart every shimmer from the left.
     if (osLogState === 'loading') {
-      if (!body.firstChild || !body.firstChild.classList ||
-          !body.firstChild.classList.contains('page-skeleton')) {
-        body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
-          progressBarHtmlPak_('oslog') +
-          '<div class="skel-summary"></div>' +
-          '<div class="skel-row"></div><div class="skel-row"></div>' +
-          '<div class="skel-row"></div><div class="skel-row"></div></div>';
-        progressStartPak_('oslog');
+      // Only the FIRST paint gets the skeleton. Once rows have been on screen
+      // the skeleton is a downgrade - it throws away what the reader is
+      // reading to say "wait" about data that is merely a few minutes old. A
+      // re-read keeps its rows and puts a bar above them instead, and they are
+      // replaced with no flash when the new ones land.
+      if (osLogEverLoaded) {
+        progressAttachBarPak_('osBody', 'oslog');
+        // and fall through to draw the rows already held
+      } else {
+        if (!body.firstChild || !body.firstChild.classList ||
+            !body.firstChild.classList.contains('page-skeleton')) {
+          body.innerHTML = '<div class="page-skeleton" aria-label="Loading">' +
+            progressBarHtmlPak_('oslog') +
+            '<div class="skel-summary"></div>' +
+            '<div class="skel-row"></div><div class="skel-row"></div>' +
+            '<div class="skel-row"></div><div class="skel-row"></div></div>';
+          progressStartPak_('oslog');
+        }
+        return;
       }
-      return;
     }
-    if (osLogState !== 'ready') {
+    // 'loading' reaches here only on a re-read that kept its rows (above), and
+    // it is not an error message - anything else that is not 'ready' is.
+    if (osLogState !== 'ready' && osLogState !== 'loading') {
       body.innerHTML = '<div class="breakdown-empty">' +
         '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>' +
         escapeTextPak_(osLogState) + '</div>';

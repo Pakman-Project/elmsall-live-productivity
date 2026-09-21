@@ -168,11 +168,35 @@ function applyLocalFiltersPak() {
 // block are at or below the threshold, from BOTH the hours and the head count.
 // The charts want that filtering; the Data Table deliberately does not, so it
 // stays a raw view of what is actually in the database.
+// Rows bucketed by their time range, in ONE pass.
+//
+// The three builders below each used to do `data.filter(...)` inside their own
+// per-block loop, which is a full sweep of every row per block: a 24-hour axis
+// is 96 blocks against tens of thousands of rows, and applyLocalFiltersPak
+// calls into here more than once, so it ran to millions of comparisons on
+// every refresh - all of it rebuilding the same buckets a single pass gives.
+//
+// Object.create(null) rather than {}: a time range is a data value, and a
+// plain object would resolve '__proto__' and 'constructor' to things on
+// Object.prototype instead of to a bucket.
+function groupByTimeRangePak_(data) {
+  var byRange = Object.create(null);
+  for (var i = 0; i < data.length; i++) {
+    var key = data[i].timeRange;
+    if (byRange[key] === undefined) byRange[key] = [];
+    byRange[key].push(data[i]);
+  }
+  return byRange;
+}
+
 function generateMainRows_(data, timeList, opts) {
   var applyThreshold = !(opts && opts.applyThreshold === false);
   var rows = [];
+  var byRange = groupByTimeRangePak_(data);
   timeList.forEach(function(tr) {
-    var blockData = data.filter(function(r) { return r.timeRange === tr; });
+    // A block with no rows was an empty array before and still is - every
+    // reduce and filter below is written to survive one.
+    var blockData = byRange[tr] || [];
     // An OS block is non-productive time: it must never count as deployed hours
     // or as head count, or every person on an indirect task would drag the site
     // figures down. The threshold filter below happens to exclude them, but only
@@ -412,8 +436,9 @@ function aggregateTrendRows(rows, windowMinutes) {
 
 function generateTrendRowsForAreas_(data, timeList, areaKeys) {
   var rows = [];
+  var byRange = groupByTimeRangePak_(data);
   timeList.forEach(function(tr) {
-    var blockData = data.filter(function(r) { return r.timeRange === tr; });
+    var blockData = byRange[tr] || [];
     var qualifiedData = blockData.filter(function(r) { return (r.value || 0) > currentThreshold; });
     var totalDeployed = 0;
     var stdBreakdown = {};
@@ -507,8 +532,9 @@ function generatePerfSplitRows_(data, timeList, groups, pureOnly) {
     return out;
   });
 
+  var byRange = groupByTimeRangePak_(data);
   timeList.forEach(function(tr) {
-    var blockData = data.filter(function(r) { return r.timeRange === tr; });
+    var blockData = byRange[tr] || [];
     var row = { dateTime: tr };
     groups.forEach(function(group, gi) {
       var totalStd = 0;

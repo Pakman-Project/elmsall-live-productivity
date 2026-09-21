@@ -1180,6 +1180,28 @@
   // now, without waiting for the dashboard payload. Only those three: every
   // other page is drawn from the payload and has nothing to show until it
   // lands, so a redraw there would replace real rows with an empty card.
+  // The other half of logFetchesHeldPak_ - see the note on it in JsState.
+  //
+  // All THREE are started here, not just whichever is on screen. They each cost
+  // one server read, cached for five minutes, and the reader who changes the
+  // date is usually about to look at one of them; making them wait for the page
+  // switch is a second pause bolted onto the one they just sat through.
+  //
+  // Put back to null rather than marked as needing a refresh: a date change is
+  // a different day, so nothing that is currently held is worth keeping as the
+  // answer. The ROWS stay, so a page that has loaded before keeps them on
+  // screen under the bar until the new day's land.
+  function releaseLogFetchesPak_() {
+    if (!logFetchesHeldPak_) return;
+    logFetchesHeldPak_ = false;
+    osLogState = null;
+    nplLogState = null;
+    fraudLogState = null;
+    if (typeof ensureOsLogPak_ === 'function') ensureOsLogPak_();
+    if (typeof ensureNplLogPak_ === 'function') ensureNplLogPak_();
+    if (typeof ensureFraudLogsPak_ === 'function') ensureFraudLogsPak_();
+  }
+
   function redrawCurrentPagePak_() {
     if (currentPage === 3 && typeof renderFraudPagePak === 'function') renderFraudPagePak();
     else if (currentPage === 4 && typeof renderOsPagePak === 'function') renderOsPagePak();
@@ -2157,13 +2179,23 @@
 // still holds 'all' | 'e1e2' | 'e3', and those are exactly the three legal tick
 // combinations. Nothing downstream of siteFilter changed.
 //
-// Both ticked means Elmsall. Unticking the last one is refused rather than
-// silently reinterpreted - an empty warehouse selection describes nothing, and
-// quietly turning it back into "all" would look like the click was ignored.
+// Both ticked means Elmsall. An empty selection describes nothing, so unticking
+// the last one falls back to WAREHOUSE_FALLBACK_ instead - see toggleWarehouse_
+// for why that beats refusing the click.
 var WAREHOUSE_OPTIONS_ = [
   { key: 'e1e2', label: 'E1/E2' },
   { key: 'e3',   label: 'E3' }
 ];
+
+// Where the selection lands when the reader unticks the last warehouse.
+var WAREHOUSE_FALLBACK_ = 'e1e2';
+
+function warehouseLabelFor_(key) {
+  for (var i = 0; i < WAREHOUSE_OPTIONS_.length; i++) {
+    if (WAREHOUSE_OPTIONS_[i].key === key) return WAREHOUSE_OPTIONS_[i].label;
+  }
+  return key;
+}
 
 function warehouseSelection_() {
   if (siteFilter === 'e1e2') return ['e1e2'];
@@ -2206,9 +2238,17 @@ function toggleWarehouse_(key) {
   if (i === -1) sel.push(key);
   else sel.splice(i, 1);
 
+  // Unchecking the last one hands the selection to E1/E2 rather than refusing
+  // the click. Refusing left the tick sitting where the reader had just tried
+  // to remove it, which reads as the control being broken - there is no state
+  // in which no warehouse is selected, so the only question is which one it
+  // falls back to.
   if (sel.length === 0) {
-    if (typeof showToastPak === 'function') showToastPak('Pick at least one warehouse');
-    return;
+    sel = [WAREHOUSE_FALLBACK_];
+    if (typeof showToastPak === 'function') {
+      showToastPak('At least one warehouse stays selected - switched to ' +
+                   warehouseLabelFor_(WAREHOUSE_FALLBACK_));
+    }
   }
   // Keep the declared order, so 'all' is recognised by length alone and the
   // label never reads "E3, E1/E2".

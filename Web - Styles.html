@@ -4027,7 +4027,41 @@ body.page-scrolled-far .back-to-top {
 /* A string of work-area names, and the one cell here that can run long. It
    wraps rather than being clipped: which areas they were in is the whole
    evidence, and half of it is no use. */
-.fraud-areas-cell { line-height: 1.45; }
+/* Wraps rather than truncating. The column inherited nowrap + ellipsis, which
+   was survivable when it held bare names but is not now the hours are beside
+   them: a second area was being cut off with a "…", and the hidden one is
+   exactly what the column exists to say. Two areas stack onto two lines. */
+.fraud-areas-cell {
+  line-height: 1.45;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* One area and the hours it carries, as a single unbreakable unit - the pair
+   means nothing split across a line wrap. */
+.fraud-area {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0 6px 2px 0;
+  white-space: nowrap;
+}
+
+.fraud-area-std {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--w6);
+  color: var(--muted);
+}
+
+/* The bar a re-read shows in place of a skeleton, sitting above the rows it is
+   replacing rather than on top of them - see progressAttachBarPak_. */
+.page-refresh-bar {
+  margin: 0 0 10px;
+}
 
 @media (max-width: 700px) {
   .fraud-head { margin-bottom: 8px; }

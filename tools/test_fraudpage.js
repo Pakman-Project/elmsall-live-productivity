@@ -203,10 +203,10 @@ head('[4] work areas come from the one list that names them');
 {
   check('read off VOLUME_TYPES, not a second list of names',
         /for \(var i = 0; i < VOLUME_TYPES\.length; i\+\+\)/.test(PAGE) &&
-        /into\[t\.label\] = true;/.test(PAGE),
+        /into\[t\.label\] = \(into\[t\.label\] \|\| 0\) \+ std;/.test(PAGE),
         'a list here would drift from the legend the first time an area was renamed');
   check('an area counts when it carries standard hours',
-        /\(Number\(row\[t\.stdKey\]\) \|\| 0\) > 0/.test(PAGE),
+        /var std = Number\(row\[t\.stdKey\]\) \|\| 0;/.test(PAGE) && /if \(std > 0\)/.test(PAGE),
         'volume without hours is not what the claim is being checked against');
   // Run it: two areas on one row, one on another, and the union of them.
   const areas = {};
@@ -217,6 +217,52 @@ head('[4] work areas come from the one list that names them');
         Object.keys(areas).sort().join(', '));
   check('and the page sorts them the same way',
         /areas: Object\.keys\(areas\)\.sort\(\)/.test(PAGE));
+
+  // The hours themselves, which is what the cell now shows. Accumulated across
+  // blocks rather than overwritten: an area worked in four blocks of the
+  // overlap carries the sum of the four, not the last one seen.
+  check('each area carries the hours it accounts for, summed across blocks',
+        areas['OSR PiE'] === 0.1 && areas['RSPS Pick'] === 0.4 &&
+        areas['ISPS Top Up'] === 0.2,
+        JSON.stringify(areas));
+  const more = {};
+  ctx.fraudAreasOfRowPak_({ pieStd: 0.25 }, more);
+  ctx.fraudAreasOfRowPak_({ pieStd: 0.25 }, more);
+  check('the same area twice sums rather than replaces',
+        more['OSR PiE'] === 0.5, String(more['OSR PiE']));
+  check('and the row carries them beside the plain name list',
+        /areaStd: areas,/.test(PAGE) &&
+        /fraudAreasCellPak_\(r\.areas, r\.areaStd\)/.test(PAGE),
+        'the filter and its dropdown still read the names, untouched');
+  // An archive read before areaStd existed still has areas and must not throw.
+  check('a row with no hours map falls back to the plain names',
+        ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'], null)
+          .indexOf('OSR PiE, RSPS Pick') !== -1);
+  check('and with one, the biggest area reads first',
+        ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
+                               { 'OSR PiE': 0.1, 'RSPS Pick': 0.4 })
+          .indexOf('RSPS Pick') <
+        ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
+                               { 'OSR PiE': 0.1, 'RSPS Pick': 0.4 })
+          .indexOf('OSR PiE'),
+        'the area that explains the overlap should not sort alphabetically');
+}
+
+head('[4b] one row per claim - two records stay two rows');
+// A person with an OS spell AND an NPL spell over the same period is two
+// claims, and collapsing them into one row would hide one of them. Verified
+// rather than changed: the emission is already right.
+{
+  check('the scan pushes once per surviving claim, inside consider()',
+        /function consider\(row, kind, auth, extra\)/.test(PAGE) &&
+        (PAGE.match(/out\.push\(\{/g) || []).length === 1,
+        'one push site means one row per record, whatever kind it is');
+  check('and the renderer emits one <tr> per scanned row',
+        /for \(var i = 0; i < rows\.length; i\+\+\) \{[\s\S]{0,400}html \+= '<tr>';/.test(PAGE),
+        'a straight walk of the scan output, with no grouping between');
+  check('nothing merges or de-duplicates by bonus number',
+        !/dedupe|uniqueByBonus|mergeClaims/i.test(PAGE),
+        'two records for one person are two separate things to check');
 }
 
 head('[5] the pivot is read whole, not through the Warehouse picker');
@@ -288,9 +334,16 @@ head('[7] the table names every part of the case');
         'two bare clock times cannot say that a claim crossed a date');
   check('the OVERLAP time range uses the same marker, not just Claim Time',
         /fraudRangeTextPak_\(r\.overlapFrom, r\.overlapTo\)/.test(PAGE));
+  // Was a test that .fraud-areas-cell merely set a line-height, which says
+  // nothing about wrapping. It passed the whole time the cell was inheriting
+  // nowrap + ellipsis and hiding the second area behind a "…".
   check('the work areas wrap rather than being clipped',
-        /\.fraud-areas-cell \{ line-height/.test(R('Web - Styles.html')),
+        /\.fraud-areas-cell \{[\s\S]{0,200}white-space: normal;[\s\S]{0,120}overflow: visible;[\s\S]{0,120}text-overflow: clip;/
+          .test(R('Web - Styles.html')),
         'which areas they were in is the evidence; half of it is no use');
+  check('and an area keeps its hours on the same line as its name',
+        /\.fraud-area \{[\s\S]{0,200}white-space: nowrap;/.test(R('Web - Styles.html')),
+        'the pair means nothing split across a wrap');
   check('OS and NPL are told apart in their own column',
         /fraud-kind-' \+ kind\.toLowerCase\(\)/.test(PAGE));
   check('and that chip is neutral, not a verdict colour',

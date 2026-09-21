@@ -769,6 +769,22 @@ var nplCheckFilter = {};
 var fraudOsRows = [];
 var fraudNplRows = [];
 var fraudLogState = null;      // null | 'loading' | 'ready' | an error message
+// The same pair the OS and NPL pages carry, and for the same reason: this page
+// used to be dropped to null on EVERY dashboard refresh, so an auto-refresh
+// nobody asked for tore the table down and rebuilt it from a skeleton. Once
+// the logs have been read once, later refreshes are marked instead and swap in
+// underneath - see ensureFraudLogsPak_.
+var fraudLogEverLoaded = false;
+var fraudLogNeedsRefresh = false;
+
+// Set while a DATE CHANGE is still waiting for the dashboard payload.
+//
+// The three log pages build their requests out of timeRanges and read
+// rawSideData, and neither is replaced until renderDashboardPayload_ runs. Left
+// to themselves they fetch the moment the date changes - which asks the server
+// for the OLD day's dates and draws the answer as if it were the new one. Held
+// here, released by releaseLogFetchesPak_ once the payload has landed.
+var logFetchesHeldPak_ = false;
 // The five filters. Each is a whitelist and an EMPTY one means no filter, not
 // nothing - same bargain as the OS page's, for the same reason: the first
 // click on a fresh dropdown emptying the page reads as the page being broken.

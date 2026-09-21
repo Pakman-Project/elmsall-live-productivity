@@ -247,11 +247,21 @@
     // The Claims page holds its logs for a PRODUCTION DAY, not for the axis,
     // so "the window moved on" does not apply to it the way it does to the two
     // pages below - but the day itself can change under it, and a refresh is
-    // the only moment that shows. Dropped outright rather than marked: it has
-    // no silent-refresh path, because unlike OS and NPL there is nothing on
-    // its screen worth protecting from a flash - it is one table, not a tree
-    // somebody is part-way through opening.
-    fraudLogState = null;
+    // the only moment that shows.
+    //
+    // It used to be dropped outright here, on the reasoning that one table has
+    // nothing worth protecting from a flash. That was wrong twice over: the
+    // flash landed on every automatic refresh, once a minute, whether or not
+    // anything had changed - and a reader part-way down a sorted table of
+    // claims loses their place exactly as badly as one part-way through a
+    // tree. Marked instead, on the same terms as the two below.
+    if (fraudLogEverLoaded) {
+      fraudLogNeedsRefresh = true;
+    } else {
+      fraudOsRows = [];
+      fraudNplRows = [];
+      fraudLogState = null;
+    }
     // The NPL page, on exactly the same terms and for the same reasons.
     if (nplLogEverLoaded) {
       nplLogNeedsRefresh = true;
@@ -275,6 +285,12 @@
     renderLastUpdate_();
 
     applyLocalFiltersPak();
+
+    // The new day is now really here: timeRanges, allSideData and rawSideData
+    // have all been replaced above, and applyLocalFiltersPak has rebuilt the
+    // render context off them. Only now is it safe for the three log pages to
+    // ask the server anything - see releaseLogFetchesPak_.
+    releaseLogFetchesPak_();
 
     $('status').textContent = 'Loaded';
     var noteEl = $('noteText');
@@ -598,6 +614,20 @@
       // out of date. Marking them here and drawing immediately puts the
       // skeleton up at the moment of the click, which is when the reader asked
       // the question.
+      //
+      // HELD, not fetched. Marking them and drawing immediately is right - it
+      // acknowledges the click - but the draw used to start the fetches too,
+      // and those build their request out of timeRanges, which is still the
+      // OLD day until the payload below comes back. So the three pages asked
+      // the server for the previous day's dates, got a perfectly good answer,
+      // and drew it as if it were the day that had just been picked. Filtering
+      // by bonus then matched nothing, because the filter was the new day's
+      // and the rows were not.
+      //
+      // The hold lets them show that they are loading without asking anything
+      // yet; releaseLogFetchesPak_ starts the real fetches once the payload
+      // has landed.
+      logFetchesHeldPak_ = true;
       if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
       if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
       if (typeof fraudMarkControlChangedPak_ === 'function') { fraudMarkControlChangedPak_(); }
