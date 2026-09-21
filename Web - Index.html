@@ -2,6 +2,13 @@
 <html>
   <head>
     <base target="_top">
+    <!-- Stated rather than left to the server's header. Apps Script serves
+         utf-8 and production has always been fine, but the page carries real
+         non-ASCII - the "Still loading…" ellipsis, the en-dashes in the empty
+         cells - and anything else serving this file (tools/preview.js builds a
+         standalone copy) has to guess without this, which renders them as
+         mojibake. -->
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Elmsall Live Productivity</title>
 

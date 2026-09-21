@@ -446,8 +446,15 @@
     // Not on a silent refresh: nothing is covered, there is nothing to wait
     // in front of, and a bar appearing over a populated dashboard would be
     // an interruption rather than an answer.
-    if (!silent && !tourActive && typeof progressStartPak_ === 'function') {
-      progressStartPak_('dashboard');
+    //
+    // Attached ABOVE the pages rather than merely started. The only markup
+    // carrying data-progress="dashboard" is inside #loadingOverlay, and the
+    // line below takes that overlay's .active off on this very same path - so
+    // the bar was being started, ticked and painted for the whole load, into
+    // an element at opacity 0. Nobody has ever seen it: the skeleton replaced
+    // the blocking overlay, and the bar was left behind inside it.
+    if (!silent && !tourActive && typeof progressAttachBarPak_ === 'function') {
+      progressAttachBarPak_('swipeContainer', 'dashboard');
     }
 
     if (!silent && !tourActive) {

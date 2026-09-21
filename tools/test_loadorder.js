@@ -81,6 +81,15 @@ head('[3] a skeleton only on a first paint');
   check('the bar is a sibling of the content, not inside it',
         /host\.parentNode\.insertBefore\(wrap, host\)/.test(PROG),
         'each page rewrites its own innerHTML from several places');
+  // The dashboard's bar was STARTED on every load and never once seen: the
+  // only markup carrying data-progress="dashboard" is inside #loadingOverlay,
+  // and the next line of the same function takes that overlay's .active off.
+  check('the dashboard bar is ATTACHED to visible content, not just started',
+        /progressAttachBarPak_\('swipeContainer', 'dashboard'\)/.test(INIT) &&
+        !/progressStartPak_\('dashboard'\)/.test(INIT),
+        'starting a bar inside the overlay this same function hides shows nobody anything');
+  check('and its host is outside the overlay it used to live in',
+        !/id="loadingOverlay"[\s\S]{0,400}id="swipeContainer"/.test(R('Web - Index.html')));
   check('and it is removed when the fetch ends, wherever that happens',
         /progressDetachBarPak_\(key\);/.test(PROG) &&
         PROG.indexOf('function progressEndPak_') < PROG.indexOf('progressDetachBarPak_(key);'),
