@@ -272,5 +272,60 @@ head('[9] a pure-NPL block synthesizes a row too, same as a pure-OS one');
         '_dtr is the window formatter; rebinding it to a string breaks _os_windows');
 }
 
+head('[10] a pure-NPL block reaches the payload at all');
+// The bug this exists for: a continuous 18:00-00:00 NPL claim drew as FOUR
+// separate bands on the chart, one per block where the operator also happened
+// to produce something. Every quiet block in between was dropped by the
+// server before it ever reached the client.
+//
+// All three read paths admit a zero-hours row only when it carries a flag,
+// and the flag they tested was OS. NPL has exactly the same property - no
+// standard hours by definition - and was missed when it was added.
+{
+  // Run the three conditions for real, rather than trusting a regex to have
+  // read the boolean logic correctly.
+  const cond = {
+    yesterday: (e) => !(!e.bonus || (e.value <= 0 && !e.os && !e.npl)),
+    live:      (e) => !(!e.bonus || (e.value <= 0 && !e.os && !e.npl)),
+    archive:   (e) => !!(e.bonus && (e.value > 0 || e.os || e.npl))
+  };
+  // Each condition lifted straight out of Code.js, so a change there that this
+  // file does not follow shows up as a mismatch rather than as a silent pass.
+  const CODE = fs.readFileSync(APPS + 'Web - Code.js', 'utf8');
+  check('all three read paths admit a flagged zero-hours row',
+        (CODE.match(/value <= 0 && !\w+\.os && !\w+\.npl/g) || []).length === 2 &&
+        /value > 0 \|\| entry\.os \|\| entry\.npl/.test(CODE),
+        'yesterday-archive, live, and archive-mode');
+
+  const rows = {
+    'pure NPL, no hours':    { bonus: 'DYB', value: 0, os: false, npl: true },
+    'pure OS, no hours':     { bonus: 'HJW', value: 0, os: true,  npl: false },
+    'both, no hours':        { bonus: 'B58', value: 0, os: true,  npl: true },
+    'ordinary produced row': { bonus: 'AAA', value: 0.25, os: false, npl: false }
+  };
+  Object.keys(rows).forEach(function (label) {
+    const e = rows[label];
+    check(label + ' survives every path',
+          cond.yesterday(e) && cond.live(e) && cond.archive(e), JSON.stringify(e));
+  });
+
+  // The rows that SHOULD still be dropped - the filter has to keep doing its job.
+  const dropped = {
+    'a zero row with no flag at all': { bonus: 'ZZZ', value: 0, os: false, npl: false },
+    'a row with no bonus number':     { bonus: '',    value: 9, os: false, npl: true }
+  };
+  Object.keys(dropped).forEach(function (label) {
+    const e = dropped[label];
+    check(label + ' is still dropped',
+          !cond.yesterday(e) && !cond.live(e) && !cond.archive(e), JSON.stringify(e));
+  });
+
+  // The axis trim is the one place that must NOT count them: a log entry is
+  // typed ahead of time, so an 18:00 finish exists in the sheet at 09:00.
+  check('but the trailing axis trim still judges on hours alone',
+        /if \(rawSideData\[pi\]\.value > 0\) \{ presentTR/.test(CODE),
+        'counting a logged-ahead block as data rolls the axis into empty blocks');
+}
+
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
 process.exit(fail ? 1 : 0);

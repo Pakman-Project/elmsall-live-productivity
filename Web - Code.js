@@ -1337,8 +1337,12 @@ function getDashboardData(archiveUrl) {
               var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
               if (!yesterdayTRSet[aEntry.timeRange]) continue;
               // An OS block has no standard hours by definition, so the value
-              // test alone would drop exactly the rows the OS band needs.
-              if (!aEntry.bonus || (aEntry.value <= 0 && !aEntry.os)) continue;
+              // test alone would drop exactly the rows the OS band needs. NPL
+              // is the same shape and was missed when it was added: a spell
+              // survived only in the blocks where the operator ALSO produced,
+              // so one continuous claim drew as several separate bands with
+              // the quiet blocks between them simply absent.
+              if (!aEntry.bonus || (aEntry.value <= 0 && !aEntry.os && !aEntry.npl)) continue;
               yEntries.push(aEntry);
               yLines_.push(backendJoin_(aRead.vals[i]));
             }
@@ -1370,7 +1374,9 @@ function getDashboardData(archiveUrl) {
 
       for (var i = 0; i < lRead.vals.length; i++) {
         var lEntry = buildSideEntry_(lRead.vals[i], lRead.disps[i], lRead.map);
-        if (!lEntry.bonus || (lEntry.value <= 0 && !lEntry.os)) continue;
+        // OS or NPL - both are blocks with no standard hours by definition.
+        // See the note on the archive read above.
+        if (!lEntry.bonus || (lEntry.value <= 0 && !lEntry.os && !lEntry.npl)) continue;
 
         var lKey = lEntry.timeRange + '||' + lEntry.bonus;
 
@@ -1412,7 +1418,9 @@ function getDashboardData(archiveUrl) {
 
       for (var i = 0; i < sRead.vals.length; i++) {
         var entry = buildSideEntry_(sRead.vals[i], sRead.disps[i], sRead.map);
-        if (timeSet[entry.timeRange] && entry.bonus && (entry.value > 0 || entry.os)) {
+        // ...and on the archive path too. NPL beside OS for the same reason.
+        if (timeSet[entry.timeRange] && entry.bonus &&
+            (entry.value > 0 || entry.os || entry.npl)) {
           rawSideData.push(entry);
           bonusSet[entry.bonus] = true;
         }
