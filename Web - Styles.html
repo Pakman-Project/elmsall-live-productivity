@@ -4024,14 +4024,14 @@ body.page-scrolled-far .back-to-top {
   white-space: nowrap;
 }
 
-/* Total Std Hrs, in red: it is the figure the reader compares Overlap Std
-   Hrs against, and a claim only means something once you can tell "worked a
-   lot" from "worked almost only during this claim" - red for the same reason
+/* Overlap Std Hrs, in red: it is the actual evidence a claim overlaps
+   production - standard hours produced during time logged as not worked -
+   where Total Std Hrs is only the context beside it. Red for the same reason
    a warning is red, not because anything here is itself an accusation.
    ".record-table td { color: var(--text) }" is class+type (0,0,1,1), which
    beats a bare single class - ".fraud-table td" makes this two classes and a
    type (0,0,2,1) so it actually wins. */
-.fraud-table td.fraud-total-cell { color: var(--color-bad); }
+.fraud-table td.fraud-overlap-cell { color: var(--color-bad); }
 
 /* A row holding a bonus the reader has filtered to. Applied to each td, not
    the tr - box-shadow on a <tr> renders inconsistently across browsers, since

@@ -597,29 +597,32 @@ head('[10] the columns sort, by header on a desktop and by dropdown on a phone')
         'binding inside the renderer would stack a listener per draw');
 }
 
-head('[11] Total Std Hrs reads red, and only that column');
+head('[11] Overlap Std Hrs reads red, and only that column');
+// Overlap Std Hrs is the actual evidence - hours produced during claimed-off
+// time. Total Std Hrs is only the context beside it, so it stays plain.
 {
   const CSS = R('Web - Styles.html');
-  check('the Total Std Hrs cell gets its own class, beside fraud-std-cell',
-        /class="fraud-std-cell fraud-total-cell"/.test(PAGE));
-  check('Overlap Std Hrs keeps the plain class - it is not the one turning red',
-        /'<td data-label="Overlap Std Hrs" class="fraud-std-cell"'/.test(PAGE));
+  check('the Overlap Std Hrs cell gets its own class, beside fraud-std-cell',
+        /class="fraud-std-cell fraud-overlap-cell"/.test(PAGE));
+  check('Total Std Hrs keeps the plain class - it is not the one turning red',
+        /'<td data-label="Total Std Hrs" class="fraud-std-cell"'/.test(PAGE));
   check('coloured from the bad/error token, not a literal',
-        /\.fraud-table td\.fraud-total-cell \{ color: var\(--color-bad\); \}/.test(CSS),
+        /\.fraud-table td\.fraud-overlap-cell \{ color: var\(--color-bad\); \}/.test(CSS),
         'a literal hex here would not follow the theme switch the rest of the page does');
-  // A bare ".fraud-total-cell" here PASSES this same check while doing
+  // A bare ".fraud-overlap-cell" here PASSES this same check while doing
   // nothing on screen: ".record-table td { color: var(--text) }" is one
   // class plus one type - specificity (0,0,1,1) - which OUTRANKS a single
   // bare class (0,0,1,0) regardless of which rule comes later in the file.
-  // Confirmed live in a browser before this was caught: the cell rendered in
-  // the ordinary text colour, not red. Specificity, not presence, is what a
-  // regex for "the rule exists" cannot see - so count it.
+  // Confirmed live in a browser before this was caught the first time round
+  // (against fraud-total-cell): the cell rendered in the ordinary text
+  // colour, not red. Specificity, not presence, is what a regex for "the
+  // rule exists" cannot see - so count it.
   const specificity = sel => {
     const classes = (sel.match(/\.[\w-]+/g) || []).length;
     const types = (sel.match(/(^|[\s>+~])[a-z][\w-]*/gi) || []).length;
     return { classes: classes, types: types };
   };
-  const fraudSel = specificity('.fraud-table td.fraud-total-cell');
+  const fraudSel = specificity('.fraud-table td.fraud-overlap-cell');
   const rivalSel = specificity('.record-table td');
   check('and it actually OUTRANKS the table\'s own base text colour rule',
         fraudSel.classes > rivalSel.classes ||

@@ -596,14 +596,14 @@
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
       html += '<td data-label="Work Areas" class="fraud-areas-cell">' +
               fraudAreasCellPak_(r.areas, r.areaStd) + '</td>';
-      // fraud-total-cell, not fraud-std-cell: it is styled to stand out in
-      // red (see the CSS) because it is the figure a reader compares
-      // "Overlap Std Hrs" against to judge how much of the day this one
-      // claim actually accounts for.
-      html += '<td data-label="Total Std Hrs" class="fraud-std-cell fraud-total-cell"' +
+      html += '<td data-label="Total Std Hrs" class="fraud-std-cell"' +
               ' title="Standard hours this bonus number produced across the whole day">' +
               r.totalStd.toFixed(2) + '</td>';
-      html += '<td data-label="Overlap Std Hrs" class="fraud-std-cell"' +
+      // fraud-overlap-cell, not fraud-std-cell: styled to stand out in red
+      // (see the CSS) because THIS is the figure that is actually the
+      // evidence - standard hours produced during time the claim says was
+      // not worked. Total Std Hrs is only context for it.
+      html += '<td data-label="Overlap Std Hrs" class="fraud-std-cell fraud-overlap-cell"' +
               ' title="Standard hours produced inside the overlapping time only">' +
               r.overlapStd.toFixed(2) + '</td>';
       html += '<td data-label="Overlap Time" class="time-cell"' +
