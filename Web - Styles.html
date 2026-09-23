@@ -1213,7 +1213,13 @@ select.hc-control.fa-caret-select {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  /* No margin-bottom: the banner sits OUTSIDE .page, so its own 20px top
+     padding already gives every page - filtered or not - the same breathing
+     room above its first element. Adding a margin here stacked on top of
+     that and left a bare white seam between the banner and whatever the page
+     puts first - visible as its own gap on pages like Claims/OS/NPL, whose
+     own header sits on a tinted panel that started right where the banner's
+     colour stopped, with a strip of nothing in between. */
   padding: 8px 14px;
   border-radius: 10px;
   background: var(--accent-14);
@@ -3506,6 +3512,19 @@ body.page-scrolled-far .back-to-top {
 
 .record-table tr:last-child td { border-bottom: none; }
 
+/* A row holding a bonus the reader has filtered to - the Claims, OS and NPL
+   record tables all share this, so it lives beside the table's own base
+   rules rather than in any one page's block.
+   Applied to each td, not the tr - box-shadow on a <tr> renders
+   inconsistently across browsers, since a table row is not always painted as
+   one box, while a <td> always is. Same accent language as .bonus-hit-row on
+   the OS/NPL breakdown tree: the filter is not a verdict, so it borrows the
+   selection colour rather than a status one. */
+.record-table tbody tr.record-row-selected td { background: var(--accent-8); }
+.record-table tbody tr.record-row-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .time-cell {
   font-family: 'Roboto Mono', ui-monospace, monospace;
   white-space: nowrap;
@@ -4032,16 +4051,6 @@ body.page-scrolled-far .back-to-top {
    beats a bare single class - ".fraud-table td" makes this two classes and a
    type (0,0,2,1) so it actually wins. */
 .fraud-table td.fraud-overlap-cell { color: var(--color-bad); }
-
-/* A row holding a bonus the reader has filtered to. Applied to each td, not
-   the tr - box-shadow on a <tr> renders inconsistently across browsers, since
-   a table row is not always painted as one box, while a <td> always is. Same
-   accent language as .bonus-hit-row on the OS/NPL pages: the filter is not a
-   verdict, so it borrows the selection colour rather than a status one. */
-.fraud-table tbody tr.fraud-row-selected td { background: var(--accent-8); }
-.fraud-table tbody tr.fraud-row-selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--accent);
-}
 
 @media (min-width: 701px) {
   /* Every column reads as a single short value - a number, a time, a chip -

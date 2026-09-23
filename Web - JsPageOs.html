@@ -816,7 +816,9 @@
       var r = records[i];
       var esc = escapeAttrPak(r.bonus);
       var picked = selectedBonuses.indexOf(r.bonus) !== -1;
-      html += '<tr>';
+      // The whole row, not just the chip - see .record-row-selected, shared
+      // with the Claims and NPL record tables.
+      html += '<tr' + (picked ? ' class="record-row-selected"' : '') + '>';
       html += '<td data-label="Bonus"><span class="bonus-chip bonus-tip-host clickable-bonus' +
               (picked ? ' selected' : '') + '"' +
               ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
@@ -963,7 +965,7 @@
     var badge = document.getElementById('osRangeBadge');
     if (badge) {
       badge.textContent = win
-        ? (Math.round((win.finish - win.start) / 60000) + ' min')
+        ? hoursLabelPak_(Math.round((win.finish - win.start) / 60000))
         : '-';
     }
 

@@ -653,19 +653,26 @@ head('[12] every column centers except Bonus and Work Areas');
 }
 
 head('[13] the whole row goes blue when its bonus is filtered, not just the chip');
+// .record-row-selected, not a Claims-only class: the OS and NPL record
+// tables share this same rule and this same test shape - see test_ospage.js
+// and test_nplpage.js.
 {
   check('the <tr> itself carries the class, driven by the same "picked" the chip already used',
-        /var picked = selectedBonuses\.indexOf\(r\.bonus\) !== -1;\s*\n[\s\S]{0,260}<tr' \+ \(picked \? ' class="fraud-row-selected"' : ''\) \+ '>'/
+        /var picked = selectedBonuses\.indexOf\(r\.bonus\) !== -1;\s*\n[\s\S]{0,260}<tr' \+ \(picked \? ' class="record-row-selected"' : ''\) \+ '>'/
           .test(PAGE));
   check('an unpicked row gets no class at all, not an empty one',
-        /\(picked \? ' class="fraud-row-selected"' : ''\)/.test(PAGE));
+        /\(picked \? ' class="record-row-selected"' : ''\)/.test(PAGE));
   const CSS = R('Web - Styles.html');
-  check('styled with the SAME accent language as the OS/NPL pages\' filtered-row highlight',
-        /\.fraud-table tbody tr\.fraud-row-selected td \{ background: var\(--accent-8\); \}/.test(CSS) &&
+  check('styled with the SAME accent language as the OS/NPL breakdown tree\'s filtered-row highlight',
+        /\.record-table tbody tr\.record-row-selected td \{ background: var\(--accent-8\); \}/.test(CSS) &&
         /\.breakdown-row\.bonus-hit-row \{[\s\S]{0,80}background: var\(--accent-8\);/.test(CSS),
         'one visual language for "this row is what the filter found", not two');
+  check('scoped to .record-table generically, not to .fraud-table',
+        /\.record-table tbody tr\.record-row-selected/.test(CSS) &&
+        !/\.fraud-table tbody tr\.record-row-selected/.test(CSS),
+        'the OS and NPL record tables need the same rule without their own copy of it');
   check('applied per-cell rather than to the <tr>, since box-shadow on a <tr> is unreliable',
-        /tr\.fraud-row-selected td:first-child \{\s*\n\s*box-shadow: inset 3px 0 0 var\(--accent\);/.test(CSS));
+        /tr\.record-row-selected td:first-child \{\s*\n\s*box-shadow: inset 3px 0 0 var\(--accent\);/.test(CSS));
 
   // Run the render loop for real and read the class off the actual markup.
   ctx.fraudLogState = 'ready';
@@ -681,9 +688,9 @@ head('[13] the whole row goes blue when its bonus is filtered, not just the chip
   // are the second and third pieces, not the first.
   const rows = html.split('<tr').slice(2);
   check('the row for the filtered bonus carries the class',
-        /^ class="fraud-row-selected"/.test(rows[0]), rows[0].slice(0, 40));
+        /^ class="record-row-selected"/.test(rows[0]), rows[0].slice(0, 40));
   check('the row for a different bonus does not',
-        !/fraud-row-selected/.test(rows[1]), rows[1].slice(0, 40));
+        !/record-row-selected/.test(rows[1]), rows[1].slice(0, 40));
   ctx.selectedBonuses = [];
 }
 

@@ -1645,11 +1645,7 @@
 
     var blockCount = toIdx - fromIdx + 1;
     var minutes = blockCount * 15;
-    var hours = minutes / 60;
-    var hoursLabel = hours >= 1
-      ? (Number.isInteger(hours) ? hours + ' hr' + (hours !== 1 ? 's' : '') : hours.toFixed(1) + ' hrs')
-      : minutes + ' min';
-    if (badge) badge.textContent = blockCount + ' block' + (blockCount !== 1 ? 's' : '') + ' · ' + hoursLabel;
+    if (badge) badge.textContent = blockCount + ' block' + (blockCount !== 1 ? 's' : '') + ' · ' + hoursLabelPak_(minutes);
 
     renderBreakdownBody();
   }

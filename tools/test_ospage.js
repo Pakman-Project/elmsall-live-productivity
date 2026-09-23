@@ -307,6 +307,24 @@ head('[7] the record row shows the six things it was asked for');
     .forEach(c => check('.' + c + ' is styled', css.indexOf('.' + c + ' {') !== -1));
 }
 
+head('[7b] the whole row goes blue when its bonus is filtered, not just the chip');
+// .record-row-selected, shared with the Claims and NPL record tables - see
+// test_fraudpage.js's [13], which this mirrors.
+{
+  check('the <tr> carries the class, driven by the same "picked" the chip uses',
+        /var picked = selectedBonuses\.indexOf\(r\.bonus\) !== -1;\s*\n[\s\S]{0,260}<tr' \+ \(picked \? ' class="record-row-selected"' : ''\) \+ '>'/
+          .test(PAGE));
+
+  ctx.selectedBonuses = ['AAA'];
+  const html = ctx.osJobTableHtmlPak_([rec({ bonus: 'AAA' }), rec({ bonus: 'BBB' })]);
+  const rows = html.split('<tr').slice(2);   // [0] is <thead><tr>
+  check('the row for the filtered bonus carries the class',
+        /^ class="record-row-selected"/.test(rows[0]), rows[0].slice(0, 40));
+  check('the row for a different bonus does not',
+        !/record-row-selected/.test(rows[1]), rows[1].slice(0, 40));
+  ctx.selectedBonuses = [];
+}
+
 head('[8] a spell is included when it OVERLAPS the range');
 // Requiring it to fit inside would hide exactly the people currently on OS: a
 // shift that started before the window and is still running.

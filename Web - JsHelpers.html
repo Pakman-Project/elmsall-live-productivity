@@ -1144,6 +1144,23 @@ function hexToRgbaPak(hex, a) {
     a + ')';
 }
 
+// Minutes -> "N min" under an hour, "N hr"/"N hrs" for a whole number of
+// them, "N.NN hrs" otherwise - the one rule for every "how much time is this
+// range" badge on the dashboard.
+//
+// It was three separate answers: the Bonus page's own range badge and the
+// Head Deployed breakdown modal each restated the same whole-hour/fractional
+// split (and disagreed on decimal places - one decimal against the two asked
+// for here), while the OS and NPL pages never converted to hours at all and
+// showed raw minutes even for a full day - "1440 min" where every other page
+// on the dashboard would say "24 hrs".
+function hoursLabelPak_(minutes) {
+  var hours = minutes / 60;
+  if (hours < 1) return minutes + ' min';
+  if (Number.isInteger(hours)) return hours + ' hr' + (hours !== 1 ? 's' : '');
+  return hours.toFixed(2) + ' hrs';
+}
+
 function addMinutesToLabel(label, mins) {
   var match = label.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!match) return label;

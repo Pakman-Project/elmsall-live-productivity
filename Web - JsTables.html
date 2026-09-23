@@ -821,11 +821,7 @@ function renderSideTablesPak(rowsLimit) {
   if (badge) {
     var blockCount = selectedSlice.length;
     var minutes = blockCount * 15;
-    var hours = minutes / 60;
-    var hoursLabel = hours >= 1
-      ? (Number.isInteger(hours) ? hours + ' hr' + (hours !== 1 ? 's' : '') : hours.toFixed(1) + ' hrs')
-      : minutes + ' min';
-    badge.textContent = blockCount + ' block' + (blockCount !== 1 ? 's' : '') + ' · ' + hoursLabel;
+    badge.textContent = blockCount + ' block' + (blockCount !== 1 ? 's' : '') + ' · ' + hoursLabelPak_(minutes);
   }
 
   var windowData = rawSideData.filter(function (r) { return selectedSet[r.timeRange]; });

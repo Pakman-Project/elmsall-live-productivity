@@ -315,6 +315,25 @@ head('[8] the record table');
                                    PAGE.indexOf('function nplBadRowsHtmlPak_'))));
 }
 
+head('[8b] the whole row goes blue when its bonus is filtered, not just the chip');
+// .record-row-selected, shared with the Claims and OS record tables - see
+// test_fraudpage.js's [13], which this mirrors.
+{
+  check('the <tr> carries the class, driven by the same "picked" the chip uses',
+        /var picked = selectedBonuses\.indexOf\(r\.bonus\) !== -1;\s*\n[\s\S]{0,260}<tr' \+ \(picked \? ' class="record-row-selected"' : ''\) \+ '>'/
+          .test(PAGE));
+
+  ctx.tmDirectory = ctx.tmDirectory || {};   // bonusTipHtmlPak_ reads this
+  ctx.selectedBonuses = ['AAA'];
+  const html = ctx.nplTaskTableHtmlPak_([rec({ bonus: 'AAA' }), rec({ bonus: 'BBB' })]);
+  const rows = html.split('<tr').slice(2);   // [0] is <thead><tr>
+  check('the row for the filtered bonus carries the class',
+        /^ class="record-row-selected"/.test(rows[0]), rows[0].slice(0, 40));
+  check('the row for a different bonus does not',
+        !/record-row-selected/.test(rows[1]), rows[1].slice(0, 40));
+  ctx.selectedBonuses = [];
+}
+
 head('[9] the records that reach no figure are named, not counted');
 // An NPL record with an impossible date or a nineteen-hour shift is a real
 // form somebody filled in wrongly. "7 records could not be read" with no way
