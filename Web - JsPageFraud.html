@@ -205,9 +205,18 @@
       var overlapFrom = null, overlapTo = null;
       for (var b = 0; b < blocks.length; b++) {
         var hit = idx[String(row.bonus).toUpperCase() + '||' + blocks[b]];
-        if (!hit) continue;
+        // A block only counts as OVERLAP when it carries real production. A
+        // row can exist in idx with zero std hours - this bonus was flagged
+        // OS or NPL for that block but produced nothing in it, which the
+        // payload now admits so the chart's band draws unbroken (see
+        // buildSideEntry_/the payload-admission fix). Treating that as a hit
+        // here would widen Overlap Time to every block the claim itself
+        // touches, which is exactly the claim's own span, not evidence
+        // against it.
+        var hitStd = hit ? (Number(hit.value) || 0) : 0;
+        if (!hit || hitStd <= 0) continue;
         covered++;
-        overlapStd += Number(hit.value) || 0;
+        overlapStd += hitStd;
         fraudAreasOfRowPak_(hit, areas);
         if (overlapFrom === null) overlapFrom = new Date(blocks[b]);
         overlapTo = new Date(blocks[b] + ms);
@@ -557,7 +566,14 @@
     for (var c = 0; c < FRAUD_COLUMNS_.length; c++) {
       var col = FRAUD_COLUMNS_[c];
       var on = (fraudSort.key === col.key);
-      html += '<th class="fraud-th' + (on ? ' active-sort ' + fraudSort.dir : '') + '"' +
+      // Bonus and Work Areas stay left-aligned - one names a person, the
+      // other a list of names, and centering either just makes it harder to
+      // start reading at the edge of the column. Every other column here is
+      // a single short value (a number, a time, a chip), which centering
+      // reads as a table, not text.
+      var leftAlign = (col.key === 'bonus' || col.key === 'areas');
+      html += '<th class="fraud-th' + (leftAlign ? ' fraud-th-left' : '') +
+              (on ? ' active-sort ' + fraudSort.dir : '') + '"' +
               ' onclick="fraudSortByPak_(\'' + escapeAttrPak(col.key) + '\')"' +
               ' title="Sort by ' + escapeAttrPak(col.label) + '">' +
               escapeTextPak_(col.label) + '</th>';
@@ -567,8 +583,12 @@
       var r = rows[i];
       var esc = escapeAttrPak(r.bonus);
       var picked = selectedBonuses.indexOf(r.bonus) !== -1;
-      html += '<tr>';
-      html += '<td data-label="Bonus"><span class="bonus-chip bonus-tip-host clickable-bonus' +
+      // The whole row, not just the chip: a filtered bonus should be
+      // findable at a glance down the table, not only once the reader's eye
+      // has already reached the first column.
+      html += '<tr' + (picked ? ' class="fraud-row-selected"' : '') + '>';
+      html += '<td data-label="Bonus" class="fraud-bonus-cell">' +
+              '<span class="bonus-chip bonus-tip-host clickable-bonus' +
               (picked ? ' selected' : '') + '"' +
               ' onclick="event.stopPropagation();toggleBonusFilter(\'' + esc + '\');">' +
               escapeTextPak_(r.bonus) +
@@ -576,7 +596,11 @@
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
       html += '<td data-label="Work Areas" class="fraud-areas-cell">' +
               fraudAreasCellPak_(r.areas, r.areaStd) + '</td>';
-      html += '<td data-label="Total Std Hrs" class="fraud-std-cell"' +
+      // fraud-total-cell, not fraud-std-cell: it is styled to stand out in
+      // red (see the CSS) because it is the figure a reader compares
+      // "Overlap Std Hrs" against to judge how much of the day this one
+      // claim actually accounts for.
+      html += '<td data-label="Total Std Hrs" class="fraud-std-cell fraud-total-cell"' +
               ' title="Standard hours this bonus number produced across the whole day">' +
               r.totalStd.toFixed(2) + '</td>';
       html += '<td data-label="Overlap Std Hrs" class="fraud-std-cell"' +

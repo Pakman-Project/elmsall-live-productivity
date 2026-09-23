@@ -4024,6 +4024,43 @@ body.page-scrolled-far .back-to-top {
   white-space: nowrap;
 }
 
+/* Total Std Hrs, in red: it is the figure the reader compares Overlap Std
+   Hrs against, and a claim only means something once you can tell "worked a
+   lot" from "worked almost only during this claim" - red for the same reason
+   a warning is red, not because anything here is itself an accusation.
+   ".record-table td { color: var(--text) }" is class+type (0,0,1,1), which
+   beats a bare single class - ".fraud-table td" makes this two classes and a
+   type (0,0,2,1) so it actually wins. */
+.fraud-table td.fraud-total-cell { color: var(--color-bad); }
+
+/* A row holding a bonus the reader has filtered to. Applied to each td, not
+   the tr - box-shadow on a <tr> renders inconsistently across browsers, since
+   a table row is not always painted as one box, while a <td> always is. Same
+   accent language as .bonus-hit-row on the OS/NPL pages: the filter is not a
+   verdict, so it borrows the selection colour rather than a status one. */
+.fraud-table tbody tr.fraud-row-selected td { background: var(--accent-8); }
+.fraud-table tbody tr.fraud-row-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+@media (min-width: 701px) {
+  /* Every column reads as a single short value - a number, a time, a chip -
+     except Bonus (a name) and Work Areas (a list of names), which stay
+     left-aligned so the reader has a fixed edge to start reading from.
+     Desktop only: on a phone each <td> is already a label/value row with its
+     own right-alignment (see the @media (max-width:700px) block above), and
+     this must not fight that. */
+  .fraud-table td,
+  .fraud-table th {
+    text-align: center;
+  }
+  .fraud-table td.fraud-bonus-cell,
+  .fraud-table td.fraud-areas-cell,
+  .fraud-table th.fraud-th-left {
+    text-align: left;
+  }
+}
+
 /* A string of work-area names, and the one cell here that can run long. It
    wraps rather than being clipped: which areas they were in is the whole
    evidence, and half of it is no use. */

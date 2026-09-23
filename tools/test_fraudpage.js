@@ -126,7 +126,11 @@ head('[3] any produced hours at all flags the claim');
         /if \(overlapStd <= 0\) return;/.test(PAGE),
         'the threshold is about whether a block counts as WORKED; this is not that question');
   check('the hours are summed over the covered blocks',
-        /overlapStd \+= Number\(hit\.value\) \|\| 0;/.test(PAGE));
+        /var hitStd = hit \? \(Number\(hit\.value\) \|\| 0\) : 0;/.test(PAGE) &&
+        /overlapStd \+= hitStd;/.test(PAGE));
+  check('but only a block with REAL production counts as a hit',
+        /if \(!hit \|\| hitStd <= 0\) continue;/.test(PAGE),
+        'a zero-hours flagged row (OS/NPL with no production) is not evidence - it is the claim\'s own span');
   check('a claim that cannot be placed on a clock is not judged',
         /var w = osSpellWindowPak_\(row\);\s*\n\s*if \(!w\) return;/.test(PAGE),
         'it has no blocks to check, and guessing at one would be an accusation from nothing');
@@ -199,6 +203,57 @@ head('[3c] Total Std Hrs is the whole day, independent of any one claim');
         /totals\[String\(row\.bonus\)\.toUpperCase\(\)\] \|\| 0/.test(PAGE));
 }
 
+head('[3d] Overlap Time is where THIS bonus produced, not every block the claim touches');
+// The reported bug: a continuous NPL claim (18:00-00:00) drew Overlap Time as
+// nearly the whole claim, even though the bonus number only produced in a
+// handful of scattered blocks. Cause: the payload now admits a zero-hours row
+// for a bonus flagged OS/NPL in a block it did NOT produce in (so the chart's
+// band draws unbroken - see buildSideEntry_) - and fraudStdIndexPak_ indexes
+// every row in allSideData, so that zero-hours row was as much a "hit" as a
+// real one. Run the real scan, not just the regex, since this is exactly the
+// kind of thing a source-text check cannot see.
+{
+  ctx.allSideData = [
+    // A SYNTHESIZED zero-hours row at the claim's OWN first block: DYB is
+    // flagged NPL here (so the chart's band stays unbroken) but produced
+    // NOTHING. overlapFrom is set on the FIRST hit found while walking the
+    // claim's blocks in order - so a spurious hit here, and only here, is
+    // what pulls the start of Overlap Time back to match the claim's own
+    // start rather than where production actually began.
+    { bonus: 'DYB', timeRange: '18/09/2026 18:00 - x', value: 0, npl: true },
+    // Real production, well inside the claim.
+    { bonus: 'DYB', timeRange: '18/09/2026 19:00 - x', value: 0.3, npl: false },
+    { bonus: 'DYB', timeRange: '18/09/2026 22:00 - x', value: 0.25, npl: false },
+    // The same synthesized-zero shape at the claim's OWN last block -
+    // overlapTo is set on the LAST hit, so this is what pulls the end
+    // forward to the claim's own finish.
+    { bonus: 'DYB', timeRange: '18/09/2026 23:45 - x', value: 0, npl: true }
+  ];
+  ctx.fraudOsRows = [];
+  ctx.fraudNplRows = [{
+    bonus: 'DYB', date: '18/09/2026', from: '18:00', to: '00:00',
+    check: 'OK', tmAuth: 'T Harrer', task: 'Meeting'
+  }];
+  ctx.fraudBonusFilter = {}; ctx.fraudAreaFilter = {}; ctx.fraudKindFilter = {};
+  ctx.fraudAuthFilter = {}; ctx.fraudStatusFilter = {};
+
+  // fraudWindowPak_ reads the date control via fraudSelectedDayPak_, which
+  // this harness has no DOM for - build the same window directly instead.
+  const claimWin = { start: new Date(2026, 8, 18, 6, 0), finish: new Date(2026, 8, 19, 6, 0) };
+  const scan = ctx.fraudScanPak_(claimWin);
+  check('the claim is found', scan.rows.length === 1, scan.rows.length);
+  const row = scan.rows[0];
+  check('overlap std hours is the sum of the REAL production only',
+        Math.abs(row.overlapStd - 0.55) < 1e-9, row.overlapStd);
+  check('overlap starts at the first REAL hit, not the claim\'s own start (18:00)',
+        ctx.fraudTimeTextPak_(row.overlapFrom) === '19:00', ctx.fraudTimeTextPak_(row.overlapFrom));
+  check('and ends at the last REAL hit, not the claim\'s own finish (00:00)',
+        ctx.fraudTimeTextPak_(row.overlapTo) === '22:15', ctx.fraudTimeTextPak_(row.overlapTo));
+  check('the zero-hours flagged blocks at each end are not counted as overlap',
+        row.overlapTo - row.overlapFrom < (row.to - row.from),
+        'a wrongly-counted block at each end stretches this window to the whole claim');
+}
+
 head('[4] work areas come from the one list that names them');
 {
   check('read off VOLUME_TYPES, not a second list of names',
@@ -267,7 +322,7 @@ head('[4b] one row per claim - two records stay two rows');
         (PAGE.match(/out\.push\(\{/g) || []).length === 1,
         'one push site means one row per record, whatever kind it is');
   check('and the renderer emits one <tr> per scanned row',
-        /for \(var i = 0; i < rows\.length; i\+\+\) \{[\s\S]{0,400}html \+= '<tr>';/.test(PAGE),
+        /for \(var i = 0; i < rows\.length; i\+\+\) \{[\s\S]{0,400}html \+= '<tr'/.test(PAGE),
         'a straight walk of the scan output, with no grouping between');
   check('nothing merges or de-duplicates by bonus number',
         !/dedupe|uniqueByBonus|mergeClaims/i.test(PAGE),
@@ -540,6 +595,93 @@ head('[10] the columns sort, by header on a desktop and by dropdown on a phone')
   check('its listeners are bound once, not on every render',
         /addEventListener\('DOMContentLoaded', function \(\) \{[\s\S]{0,600}fraudSortSelect/.test(PAGE),
         'binding inside the renderer would stack a listener per draw');
+}
+
+head('[11] Total Std Hrs reads red, and only that column');
+{
+  const CSS = R('Web - Styles.html');
+  check('the Total Std Hrs cell gets its own class, beside fraud-std-cell',
+        /class="fraud-std-cell fraud-total-cell"/.test(PAGE));
+  check('Overlap Std Hrs keeps the plain class - it is not the one turning red',
+        /'<td data-label="Overlap Std Hrs" class="fraud-std-cell"'/.test(PAGE));
+  check('coloured from the bad/error token, not a literal',
+        /\.fraud-table td\.fraud-total-cell \{ color: var\(--color-bad\); \}/.test(CSS),
+        'a literal hex here would not follow the theme switch the rest of the page does');
+  // A bare ".fraud-total-cell" here PASSES this same check while doing
+  // nothing on screen: ".record-table td { color: var(--text) }" is one
+  // class plus one type - specificity (0,0,1,1) - which OUTRANKS a single
+  // bare class (0,0,1,0) regardless of which rule comes later in the file.
+  // Confirmed live in a browser before this was caught: the cell rendered in
+  // the ordinary text colour, not red. Specificity, not presence, is what a
+  // regex for "the rule exists" cannot see - so count it.
+  const specificity = sel => {
+    const classes = (sel.match(/\.[\w-]+/g) || []).length;
+    const types = (sel.match(/(^|[\s>+~])[a-z][\w-]*/gi) || []).length;
+    return { classes: classes, types: types };
+  };
+  const fraudSel = specificity('.fraud-table td.fraud-total-cell');
+  const rivalSel = specificity('.record-table td');
+  check('and it actually OUTRANKS the table\'s own base text colour rule',
+        fraudSel.classes > rivalSel.classes ||
+        (fraudSel.classes === rivalSel.classes && fraudSel.types >= rivalSel.types),
+        'fraud=' + JSON.stringify(fraudSel) + ' vs record-table td=' + JSON.stringify(rivalSel));
+}
+
+head('[12] every column centers except Bonus and Work Areas');
+{
+  const CSS = R('Web - Styles.html');
+  const centerRuleMatch = /\.fraud-table td,\s*\.fraud-table th \{\s*text-align: center;/.exec(CSS);
+  check('the center-align rule exists', !!centerRuleMatch);
+  const centerRuleAt = centerRuleMatch ? centerRuleMatch.index : -1;
+  check('it sits inside a min-width: 701px block, so it cannot fight the phone card layout',
+        centerRuleAt !== -1 &&
+        CSS.lastIndexOf('@media (min-width: 701px) {', centerRuleAt) !== -1 &&
+        centerRuleAt - CSS.lastIndexOf('@media (min-width: 701px) {', centerRuleAt) < 600,
+        'the nearest desktop-only wrapper ahead of it');
+  const block = CSS.slice(centerRuleAt, centerRuleAt + 500);
+  check('Bonus and Work Areas are the exceptions, by class not position',
+        /\.fraud-table td\.fraud-bonus-cell,\s*\n\s*\.fraud-table td\.fraud-areas-cell,\s*\n\s*\.fraud-table th\.fraud-th-left \{\s*\n\s*text-align: left;/
+          .test(block),
+        'a positional nth-child rule would silently point at the wrong column the day these are reordered');
+  check('the Bonus <td> carries the class the CSS targets',
+        /<td data-label="Bonus" class="fraud-bonus-cell">/.test(PAGE));
+  check('and the header loop marks the same two columns, by key not index',
+        /var leftAlign = \(col\.key === 'bonus' \|\| col\.key === 'areas'\);/.test(PAGE));
+}
+
+head('[13] the whole row goes blue when its bonus is filtered, not just the chip');
+{
+  check('the <tr> itself carries the class, driven by the same "picked" the chip already used',
+        /var picked = selectedBonuses\.indexOf\(r\.bonus\) !== -1;\s*\n[\s\S]{0,260}<tr' \+ \(picked \? ' class="fraud-row-selected"' : ''\) \+ '>'/
+          .test(PAGE));
+  check('an unpicked row gets no class at all, not an empty one',
+        /\(picked \? ' class="fraud-row-selected"' : ''\)/.test(PAGE));
+  const CSS = R('Web - Styles.html');
+  check('styled with the SAME accent language as the OS/NPL pages\' filtered-row highlight',
+        /\.fraud-table tbody tr\.fraud-row-selected td \{ background: var\(--accent-8\); \}/.test(CSS) &&
+        /\.breakdown-row\.bonus-hit-row \{[\s\S]{0,80}background: var\(--accent-8\);/.test(CSS),
+        'one visual language for "this row is what the filter found", not two');
+  check('applied per-cell rather than to the <tr>, since box-shadow on a <tr> is unreliable',
+        /tr\.fraud-row-selected td:first-child \{\s*\n\s*box-shadow: inset 3px 0 0 var\(--accent\);/.test(CSS));
+
+  // Run the render loop for real and read the class off the actual markup.
+  ctx.fraudLogState = 'ready';
+  ctx.tmDirectory = {};   // bonusTipHtmlPak_ reads this; unrelated to the row class
+  const mk2 = over => Object.assign({
+    bonus: 'AAA', areas: [], areaStd: {}, totalStd: 1, overlapStd: 1,
+    overlapFrom: at(10, 0), overlapTo: at(10, 15), kind: 'OS',
+    from: at(10, 0), to: at(10, 15), auth: '', statusHtml: '', statusText: ''
+  }, over);
+  ctx.selectedBonuses = ['AAA'];
+  const html = ctx.fraudTableHtmlPak_([mk2({ bonus: 'AAA' }), mk2({ bonus: 'BBB' })]);
+  // split('<tr') also catches the <thead><tr> heading row - the body rows
+  // are the second and third pieces, not the first.
+  const rows = html.split('<tr').slice(2);
+  check('the row for the filtered bonus carries the class',
+        /^ class="fraud-row-selected"/.test(rows[0]), rows[0].slice(0, 40));
+  check('the row for a different bonus does not',
+        !/fraud-row-selected/.test(rows[1]), rows[1].slice(0, 40));
+  ctx.selectedBonuses = [];
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
