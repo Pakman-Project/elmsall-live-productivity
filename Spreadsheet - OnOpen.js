@@ -9,6 +9,8 @@ function onOpen() {
     .addItem('Correct Data Tab (names + hours)', 'confirmFormatDataTab')
     .addItem('Backfill Pipeline State (past days)', 'confirmBackfillPipelineState')
     .addItem('Import Archive Links', 'refreshArchiveLinks')
+    .addItem('Send Claims Email Now', 'sendClaimsEmail')
+    .addItem('Install 07:00 Claims Email Trigger', 'installClaimsEmailTrigger')
     .addItem('Preview Dashboard (Dev)', 'previewDashboard')
     .addItem('Preview Dashboard (Mobile)', 'previewDashboardMobile')
     .addItem('Preview Dashboard (First-time / Tour)', 'previewDashboardFirstTime')

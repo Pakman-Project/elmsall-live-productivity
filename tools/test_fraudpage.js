@@ -169,7 +169,7 @@ head('[3b] a claim already marked Rejected is left out - it was never paid');
         ctx.fraudIsRejectedPak_({ check: 'Rejected' }, 'NPL') === false);
 }
 
-head('[3c] Total Std Hrs is the whole day, independent of any one claim');
+head('[3c] Total Std Mins Produced is the whole day, independent of any one claim');
 // The figure a reader needs to tell "someone who works a lot, and happened to
 // overlap once" apart from "someone whose whole day is one big overlap".
 {
@@ -293,14 +293,14 @@ head('[4] work areas come from the one list that names them');
   check('a row with no hours map falls back to the plain names',
         ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'], null)
           .indexOf('OSR PiE, RSPS Pick') !== -1);
-  // One area carries the whole overlap, so its figure IS the Overlap Std Hrs
+  // One area carries the whole overlap, so its figure IS the Overlap Std Mins
   // column one cell to the left. The hours exist to split a total between
   // areas; with nothing to split they are the same number printed twice.
   check('one area shows no hours - they would repeat the Overlap column',
         ctx.fraudAreasCellPak_(['Forward TPA'], { 'Forward TPA': 1.53 }) === 'Forward TPA',
         ctx.fraudAreasCellPak_(['Forward TPA'], { 'Forward TPA': 1.53 }));
-  check('but two areas still split it',
-        /0\.10/.test(ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
+  check('but two areas still split it, in minutes',
+        /fraud-area-std[^>]*>6</.test(ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
                                             { 'OSR PiE': 0.1, 'RSPS Pick': 0.4 })));
   check('and with one, the biggest area reads first',
         ctx.fraudAreasCellPak_(['OSR PiE', 'RSPS Pick'],
@@ -378,7 +378,7 @@ head('[7] the table names every part of the case');
   const cols = ctx.FRAUD_COLUMNS_;
   check('the nine columns, in order',
         cols.map(c => c.label).join() ===
-          'Bonus,Work Areas,Total Std Hrs,Overlap Std Hrs,Overlap Time,Claim,Claim Time,TM authorised,Status',
+          'Bonus,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,TM authorised,Status',
         cols.map(c => c.label).join());
   check('nine widths summing to 100',
         cols.length === 9 && cols.reduce((a, c) => a + c.width, 0) === 100,
@@ -386,11 +386,13 @@ head('[7] the table names every part of the case');
   check('every column names the row field it reads, and how it sorts',
         cols.every(c => c.key && c.sort),
         'a heading with no key is a heading that cannot be sorted by');
+  // Up to the next function only: the email's table further down is not a
+  // phone card and has no labels to carry.
+  const TABLE_FN = PAGE.slice(PAGE.indexOf('function fraudTableHtmlPak_'),
+                              PAGE.indexOf('function fraudRenderControlsPak_'));
   check('every cell carries the label its phone card shows',
-        (PAGE.slice(PAGE.indexOf('function fraudTableHtmlPak_'))
-             .match(/<td[^>]*>/g) || []).length ===
-        (PAGE.slice(PAGE.indexOf('function fraudTableHtmlPak_'))
-             .match(/data-label="/g) || []).length);
+        (TABLE_FN.match(/<td[^>]*>/g) || []).length ===
+        (TABLE_FN.match(/data-label="/g) || []).length);
   check('the bonus is clickable, like every other on the dashboard',
         /toggleBonusFilter\(/.test(PAGE) && /bonus-tip-host clickable-bonus/.test(PAGE));
   check('a finish past midnight is marked as such',
@@ -597,15 +599,15 @@ head('[10] the columns sort, by header on a desktop and by dropdown on a phone')
         'binding inside the renderer would stack a listener per draw');
 }
 
-head('[11] Overlap Std Hrs reads red, and only that column');
-// Overlap Std Hrs is the actual evidence - hours produced during claimed-off
-// time. Total Std Hrs is only the context beside it, so it stays plain.
+head('[11] Overlap Std Mins reads red, and only that column');
+// Overlap Std Mins is the actual evidence - minutes produced during claimed-off
+// time. Total Std Mins Produced is only the context beside it, so it stays plain.
 {
   const CSS = R('Web - Styles.html');
-  check('the Overlap Std Hrs cell gets its own class, beside fraud-std-cell',
+  check('the Overlap Std Mins cell gets its own class, beside fraud-std-cell',
         /class="fraud-std-cell fraud-overlap-cell"/.test(PAGE));
-  check('Total Std Hrs keeps the plain class - it is not the one turning red',
-        /'<td data-label="Total Std Hrs" class="fraud-std-cell"'/.test(PAGE));
+  check('Total Std Mins Produced keeps the plain class - it is not the one turning red',
+        /'<td data-label="Total Std Mins Produced" class="fraud-std-cell"'/.test(PAGE));
   check('coloured from the bad/error token, not a literal',
         /\.fraud-table td\.fraud-overlap-cell \{ color: var\(--color-bad\); \}/.test(CSS),
         'a literal hex here would not follow the theme switch the rest of the page does');
@@ -692,6 +694,26 @@ head('[13] the whole row goes blue when its bonus is filtered, not just the chip
   check('the row for a different bonus does not',
         !/record-row-selected/.test(rows[1]), rows[1].slice(0, 40));
   ctx.selectedBonuses = [];
+}
+
+head('[14] std figures show as whole minutes, "~1" when they round away');
+// Asked for: minutes, not hours, rounded to the nearest whole one - and a
+// real figure that rounds to 0 reads "~1", since a claim is only listed
+// because it has hours above zero.
+{
+  const m = ctx.fraudMinsTextPak_;
+  check('hours become minutes', m(1.5) === '90', m(1.5));
+  check('rounded to the nearest minute', m(0.0625) === '4' && m(0.2583) === '15', m(0.2583));
+  check('half a minute and up rounds to 1', m(0.5 / 60) === '1', m(0.5 / 60));
+  check('under half a minute is "~1", not 0', m(0.4 / 60) === '~1', m(0.4 / 60));
+  check('a real zero stays 0', m(0) === '0', m(0));
+  check('every std figure on the page goes through it',
+        /fraudMinsTextPak_\(r\.totalStd\)/.test(PAGE) &&
+        /fraudMinsTextPak_\(r\.overlapStd\)/.test(PAGE) &&
+        /fraudMinsTextPak_\(areaStd\[label\]\)/.test(PAGE) &&
+        /fraudMinsTextPak_\(sumOverlapStd\)/.test(PAGE) &&
+        !/toFixed/.test(PAGE),
+        'a leftover toFixed is an hours figure in a minutes column');
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

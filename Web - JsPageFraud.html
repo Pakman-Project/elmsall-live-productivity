@@ -56,8 +56,10 @@
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
-  function fraudWindowPak_() {
-    var day = fraudSelectedDayPak_();
+  // `day` is for the 07:00 email (see Spreadsheet - Claims Email.js), which
+  // has no date control to read; the page always leaves it out.
+  function fraudWindowPak_(day) {
+    day = day || fraudSelectedDayPak_();
     var start = new Date(day.getFullYear(), day.getMonth(), day.getDate(),
                          FRAUD_DAY_START_HOUR_, 0);
     return { start: start, finish: new Date(start.getTime() + 86400000) };
@@ -380,9 +382,9 @@
   // that, because a colgroup that does not is a table that drifts.
   var FRAUD_COLUMNS_ = [
     { key: 'bonus',       label: 'Bonus',           width: 8,  sort: 'text' },
-    { key: 'areas',       label: 'Work Areas',      width: 18, sort: 'text' },
-    { key: 'totalStd',    label: 'Total Std Hrs',   width: 9,  sort: 'num'  },
-    { key: 'overlapStd',  label: 'Overlap Std Hrs', width: 10, sort: 'num'  },
+    { key: 'areas',       label: 'Work Areas',      width: 15, sort: 'text' },
+    { key: 'totalStd',    label: 'Total Std Mins Produced', width: 12, sort: 'num'  },
+    { key: 'overlapStd',  label: 'Overlap Std Mins',        width: 10, sort: 'num'  },
     { key: 'overlapFrom', label: 'Overlap Time',    width: 12, sort: 'time' },
     { key: 'kind',        label: 'Claim',           width: 6,  sort: 'text' },
     { key: 'from',        label: 'Claim Time',      width: 12, sort: 'time' },
@@ -511,6 +513,19 @@
     renderFraudPagePak();
   }
 
+  // Standard HOURS in, whole minutes out, for every std figure this page
+  // shows. The rows keep hours underneath - the sort and the sums still work
+  // on the exact figure - and only the text is rounded, so a column of
+  // rounded minutes never sorts differently from what it says.
+  //
+  // "~1" rather than "0" for anything real that rounds away: a claim is only
+  // on this page BECAUSE it has hours above zero, and a 0 in the column would
+  // read as the page contradicting itself.
+  function fraudMinsTextPak_(hrs) {
+    var mins = Math.round((Number(hrs) || 0) * 60);
+    return (mins === 0 && hrs > 0) ? '~1' : String(mins);
+  }
+
   function fraudTimeTextPak_(d) {
     return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
   }
@@ -536,7 +551,7 @@
              ' work area carries them">&ndash;</span>';
     }
     // One area carries the whole overlap by definition, so its figure is the
-    // Overlap Std Hrs column repeated a cell to the left. The hours are here
+    // Overlap Std Mins column repeated a cell to the left. The hours are here
     // to SPLIT a total between areas; with nothing to split they are noise.
     if (areas.length === 1) return escapeTextPak_(areas[0]);
     // Ordered by hours, largest first, so the area that actually explains the
@@ -544,16 +559,18 @@
     // Falls back to the plain names if the hours are not there - an archive
     // read before areaStd existed still has areas.
     if (!areaStd) return escapeTextPak_(areas.join(', '));
-    var ordered = areas.slice().sort(function (a, b) {
+    return fraudAreasByStdPak_(areas, areaStd).map(function (label) {
+      return '<span class="fraud-area">' + escapeTextPak_(label) +
+             '<span class="fraud-area-std" title="Standard minutes this area' +
+             ' carries inside the overlapping time">' +
+             fraudMinsTextPak_(areaStd[label]) + '</span></span>';
+    }).join('');
+  }
+
+  function fraudAreasByStdPak_(areas, areaStd) {
+    return areas.slice().sort(function (a, b) {
       return (Number(areaStd[b]) || 0) - (Number(areaStd[a]) || 0);
     });
-    return ordered.map(function (label) {
-      var std = Number(areaStd[label]) || 0;
-      return '<span class="fraud-area">' + escapeTextPak_(label) +
-             '<span class="fraud-area-std" title="Standard hours this area' +
-             ' carries inside the overlapping time">' + std.toFixed(2) +
-             '</span></span>';
-    }).join('');
   }
 
   function fraudTableHtmlPak_(rows) {
@@ -596,16 +613,16 @@
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
       html += '<td data-label="Work Areas" class="fraud-areas-cell">' +
               fraudAreasCellPak_(r.areas, r.areaStd) + '</td>';
-      html += '<td data-label="Total Std Hrs" class="fraud-std-cell"' +
-              ' title="Standard hours this bonus number produced across the whole day">' +
-              r.totalStd.toFixed(2) + '</td>';
+      html += '<td data-label="Total Std Mins Produced" class="fraud-std-cell"' +
+              ' title="Standard minutes this bonus number produced across the whole day">' +
+              fraudMinsTextPak_(r.totalStd) + '</td>';
       // fraud-overlap-cell, not fraud-std-cell: styled to stand out in red
       // (see the CSS) because THIS is the figure that is actually the
-      // evidence - standard hours produced during time the claim says was
-      // not worked. Total Std Hrs is only context for it.
-      html += '<td data-label="Overlap Std Hrs" class="fraud-std-cell fraud-overlap-cell"' +
-              ' title="Standard hours produced inside the overlapping time only">' +
-              r.overlapStd.toFixed(2) + '</td>';
+      // evidence - standard minutes produced during time the claim says was
+      // not worked. Total Std Mins Produced is only context for it.
+      html += '<td data-label="Overlap Std Mins" class="fraud-std-cell fraud-overlap-cell"' +
+              ' title="Standard minutes produced inside the overlapping time only">' +
+              fraudMinsTextPak_(r.overlapStd) + '</td>';
       html += '<td data-label="Overlap Time" class="time-cell"' +
               ' title="The part of the claim where produced hours were actually found">' +
               escapeTextPak_(fraudRangeTextPak_(r.overlapFrom, r.overlapTo)) + '</td>';
@@ -682,6 +699,37 @@
 
   // ── the page ───────────────────────────────────────────────────────────────
 
+  var FRAUD_NONE_FOUND_ = 'No claim overlaps produced hours in the part of this day ' +
+                          'that has been checked';
+
+  // The summary line's two figures. The OVERLAP figure, not each bonus's
+  // total - the total is what they produced all day and this line is about
+  // the hours actually in question.
+  function fraudTotalsPak_(rows) {
+    var heads = {};
+    var overlapStd = 0;
+    for (var i = 0; i < rows.length; i++) {
+      heads[rows[i].bonus] = true;
+      overlapStd += rows[i].overlapStd;
+    }
+    return { heads: Object.keys(heads).length, overlapStd: overlapStd };
+  }
+
+  // What was actually looked at. Its own function because the 07:00 email says
+  // it too, and has to say it in the same words.
+  function fraudNoteTextPak_(win, scan) {
+    var cov = fraudCoveragePak_(win);
+    var n = scan.claims + ' claim' + (scan.claims === 1 ? '' : 's');
+    if (!cov) {
+      return 'None of this production day is loaded yet, so nothing has been ' +
+             'checked. ' + n + ' fall in the window.';
+    }
+    return n + ' in this production day, checked against produced hours from ' +
+           fraudDateKeyPak_(cov.from) + ' ' + fraudTimeTextPak_(cov.from) +
+           ' to ' + fraudDateKeyPak_(cov.to) + ' ' + fraudTimeTextPak_(cov.to) +
+           '. Both buildings, whatever the Warehouse picker says.';
+  }
+
   function renderFraudPagePak() {
     var body = document.getElementById('fraudBody');
     if (!body) return;
@@ -727,15 +775,8 @@
     // survived the OTHER filters - see the note on the state, above.
     fraudRenderControlsPak_(scan.rows);
     var rows = fraudSortRowsPak_(scan.rows.filter(fraudPassesPak_));
-    var heads = {};
-    // The OVERLAP figure, not each bonus's total - the total is what they
-    // produced all day and this line is about the hours actually in question.
-    var sumOverlapStd = 0;
-    for (var i = 0; i < rows.length; i++) {
-      heads[rows[i].bonus] = true;
-      sumOverlapStd += rows[i].overlapStd;
-    }
-    var headCount = Object.keys(heads).length;
+    var tot = fraudTotalsPak_(rows);
+    var headCount = tot.heads, sumOverlapStd = tot.overlapStd;
 
     var html = '<div class="breakdown-summary">';
     html += '<span class="breakdown-summary-num">' + rows.length + '</span>' +
@@ -745,29 +786,16 @@
             '<span class="breakdown-summary-label">bonus number' +
             (headCount === 1 ? '' : 's') + '</span>';
     html += '<span class="breakdown-summary-sep">&middot;</span>';
-    html += '<span class="breakdown-summary-num">' + sumOverlapStd.toFixed(2) + '</span>' +
-            '<span class="breakdown-summary-label">overlap std hours</span>';
+    html += '<span class="breakdown-summary-num">' + fraudMinsTextPak_(sumOverlapStd) + '</span>' +
+            '<span class="breakdown-summary-label">overlap std mins</span>';
     html += '</div>';
 
     // What was actually looked at. An empty table means one of two completely
     // different things - nothing found, or nothing loaded to look at - and the
     // reader cannot tell them apart without this line.
-    var cov = fraudCoveragePak_(win);
-    html += '<div class="fraud-note">';
-    if (!cov) {
-      html += '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>' +
-              'None of this production day is loaded yet, so nothing has been ' +
-              'checked. ' + scan.claims + ' claim' + (scan.claims === 1 ? '' : 's') +
-              ' fall in the window.';
-    } else {
-      html += '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>' +
-              scan.claims + ' claim' + (scan.claims === 1 ? '' : 's') +
-              ' in this production day, checked against produced hours from ' +
-              fraudDateKeyPak_(cov.from) + ' ' + fraudTimeTextPak_(cov.from) +
-              ' to ' + fraudDateKeyPak_(cov.to) + ' ' + fraudTimeTextPak_(cov.to) +
-              '. Both buildings, whatever the Warehouse picker says.';
-    }
-    html += '</div>';
+    html += '<div class="fraud-note">' +
+            '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>' +
+            escapeTextPak_(fraudNoteTextPak_(win, scan)) + '</div>';
 
     if (rows.length === 0) {
       // Two very different empties, and the reader cannot act on either
@@ -778,13 +806,89 @@
               '" aria-hidden="true"></i>' +
               (filtered
                 ? ('All ' + scan.rows.length + ' of them are filtered out')
-                : ('No claim overlaps produced hours in the part of this day ' +
-                   'that has been checked')) + '</div>';
+                : FRAUD_NONE_FOUND_) + '</div>';
       body.innerHTML = html;
       return;
     }
 
     html += fraudTableHtmlPak_(rows);
     body.innerHTML = html;
+  }
+
+  // ── the 07:00 email ────────────────────────────────────────────────────────
+  // Run on the SERVER, never by the page: Spreadsheet - Claims Email.js loads
+  // this file and the ones it leans on into a function scope of its own and
+  // calls this with one archive's data - so the email is this page's own scan,
+  // not a second copy of it that could drift. It sets the page's state to do
+  // that, which is exactly why nothing here calls it.
+  //
+  // No filters: the email is the whole day. The order is the page's default
+  // sort, worst overlap first, which is the order the scan returns.
+  function fraudEmailReportPak_(dayKey, payload, osRows, nplRows) {
+    var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dayKey);
+    var win = fraudWindowPak_(new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+    allSideData = decodeSideRowsPak_(payload.rawSideData, payload.sideSchema);
+    rawSideData = allSideData;
+    timeRanges = payload.timeRanges || [];
+    fraudOsRows = osRows || [];
+    fraudNplRows = nplRows || [];
+    var scan = fraudScanPak_(win);
+    var cells = scan.rows.map(fraudRowTextsPak_);
+    return {
+      subject: 'Potential Fraudulent Claims - ' + dayKey,
+      header: FRAUD_COLUMNS_.map(function (c) { return c.label; }),
+      rows: cells,
+      html: fraudEmailHtmlPak_(win, scan, cells)
+    };
+  }
+
+  // One row as plain text, in FRAUD_COLUMNS_ order - what the email's table
+  // and the archive's Claims Email tab both show. The same wording as the
+  // page's cells, minus the chips.
+  function fraudRowTextsPak_(r) {
+    var areas = !r.areas.length ? '-'
+      : (r.areas.length === 1 || !r.areaStd) ? r.areas.join(', ')
+      : fraudAreasByStdPak_(r.areas, r.areaStd).map(function (label) {
+          return label + ' ' + fraudMinsTextPak_(r.areaStd[label]);
+        }).join(', ');
+    return [r.bonus, areas, fraudMinsTextPak_(r.totalStd), fraudMinsTextPak_(r.overlapStd),
+            fraudRangeTextPak_(r.overlapFrom, r.overlapTo), r.kind,
+            fraudRangeTextPak_(r.from, r.to), fraudAuthValuePak_(r), r.statusText];
+  }
+
+  // Inline styles and literal colours only: mail clients drop the page's
+  // stylesheet, and none of them read its CSS variables.
+  function fraudEmailHtmlPak_(win, scan, cells) {
+    var tot = fraudTotalsPak_(scan.rows);
+    var td = 'padding:6px 8px;border-bottom:1px solid #e0e0e0;';
+    var h = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#212121">' +
+            '<h2 style="margin:0 0 4px;font-size:18px">Potential Fraudulent Claims</h2>' +
+            '<div style="color:#616161;margin-bottom:12px">' +
+            fraudDateKeyPak_(win.start) + ' 06:00 to ' + fraudDateKeyPak_(win.finish) +
+            ' 06:00</div>' +
+            '<div style="font-size:15px;margin-bottom:6px"><b>' + cells.length +
+            '</b> to check &middot; <b>' + tot.heads + '</b> bonus number' +
+            (tot.heads === 1 ? '' : 's') + ' &middot; <b>' +
+            fraudMinsTextPak_(tot.overlapStd) + '</b> overlap std mins</div>' +
+            '<div style="color:#616161;margin-bottom:12px">' +
+            escapeTextPak_(fraudNoteTextPak_(win, scan)) + '</div>';
+    if (!cells.length) return h + '<p>' + FRAUD_NONE_FOUND_ + '.</p></div>';
+    h += '<table cellspacing="0" style="border-collapse:collapse;font-size:13px"><tr>';
+    for (var c = 0; c < FRAUD_COLUMNS_.length; c++) {
+      h += '<th style="' + td + 'background:#f5f5f5;text-align:' + (c < 2 ? 'left' : 'center') +
+           '">' + escapeTextPak_(FRAUD_COLUMNS_[c].label) + '</th>';
+    }
+    h += '</tr>';
+    for (var i = 0; i < cells.length; i++) {
+      h += '<tr>';
+      for (var j = 0; j < cells[i].length; j++) {
+        // Overlap Std Mins in red, as on the page - it is the evidence.
+        h += '<td style="' + td + 'text-align:' + (j < 2 ? 'left' : 'center') +
+             (FRAUD_COLUMNS_[j].key === 'overlapStd' ? ';color:#d32f2f;font-weight:bold' : '') +
+             '">' + escapeTextPak_(cells[i][j]) + '</td>';
+      }
+      h += '</tr>';
+    }
+    return h + '</table></div>';
   }
 </script>
