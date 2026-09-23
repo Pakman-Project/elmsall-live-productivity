@@ -159,8 +159,16 @@ var CACHE_CHUNK_SIZE_ = 90000;
 // make. Yesterday's slice of a 24h window on this site is ~20,000 rows, and
 // even joined by '|' that is 2.16MB - so the archive cache had never once
 // populated, and every load paid to re-open and re-read yesterday's whole
-// archive file. 3,000,000 is 34 chunks, which putAll handles in one call.
-var CACHE_MAX_TOTAL_ = 3000000;
+// archive file.
+//
+// Raised again to 4,500,000 (50 chunks) for headroom over that 2.16MB, not
+// because a write has been refused at 3,000,000 - watch for
+// "CACHE REFUSED" in the log, which names both numbers, before raising this
+// further. More chunks is not free: cacheGetLarge_ treats ANY one of them
+// going missing as a total miss, so a bigger ceiling makes the cache more
+// capable but also more exposed to a single evicted chunk losing the whole
+// payload.
+var CACHE_MAX_TOTAL_ = 4500000;
 
 // ── Load timing ─────────────────────────────────────────────────────────────
 // There was no instrumentation of any kind in here, which made "the dashboard
