@@ -44,7 +44,8 @@ function world(opts) {
     console,
     Session: { getScriptTimeZone: () => 'Europe/London' },
     Utilities: { formatDate: d => ('0' + d.getDate()).slice(-2) + '/' +
-                                  ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear() },
+                                  ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(),
+                 newBlob: (data, type, name) => ({ data, type, name }) },
     Logger: { log: m => calls.logs.push(m) },
     HtmlService: { createHtmlOutputFromFile: f => ({ getContent: () => R(f + '.html') }) },
     getArchiveLinks: () => [{ name: '22/09/2026', url: 'U22' }, { name: '23/09/2026', url: 'U23' }],
@@ -73,7 +74,8 @@ const BASE = {
   recipients: ['a@x.com', '', ' b@x.com '],
   side: [
     // AAA: 15 minutes inside its OS claim, plus 30 more elsewhere in the day.
-    { d: 22, h: 10, m: 0, bonus: 'AAA', value: 0.25, pieStd: 0.25 },
+    // Two areas, so the email has a list to print without their minutes.
+    { d: 22, h: 10, m: 0, bonus: 'AAA', value: 0.25, pieStd: 0.05, e3PackingStd: 0.2 },
     { d: 22, h: 14, m: 0, bonus: 'AAA', value: 0.5 },
     // BBB: 0.3 of a minute inside its NPL claim, after midnight.
     { d: 23, h: 1, m: 0, bonus: 'BBB', value: 0.005 }
@@ -118,6 +120,23 @@ head('[1] on 24/09 at 07:00 it sends the 22/09 archive\'s Claims page');
         mail.htmlBody.includes('>~1<'));
   check('Overlap Std Mins is red in the email, like on the page',
         /color:#d32f2f;font-weight:bold">15</.test(mail.htmlBody));
+  check('several areas are named without their minutes, biggest first',
+        aaa[1] === 'E3 Packing, OSR PiE', aaa[1]);
+  check('the dashboard is linked, as "Open Elmsall Live Productivity for more information"',
+        mail.htmlBody.includes('Open <a href="https://sites.google.com/next.co.uk/' +
+                               'elmsall-live-productivity/home">Elmsall Live Productivity</a>' +
+                               ' for more information.'));
+  check('the Warehouse-picker sentence is gone', !/Warehouse picker/.test(mail.htmlBody));
+  const csv = mail.attachments && mail.attachments[0];
+  check('a CSV is attached, named without slashes',
+        csv && csv.type === 'text/csv' && csv.name === 'Potential Fraudulent Claims - 22-09-2026.csv',
+        csv && csv.name);
+  const lines = csv ? csv.data.split('\r\n') : [];
+  check('headings then the same rows as the tab', lines.length === 3 &&
+        lines[0] === hdr.v[0].join(',') && lines[2].startsWith('BBB,'), lines.join(' || '));
+  check('a field holding a comma is quoted', lines[1] ===
+        'AAA,"E3 Packing, OSR PiE",45,15,10:00 - 10:15,OS,10:00 - 11:00,J Smith,No verdict',
+        lines[1]);
   check('the client files\' state stayed inside the loader, not on the server\'s globals',
         !('fraudOsRows' in ctx) && !('timeRanges' in ctx) && !('allSideData' in ctx) &&
         !('rawSideData' in ctx),

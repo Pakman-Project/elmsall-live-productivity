@@ -8,8 +8,9 @@
  * On day D this sends the Potential Fraudulent Claims page for the archive
  * dated D-2 - on 24/09 it is "..._Archive_22/09/2026", the production day
  * 22/09 06:00 to 23/09 06:00. Recipients are the live file's
- * 'Claims Email'!A2:A; the same rows are written into that archive's own
- * 'Claims Email' tab from C2 down, headings in C1.
+ * 'Claims Email'!A2:A, with the rows attached as a CSV; the same rows are
+ * written into that archive's own 'Claims Email' tab from C2 down, headings
+ * in C1.
  *
  * The page is not re-implemented here. Its own client files are loaded into a
  * function scope and fraudEmailReportPak_ (Web - JsPageFraud) is called with
@@ -76,9 +77,27 @@ function sendClaimsEmailFor_(now) {
   if (!recipients.length) {
     throw new Error('Claims email: no recipients in ' + CLAIMS_EMAIL_SHEET_ + '!A2:A');
   }
-  MailApp.sendEmail({ to: recipients.join(','), subject: report.subject, htmlBody: report.html });
+  MailApp.sendEmail({
+    to: recipients.join(','), subject: report.subject, htmlBody: report.html,
+    // Dashes, not slashes: a slash in an attachment's name is a folder to
+    // some mail clients.
+    attachments: [Utilities.newBlob(claimsEmailCsv_([report.header].concat(report.rows)),
+                                    'text/csv', report.subject.replace(/\//g, '-') + '.csv')]
+  });
   Logger.log('Claims email: ' + report.rows.length + ' rows for ' + dayKey +
              ' to ' + recipients.length + ' recipient(s)');
+}
+
+// RFC 4180: a field is quoted when it holds a comma, a quote or a line
+// break, and a quote inside one is doubled. Work Areas and TM names both
+// carry commas.
+function claimsEmailCsv_(rows) {
+  return rows.map(function (r) {
+    return r.map(function (v) {
+      v = String(v == null ? '' : v);
+      return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(',');
+  }).join('\r\n');
 }
 
 function claimsEmailRecipients_() {

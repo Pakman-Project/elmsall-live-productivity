@@ -336,8 +336,6 @@ head('[5] the pivot is read whole, not through the Warehouse picker');
   check('allSideData, with rawSideData only as a fallback',
         (PAGE.match(/allSideData\.length\)\s*\n\s*\? allSideData : rawSideData/g) || []).length === 3,
         'in the block index, the TOTAL index, and the coverage line, or they would disagree');
-  check('and the page says so on screen',
-        /Both buildings, whatever the Warehouse picker says\./.test(PAGE));
   check('the index is keyed on bonus and block together',
         /idx\[String\(r\.bonus\)\.toUpperCase\(\) \+ '\|\|' \+ d\.getTime\(\)\] = r;/.test(PAGE));
   check('and looked up the same way it was built',

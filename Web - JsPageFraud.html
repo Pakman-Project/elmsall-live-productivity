@@ -726,8 +726,7 @@
     }
     return n + ' in this production day, checked against produced hours from ' +
            fraudDateKeyPak_(cov.from) + ' ' + fraudTimeTextPak_(cov.from) +
-           ' to ' + fraudDateKeyPak_(cov.to) + ' ' + fraudTimeTextPak_(cov.to) +
-           '. Both buildings, whatever the Warehouse picker says.';
+           ' to ' + fraudDateKeyPak_(cov.to) + ' ' + fraudTimeTextPak_(cov.to) + '.';
   }
 
   function renderFraudPagePak() {
@@ -842,19 +841,19 @@
     };
   }
 
-  // One row as plain text, in FRAUD_COLUMNS_ order - what the email's table
-  // and the archive's Claims Email tab both show. The same wording as the
-  // page's cells, minus the chips.
+  // One row as plain text, in FRAUD_COLUMNS_ order - what the email's table,
+  // its CSV and the archive's Claims Email tab all show. The same wording as
+  // the page's cells, minus the chips - and minus each area's minutes, which
+  // the email was asked to leave out. Still biggest area first.
   function fraudRowTextsPak_(r) {
     var areas = !r.areas.length ? '-'
-      : (r.areas.length === 1 || !r.areaStd) ? r.areas.join(', ')
-      : fraudAreasByStdPak_(r.areas, r.areaStd).map(function (label) {
-          return label + ' ' + fraudMinsTextPak_(r.areaStd[label]);
-        }).join(', ');
+      : (r.areaStd ? fraudAreasByStdPak_(r.areas, r.areaStd) : r.areas).join(', ');
     return [r.bonus, areas, fraudMinsTextPak_(r.totalStd), fraudMinsTextPak_(r.overlapStd),
             fraudRangeTextPak_(r.overlapFrom, r.overlapTo), r.kind,
             fraudRangeTextPak_(r.from, r.to), fraudAuthValuePak_(r), r.statusText];
   }
+
+  var FRAUD_DASHBOARD_URL_ = 'https://sites.google.com/next.co.uk/elmsall-live-productivity/home';
 
   // Inline styles and literal colours only: mail clients drop the page's
   // stylesheet, and none of them read its CSS variables.
@@ -872,7 +871,9 @@
             fraudMinsTextPak_(tot.overlapStd) + '</b> overlap std mins</div>' +
             '<div style="color:#616161;margin-bottom:12px">' +
             escapeTextPak_(fraudNoteTextPak_(win, scan)) + '</div>';
-    if (!cells.length) return h + '<p>' + FRAUD_NONE_FOUND_ + '.</p></div>';
+    var more = '<p style="margin-top:16px">Open <a href="' + FRAUD_DASHBOARD_URL_ +
+               '">Elmsall Live Productivity</a> for more information.</p></div>';
+    if (!cells.length) return h + '<p>' + FRAUD_NONE_FOUND_ + '.</p>' + more;
     h += '<table cellspacing="0" style="border-collapse:collapse;font-size:13px"><tr>';
     for (var c = 0; c < FRAUD_COLUMNS_.length; c++) {
       h += '<th style="' + td + 'background:#f5f5f5;text-align:' + (c < 2 ? 'left' : 'center') +
@@ -889,6 +890,6 @@
       }
       h += '</tr>';
     }
-    return h + '</table></div>';
+    return h + '</table>' + more;
   }
 </script>
