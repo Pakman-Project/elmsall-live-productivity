@@ -90,7 +90,20 @@
 
   var PAYLOAD_CACHE_KEY = 'e3_dashboard_payload_v3_' + VOLUME_TYPES.length;
   var PAYLOAD_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;  // 6h: older than a shift is not worth showing
-  var PAYLOAD_CACHE_MAX_CHARS = 3000000;              // stay well clear of the ~5MB localStorage quota
+  // Raised from 3,000,000, which was declining every write it was ever asked
+  // to make - the payload for this account is 1,809 bonus numbers x 96
+  // blocks, 7,606,307 chars stringified, well past that ceiling, so the
+  // instant-repaint cache had never once populated.
+  //
+  // 3,000,000 was chosen to stay clear of the ~5MB localStorage quota;
+  // 10,000,000 does not - a phone browser or a private window with a tighter
+  // quota can still throw on the write. That is not a regression: the catch
+  // in savePayloadCache_ below already drops the write and logs it, the exact
+  // same "no instant repaint this visit" outcome the old ceiling produced by
+  // declining outright. Watch for "payload cache write failed" in the console
+  // before raising this further - unlike a decline, that is the quota being
+  // hit for real.
+  var PAYLOAD_CACHE_MAX_CHARS = 10000000;
 
   // Only LIVE data is cached. Archive snapshots are picked deliberately and are
   // never the default view on startup, so caching them would only burn quota.
