@@ -105,10 +105,20 @@
   // hit for real.
   var PAYLOAD_CACHE_MAX_CHARS = 10000000;
 
+  // Set once localStorage itself has refused a write this session - not just
+  // PAYLOAD_CACHE_MAX_CHARS declining it, an actual QuotaExceededError. That
+  // means THIS browser's real quota is below what gets sent, which the
+  // payload only grows past over the course of a session, never shrinks back
+  // under - so a second attempt would cost another ~7MB JSON.stringify for
+  // the same guaranteed failure. A session-only flag rather than something
+  // persisted: a fresh load tomorrow, on a browser whose quota has changed or
+  // an account whose payload has, deserves its own first try.
+  var payloadCacheQuotaHit_ = false;
+
   // Only LIVE data is cached. Archive snapshots are picked deliberately and are
   // never the default view on startup, so caching them would only burn quota.
   function savePayloadCache_(data, archiveUrl) {
-    if (archiveUrl) return;
+    if (archiveUrl || payloadCacheQuotaHit_) return;
     try {
       var json = JSON.stringify({ savedAt: Date.now(), payload: data });
       // Logged, not silent. Declining the write costs the instant repaint on
@@ -129,6 +139,7 @@
       // Quota exceeded or storage unavailable — drop the stale copy and move on.
       console.warn('payload cache write failed: ' + e.message);
       try { localStorage.removeItem(PAYLOAD_CACHE_KEY); } catch (e2) {}
+      payloadCacheQuotaHit_ = true;
     }
   }
 
