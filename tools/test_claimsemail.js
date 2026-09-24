@@ -31,7 +31,7 @@ const block = (d, h, m) => {
 };
 
 function world(opts) {
-  const calls = { opened: [], logs: [], mail: [], writes: [], cleared: [] };
+  const calls = { opened: [], logs: [], mail: [], writes: [], cleared: [], dash: [] };
   const claimsTab = {
     getLastRow: () => opts.archiveLastRow || 0,
     getRange: (r, c, nr, nc) => ({
@@ -51,10 +51,14 @@ function world(opts) {
     getArchiveLinks: () => [{ name: '22/09/2026', url: 'U22' }, { name: '23/09/2026', url: 'U23' }],
     getOsLogRows: (keys, url) => { calls.logs.push('os ' + keys + ' ' + url); return { rows: opts.os }; },
     getNplLogRows: (keys, url) => { calls.logs.push('npl ' + keys + ' ' + url); return { rows: opts.npl }; },
+    // An archive holds its own calendar date only. Live is a rolling 24 hours,
+    // so at 07:00 it also reaches back into yesterday - rows the archive has.
     getDashboardData: url => {
+      calls.dash.push(url || 'live');
+      const rows = url ? side.filter(s => s.d === 23) : side.filter(s => s.d === 24 || s.h >= 7);
       const schema = wire.sideSchema_();
       return JSON.parse(JSON.stringify({ timeRanges: [], sideSchema: schema,
-                                         rawSideData: wire.encodeSideRows_(side, schema) }));
+                                         rawSideData: wire.encodeSideRows_(rows, schema) }));
     },
     SpreadsheetApp: {
       openByUrl: u => { calls.opened.push(u); return { getSheetByName: () => claimsTab }; },
@@ -77,8 +81,11 @@ const BASE = {
     // Two areas, so the email has a list to print without their minutes.
     { d: 23, h: 10, m: 0, bonus: 'AAA', value: 0.25, pieStd: 0.05, e3PackingStd: 0.2 },
     { d: 23, h: 14, m: 0, bonus: 'AAA', value: 0.5 },
-    // BBB: 0.3 of a minute inside its NPL claim, after midnight.
+    // BBB: 0.3 of a minute inside its NPL claim, after midnight - so only
+    // the live file has it.
     { d: 24, h: 1, m: 0, bonus: 'BBB', value: 0.005 },
+    // Live data running past the day's 06:00 end.
+    { d: 24, h: 6, m: 30, bonus: 'DDD', value: 0.25 },
     // CCC: real production inside an 11.5-hour-plus claim, which must not
     // reach the email at all - see [1b].
     { d: 23, h: 8, m: 0, bonus: 'CCC', value: 0.25, npl: true }
@@ -111,6 +118,11 @@ head('[1] on 24/09 at 07:00 it sends the 23/09 archive\'s Overlapping Claims pag
         mail.to === 'a@x.com,b@x.com', mail.to);
   check('the window is 23/09 06:00 to 24/09 06:00',
         mail.htmlBody.includes('23/09/2026 06:00 to 24/09/2026 06:00'));
+  check('the 23/09 archive and the live file, which holds 24/09 00:00-06:00',
+        calls.dash.join() === 'U23,live', calls.dash.join());
+  const note = (mail.htmlBody.match(/checked against produced hours[^<]*/) || [''])[0];
+  check('checked against produced hours to 24/09 06:00, not midnight',
+        / to 24\/09\/2026 06:00\.$/.test(note), note);
   check('written into that archive', calls.opened.join() === 'U23', calls.opened.join());
 
   const hdr = calls.writes.find(w => w.r === 1);
@@ -123,7 +135,7 @@ head('[1] on 24/09 at 07:00 it sends the 23/09 archive\'s Overlapping Claims pag
         body && body.c === 3 && body.v.map(r => r[0]).join() === 'AAA,BBB',
         body && JSON.stringify(body.v));
   const aaa = body.v[0], bbb = body.v[1];
-  check('AAA: 45 mins all day, 15 of them overlapping',
+  check('AAA: 45 mins all day, 15 of them overlapping - its rows in both files counted once',
         aaa[2] === '45' && aaa[3] === '15', aaa.join(' | '));
   check('BBB: a fraction of a minute reads "~1"', bbb[3] === '~1', bbb.join(' | '));
   check('a claim starting after midnight still belongs to the day before',

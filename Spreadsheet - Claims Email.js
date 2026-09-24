@@ -9,10 +9,11 @@
  * - on 24/09 it is "..._Archive_23/09/2026", the production day 23/09 06:00
  * to 24/09 06:00. That archive already exists by 07:00: the daily automation
  * archives a date once it is no longer today, which happens at rollover, well
- * before this trigger fires. Recipients are the live file's
- * 'Claims Email'!A2:A, with the rows attached as a CSV; the same rows are
- * written into that archive's own 'Claims Email' tab from C2 down, headings
- * in C1.
+ * before this trigger fires. It holds 23/09 00:00-24:00 only, so the
+ * 24/09 00:00-06:00 end of the day is read from the live file. Recipients
+ * are the live file's 'Claims Email'!A2:A, with the rows attached as a CSV;
+ * the same rows are written into that archive's own 'Claims Email' tab from
+ * C2 down, headings in C1.
  *
  * The page is not re-implemented here. Its own client files are loaded into a
  * function scope and fraudEmailReportPak_ (Web - JsPageFraud) is called with
@@ -60,7 +61,17 @@ function sendClaimsEmailFor_(now) {
   if (os.error) throw new Error('Claims email: OS log - ' + os.error);
   if (npl.error) throw new Error('Claims email: NPL log - ' + npl.error);
 
-  var report = claimsEmailReport_()(dayKey, getDashboardData(url), os.rows, npl.rows);
+  // The day runs to 06:00 on D, but an archive holds its own calendar date
+  // only, so everything after midnight is still in the live file. Its rows
+  // on the archive's date are dropped: live is a rolling 24 hours that
+  // carries some of those too, and a total would count them twice.
+  var payload = getDashboardData(url);
+  var live = getDashboardData();
+  var tr = live.sideSchema.text.indexOf('timeRange');
+  payload.rawSideData = payload.rawSideData.concat(live.rawSideData.filter(function (r) {
+    return String(r[tr]).indexOf(dayKey) !== 0;
+  }));
+  var report = claimsEmailReport_()(dayKey, payload, os.rows, npl.rows);
 
   var archive = SpreadsheetApp.openByUrl(url);
   var sheet = archive.getSheetByName(CLAIMS_EMAIL_SHEET_) ||
