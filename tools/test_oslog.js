@@ -793,43 +793,42 @@ head('[15] the clipped OS times - when the spell really started and stopped');
         '[{"from":0,"to":1,"status":""}]',
         'so nothing about an archived day changes');
 
-  // The STATUS is in the tooltip as well as the times, because the drawn label
-  // under the word OS cannot always be there - a band one block wide is about
-  // eleven pixels on a 24-hour desktop axis. This is the one channel that is
-  // always available.
-  check('the label reads [ OS Approved : 07:26 - 08:06 ]',
-        ctx.osBandTimeLabelPak_('Approved', '07:26', '08:06') ===
-        '[ OS Approved : 07:26 - 08:06 ]',
-        ctx.osBandTimeLabelPak_('Approved', '07:26', '08:06'));
-  check('the form\'s own wording is folded, as everywhere else',
-        ctx.osBandTimeLabelPak_('OK', '07:26', '08:06') ===
-        '[ OS Approved : 07:26 - 08:06 ]' &&
-        ctx.osBandTimeLabelPak_('Cancelled', '07:26', '08:06') ===
-        '[ OS Rejected : 07:26 - 08:06 ]',
-        ctx.osBandTimeLabelPak_('OK', '07:26', '08:06'));
-  // Never empty while there IS a band: an archive from before the OS Time
-  // column has no times, and a spell logged with no verdict has no status, but
-  // confirming what the grey means is the whole reason somebody hovers it.
-  check('no times still says what the grey is',
-        ctx.osBandTimeLabelPak_('Approved', '', '') === '[ OS Approved ]' &&
-        ctx.osBandTimeLabelPak_('Approved', '07:26', '') === '[ OS Approved ]',
-        ctx.osBandTimeLabelPak_('Approved', '', ''));
-  check('and neither times nor a verdict still says OS',
-        ctx.osBandTimeLabelPak_('', '', '') === '[ OS ]' &&
-        ctx.osBandTimeLabelPak_('YES', '', '') === '[ OS ]',
-        ctx.osBandTimeLabelPak_('', '', ''));
+  // The label no longer restates the band's own type and status - the band's
+  // colour already carries that (grey for OS/NPL, the label tint for the
+  // verdict) - so it says the record's Department + Job when one was found
+  // (osBandRecordPak_, tested separately), and falls back to just the times
+  // when it was not.
+  check('a found record reads "Dept Job : 07:26 - 08:06", no brackets',
+        ctx.osBandTimeLabelPak_({ dept: 'E3 Packing', job: 'Site Transfer' }, '07:26', '08:06') ===
+        'E3 Packing Site Transfer : 07:26 - 08:06',
+        ctx.osBandTimeLabelPak_({ dept: 'E3 Packing', job: 'Site Transfer' }, '07:26', '08:06'));
+  check('no record found still says the times',
+        ctx.osBandTimeLabelPak_(null, '07:26', '08:06') === '07:26 - 08:06',
+        ctx.osBandTimeLabelPak_(null, '07:26', '08:06'));
+  // Never empty when there IS a record, even with no times to add - an
+  // archive from before the OS Time column has none.
+  check('a record with no times still says the department/job',
+        ctx.osBandTimeLabelPak_({ dept: 'E3 Packing', job: '' }, '', '') === 'E3 Packing',
+        ctx.osBandTimeLabelPak_({ dept: 'E3 Packing', job: '' }, '', ''));
+  // Neither a record nor times: the colour alone is no longer a claim this
+  // line has to back up, so it adds nothing rather than saying "OS" again.
+  check('neither a record nor times is null, not "[ OS ]"',
+        ctx.osBandTimeLabelPak_(null, '', '') === null);
 
   // Hung off the tooltip rather than drawn as a second floating box: the band
   // is the full height of the plot, so pointing anywhere in the grey already
   // means pointing at the band, and a box of its own would fight the chart's
   // own tooltip for the same few pixels beside the cursor.
   {
+    // No bonus filtered in this suite, so osBandRecordPak_ never finds a
+    // record - the times-only fallback is what's under test here; a found
+    // record is covered in test_nplpivot.js, where the log rows exist.
     const chart = { options: { plugins: { osBand: { bands: band } } } };
     const tip = i => ctx.osBandTooltipPak_([{ chart: chart, dataIndex: i }]);
-    check('hovering a block inside the band shows the spell and the verdict',
-          tip(0).join() === '[ OS Approved : 06:07 - 06:52 ]', JSON.stringify(tip(0)));
+    check('hovering a block inside the band shows the spell',
+          tip(0).join() === '06:07 - 06:52', JSON.stringify(tip(0)));
     check('any block of it, not just the first',
-          tip(3).join() === '[ OS Approved : 06:07 - 06:52 ]', JSON.stringify(tip(3)));
+          tip(3).join() === '06:07 - 06:52', JSON.stringify(tip(3)));
     check('an EMPTY ARRAY outside it, not an empty string',
           Array.isArray(tip(9)) && tip(9).length === 0,
           'a string would draw a blank line into every tooltip on the chart');

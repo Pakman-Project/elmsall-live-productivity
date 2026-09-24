@@ -820,29 +820,27 @@ function osClipAtPak_(timeRange, minsIn) {
 
 // The line the band adds to a chart tooltip.
 //
-// The STATUS is in it as well as the times, because the drawn label under the
-// word OS cannot always be there: a band one block wide is about eleven pixels
-// on a 24-hour desktop axis and no font fits. The tooltip is the one channel
-// that is always available, so it carries everything the band knows.
+// USED to restate the band's own type and status - "[ NPL OK : ... ]" - which
+// the band's colour already carries (grey for OS/NPL, the label tint for the
+// verdict), so hovering said the same thing twice. Says the record's own
+// Department + Job instead, when osBandRecordPak_ can find it: exactly one
+// bonus filtered, its OS/NPL log loaded, and a row for that bonus, day and
+// status. "Packing Site Transfer : 08:15 - 10:00", no brackets.
 //
-// Never empty when there is a band. An archive cut before the OS Time column
-// existed has no times, and a spell logged with no verdict has no status, but
-// "[ OS ]" still confirms what the grey means - which is the whole reason
-// somebody hovers it.
-function osBandTimeLabelPak_(status, from, to) {
-  var band = osStatusBandPak_(status);
-  var head = band ? ('OS ' + band) : 'OS';
-  return (from && to) ? ('[ ' + head + ' : ' + from + ' - ' + to + ' ]')
-                      : ('[ ' + head + ' ]');
+// rec is null whenever it cannot be identified - falls back to just the
+// times, and to nothing at all when there are no times either, since the
+// colour alone is no longer a claim this line has to back up.
+function osBandTimeLabelPak_(rec, from, to) {
+  var head = rec ? [rec.dept, rec.job].filter(Boolean).join(' ') : '';
+  if (!head) return (from && to) ? (from + ' - ' + to) : null;
+  return (from && to) ? (head + ' : ' + from + ' - ' + to) : head;
 }
 
-// The NPL twin. The Check is NOT folded on the way in - it reads as logged,
-// for the reason nplStatusOfPak_ gives - so this passes it through as-is.
-function nplBandTimeLabelPak_(check, from, to) {
-  var c = String(check == null ? '' : check).trim();
-  var head = c ? ('NPL ' + c) : 'NPL';
-  return (from && to) ? ('[ ' + head + ' : ' + from + ' - ' + to + ' ]')
-                      : ('[ ' + head + ' ]');
+// The NPL twin - Task in place of Job, the field NPL's own log carries.
+function nplBandTimeLabelPak_(rec, from, to) {
+  var head = rec ? [rec.dept, rec.task].filter(Boolean).join(' ') : '';
+  if (!head) return (from && to) ? (from + ' - ' + to) : null;
+  return (from && to) ? (head + ' : ' + from + ' - ' + to) : head;
 }
 
 // The tag itself. Returns nothing when they were not on OS, so callers can

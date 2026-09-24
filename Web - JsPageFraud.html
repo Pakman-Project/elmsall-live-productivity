@@ -1,5 +1,5 @@
 <script>
-  // ── The Potential Fraudulent Claims page ───────────────────────────────────
+  // ── The Overlapping Claims page ─────────────────────────────────────────────
   // An OS or NPL claim says "I was not producing between these two times". The
   // pivot says what each bonus number actually produced, block by block. Where
   // those two disagree, somebody has been paid for time they were working.
@@ -27,6 +27,11 @@
 
   var FRAUD_DAY_START_HOUR_ = 6;
   var FRAUD_BLOCK_MINUTES_ = 15;
+  // A claim spanning this long or more is left out entirely, as asked - not
+  // shown on the page, not counted in "N claims", not in the email. 11.5
+  // hours is past a real shift; a claim this long is a typed slip (a finish
+  // date, not a finish time) rather than a case worth somebody looking at.
+  var FRAUD_MAX_CLAIM_MINUTES_ = 690;
 
   // ── the window ─────────────────────────────────────────────────────────────
 
@@ -189,11 +194,15 @@
     var claims = 0;
     var ms = FRAUD_BLOCK_MINUTES_ * 60000;
 
-    function consider(row, kind, auth, extra) {
+    function consider(row, kind, auth, task) {
       var w = osSpellWindowPak_(row);
       if (!w) return;                       // cannot be placed on a clock
       if (w.finish <= win.start || w.start >= win.finish) return;
       if (fraudIsRejectedPak_(row, kind)) return;   // never paid; nothing to flag
+      // Excluded before claims++, like a rejected claim above: it is not one
+      // of the claims this scan is checking, so it should not inflate that
+      // count either.
+      if ((w.finish - w.start) / 60000 >= FRAUD_MAX_CLAIM_MINUTES_) return;
       claims++;
 
       var blocks = fraudFullBlocksPak_(w.start, w.finish);
@@ -253,7 +262,7 @@
         statusText: (kind === 'OS') ? osRecordStatusPak_(row) : nplCheckValuePak_(row),
         blocks: blocks.length,
         covered: covered,
-        extra: extra || ''
+        task: task || ''
       });
     }
 
@@ -382,13 +391,17 @@
   // that, because a colgroup that does not is a table that drifts.
   var FRAUD_COLUMNS_ = [
     { key: 'bonus',       label: 'Bonus',           width: 8,  sort: 'text' },
-    { key: 'areas',       label: 'Work Areas',      width: 15, sort: 'text' },
+    { key: 'areas',       label: 'Work Areas',      width: 10, sort: 'text' },
     { key: 'totalStd',    label: 'Total Std Mins Produced', width: 12, sort: 'num'  },
     { key: 'overlapStd',  label: 'Overlap Std Mins',        width: 10, sort: 'num'  },
     { key: 'overlapFrom', label: 'Overlap Time',    width: 12, sort: 'time' },
     { key: 'kind',        label: 'Claim',           width: 6,  sort: 'text' },
     { key: 'from',        label: 'Claim Time',      width: 12, sort: 'time' },
-    { key: 'auth',        label: 'TM authorised',   width: 15, sort: 'text' },
+    // The OS Job / NPL Task the record itself carries - what consider() used
+    // to pass only as extra, a tooltip on Claim Time. A column now, because
+    // that is worth reading at a glance, not on hover.
+    { key: 'task',        label: 'Task',            width: 10, sort: 'text' },
+    { key: 'auth',        label: 'TM authorised',   width: 10, sort: 'text' },
     { key: 'statusText',  label: 'Status',          width: 10, sort: 'text' }
   ];
 
@@ -547,7 +560,7 @@
       // Standard hours with no area carrying them: the total column on the
       // pivot moved but no single area's did. Worth saying rather than
       // leaving the cell blank, which reads as "not looked at".
-      return '<span class="cell-none" title="Standard hours, but no single' +
+      return '<span class="cell-none" title="Standard minutes, but no single' +
              ' work area carries them">&ndash;</span>';
     }
     // One area carries the whole overlap by definition, so its figure is the
@@ -627,9 +640,10 @@
               ' title="The part of the claim where produced hours were actually found">' +
               escapeTextPak_(fraudRangeTextPak_(r.overlapFrom, r.overlapTo)) + '</td>';
       html += '<td data-label="Claim">' + fraudKindChipPak_(r.kind) + '</td>';
-      html += '<td data-label="Claim Time" class="time-cell"' +
-              (r.extra ? ' title="' + escapeAttrPak(r.extra) + '"' : '') + '>' +
+      html += '<td data-label="Claim Time" class="time-cell">' +
               escapeTextPak_(fraudRangeTextPak_(r.from, r.to)) + '</td>';
+      html += '<td data-label="Task">' +
+              (r.task ? escapeTextPak_(r.task) : '<span class="cell-none">&ndash;</span>') + '</td>';
       html += '<td data-label="TM authorised">' + osPersonCellPak_(r.auth) + '</td>';
       html += '<td data-label="Status">' + r.statusHtml + '</td>';
       html += '</tr>';
@@ -834,7 +848,7 @@
     var scan = fraudScanPak_(win);
     var cells = scan.rows.map(fraudRowTextsPak_);
     return {
-      subject: 'Potential Fraudulent Claims - ' + dayKey,
+      subject: 'Overlapping Claims - ' + dayKey,
       header: FRAUD_COLUMNS_.map(function (c) { return c.label; }),
       rows: cells,
       html: fraudEmailHtmlPak_(win, scan, cells)
@@ -850,7 +864,7 @@
       : (r.areaStd ? fraudAreasByStdPak_(r.areas, r.areaStd) : r.areas).join(', ');
     return [r.bonus, areas, fraudMinsTextPak_(r.totalStd), fraudMinsTextPak_(r.overlapStd),
             fraudRangeTextPak_(r.overlapFrom, r.overlapTo), r.kind,
-            fraudRangeTextPak_(r.from, r.to), fraudAuthValuePak_(r), r.statusText];
+            fraudRangeTextPak_(r.from, r.to), r.task || '-', fraudAuthValuePak_(r), r.statusText];
   }
 
   var FRAUD_DASHBOARD_URL_ = 'https://sites.google.com/next.co.uk/elmsall-live-productivity/home';
@@ -861,14 +875,14 @@
     var tot = fraudTotalsPak_(scan.rows);
     var td = 'padding:6px 8px;border-bottom:1px solid #e0e0e0;';
     var h = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#212121">' +
-            '<h2 style="margin:0 0 4px;font-size:18px">Potential Fraudulent Claims</h2>' +
+            '<h2 style="margin:0 0 4px;font-size:18px">Overlapping Claims</h2>' +
             '<div style="color:#616161;margin-bottom:12px">' +
             fraudDateKeyPak_(win.start) + ' 06:00 to ' + fraudDateKeyPak_(win.finish) +
             ' 06:00</div>' +
             '<div style="font-size:15px;margin-bottom:6px"><b>' + cells.length +
             '</b> to check &middot; <b>' + tot.heads + '</b> bonus number' +
-            (tot.heads === 1 ? '' : 's') + ' &middot; <b>' +
-            fraudMinsTextPak_(tot.overlapStd) + '</b> overlap std mins</div>' +
+            (tot.heads === 1 ? '' : 's') + ' &middot; <b style="color:#d32f2f">' +
+            fraudMinsTextPak_(tot.overlapStd) + ' OVERLAP STD MINS</b></div>' +
             '<div style="color:#616161;margin-bottom:12px">' +
             escapeTextPak_(fraudNoteTextPak_(win, scan)) + '</div>';
     var more = '<p style="margin-top:16px">Open <a href="' + FRAUD_DASHBOARD_URL_ +

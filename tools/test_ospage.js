@@ -909,7 +909,7 @@ head('[10] Claims at 3, OS at 4, NPL at 5, the Data Table at 6');
   const rail = (index.match(/onclick="goToPage\((\d)\)"/g) || []).map(s => s.replace(/\D/g, ''));
   check('seven rail tabs, in order', rail.join() === '0,1,2,3,4,5,6', rail.join());
   check('the Claims tab is the fourth',
-        /goToPage\(3\)" title="Potential Fraudulent Claims"/.test(index));
+        /goToPage\(3\)" title="Overlapping Claims"/.test(index));
   check('the OS tab is the fifth', /goToPage\(4\)" title="Operational Support"/.test(index));
   check('the NPL tab is the sixth', /goToPage\(5\)" title="Non-Productive Labour"/.test(index));
   check('and the Data Table the seventh', /goToPage\(6\)" title="Data Table"/.test(index));
@@ -1591,7 +1591,7 @@ head('[30] the share export knows which page it is on');
         (/PAGE_TITLES_ = \[([\s\S]*?)\];/.exec(sh) || [0, ''])[1]
           .split(',').length === 7);
   check('Claims, OS and NPL are among them',
-        /'Potential Fraudulent Claims', 'Operational Support',\s*\n\s*'Non-Productive Labour'/.test(sh));
+        /'Overlapping Claims', 'Operational Support',\s*\n\s*'Non-Productive Labour'/.test(sh));
   check('and the caption reads that list rather than one of its own',
         /var pageName = PAGE_TITLES_\[currentPage\] \|\| '';/.test(sh));
   // The capture was being cut off mid-card with a band of empty panel below.

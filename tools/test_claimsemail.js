@@ -75,51 +75,66 @@ const BASE = {
   side: [
     // AAA: 15 minutes inside its OS claim, plus 30 more elsewhere in the day.
     // Two areas, so the email has a list to print without their minutes.
-    { d: 22, h: 10, m: 0, bonus: 'AAA', value: 0.25, pieStd: 0.05, e3PackingStd: 0.2 },
-    { d: 22, h: 14, m: 0, bonus: 'AAA', value: 0.5 },
+    { d: 23, h: 10, m: 0, bonus: 'AAA', value: 0.25, pieStd: 0.05, e3PackingStd: 0.2 },
+    { d: 23, h: 14, m: 0, bonus: 'AAA', value: 0.5 },
     // BBB: 0.3 of a minute inside its NPL claim, after midnight.
-    { d: 23, h: 1, m: 0, bonus: 'BBB', value: 0.005 }
+    { d: 24, h: 1, m: 0, bonus: 'BBB', value: 0.005 },
+    // CCC: real production inside an 11.5-hour-plus claim, which must not
+    // reach the email at all - see [1b].
+    { d: 23, h: 8, m: 0, bonus: 'CCC', value: 0.25, npl: true }
   ],
-  os: [{ bonus: 'AAA', date: '22/09/2026', from: '10:00', to: '11:00', status: '',
+  os: [{ bonus: 'AAA', date: '23/09/2026', from: '10:00', to: '11:00', status: '',
          auth: 'J Smith', job: 'Training' }],
-  npl: [{ bonus: 'BBB', date: '22/09/2026', from: '00:30', to: '02:00', check: 'OK',
-          tmAuth: 'K Lee', task: 'Meeting' }]
+  npl: [
+    { bonus: 'BBB', date: '23/09/2026', from: '00:30', to: '02:00', check: 'OK',
+      tmAuth: 'K Lee', task: 'Meeting' },
+    { bonus: 'CCC', date: '23/09/2026', from: '06:00', to: '18:00', check: 'OK',
+      tmAuth: 'L Ng', task: 'Long one' }
+  ]
 };
 
-head('[1] on 24/09 at 07:00 it sends the 22/09 archive\'s Claims page');
+head('[1] on 24/09 at 07:00 it sends the 23/09 archive\'s Overlapping Claims page');
+// Corrected from the original D-2 spec: the archive for D-1 already exists by
+// 07:00 (the daily automation archives a date the moment it is no longer
+// today, well before this trigger fires), and D-1 is the production day
+// someone checking "yesterday's claims" at 07:00 actually means.
 {
   const { ctx, calls } = world(BASE);
   ctx.sendClaimsEmailFor_(new Date(2026, 8, 24, 7, 0));
-  check('both logs asked for 22/09, from the 22/09 archive',
-        calls.logs.includes('os 22/09/2026 U22') && calls.logs.includes('npl 22/09/2026 U22'),
+  check('both logs asked for 23/09, from the 23/09 archive',
+        calls.logs.includes('os 23/09/2026 U23') && calls.logs.includes('npl 23/09/2026 U23'),
         calls.logs.join(' | '));
   check('one email', calls.mail.length === 1);
   const mail = calls.mail[0];
-  check('subject as asked', mail.subject === 'Potential Fraudulent Claims - 22/09/2026', mail.subject);
+  check('subject uses the page\'s new name', mail.subject === 'Overlapping Claims - 23/09/2026', mail.subject);
   check('recipients from A2:A, blanks skipped and trimmed',
         mail.to === 'a@x.com,b@x.com', mail.to);
-  check('the window is 22/09 06:00 to 23/09 06:00',
-        mail.htmlBody.includes('22/09/2026 06:00 to 23/09/2026 06:00'));
-  check('written into that archive', calls.opened.join() === 'U22', calls.opened.join());
+  check('the window is 23/09 06:00 to 24/09 06:00',
+        mail.htmlBody.includes('23/09/2026 06:00 to 24/09/2026 06:00'));
+  check('written into that archive', calls.opened.join() === 'U23', calls.opened.join());
 
   const hdr = calls.writes.find(w => w.r === 1);
   const body = calls.writes.find(w => w.r === 2);
-  check('headings at C1, the page\'s own column labels',
+  check('headings at C1, the page\'s own column labels, Task included',
         hdr && hdr.c === 3 && hdr.v[0].join() ===
-          'Bonus,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,TM authorised,Status',
+          'Bonus,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,Task,TM authorised,Status',
         hdr && hdr.v[0].join());
-  check('rows from C2, worst overlap first', body && body.c === 3 &&
-        body.v.map(r => r[0]).join() === 'AAA,BBB', body && JSON.stringify(body.v));
+  check('rows from C2, worst overlap first, CCC left out (690+ minute claim)',
+        body && body.c === 3 && body.v.map(r => r[0]).join() === 'AAA,BBB',
+        body && JSON.stringify(body.v));
   const aaa = body.v[0], bbb = body.v[1];
   check('AAA: 45 mins all day, 15 of them overlapping',
         aaa[2] === '45' && aaa[3] === '15', aaa.join(' | '));
   check('BBB: a fraction of a minute reads "~1"', bbb[3] === '~1', bbb.join(' | '));
   check('a claim starting after midnight still belongs to the day before',
         bbb[6] === '00:30 - 02:00', bbb[6]);
+  check('the Task column carries the OS Job / NPL Task, between Claim Time and TM authorised',
+        aaa[7] === 'Training' && bbb[7] === 'Meeting', aaa.join(' | ') + ' // ' + bbb.join(' | '));
   check('the email shows the same rows', mail.htmlBody.includes('>AAA<') &&
-        mail.htmlBody.includes('>~1<'));
-  check('Overlap Std Mins is red in the email, like on the page',
-        /color:#d32f2f;font-weight:bold">15</.test(mail.htmlBody));
+        mail.htmlBody.includes('>~1<') && mail.htmlBody.includes('>Training<'));
+  check('CCC is nowhere in the email either', !mail.htmlBody.includes('>CCC<'));
+  check('OVERLAP STD MINS reads red and uppercase in the summary line',
+        /color:#d32f2f">15 OVERLAP STD MINS/.test(mail.htmlBody), mail.htmlBody);
   check('several areas are named without their minutes, biggest first',
         aaa[1] === 'E3 Packing, OSR PiE', aaa[1]);
   check('the dashboard is linked, as "Open Elmsall Live Productivity for more information"',
@@ -129,13 +144,13 @@ head('[1] on 24/09 at 07:00 it sends the 22/09 archive\'s Claims page');
   check('the Warehouse-picker sentence is gone', !/Warehouse picker/.test(mail.htmlBody));
   const csv = mail.attachments && mail.attachments[0];
   check('a CSV is attached, named without slashes',
-        csv && csv.type === 'text/csv' && csv.name === 'Potential Fraudulent Claims - 22-09-2026.csv',
+        csv && csv.type === 'text/csv' && csv.name === 'Overlapping Claims - 23-09-2026.csv',
         csv && csv.name);
   const lines = csv ? csv.data.split('\r\n') : [];
   check('headings then the same rows as the tab', lines.length === 3 &&
         lines[0] === hdr.v[0].join(',') && lines[2].startsWith('BBB,'), lines.join(' || '));
   check('a field holding a comma is quoted', lines[1] ===
-        'AAA,"E3 Packing, OSR PiE",45,15,10:00 - 10:15,OS,10:00 - 11:00,J Smith,No verdict',
+        'AAA,"E3 Packing, OSR PiE",45,15,10:00 - 10:15,OS,10:00 - 11:00,Training,J Smith,No verdict',
         lines[1]);
   check('the client files\' state stayed inside the loader, not on the server\'s globals',
         !('fraudOsRows' in ctx) && !('timeRanges' in ctx) && !('allSideData' in ctx) &&
@@ -148,7 +163,7 @@ head('[2] a re-run clears the old rows before writing');
   const { ctx, calls } = world(Object.assign({}, BASE, { archiveLastRow: 9 }));
   ctx.sendClaimsEmailFor_(new Date(2026, 8, 24, 7, 0));
   check('C2 down cleared, the full width', calls.cleared.length === 1 &&
-        JSON.stringify(calls.cleared[0]) === '{"r":2,"c":3,"nr":8,"nc":9}',
+        JSON.stringify(calls.cleared[0]) === '{"r":2,"c":3,"nr":8,"nc":10}',
         JSON.stringify(calls.cleared));
 }
 
@@ -170,7 +185,7 @@ head('[4] failures are loud, not silent');
     catch (e) { return e.message; }
   };
   check('no archive for the day throws', /no archive for 21\/09\/2026/.test(
-        throws({}, new Date(2026, 8, 23, 7, 0))));
+        throws({}, new Date(2026, 8, 22, 7, 0))));
   check('no recipients throws', /no recipients/.test(throws({ recipients: [''] })));
 }
 

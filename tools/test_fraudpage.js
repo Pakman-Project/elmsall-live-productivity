@@ -1,4 +1,4 @@
-// Potential Fraudulent Claims — where an OS or NPL claim overlaps hours the
+// Overlapping Claims — where an OS or NPL claim overlaps hours the
 // pivot says were actually produced.
 //
 // The dangerous part is the BLOCK RULE, and it is dangerous in both directions.
@@ -318,7 +318,7 @@ head('[4b] one row per claim - two records stay two rows');
 // rather than changed: the emission is already right.
 {
   check('the scan pushes once per surviving claim, inside consider()',
-        /function consider\(row, kind, auth, extra\)/.test(PAGE) &&
+        /function consider\(row, kind, auth, task\)/.test(PAGE) &&
         (PAGE.match(/out\.push\(\{/g) || []).length === 1,
         'one push site means one row per record, whatever kind it is');
   check('and the renderer emits one <tr> per scanned row',
@@ -374,12 +374,12 @@ head('[7] the table names every part of the case');
   // kept in the same order by hand is how a column ends up labelled as its
   // neighbour.
   const cols = ctx.FRAUD_COLUMNS_;
-  check('the nine columns, in order',
+  check('the ten columns, in order',
         cols.map(c => c.label).join() ===
-          'Bonus,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,TM authorised,Status',
+          'Bonus,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,Task,TM authorised,Status',
         cols.map(c => c.label).join());
-  check('nine widths summing to 100',
-        cols.length === 9 && cols.reduce((a, c) => a + c.width, 0) === 100,
+  check('ten widths summing to 100',
+        cols.length === 10 && cols.reduce((a, c) => a + c.width, 0) === 100,
         cols.map(c => c.width).join('+') + '=' + cols.reduce((a, c) => a + c.width, 0));
   check('every column names the row field it reads, and how it sorts',
         cols.every(c => c.key && c.sort),
@@ -424,9 +424,8 @@ head('[7] the table names every part of the case');
   // The page is named for what it is: potential.
   check('the page does not call anybody a fraud',
         !/\bis fraud\b|confirmed|guilty/i.test(PAGE));
-  check('and the on-screen heading says the full name, not a euphemism for it',
-        /<span>Potential Fraudulent Claims<\/span>/.test(INDEX),
-        '"Claims overlapping produced hours" told the reader what the page DOES, not what it is FOR');
+  check('and the on-screen heading matches the page\'s new name',
+        /<span>Overlapping Claims<\/span>/.test(INDEX));
 }
 
 head('[8] fetched for the day, and dropped when the day can change');
@@ -712,6 +711,64 @@ head('[14] std figures show as whole minutes, "~1" when they round away');
         /fraudMinsTextPak_\(sumOverlapStd\)/.test(PAGE) &&
         !/toFixed/.test(PAGE),
         'a leftover toFixed is an hours figure in a minutes column');
+}
+
+head('[15] the OS Job / NPL Task gets its own column, before TM authorised');
+{
+  const cols = ctx.FRAUD_COLUMNS_;
+  const taskIdx = cols.findIndex(c => c.key === 'task');
+  const authIdx = cols.findIndex(c => c.key === 'auth');
+  check('Task sits right before TM authorised', taskIdx >= 0 && taskIdx === authIdx - 1,
+        cols.map(c => c.key).join());
+  check('consider() takes it as its fourth argument, named for what it now is',
+        /function consider\(row, kind, auth, task\)/.test(PAGE));
+  check('an OS row is scanned with its Job as the fourth argument',
+        /consider\(fraudOsRows\[i\], 'OS', fraudOsRows\[i\]\.auth, fraudOsRows\[i\]\.job\)/.test(PAGE));
+  check('an NPL row is scanned with its Task as the fourth argument',
+        /consider\(fraudNplRows\[j\], 'NPL', fraudNplRows\[j\]\.tmAuth, fraudNplRows\[j\]\.task\)/.test(PAGE));
+  check('the cell shows it, or a dash when the record carries none',
+        /<td data-label="Task">' \+\s*\n\s*\(r\.task \? escapeTextPak_\(r\.task\) : '<span class="cell-none">&ndash;<\/span>'\) \+ '<\/td>'/.test(PAGE));
+  check('the email/CSV row carries it too, between Claim Time and TM authorised',
+        /fraudRangeTextPak_\(r\.from, r\.to\), r\.task \|\| '-', fraudAuthValuePak_\(r\)/.test(PAGE));
+}
+
+head('[16] a claim of 690 minutes or more is left out altogether');
+// Asked for: not shown, and not counted - a claim this long is treated as a
+// typed slip, not a case to look at.
+{
+  ctx.allSideData = [
+    // Real production inside BOTH claims, so the only thing that can be
+    // hiding either one is the length guard itself.
+    { bonus: 'LNG', timeRange: '18/09/2026 08:00 - x', value: 0.25, npl: true },
+    { bonus: 'OKY', timeRange: '18/09/2026 08:00 - x', value: 0.25, npl: true }
+  ];
+  ctx.fraudOsRows = [];
+  ctx.fraudNplRows = [
+    // 06:00 to 18:00 = 720 minutes: at the 690 line and over it.
+    { bonus: 'LNG', date: '18/09/2026', from: '06:00', to: '18:00',
+      check: 'OK', tmAuth: 'A', task: 'Long one' },
+    // 06:00 to 17:29 = 689 minutes: one under, so it must survive.
+    { bonus: 'OKY', date: '18/09/2026', from: '06:00', to: '17:29',
+      check: 'OK', tmAuth: 'B', task: 'Just under' }
+  ];
+  ctx.fraudBonusFilter = {}; ctx.fraudAreaFilter = {}; ctx.fraudKindFilter = {};
+  ctx.fraudAuthFilter = {}; ctx.fraudStatusFilter = {};
+  const win = { start: new Date(2026, 8, 18, 6, 0), finish: new Date(2026, 8, 19, 6, 0) };
+  const scan = ctx.fraudScanPak_(win);
+  check('the 720-minute claim is left out', !scan.rows.some(r => r.bonus === 'LNG'),
+        scan.rows.map(r => r.bonus).join());
+  check('the 689-minute claim survives', scan.rows.some(r => r.bonus === 'OKY'),
+        scan.rows.map(r => r.bonus).join());
+  check('and it does not inflate the "N claims" count either', scan.claims === 1, scan.claims);
+  check('exactly 690 minutes is excluded too - "equal or more", not just "more"',
+        (() => {
+          ctx.fraudNplRows = [{ bonus: 'EXA', date: '18/09/2026', from: '06:00', to: '17:30',
+                                check: 'OK', tmAuth: 'C', task: 'Exact' }];
+          ctx.allSideData = [{ bonus: 'EXA', timeRange: '18/09/2026 08:00 - x', value: 0.25, npl: true }];
+          return ctx.fraudScanPak_(win).rows.length === 0;
+        })());
+  check('the guard reads real minutes off the claim\'s own window, not a fixed field',
+        /if \(\(w\.finish - w\.start\) \/ 60000 >= FRAUD_MAX_CLAIM_MINUTES_\) return;/.test(PAGE));
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));

@@ -1,13 +1,15 @@
 /************************************************************
- * CLAIMS EMAIL — 07:00, THE DAY BEFORE YESTERDAY
+ * CLAIMS EMAIL — 07:00, FOR YESTERDAY
  *
  * Entry points:
  *   sendClaimsEmail()             on a daily 07:00 trigger
  *   installClaimsEmailTrigger()   run once to put it there
  *
- * On day D this sends the Potential Fraudulent Claims page for the archive
- * dated D-2 - on 24/09 it is "..._Archive_22/09/2026", the production day
- * 22/09 06:00 to 23/09 06:00. Recipients are the live file's
+ * On day D this sends the Overlapping Claims page for the archive dated D-1
+ * - on 24/09 it is "..._Archive_23/09/2026", the production day 23/09 06:00
+ * to 24/09 06:00. That archive already exists by 07:00: the daily automation
+ * archives a date once it is no longer today, which happens at rollover, well
+ * before this trigger fires. Recipients are the live file's
  * 'Claims Email'!A2:A, with the rows attached as a CSV; the same rows are
  * written into that archive's own 'Claims Email' tab from C2 down, headings
  * in C1.
@@ -19,7 +21,7 @@
  ************************************************************/
 
 var CLAIMS_EMAIL_SHEET_ = 'Claims Email';
-var CLAIMS_EMAIL_DAYS_BACK_ = 2;
+var CLAIMS_EMAIL_DAYS_BACK_ = 1;
 var CLAIMS_EMAIL_HOUR_ = 7;
 
 // In Index.html's order: each leans on the ones before it. Web - JsState is

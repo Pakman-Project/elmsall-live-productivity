@@ -216,6 +216,41 @@
     return null;
   }
 
+  // The OS/NPL log row a band's block belongs to, for its Department + Job/
+  // Task - what the tooltip now says instead of restating the band's own
+  // type and status, which its colour already carries.
+  //
+  // Only when exactly one bonus is filtered: pooled across more than one, a
+  // block's status cannot be credited to a single person's record any more,
+  // and osLogRows/nplLogRows is only ever populated once that page (or
+  // Claims) has been opened this session - null either way falls back to
+  // just the times.
+  //
+  // Matched on bonus + production day + the SAME status the band already
+  // carries, which is specific enough in practice: one bonus rarely logs two
+  // spells of the same verdict on the same day.
+  function osBandRecordPak_(kind, dateTimeStr, status) {
+    if (selectedBonuses.length !== 1 || !dateTimeStr) return null;
+    var d = parseDateTimePartPak(extractRangePartsPak(dateTimeStr).start);
+    if (!d) return null;
+    // The log's Date column is the PRODUCTION day - the same 06:00 fold
+    // osSpellWalkPak_ applies when reading it back the other way.
+    if (d.getHours() < OS_DAY_START_HOUR_PAK_) d = new Date(d.getTime() - 86400000);
+    var dateKey = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) +
+                  '/' + d.getFullYear();
+    var bonus = String(selectedBonuses[0]).toUpperCase();
+    var rows = (kind === 'os') ? osLogRows : nplLogRows;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (String(r.bonus).toUpperCase() !== bonus || r.date !== dateKey) continue;
+      var st = (kind === 'os') ? osStatusBandPak_(r.status)
+                               : String(r.check == null ? '' : r.check).trim();
+      if (st !== status) continue;
+      return { dept: r.dept, job: r.job, task: r.task };
+    }
+    return null;
+  }
+
   // The band's own line in a chart tooltip, hung off afterBody on every chart
   // that carries the plugin. A band is the full height of the plot area, so
   // pointing anywhere in the grey is pointing at the band - no separate hover
@@ -226,7 +261,9 @@
   // a 07:26-08:06 spell fills neither the first of them nor the last.
   //
   // An empty ARRAY rather than an empty string when there is nothing to add -
-  // a string would draw a blank line into every tooltip on the chart.
+  // a string would draw a blank line into every tooltip on the chart. A label
+  // function can itself return null (osBandRecordPak_ found nothing AND
+  // there are no times either), which is filtered out the same way.
   function osBandTooltipPak_(items) {
     if (!items || !items.length) return [];
     var chart = items[0].chart;
@@ -234,15 +271,20 @@
                ? chart.options.plugins.osBand : null;
     if (!opts || ((!opts.bands || !opts.bands.length) &&
                   (!opts.nplBands || !opts.nplBands.length))) return [];
+    var dateTimeStr = opts.blockDates && opts.blockDates[items[0].dataIndex];
     var out = [];
     var band = osBandAtPak_(opts.bands || [], items[0].dataIndex);
-    if (band) out.push(osBandTimeLabelPak_(band.status, band.t0, band.t1));
+    if (band) {
+      var osLabel = osBandTimeLabelPak_(osBandRecordPak_('os', dateTimeStr, band.status), band.t0, band.t1);
+      if (osLabel) out.push(osLabel);
+    }
     // Both, when a block is both. The tooltip is the one channel always wide
     // enough to say so, which is exactly why the drawn labels are allowed to
     // give up on a narrow band.
     var nplBand = osBandAtPak_(opts.nplBands || [], items[0].dataIndex);
     if (nplBand) {
-      out.push(nplBandTimeLabelPak_(nplBand.status, nplBand.t0, nplBand.t1));
+      var nplLabel = nplBandTimeLabelPak_(osBandRecordPak_('npl', dateTimeStr, nplBand.status), nplBand.t0, nplBand.t1);
+      if (nplLabel) out.push(nplLabel);
     }
     return out;
   }
@@ -1121,6 +1163,9 @@
         topUpData = _c.topUpData, yMax = _c.yMax, xOpt = _c.xOpt, tOpt = _c.tOpt,
         wm = _c.wm, hRange = _c.hRange, osBands = _c.osBands,
         nplBands = _c.nplBands;
+    // blockDates rides along so osBandTooltipPak_ can look up which OS/NPL log
+    // row a hovered block belongs to, for its Department/Task - see there.
+    var osBandOpts = { bands: osBands, nplBands: nplBands, blockDates: labels };
 
     // --- 1. VOLUME ---
     var overviewTitleEl = $('overviewVolChart').closest('.card.panel').querySelector('h2');
@@ -1184,10 +1229,10 @@
       });
     }
     syncOverviewVolBtn_();
-    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands, nplBands: nplBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
+    overviewVolChart = new Chart($('overviewVolChart'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: overviewDatasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: osBandOpts, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(0) : ''); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { beginAtZero: true, stacked: true, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: 'Volume', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(overviewVolChart, [perfChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 2. OVERALL PRODUCTIVITY ---
-    perfChart = new Chart($('perfChart'), { type: 'bar', plugins: [osBandPlugin_], data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands, nplBands: nplBands }, legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
+    perfChart = new Chart($('perfChart'), { type: 'bar', plugins: [osBandPlugin_], data: { labels: labels, datasets: [{ label: 'Productivity %', data: agg.map(function(r){return r.performance;}), backgroundColor: function(ctx) { var v = ctx.raw; return v >= APP_CONFIG.thresholds.good ? APP_CONFIG.colors.good : v >= APP_CONFIG.thresholds.warn ? APP_CONFIG.colors.warn : APP_CONFIG.colors.bad; }, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: osBandOpts, legend: { display: false }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y !== null ? Number(c.parsed.y).toFixed(1) + '%' : ''); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, max: yMax, title: { display: true, text: 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) { syncToTargets(perfChart, [overviewVolChart].concat(areaGroupCharts).concat(trendCharts), event, elements); } } });
 
     // --- 3. AREA GROUP (1 to MAX_AREA_GROUP_CHARTS charts) ---
     var areaGroupBuckets = [];
@@ -1333,7 +1378,7 @@
           agWrap.appendChild(panelEl);
           ensureChartBoxesPak_(panelEl);
 
-          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands, nplBands: nplBands }, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y === null ? '' : agStdMode ? Number(c.parsed.y).toFixed(2) + ' hrs' : Number(c.parsed.y).toFixed(1) + '%'); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: agStdMode ? 'Standard Hours' : 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
+          var chart = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: buildAreaGroupDatasets_(areaGroupBuckets[agIdx]) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: osBandOpts, legend: { display: true, labels: { color: CHART_TEXT() }, position: 'bottom', onClick: function(e, legendItem, legend) { stopChartEventPak_(e); var index = legendItem.datasetIndex; var ci = legend.chart; if (ci.isDatasetVisible(index)) { ci.hide(index); legendItem.hidden = true; } else { ci.show(index); legendItem.hidden = false; } } }, tooltip: { callbacks: { title: function(c) { return rl[c[0].dataIndex] || ''; }, label: function(c) { return (c.dataset.label || '') + ': ' + (c.parsed.y === null ? '' : agStdMode ? Number(c.parsed.y).toFixed(2) + ' hrs' : Number(c.parsed.y).toFixed(1) + '%'); }, afterBody: osBandTooltipPak_ } } }, scales: { x: xOpt, y: { min: agY.min, max: agY.max, ticks: { color: CHART_MUTED() }, grid: { color: CHART_GRID() }, title: { display: true, text: agStdMode ? 'Standard Hours' : 'Productivity %', color: CHART_MUTED(), font: { size: 12 } } } }, onHover: function(event, elements) {
             var others = [perfChart, overviewVolChart].concat(trendCharts);
             for (var oc = 0; oc < areaGroupCharts.length; oc++) { if (oc !== agIdx) others.push(areaGroupCharts[oc]); }
             syncToTargets(areaGroupCharts[agIdx], others, event, elements);
@@ -1413,7 +1458,7 @@
         // From the panel, not by id: the id is not unique for the instant
         // between a rebuild and the hoist that follows it, and getElementById
         // would return whichever came first in document order.
-        trendCharts[idx] = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: { bands: osBands, nplBands: nplBands }, legend: { labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
+        trendCharts[idx] = new Chart(panelEl.querySelector('canvas'), { type: 'line', plugins: [osBandPlugin_], data: { labels: labels, datasets: datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { osBand: osBandOpts, legend: { labels: { color: CHART_TEXT() }, position: 'bottom' }, tooltip: tOpt }, scales: { x: xOpt, y: trendY }, onHover: function(event, elements) {
           var others = [perfChart, overviewVolChart].concat(areaGroupCharts);
           for (var k = 0; k < trendCharts.length; k++) { if (k !== idx && trendCharts[k]) others.push(trendCharts[k]); }
           syncToTargets(trendCharts[idx], others, event, elements);

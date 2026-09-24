@@ -120,10 +120,10 @@
             <i class="rail-icon fa-solid fa-hashtag" aria-hidden="true"></i>
             <span class="rail-label">Bonus</span>
           </button>
-          <!-- Potential Fraudulent Claims. Before OS and NPL because it is
+          <!-- Overlapping Claims. Before OS and NPL because it is
                about both at once - it says which claims are worth opening
                those two pages to look at. -->
-          <button type="button" class="rail-item" onclick="goToPage(3)" title="Potential Fraudulent Claims">
+          <button type="button" class="rail-item" onclick="goToPage(3)" title="Overlapping Claims">
             <i class="rail-icon fa-solid fa-magnifying-glass-dollar" aria-hidden="true"></i>
             <span class="rail-label">Claims</span>
           </button>
@@ -474,7 +474,7 @@
                spell is included when it OVERLAPS the range, not when it fits
                inside it: a shift running from before the window into it is
                exactly the case this page exists for. -->
-          <!-- Potential Fraudulent Claims. A claim says "I was not producing
+          <!-- Overlapping Claims. A claim says "I was not producing
                between these times"; the pivot says what was actually produced,
                block by block. This page is where the two are put side by side.
                No range picker of its own: the window IS the production day on
@@ -484,7 +484,7 @@
             <div class="fraud-head">
               <div class="fraud-head-title">
                 <i class="fa-solid fa-magnifying-glass-dollar" aria-hidden="true"></i>
-                <span>Potential Fraudulent Claims</span>
+                <span>Overlapping Claims</span>
               </div>
               <span id="fraudRangeBadge" class="breakdown-range-badge fraud-range-badge">-</span>
             </div>

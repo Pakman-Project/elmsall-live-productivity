@@ -174,9 +174,8 @@ head('[6] the Check is shown as logged - only OK is good');
   check('the colour is two-way, not three',
         /function CHART_NPL_STATUS\(check\)/.test(CHARTS) &&
         /nplCheckIsOkPak_\(check\) \? APP_CONFIG\.colors\.good : APP_CONFIG\.colors\.bad/.test(CHARTS));
-  check('and the tooltip passes the wording straight through',
-        /function nplBandTimeLabelPak_\(check, from, to\)/.test(HELP) &&
-        /'NPL ' \+ c/.test(HELP));
+  check('the matcher reads the Check RAW, the same terms as the band cut',
+        /String\(r\.check == null \? '' : r\.check\)\.trim\(\)/.test(CHARTS));
   check('so a band cut happens on the RAW wording for NPL, folded for OS',
         /kind === 'os' \? osStatusBandPak_\(raw\)/.test(CHARTS));
 }
@@ -199,7 +198,7 @@ head('[7] the band: its own tint, under the OS one, both labelled');
         /ctx\.fillText\('OS', mid, area\.top \+ 6\)/.test(CHARTS),
         'both are true of the block; hiding one loses a fact to save a pixel');
   check('both sets ride on the one existing options key',
-        (CHARTS.match(/osBand: \{ bands: osBands, nplBands: nplBands \}/g) || []).length === 4,
+        (CHARTS.match(/osBand: osBandOpts/g) || []).length === 4,
         'all four banded charts');
   check('and both are gated on the bonus filter',
         /var nplBands = \(selectedBonuses\.length > 0\) \? mergeNplBands_\(agg\) : \[\];/.test(CHARTS),
