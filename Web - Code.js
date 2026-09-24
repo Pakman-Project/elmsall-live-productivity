@@ -168,7 +168,12 @@ var CACHE_CHUNK_SIZE_ = 90000;
 // going missing as a total miss, so a bigger ceiling makes the cache more
 // capable but also more exposed to a single evicted chunk losing the whole
 // payload.
-var CACHE_MAX_TOTAL_ = 4500000;
+//
+// Raised again to 8,000,000 (~89 chunks): yesterday's archive was already at
+// 3,585,655 chars (1,809 bonus numbers x 96 blocks) with more headroom wanted
+// as that grows, not because a write has been refused at 4,500,000 - the same
+// "CACHE REFUSED" watch applies before raising this further.
+var CACHE_MAX_TOTAL_ = 8000000;
 
 // ── Load timing ─────────────────────────────────────────────────────────────
 // There was no instrumentation of any kind in here, which made "the dashboard
