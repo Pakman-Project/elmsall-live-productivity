@@ -115,9 +115,38 @@ head('[2] the window is a production day, not a calendar one');
         'the Date column is already the production day; a second key would double-count');
   check('and the key is built from the selected day',
         /var key = fraudDateKeyPak_\(fraudSelectedDayPak_\(\)\);/.test(PAGE));
-  check('Live reads the data\'s own clock, not the browser\'s',
-        /for \(var i = timeRanges\.length - 1; i >= 0 && !newest; i--\)/.test(PAGE),
+  check('Live reads the data\'s own clock (lastRefreshTimestamp), not just the browser\'s',
+        /lastRefreshTimestamp/.test(PAGE) &&
+        /new Date\(lastRefreshTimestamp\) : new Date\(\)/.test(PAGE),
         'the browser\'s clock can disagree with the sheet\'s by more than a block');
+
+  // The trailing-empty-block trim in getDashboardData rolls timeRanges back
+  // past midnight whenever nobody has produced any standard hours yet today
+  // - normal for the first stretch of a new production day. Reading THAT for
+  // "today" would show yesterday's already-finished window instead of
+  // today's still-empty one. lastRefreshTimestamp (Front!B2) is untouched by
+  // that trim and must win regardless of what timeRanges has survived to.
+  {
+    const savedDoc = ctx.document;
+    ctx.document = { getElementById: function () { return null; } }; // no archiveSelect match -> live
+    // "dd/mm/yyyy hh:mm - x": only the start half is ever read here, same
+    // shorthand [3] below uses for a bare start-time fixture.
+    const rangeAt = (d, h, m) => ('0' + d).slice(-2) + '/09/2026 ' +
+                                  ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2) + ' - x';
+    ctx.timeRanges = [
+      // Last night only - today's blocks were trimmed off because nothing
+      // has been produced yet this morning.
+      rangeAt(24, 23, 0), rangeAt(24, 23, 15)
+    ];
+    ctx.lastRefreshTimestamp = new Date(2026, 8, 25, 7, 0).getTime(); // 25/09 07:00, the sheet's own clock
+    const day = ctx.fraudSelectedDayPak_();
+    check('a production day with no hours yet still reads as TODAY, not last night',
+          day.getFullYear() === 2026 && day.getMonth() === 8 && day.getDate() === 25,
+          day.toDateString());
+    ctx.document = savedDoc;
+    delete ctx.timeRanges;
+    delete ctx.lastRefreshTimestamp;
+  }
 }
 
 head('[3] any produced hours at all flags the claim');

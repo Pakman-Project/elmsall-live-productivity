@@ -50,14 +50,18 @@
     if (m) {
       return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
     }
-    // Live. Taken from the newest block on the axis rather than from the
-    // browser's clock: that is the data's own idea of now, and it is what
-    // every other number on the dashboard is drawn against.
-    var newest = null;
-    for (var i = timeRanges.length - 1; i >= 0 && !newest; i--) {
-      newest = parseDateTimePartPak(extractRangePartsPak(timeRanges[i]).start);
-    }
-    var d = newest || new Date();
+    // Live. lastRefreshTimestamp (Front!B2, set in JsInit) rather than the
+    // newest block on the axis: that used to be "the data's own idea of now",
+    // but timeRanges has its trailing EMPTY blocks trimmed off by the server
+    // whenever nobody has produced any standard hours yet today (see
+    // getDashboardData) - so early in a shift, before the first real hours
+    // land, the newest surviving block is still last night's, and reading it
+    // here would silently show yesterday's finished window instead of
+    // today's still-empty one. lastRefreshTimestamp is untouched by that
+    // trim, so it keeps the promise above literally: once the clock is past
+    // 06:00, this is today, empty or not.
+    var d = (typeof lastRefreshTimestamp === 'number' && lastRefreshTimestamp)
+      ? new Date(lastRefreshTimestamp) : new Date();
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
