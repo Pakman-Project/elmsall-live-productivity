@@ -1210,6 +1210,11 @@
 
   function goToPage(index) {
     if (index < 0 || index >= totalPages) return;
+    // Entering the Bonus page (2) FROM somewhere else - not re-selecting it
+    // while already there - always resets its From/To to today's default
+    // half, discarding whatever was picked on the last visit. See
+    // resetBonusTimeRangeToDefault_.
+    var enteringBonusPage = (index === 2 && currentPage !== 2);
     currentPage = index;
     syncTimeAxisControlsPak_(index);
     syncSiteControlPak_(index);
@@ -1221,6 +1226,9 @@
     prevTranslate = currentTranslate;
     setSliderPosition();
     updateDots();
+    if (enteringBonusPage && typeof resetBonusTimeRangeToDefault_ === 'function') {
+      resetBonusTimeRangeToDefault_();
+    }
     // Build this page's content if it hasn't been rendered since the last
     // data/filter change, before sizing its charts.
     renderPageIfNeeded_(index);

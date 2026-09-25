@@ -448,21 +448,13 @@ function buildMainDetailTableHtml_(entryRows) {
   return html;
 }
 
-function ensureBonusTimeSelects_() {
-  var fromSel = $('bonusFrom');
-  var toSel = $('bonusTo');
-  if (!fromSel || !toSel) return;
+function bonusTimeSlicedSig_(sliced) {
+  return sliced.length ? (sliced[0] + '||' + sliced[sliced.length - 1] + '||' + sliced.length) : '';
+}
 
-  var sliced = timeRanges.slice(-96);
-  var sig = sliced.length ? (sliced[0] + '||' + sliced[sliced.length - 1] + '||' + sliced.length) : '';
-  if (fromSel.dataset.sig === sig) return;
-
-  var prevFrom = fromSel.value;
-  var prevTo = toSel.value;
-
+function rebuildBonusTimeOptions_(fromSel, toSel, sliced) {
   fromSel.innerHTML = '';
   toSel.innerHTML = '';
-
   for (var i = 0; i < sliced.length; i++) {
     var parts = extractRangePartsPak(sliced[i]);
     var optF = document.createElement('option');
@@ -475,8 +467,57 @@ function ensureBonusTimeSelects_() {
     optT.textContent = parts.end;
     toSel.appendChild(optT);
   }
+  fromSel.dataset.sig = bonusTimeSlicedSig_(sliced);
+}
 
-  fromSel.dataset.sig = sig;
+// The half of the rolling day "now" falls in - 06:00 to 18:00, or 18:00 to
+// 06:00 the next day. lastRefreshTimestamp (the sheet's own clock, set in
+// JsInit - see the same choice on the Claims page) rather than the raw
+// browser clock, which can disagree with it by more than a block.
+function bonusDefaultHalfPak_() {
+  var now = (typeof lastRefreshTimestamp === 'number' && lastRefreshTimestamp)
+    ? new Date(lastRefreshTimestamp) : new Date();
+  var y = now.getFullYear(), mo = now.getMonth(), d = now.getDate(), h = now.getHours();
+  if (h >= 6 && h < 18) {
+    return { start: new Date(y, mo, d, 6, 0), end: new Date(y, mo, d, 18, 0) };
+  }
+  // Overnight half: before 06:00 it started YESTERDAY at 18:00; from 18:00
+  // on it started TODAY, ending 06:00 tomorrow.
+  var startDay = h < 6 ? d - 1 : d;
+  return { start: new Date(y, mo, startDay, 18, 0), end: new Date(y, mo, startDay + 1, 6, 0) };
+}
+
+// The From index into `sliced` for the half "now" falls in - the block
+// starting exactly at the half's own start. Falls back to the earliest
+// available block if that exact start is not found (should not happen
+// inside a 24h rolling window, but sliced could in principle be shorter
+// just after a load). "To" is always the newest available block: the half
+// containing "now" cannot have ended yet, by construction (bonusDefaultHalfPak_
+// only ever returns a half that "now" is strictly inside), so its own end is
+// never among the blocks published so far.
+function bonusDefaultIndexesPak_(sliced) {
+  var half = bonusDefaultHalfPak_();
+  var fromIdx = 0;
+  for (var i = 0; i < sliced.length; i++) {
+    var s = parseDateTimePartPak(extractRangePartsPak(sliced[i]).start);
+    if (s && s.getTime() === half.start.getTime()) { fromIdx = i; break; }
+  }
+  return { from: fromIdx, to: sliced.length - 1 };
+}
+
+function ensureBonusTimeSelects_() {
+  var fromSel = $('bonusFrom');
+  var toSel = $('bonusTo');
+  if (!fromSel || !toSel) return;
+
+  var sliced = timeRanges.slice(-96);
+  var sig = bonusTimeSlicedSig_(sliced);
+  if (fromSel.dataset.sig === sig) return;
+
+  var prevFrom = fromSel.value;
+  var prevTo = toSel.value;
+
+  rebuildBonusTimeOptions_(fromSel, toSel, sliced);
 
   var fromRestored = false;
   var toRestored = false;
@@ -485,9 +526,28 @@ function ensureBonusTimeSelects_() {
     if (sliced[i] === prevTo) { toSel.selectedIndex = i; toRestored = true; }
   }
   if (!fromRestored || !toRestored || toSel.selectedIndex < fromSel.selectedIndex) {
-    fromSel.selectedIndex = Math.max(0, sliced.length - 4);
-    toSel.selectedIndex = sliced.length - 1;
+    var def = bonusDefaultIndexesPak_(sliced);
+    fromSel.selectedIndex = def.from;
+    toSel.selectedIndex = def.to;
   }
+}
+
+// Called only on ENTERING the Bonus page (see goToPage) - unlike
+// ensureBonusTimeSelects_ above, which is the periodic-refresh path and
+// deliberately keeps a mid-visit pick across a data refresh, this always
+// resets to the current half's default and never restores what was picked
+// on a previous visit. Rebuilds unconditionally too, since a straight return
+// on an unchanged signature would leave a lingering manual pick in place.
+function resetBonusTimeRangeToDefault_() {
+  var fromSel = $('bonusFrom');
+  var toSel = $('bonusTo');
+  if (!fromSel || !toSel) return;
+  var sliced = timeRanges.slice(-96);
+  rebuildBonusTimeOptions_(fromSel, toSel, sliced);
+  var def = bonusDefaultIndexesPak_(sliced);
+  fromSel.selectedIndex = def.from;
+  toSel.selectedIndex = def.to;
+  refreshBonusTables();
 }
 
 function onBonusRangeChange() {
