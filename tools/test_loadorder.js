@@ -229,5 +229,154 @@ head('[6] the last warehouse hands over to the OTHER one, whichever it is');
         ctx.warehouseKeyFor_(['e1e2', 'e3']) === 'all');
 }
 
+// ── the answer drawn is the answer to the LAST question ───────────────────
+// A google.script.run call cannot be cancelled. Pick 23/09, then 24/09 while
+// 23/09 is still loading, and both are answered - in whatever order the
+// server finishes them. Whichever landed last used to be drawn, so the charts
+// could show 23/09 under a date control reading 24/09.
+
+// One named function, lifted out whole by matching its braces.
+function fnSource(src, name) {
+  const s = src.replace(/\r\n/g, '\n');
+  const start = s.indexOf('function ' + name + '(');
+  let depth = 0, i = s.indexOf('{', start);
+  for (; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}' && --depth === 0) break;
+  }
+  return s.slice(start, i + 1);
+}
+
+// A google.script.run that holds every call until the test answers it.
+function fakeRunner(calls) {
+  return {
+    script: {
+      get run() {
+        const h = {};
+        const r = {
+          withSuccessHandler(f) { h.ok = f; return r; },
+          withFailureHandler(f) { h.err = f; return r; }
+        };
+        ['getDashboardData', 'getDashboardDataRange', 'getOsLogRows', 'getNplLogRows'].forEach(m => {
+          r[m] = function () { calls.push({ method: m, args: [].slice.call(arguments), h: h }); };
+        });
+        return r;
+      }
+    }
+  };
+}
+
+function fakeEl() {
+  return { innerHTML: '', textContent: '', classList: { add() {}, remove() {} } };
+}
+
+head('[7] a dashboard load overtaken by a newer one is dropped, not drawn');
+{
+  const calls = [], drawn = [];
+  const els = { status: fakeEl(), loadingOverlay: fakeEl() };
+  const ctx = {
+    console: { info() {}, warn() {}, error() {} },
+    google: fakeRunner(calls),
+    $: id => els[id] || null,
+    document: { body: { classList: { add() {}, remove() {} } }, querySelectorAll: () => [],
+                activeElement: null, getElementById: () => null },
+    fetchSeqPak_: { dash: 0, os: 0, npl: 0, fraud: 0 },
+    tourActive: false, customRangeQuery: null, currentArchiveUrl: null, currentPage: 0,
+    lastRealPayload: null,
+    progressAttachBarPak_() {}, progressEndPak_() {},
+    savePayloadCache_() {}, setChartAnimationEnabled_() {},
+    escapeAttrPak: s => s,
+    renderDashboardPayload_: d => { drawn.push(d.day); }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource(INIT, 'loadDataPak'), ctx);
+
+  ctx.loadDataPak('U23');
+  ctx.loadDataPak('U24');
+  check('both requests went out - neither can be cancelled', calls.length === 2);
+
+  calls[1].h.ok({ day: '24/09' });      // the newer one lands FIRST...
+  calls[0].h.ok({ day: '23/09' });      // ...and the older one after it
+  check('only the newest answer is drawn, whichever order they land in',
+        drawn.join() === '24/09', drawn.join());
+  check('and the view it records is the newest one too',
+        ctx.currentArchiveUrl === 'U24', ctx.currentArchiveUrl);
+
+  // The other order, which is the one that used to be harmless.
+  calls.length = 0; drawn.length = 0;
+  ctx.loadDataPak('U23');
+  ctx.loadDataPak('U24');
+  calls[0].h.ok({ day: '23/09' });
+  calls[1].h.ok({ day: '24/09' });
+  check('in order, the older one is still dropped rather than flashed first',
+        drawn.join() === '24/09', drawn.join());
+
+  // An overtaken load that FAILS must not put an error up over the one
+  // that is still on its way.
+  calls.length = 0; drawn.length = 0; els.status.innerHTML = '';
+  ctx.loadDataPak('U23');
+  ctx.loadDataPak('U24');
+  calls[0].h.err({ message: 'timed out' });
+  check('an overtaken load failing leaves the status alone',
+        els.status.innerHTML.indexOf('timed out') === -1, els.status.innerHTML);
+  calls[1].h.ok({ day: '24/09' });
+  check('and the newest still draws', drawn.join() === '24/09', drawn.join());
+}
+
+head('[8] a log read for the date just left is dropped, even before its replacement starts');
+{
+  const calls = [];
+  const ctx = {
+    console: { info() {}, warn() {}, error() {} },
+    google: fakeRunner(calls),
+    fetchSeqPak_: { dash: 0, os: 0, npl: 0, fraud: 0 },
+    logFetchesHeldPak_: false, currentArchiveUrl: null,
+    osLogRows: ['old'], osLogSkipped: 0, osLogBad: [], osLogState: 'loading', osLogEverLoaded: false,
+    nplLogRows: ['old'], nplLogSkipped: 0, nplLogBad: [], nplLogState: 'loading', nplLogEverLoaded: false,
+    fraudOsRows: ['old'], fraudNplRows: ['old'], fraudLogState: 'loading', fraudLogEverLoaded: false,
+    osLogWantDates_: () => ['23/09/2026'], fraudWantDatesPak_: () => ['23/09/2026'],
+    progressEndPak_() {},
+    renders: { os: 0, npl: 0, fraud: 0 }
+  };
+  ctx.renderOsPagePak = () => { ctx.renders.os++; };
+  ctx.renderNplPagePak = () => { ctx.renders.npl++; };
+  ctx.renderFraudPagePak = () => { ctx.renders.fraud++; };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource(OS, 'osFetchLogPak_') + '\n' + fnSource(NPL, 'nplFetchLogPak_') + '\n' +
+                  fnSource(FRAUD, 'fraudFetchLogsPak_') + '\n' + fnSource(INIT, 'beginNewViewPak_'), ctx);
+
+  ctx.osFetchLogPak_(false);
+  ctx.nplFetchLogPak_(false);
+  ctx.fraudFetchLogsPak_(false);
+  check('all four log reads went out for 23/09', calls.length === 4, String(calls.length));
+
+  ctx.beginNewViewPak_();                // 24/09 picked while they are in the air
+  calls.forEach(c => c.h.ok({ rows: [{ bonus: 'A23' }] }));
+  check('the OS page keeps what it had rather than drawing 23/09 under 24/09',
+        ctx.osLogRows[0] === 'old' && ctx.renders.os === 0, JSON.stringify(ctx.osLogRows));
+  check('so does NPL', ctx.nplLogRows[0] === 'old' && ctx.renders.npl === 0);
+  check('and Claims, both halves of it',
+        ctx.fraudOsRows[0] === 'old' && ctx.fraudNplRows[0] === 'old' && ctx.renders.fraud === 0);
+  check('nor is any of them marked ready - the new date is still to come',
+        ctx.osLogState === 'loading' && ctx.nplLogState === 'loading' && ctx.fraudLogState === 'loading');
+
+  // The replacement read, once the payload is in, is answered normally.
+  calls.length = 0;
+  ctx.osFetchLogPak_(false);
+  calls[0].h.ok({ rows: [{ bonus: 'B24' }] });
+  check('the read started after the change is drawn',
+        ctx.osLogRows[0].bonus === 'B24' && ctx.osLogState === 'ready' && ctx.renders.os === 1);
+
+  // Two reads of the SAME view overlapping - a refresh landing behind a newer
+  // one - is the same race by a different route.
+  calls.length = 0;
+  ctx.osFetchLogPak_(true);
+  ctx.osFetchLogPak_(true);
+  calls[1].h.ok({ rows: [{ bonus: 'NEW' }] });
+  calls[0].h.ok({ rows: [{ bonus: 'STALE' }] });
+  check('an older refresh landing late does not overwrite a newer one',
+        ctx.osLogRows[0].bonus === 'NEW', ctx.osLogRows[0].bonus);
+}
+
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
 process.exit(fail ? 1 : 0);
