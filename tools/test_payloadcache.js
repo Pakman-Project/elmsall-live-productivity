@@ -43,6 +43,9 @@ function world() {
       },
       removeItem: k => { delete store[k]; }
     },
+    // A custom range is a second reason (besides an archive) to decline the
+    // cache - savePayloadCache_ checks it first. Null: this suite never sets one.
+    customRangeQuery: null,
     __quotaFails: false
   };
   vm.createContext(ctx);

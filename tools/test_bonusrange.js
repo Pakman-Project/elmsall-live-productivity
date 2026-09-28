@@ -32,7 +32,9 @@ function FakeSelect() {
   return el;
 }
 
-const ctx = { console };
+// A custom range (Web - JsUi's applyDateRange_) locks this pair disabled and
+// spanning the whole window - null here, since this suite never sets one.
+const ctx = { console, customRangeQuery: null };
 vm.createContext(ctx);
 vm.runInContext(strip(R('Web - JsHelpers.html')), ctx);
 const fromSel = FakeSelect(), toSel = FakeSelect();

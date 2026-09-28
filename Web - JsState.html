@@ -295,6 +295,24 @@ function syncSiteScope_() {
 // chosen building without knowing the filter exists.
 var allSideData = [];
 
+// Which 24 hours a past date shows: '6-6' is 06:00 to 06:00 the next
+// morning, '0-0' is the calendar day. Null until the reader has answered,
+// so that an unanswered question is not mistaken for a default someone
+// chose - dayModePak_ reads null as '6-6'. Live is never affected.
+var dayMode = null;
+
+function dayModePak_() { return dayMode === '0-0' ? '0-0' : '6-6'; }
+
+// A past date on screen, or null on Live. `span` is everything the payload
+// brought (the date itself plus the next morning, unscoped), `list` the
+// window's blocks, and `edge` any rows fetched later for a run that carries
+// on past the window - see applyArchiveWindowPak_ in JsData.
+var archiveView = null;
+
+// The blocks a filtered bonus number's run adds either side of that window,
+// and its rows in them. Empty unless both of those are true.
+var viewStretch = { before: [], after: [], rows: [], needsEdge: false };
+
 // 'pieVol' and 'pieStd' both describe the area 'pie'.
 function areaBaseKey_(key) {
   return String(key || '').replace(/(Vol|Std)$/, '');
@@ -849,6 +867,20 @@ var detailSortState = { key: null, dir: 'asc' };
 var expandedRowKey = null;
 var currentArchiveUrl = null;
 var lastRefreshTimestamp = null;
+// A user-picked From/To span, as {from, to} "dd/MM/yyyy HH:mm" strings, or
+// null - the header's date picker offers this once Live is left, alongside
+// picking a single day. Non-null means loadDataPak reads getDashboardDataRange
+// instead of getDashboardData, Hours Range is disabled (the span already says
+// both ends), and the view is treated as historical the same way an archive
+// is - see isHistoricalViewPak_.
+var customRangeQuery = null;
+
+// True for anything that is not the rolling Live view - a single picked day
+// or a custom range - the two things every "Live only" check in JsInit
+// (polling, the staleness warning, the retry button) needs to skip alike.
+function isHistoricalViewPak_() {
+  return !!(currentArchiveUrl || customRangeQuery);
+}
 // UI theme: 'light' (default) or 'dark'. Persisted inside the user-prefs blob.
 var currentTheme = 'light';
 // Guided tour coordination: while tourActive is true the dashboard shows demo

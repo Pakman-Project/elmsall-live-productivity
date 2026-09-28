@@ -1157,6 +1157,162 @@ function parseTimeRangeStart_(tr) {
   return new Date(Number(dp[2]), Number(dp[1]) - 1, Number(dp[0]), Number(tp[0]), Number(tp[1]), 0);
 }
 
+// The URL of the archive named `name` (dd/MM/yyyy) in the Links sheet, or
+// null when that date has not been archived yet.
+function archiveUrlFor_(name) {
+  var links = getArchiveLinks();
+  for (var a = 0; a < links.length; a++) {
+    if (links[a].name === name) return links[a].url;
+  }
+  return null;
+}
+
+// One day's rows in trSet (timeRange -> true), as side entries.
+//
+// url is that day's archive. Null reads the LIVE file instead - for a day
+// whose archive does not exist yet - and is never cached, because the live
+// file is still being written. The yesterday half of the live view, the
+// morning after an archive, and the edges of a stretched run all come
+// through here, so each gets the same filter and the same cache.
+function readSideSlice_(url, dateStr, trSet, tm) {
+  // Marks repeat when this runs more than once in a load; the note says
+  // which slice the ones after it belong to.
+  tm.note('slice=' + dateStr + (url ? '' : '/live'));
+  // Opening + fully parsing an archive spreadsheet is the single most
+  // expensive thing a load does, and it is pure waste: that file is already
+  // archived (immutable), and every viewer/auto-refresh inside the same
+  // 15-minute window needs the exact same slice of it.
+  //
+  // So cache the FILTERED entries. The key pins both the archive date and
+  // the exact window bounds, so when the rolling 24h window moves
+  // the key changes and a stale slice can never be reused. TTL is kept to
+  // 15 min so that an archive still being written just after midnight
+  // self-heals quickly rather than being pinned all day.
+  var yKeys = Object.keys(trSet);
+  var yEntries = null;
+  var yCacheKey = null;
+  // The lines to cache, collected as the rows are filtered. Null until a
+  // read actually happens, so a cache hit never rewrites what it just read.
+  var yLines_ = null;
+
+  if (url && yKeys.length) {
+    yKeys.sort();
+    // The area COUNT is in the key, not a hand-bumped version number.
+    // Entries cached by a previous build carry no field for an area added
+    // since, so yesterday's rows read as blank for it until they expired -
+    // which happened when Sorter 6 Packing arrived, and again when the two
+    // Sorter 6 inducts did, because bumping v1 to v2 was a step someone had
+    // to remember. Keying on the count makes adding an area invalidate the
+    // cache by itself.
+    // v4: entries gained an `os` field. The area count in the key does not
+    // move when a FIELD is added, so without the bump yesterday's cached
+    // rows would come back missing it for up to fifteen minutes.
+    // v5: and an `osStatus` field, for the same reason. Cached v4 rows
+    // carry the flag but no status, so the band would draw unlabelled on
+    // yesterday's half of the window and labelled on today's - which reads
+    // as the status having changed at midnight.
+    // v6: and the two clip times. Same failure shape: a band spanning
+    // midnight would report a start and end for its second half only.
+    // v7: the FORMAT changed, not a field - this now holds delimited
+    // lines rather than entry objects, because the objects ran to ~19MB
+    // and the write was refused every time. A v6 entry fed to the line
+    // splitter would come back as garbage rather than as a miss.
+    // v8: the pivot grew NPL Status and NPL Time. A cached v7 line carries
+    // the old header, so those resolve to -1 and yesterday's half of the
+    // window would show no NPL while today's did - the same "it changed at
+    // midnight" reading v5 and v6 were bumped to avoid.
+    yCacheKey = 'ydayArch_v8_' + PROC_AREA_COLUMNS_.length + '_' + dateStr +
+                '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
+    var yCached = cacheGetLarge_(yCacheKey);
+    if (yCached) {
+      try {
+        // Stored as delimited LINES, not as the expanded entry objects it
+        // used to hold. Those ran to ~19MB for this site's yesterday
+        // slice, so the write was refused every single time and the cache
+        // had never once populated - see CACHE_MAX_TOTAL_. The same rows
+        // as text are about a tenth of that.
+        //
+        // The header travels with them and is re-mapped by NAME on the
+        // way out, so a cache entry written before an area was added
+        // cannot silently read one column short.
+        var yLines = yCached.split('\n');
+        var yMap = buildProcColumnMap_(yLines[0].split(BACKEND_DELIM_));
+        if (yMap.total >= 0) {
+          yEntries = [];
+          for (var yl = 1; yl < yLines.length; yl++) {
+            if (!yLines[yl]) continue;
+            var yCols = yLines[yl].split(BACKEND_DELIM_);
+            yEntries.push(buildSideEntry_(yCols, yCols, yMap));
+          }
+        }
+      } catch (e) { yEntries = null; }
+    }
+    tm.mark('ydayCacheGet');
+    tm.note('ydayCache=' + (yEntries ? 'HIT/' + yCached.length + 'chars' : 'MISS'));
+  }
+
+  if (!yEntries) {
+    yEntries = [];
+    try {
+      var archiveSS = url ? SpreadsheetApp.openByUrl(url) : SpreadsheetApp.getActiveSpreadsheet();
+      var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
+      // The single most expensive call in this function, measured on its
+      // own so it is not hidden inside the read that follows it.
+      tm.mark('ydayOpen');
+      // Once, not twice: getLastRow() is its own round trip.
+      var aLastRow = archiveSource ? archiveSource.getLastRow() : 0;
+      if (archiveSource && aLastRow >= 2) {
+        var aRead = readSourceRows_(archiveSS, archiveSource, aLastRow);
+        tm.mark('ydayRead', aRead.cells);
+        if (aRead.fallback) tm.note('ydayFELLBACK');
+
+        // The header first, so a cache entry can be re-mapped by NAME on
+        // the way out rather than trusting its positions.
+        yLines_ = [backendJoin_(aRead.header)];
+        for (var i = 0; i < aRead.vals.length; i++) {
+          var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
+          if (!trSet[aEntry.timeRange]) continue;
+          // An OS block has no standard hours by definition, so the value
+          // test alone would drop exactly the rows the OS band needs. NPL
+          // is the same shape and was missed when it was added: a spell
+          // survived only in the blocks where the operator ALSO produced,
+          // so one continuous claim drew as several separate bands with
+          // the quiet blocks between them simply absent.
+          if (!aEntry.bonus || (aEntry.value <= 0 && !aEntry.os && !aEntry.npl)) continue;
+          yEntries.push(aEntry);
+          yLines_.push(backendJoin_(aRead.vals[i]));
+        }
+      }
+      // Cached as the lines themselves rather than as the objects built
+      // from them. Only the rows that survived the window filter are
+      // kept, which is most of the saving.
+      if (yCacheKey && yLines_) {
+        cachePutLarge_(yCacheKey, yLines_.join('\n'), 900);
+      }
+    } catch (e) {
+      Logger.log('Archive slice read failed (' + dateStr + '): ' + e.message);
+    }
+  }
+
+  return yEntries;
+}
+
+// timeRange -> true for the blocks of `day` from hour h0 up to hour h1, by
+// the clock. Generated back from h1 with two hours to spare and then cut to
+// that date and those hours, so the night the clocks change neither loses a
+// block nor picks one up from the evening before.
+function dayBlockSet_(day, h0, h1) {
+  var key = Utilities.formatDate(day, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  var ranges = generateTimeRanges_(
+    new Date(day.getFullYear(), day.getMonth(), day.getDate(), h1), (h1 - h0 + 2) * 4);
+  var set = {};
+  for (var i = 0; i < ranges.length; i++) {
+    var h = Number(ranges[i].slice(11, 13));
+    if (ranges[i].indexOf(key) === 0 && h >= h0 && h < h1) set[ranges[i]] = true;
+  }
+  return set;
+}
+
 function getDashboardData(archiveUrl) {
   var ss;
   var isLiveMode = !archiveUrl;
@@ -1209,6 +1365,7 @@ function getDashboardData(archiveUrl) {
 
   var timeRanges = generateTimeRanges_(lastRefresh, 96);
   var rawSideData = [];
+  var nextDayRows = [];
   var bonusSet = {};
 
   // ═══════════════════════════════════════════════
@@ -1240,137 +1397,15 @@ function getDashboardData(archiveUrl) {
     var yesterdayDate = new Date(Number(todayParts[2]), Number(todayParts[1]) - 1, Number(todayParts[0]) - 1, 0, 0, 0);
     var yesterdayStr = Utilities.formatDate(yesterdayDate, tz, "dd/MM/yyyy");
 
-    var archiveLinks = getArchiveLinks();
+    var yesterdayArchiveUrl = archiveUrlFor_(yesterdayStr);
     // Cached 300s, so a slow mark here means the cache missed.
     tm.mark('links');
-    var yesterdayArchiveUrl = null;
-    for (var a = 0; a < archiveLinks.length; a++) {
-      if (archiveLinks[a].name === yesterdayStr) {
-        yesterdayArchiveUrl = archiveLinks[a].url;
-        break;
-      }
-    }
 
     // ── Step 1: Read yesterday's data from archive (authoritative) ──
     var archiveDataMap = {};   // key = "timeRange||bonus"
 
     if (yesterdayArchiveUrl) {
-      // Opening + fully parsing yesterday's archive spreadsheet is the single
-      // most expensive thing in this function, and it is pure waste: that file
-      // is already archived (immutable), and every viewer/auto-refresh inside
-      // the same 15-minute window needs the exact same slice of it.
-      //
-      // So cache the FILTERED entries. The key pins both the archive date and
-      // the exact yesterday-window bounds, so when the rolling 24h window moves
-      // the key changes and a stale slice can never be reused. TTL is kept to
-      // 15 min so that an archive still being written just after midnight
-      // self-heals quickly rather than being pinned all day.
-      var yKeys = Object.keys(yesterdayTRSet);
-      var yEntries = null;
-      var yCacheKey = null;
-      // The lines to cache, collected as the rows are filtered. Null until a
-      // read actually happens, so a cache hit never rewrites what it just read.
-      var yLines_ = null;
-
-      if (yKeys.length) {
-        yKeys.sort();
-        // The area COUNT is in the key, not a hand-bumped version number.
-        // Entries cached by a previous build carry no field for an area added
-        // since, so yesterday's rows read as blank for it until they expired -
-        // which happened when Sorter 6 Packing arrived, and again when the two
-        // Sorter 6 inducts did, because bumping v1 to v2 was a step someone had
-        // to remember. Keying on the count makes adding an area invalidate the
-        // cache by itself.
-        // v4: entries gained an `os` field. The area count in the key does not
-        // move when a FIELD is added, so without the bump yesterday's cached
-        // rows would come back missing it for up to fifteen minutes.
-        // v5: and an `osStatus` field, for the same reason. Cached v4 rows
-        // carry the flag but no status, so the band would draw unlabelled on
-        // yesterday's half of the window and labelled on today's - which reads
-        // as the status having changed at midnight.
-        // v6: and the two clip times. Same failure shape: a band spanning
-        // midnight would report a start and end for its second half only.
-        // v7: the FORMAT changed, not a field - this now holds delimited
-        // lines rather than entry objects, because the objects ran to ~19MB
-        // and the write was refused every time. A v6 entry fed to the line
-        // splitter would come back as garbage rather than as a miss.
-        // v8: the pivot grew NPL Status and NPL Time. A cached v7 line carries
-        // the old header, so those resolve to -1 and yesterday's half of the
-        // window would show no NPL while today's did - the same "it changed at
-        // midnight" reading v5 and v6 were bumped to avoid.
-        yCacheKey = 'ydayArch_v8_' + PROC_AREA_COLUMNS_.length + '_' + yesterdayStr +
-                    '_' + yKeys.length + '_' + yKeys[0] + '_' + yKeys[yKeys.length - 1];
-        var yCached = cacheGetLarge_(yCacheKey);
-        if (yCached) {
-          try {
-            // Stored as delimited LINES, not as the expanded entry objects it
-            // used to hold. Those ran to ~19MB for this site's yesterday
-            // slice, so the write was refused every single time and the cache
-            // had never once populated - see CACHE_MAX_TOTAL_. The same rows
-            // as text are about a tenth of that.
-            //
-            // The header travels with them and is re-mapped by NAME on the
-            // way out, so a cache entry written before an area was added
-            // cannot silently read one column short.
-            var yLines = yCached.split('\n');
-            var yMap = buildProcColumnMap_(yLines[0].split(BACKEND_DELIM_));
-            if (yMap.total >= 0) {
-              yEntries = [];
-              for (var yl = 1; yl < yLines.length; yl++) {
-                if (!yLines[yl]) continue;
-                var yCols = yLines[yl].split(BACKEND_DELIM_);
-                yEntries.push(buildSideEntry_(yCols, yCols, yMap));
-              }
-            }
-          } catch (e) { yEntries = null; }
-        }
-        tm.mark('ydayCacheGet');
-        tm.note('ydayCache=' + (yEntries ? 'HIT/' + yCached.length + 'chars' : 'MISS'));
-      }
-
-      if (!yEntries) {
-        yEntries = [];
-        try {
-          var archiveSS = SpreadsheetApp.openByUrl(yesterdayArchiveUrl);
-          var archiveSource = archiveSS.getSheetByName(CONFIG.SOURCE_SHEET_NAME);
-          // The single most expensive call in this function, measured on its
-          // own so it is not hidden inside the read that follows it.
-          tm.mark('ydayOpen');
-          // Once, not twice: getLastRow() is its own round trip.
-          var aLastRow = archiveSource ? archiveSource.getLastRow() : 0;
-          if (archiveSource && aLastRow >= 2) {
-            var aRead = readSourceRows_(archiveSS, archiveSource, aLastRow);
-            tm.mark('ydayRead', aRead.cells);
-            if (aRead.fallback) tm.note('ydayFELLBACK');
-
-            // The header first, so a cache entry can be re-mapped by NAME on
-            // the way out rather than trusting its positions.
-            yLines_ = [backendJoin_(aRead.header)];
-            for (var i = 0; i < aRead.vals.length; i++) {
-              var aEntry = buildSideEntry_(aRead.vals[i], aRead.disps[i], aRead.map);
-              if (!yesterdayTRSet[aEntry.timeRange]) continue;
-              // An OS block has no standard hours by definition, so the value
-              // test alone would drop exactly the rows the OS band needs. NPL
-              // is the same shape and was missed when it was added: a spell
-              // survived only in the blocks where the operator ALSO produced,
-              // so one continuous claim drew as several separate bands with
-              // the quiet blocks between them simply absent.
-              if (!aEntry.bonus || (aEntry.value <= 0 && !aEntry.os && !aEntry.npl)) continue;
-              yEntries.push(aEntry);
-              yLines_.push(backendJoin_(aRead.vals[i]));
-            }
-          }
-          // Cached as the lines themselves rather than as the objects built
-          // from them. Only the rows that survived the window filter are
-          // kept, which is most of the saving.
-          if (yCacheKey && yLines_) {
-            cachePutLarge_(yCacheKey, yLines_.join('\n'), 900);
-          }
-        } catch (e) {
-          Logger.log('Yesterday archive read failed (' + yesterdayStr + '): ' + e.message);
-        }
-      }
-
+      var yEntries = readSideSlice_(yesterdayArchiveUrl, yesterdayStr, yesterdayTRSet, tm);
       for (var yi = 0; yi < yEntries.length; yi++) {
         var yEnt = yEntries[yi];
         archiveDataMap[yEnt.timeRange + '||' + yEnt.bonus] = yEnt;
@@ -1416,7 +1451,7 @@ function getDashboardData(archiveUrl) {
 
   } else {
     // ═══════════════════════════════════════════════
-    // ARCHIVE MODE — Single source (unchanged)
+    // ARCHIVE MODE — its own date, and the next morning beside it
     // ═══════════════════════════════════════════════
     var sLastRow = sourceSheet.getLastRow();
     if (sLastRow >= 2) {
@@ -1439,6 +1474,18 @@ function getDashboardData(archiveUrl) {
         }
       }
     }
+
+    // The morning after, 00:00-06:00. This file holds its own calendar date
+    // alone, and a 06:00-06:00 day - or a shift running past midnight - ends
+    // in the next one: read from that date's archive if it has one yet, the
+    // live file if not, the same rule the live view's yesterday half follows.
+    // Sent APART from rawSideData, which stays this date only: the Claims
+    // email reads that and fetches the morning itself, and bonusList is this
+    // date's too. The client decides which 24 hours to show.
+    var nextStr = Utilities.formatDate(lastRefresh, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+    var nextUrl = archiveUrlFor_(nextStr);
+    tm.mark('links');
+    nextDayRows = readSideSlice_(nextUrl, nextStr, dayBlockSet_(lastRefresh, 0, 6), tm);
   }
 
   // ── Hold the timeline to the newest block that actually HAS data ──────────
@@ -1505,6 +1552,10 @@ function getDashboardData(archiveUrl) {
     note: noteVal,
     tmDirectory: readTmDirectory_(ss)
   };
+  if (archiveUrl) {
+    payload.archiveDate = displayTime;
+    payload.nextDayRows = encodeSideRows_(nextDayRows, sideSchema);
+  }
   tm.mark('tmList');
 
   // The payload size probe that used to sit here has been removed. It cost
@@ -1517,6 +1568,149 @@ function getDashboardData(archiveUrl) {
   tm.note('rows=' + rawSideData.length + ' bonuses=' + payload.bonusList.length +
           ' blocks=' + timeRanges.length);
   payload.timing = tm.done(isLiveMode ? 'LIVE' : 'ARCHIVE');
+  return payload;
+}
+
+// The rows either side of an archive date that a filtered bonus number's run
+// can carry on into: the day before from 08:00, the day after from 06:00 to
+// 22:00. That is sixteen hours - the longest shift the OS page believes - out
+// from the nearest edge either day setting puts on screen. Asked for only when
+// a picked run is still going where the payload stops, so an ordinary archive
+// load never pays for it; each side is cached for everyone through
+// readSideSlice_, and cut to the bonus numbers asked about here.
+function getEdgeRows(dayKey, bonuses) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(dayKey || ''));
+  if (!m) throw new Error('getEdgeRows: not a date - ' + dayKey);
+  var want = {}, any = false;
+  var list = Array.isArray(bonuses) ? bonuses.slice(0, 10) : [];
+  for (var i = 0; i < list.length; i++) {
+    var b = String(list[i]).toUpperCase();
+    if (/^[A-Z0-9]+$/.test(b)) { want[b] = true; any = true; }
+  }
+  var schema = sideSchema_();
+  if (!any) return { sideSchema: schema, rows: [] };
+
+  var tm = loadTimer_();
+  var tz = Session.getScriptTimeZone();
+  var day = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  var sides = [
+    [new Date(day.getFullYear(), day.getMonth(), day.getDate() - 1), 8, 24],
+    [new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1), 6, 22]
+  ];
+  var rows = [];
+  for (var s = 0; s < sides.length; s++) {
+    var name = Utilities.formatDate(sides[s][0], tz, 'dd/MM/yyyy');
+    var got = readSideSlice_(archiveUrlFor_(name), name,
+                             dayBlockSet_(sides[s][0], sides[s][1], sides[s][2]), tm);
+    for (var r = 0; r < got.length; r++) {
+      if (want[String(got[r].bonus).toUpperCase()]) rows.push(got[r]);
+    }
+  }
+  tm.note('rows=' + rows.length);
+  return { sideSchema: schema, rows: encodeSideRows_(rows, schema), timing: tm.done('EDGE') };
+}
+
+// A user-picked span rather than a single calendar day: From date+time to To
+// date+time, which can cross any number of days and need not start or end on
+// a day's own boundary - the header's date picker offers this once Live is
+// left, alongside picking one day. Both are "dd/MM/yyyy HH:mm".
+//
+// Capped in DAYS so a mistyped year cannot ask this to open, read and hold in
+// memory a year of archives at once - see DATE_RANGE_MAX_DAYS_.
+var DATE_RANGE_MAX_DAYS_ = 31;
+
+function floor15Min_(d) {
+  return new Date(Math.floor(d.getTime() / 900000) * 900000);
+}
+
+function parseRangeBoundary_(s, label) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(String(s || ''));
+  if (!m) throw new Error('getDashboardDataRange: ' + label + ' is not dd/MM/yyyy HH:mm - ' + s);
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4]), Number(m[5]));
+}
+
+function getDashboardDataRange(fromStr, toStr) {
+  var tm = loadTimer_();
+  var from = floor15Min_(parseRangeBoundary_(fromStr, 'from'));
+  var to = floor15Min_(parseRangeBoundary_(toStr, 'to'));
+  if (!(to.getTime() > from.getTime())) throw new Error('getDashboardDataRange: to must be after from');
+  var spanDays = Math.ceil((to.getTime() - from.getTime()) / 86400000);
+  if (spanDays > DATE_RANGE_MAX_DAYS_) {
+    throw new Error('getDashboardDataRange: ' + spanDays + ' days is over the ' +
+                     DATE_RANGE_MAX_DAYS_ + '-day limit');
+  }
+
+  var tz = Session.getScriptTimeZone();
+  var count = Math.round((to.getTime() - from.getTime()) / 900000);
+  var timeRanges = generateTimeRanges_(to, count);
+
+  // One trSet per calendar day touched, so each day is opened once - the
+  // first and last may be a PART of that day (the picked time), everything
+  // between is the whole of it. Grouped by slicing the label itself rather
+  // than walking dates in parallel, so a block can never end up filed under
+  // the wrong day if the two ever disagreed.
+  var byDay = {};
+  var dayOrder = [];
+  for (var i = 0; i < timeRanges.length; i++) {
+    var dateStr = timeRanges[i].slice(0, 10);
+    if (!byDay[dateStr]) { byDay[dateStr] = {}; dayOrder.push(dateStr); }
+    byDay[dateStr][timeRanges[i]] = true;
+  }
+
+  var rawSideData = [];
+  var bonusSet = {};
+  for (var d = 0; d < dayOrder.length; d++) {
+    var dateStr = dayOrder[d];
+    // Same rule as the rest of the file: that day's own archive if it has
+    // one, otherwise the live file - which is what holds today, and holds
+    // yesterday too for the short window before the nightly archive run.
+    var rows = readSideSlice_(archiveUrlFor_(dateStr), dateStr, byDay[dateStr], tm);
+    for (var r = 0; r < rows.length; r++) {
+      rawSideData.push(rows[r]);
+      bonusSet[rows[r].bonus] = true;
+    }
+  }
+
+  // The same trailing-empty trim as getDashboardData, and for the same
+  // reason: the "To" time can be later than anything published yet.
+  var presentTR = {};
+  for (var pi = 0; pi < rawSideData.length; pi++) {
+    if (rawSideData[pi].value > 0) presentTR[rawSideData[pi].timeRange] = true;
+  }
+  var newestWithData = -1;
+  for (var ti = timeRanges.length - 1; ti >= 0; ti--) {
+    if (presentTR[timeRanges[ti]]) { newestWithData = ti; break; }
+  }
+  if (newestWithData >= 0 && newestWithData < timeRanges.length - 1) {
+    timeRanges = timeRanges.slice(0, newestWithData + 1);
+    var keepSet = {};
+    for (var tk = 0; tk < timeRanges.length; tk++) keepSet[timeRanges[tk]] = true;
+    rawSideData = rawSideData.filter(function (row) { return keepSet[row.timeRange]; });
+  }
+
+  // Threshold and the TM directory are site-wide settings, not archived per
+  // day, so they come from the live file exactly as the normal Live load
+  // reads them.
+  var liveSs = SpreadsheetApp.getActiveSpreadsheet();
+  var liveSheet = liveSs.getSheetByName(CONFIG.SHEET_NAME);
+  var threshold = liveSheet ? liveSheet.getRange(CONFIG.THRESHOLD_CELL).getValue() : 0;
+
+  var sideSchema = sideSchema_();
+  var payload = {
+    threshold: threshold,
+    lastRefresh: Utilities.formatDate(from, tz, 'dd/MM/yyyy HH:mm') + ' to ' +
+                 Utilities.formatDate(to, tz, 'dd/MM/yyyy HH:mm'),
+    timeRanges: timeRanges,
+    sideSchema: sideSchema,
+    rawSideData: encodeSideRows_(rawSideData, sideSchema),
+    bonusList: Object.keys(bonusSet).sort(),
+    currentTimestamp: null,
+    note: '',
+    tmDirectory: readTmDirectory_(liveSs)
+  };
+  tm.note('rows=' + rawSideData.length + ' bonuses=' + payload.bonusList.length +
+          ' days=' + dayOrder.length + ' blocks=' + timeRanges.length);
+  payload.timing = tm.done('RANGE');
   return payload;
 }
 

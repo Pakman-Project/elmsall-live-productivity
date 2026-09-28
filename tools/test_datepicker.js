@@ -64,6 +64,9 @@ FakeDate.prototype = REAL_DATE.prototype;
 const ctx = {
   console,
   Date: FakeDate,
+  // A custom range is a second way to leave Live, alongside picking a day -
+  // syncDateUi_ checks it first. Null here: this suite never applies one.
+  customRangeQuery: null,
   $: id => nodes[id] || null,
   safeTextPak: s => String(s),
   escapeAttrPak: s => String(s).replace(/"/g, '&quot;'),
@@ -194,10 +197,16 @@ head('[2a2] one footer action, and it works from today\'s own month');
   const header = R('Web - Header.html');
   check('Clear is gone', header.indexOf('data-cal-action="clear"') === -1,
         'it meant "back to Live" without saying so, which is what Today now does');
-  check('one action button remains',
-        (header.match(/data-cal-action=/g) || []).length === 1,
+  // Two now, not one: the calendar's own, and a second beside the
+  // custom-range fields (which collapse the calendar away - see
+  // toggleDateRangePanel_) so Live is still one click away without having
+  // to back out of the fields first.
+  check('two action buttons remain, the calendar\'s and the range fields\' own',
+        (header.match(/data-cal-action=/g) || []).length === 2,
         '= ' + (header.match(/data-cal-action=/g) || []).length);
-  check('and it names both things it does', /Today \(Live\)/.test(header), '');
+  check('the calendar\'s names both things it does', /Today \(Live\)/.test(header), '');
+  check('the range fields\' reads the other way round - it is reached FROM there',
+        /Live \(Today\)/.test(header), '');
 
   if (typeof handler === 'function') {
     // The reported case exactly: already on this month, already the month the
@@ -213,6 +222,20 @@ head('[2a2] one footer action, and it works from today\'s own month');
           'the whole bug was a button that did nothing visible');
     check('the menu closes behind it', nodes.dateMenu.classList.contains('open') === false, '');
     nodes.archiveSelect.value = '';
+
+    // A custom range also leaves the select on '' (applyDateRange_ does this
+    // deliberately, so a later single-day pick still differs from it) - so
+    // the SAME value the no-op guard above compares against is also what a
+    // range in progress looks like. Pressing Today then must not read as
+    // "already there" and silently do nothing.
+    ev('customRangeQuery = { from: "20/09/2026 14:00", to: "22/09/2026 09:00" };');
+    nodes.archiveSelect.value = '';
+    nodes.archiveSelect.__dispatched = null;
+    handler({ target: { closest: s => (s === '[data-cal-action]' ? btn : null) } });
+    check('pressing Today while a range is active still reloads',
+          nodes.archiveSelect.__dispatched === 'change',
+          'the value looked unchanged, but the range - not Live - was what was showing');
+    ev('customRangeQuery = null;');
   }
 }
 

@@ -849,6 +849,27 @@
             </label>
           </div>
 
+          <div class="settings-group">
+            <h3 class="tour-menu-sub">Past dates</h3>
+            <label class="setting-row" for="dayMode66">
+              <input type="radio" name="dayMode" id="dayMode66" value="6-6" onchange="setDayMode_(this.value)">
+              <span class="setting-text">
+                <span class="setting-label">06:00 to 06:00</span>
+                <span class="setting-hint">The production day: a date runs from 06:00 that morning
+                  to 06:00 the next, so a night shift stays in one piece.</span>
+              </span>
+            </label>
+            <label class="setting-row" for="dayMode00">
+              <input type="radio" name="dayMode" id="dayMode00" value="0-0" onchange="setDayMode_(this.value)">
+              <span class="setting-text">
+                <span class="setting-label">00:00 to 00:00</span>
+                <span class="setting-hint">The calendar day, midnight to midnight.</span>
+              </span>
+            </label>
+            <p class="tour-menu-reset-hint">Live always shows the last 24 hours. With a bonus number
+              filtered, a shift that is still going at either end of the day is followed until it stops.</p>
+          </div>
+
           <div class="settings-group settings-shortcuts">
             <h3 class="tour-menu-sub">Keyboard shortcuts</h3>
             <dl class="shortcut-list">
@@ -888,7 +909,7 @@
         <div class="breakdown-header">
           <div>
             <h2>What do you want to see?</h2>
-            <p class="breakdown-subtitle">Two questions, so the dashboard opens on your work rather than everyone&rsquo;s. You can change this any time from Settings.</p>
+            <p class="breakdown-subtitle">So the dashboard opens on your work rather than everyone&rsquo;s. You can change this any time from Settings.</p>
           </div>
         </div>
 
@@ -910,6 +931,15 @@
               <button class="btn" type="button" onclick="onboardingSelectAll_(false)">Select none</button>
             </div>
             <div id="onboardingAreaChoices" class="area-group-areas"></div>
+          </div>
+
+          <!-- Also shown ON ITS OWN, once, to anyone who set up before it
+               existed - see openDayModePrompt_. The number goes then, since
+               there is no 1 or 2 in front of it. -->
+          <div class="ag-step" id="onboardingPage3" hidden>
+            <h3 class="ag-step-title"><span class="ag-step-num" id="onboardingDayNum">3</span> When you open a past date, which 24 hours?</h3>
+            <p class="ag-step-hint">Live always shows the last 24 hours. With a bonus number filtered, a shift still going at either end is followed until it stops.</p>
+            <div id="onboardingDayChoices" class="onboarding-sites"></div>
           </div>
 
           <p class="onboarding-error" id="onboardingError" role="alert" hidden></p>

@@ -107,14 +107,17 @@ head('[2] the window is a production day, not a calendar one');
         /new Date\(start\.getTime\(\) \+ 86400000\)/.test(PAGE));
   check('the blocks are quarter hours',
         /var FRAUD_BLOCK_MINUTES_ = 15;/.test(PAGE));
-  // The log's Date column IS the production day, so one key covers the whole
-  // window - including the hours of it that fall after midnight.
-  check('one date key is asked of both logs',
-        /\.getOsLogRows\(\[key\], currentArchiveUrl \|\| null\)/.test(PAGE) &&
-        /\.getNplLogRows\(\[key\], currentArchiveUrl \|\| null\)/.test(PAGE),
-        'the Date column is already the production day; a second key would double-count');
-  check('and the key is built from the selected day',
-        /var key = fraudDateKeyPak_\(fraudSelectedDayPak_\(\)\);/.test(PAGE));
+  // The log's Date column IS the production day, so a single production day
+  // covers its own whole window - including the hours of it that fall after
+  // midnight - in one key. A custom range (see customRangeQuery) can span
+  // several production days, so fraudWantDatesPak_ asks for all of them;
+  // for one day it still comes back as the same one key this always sent.
+  check('both logs are asked for every production day the window touches',
+        /\.getOsLogRows\(keys, currentArchiveUrl \|\| null\)/.test(PAGE) &&
+        /\.getNplLogRows\(keys, currentArchiveUrl \|\| null\)/.test(PAGE),
+        'the Date column is already the production day; asking one at a time would miss the rest of a range');
+  check('and the keys are built by walking the window, not just reading the selected day',
+        /function fraudWantDatesPak_\(\) \{[\s\S]{0,80}var win = fraudWindowPak_\(\);/.test(PAGE));
   check('Live reads the data\'s own clock (lastRefreshTimestamp), not just the browser\'s',
         /lastRefreshTimestamp/.test(PAGE) &&
         /new Date\(lastRefreshTimestamp\) : new Date\(\)/.test(PAGE),
@@ -225,8 +228,8 @@ head('[3c] Total Std Mins Produced is the whole day, independent of any one clai
         'a value of 9.75 means the 00:00 row leaked in');
   check('the key is upper-cased, matching how it is looked up',
         totals.BBB === 0.4 && totals.bbb === undefined);
-  check('read off allSideData, with rawSideData as the only fallback',
-        /function fraudTotalStdIndexPak_\(win\) \{[\s\S]{0,300}allSideData\.length\)/.test(PAGE));
+  check('read through fraudSourcePak_, the one source every reader shares',
+        /function fraudTotalStdIndexPak_\(win\) \{[\s\S]{0,300}fraudSourcePak_\(\)/.test(PAGE));
   check('and the page reads it once per bonus, not once per block',
         /var totals = fraudTotalStdIndexPak_\(win\);/.test(PAGE) &&
         /totals\[String\(row\.bonus\)\.toUpperCase\(\)\] \|\| 0/.test(PAGE));
@@ -363,13 +366,40 @@ head('[5] the pivot is read whole, not through the Warehouse picker');
 // exactly the answer this page must not give.
 {
   check('allSideData, with rawSideData only as a fallback',
-        (PAGE.match(/allSideData\.length\)\s*\n\s*\? allSideData : rawSideData/g) || []).length === 3,
+        (PAGE.match(/var src = fraudSourcePak_\(\);/g) || []).length === 3 &&
+        /function fraudSourcePak_\(\) \{[\s\S]{0,200}allSideData\.length\)\s*\n\s*\? allSideData : rawSideData/.test(PAGE),
         'in the block index, the TOTAL index, and the coverage line, or they would disagree');
   check('the index is keyed on bonus and block together',
         /idx\[String\(r\.bonus\)\.toUpperCase\(\) \+ '\|\|' \+ d\.getTime\(\)\] = r;/.test(PAGE));
   check('and looked up the same way it was built',
         /idx\[String\(row\.bonus\)\.toUpperCase\(\) \+ '\|\|' \+ blocks\[b\]\]/.test(PAGE),
         'one side upper-cased and the other not is a join that silently finds nothing');
+}
+
+head('[5b] a past date is read off its whole span, not the window on screen');
+// On a 00:00-00:00 view the window stops at midnight, six hours short of this
+// page's 06:00-06:00 day, so the page reads everything the payload brought -
+// the date and the next morning. Run for real: a claim at 00:30-02:00 on the
+// NEXT calendar day against production at 01:00, which the window never held.
+{
+  ctx.allSideData = [{ bonus: 'NGT', timeRange: '18/09/2026 23:00 - x', value: 0.25 }];
+  ctx.archiveView = { span: ctx.allSideData.concat([
+    { bonus: 'NGT', timeRange: '19/09/2026 01:00 - x', value: 0.25 }
+  ]) };
+  ctx.fraudOsRows = [];
+  ctx.fraudNplRows = [{
+    bonus: 'NGT', date: '18/09/2026', from: '00:30', to: '02:00',
+    check: 'OK', tmAuth: 'T Harrer', task: 'Meeting'
+  }];
+  ctx.fraudBonusFilter = {}; ctx.fraudAreaFilter = {}; ctx.fraudKindFilter = {};
+  ctx.fraudAuthFilter = {}; ctx.fraudStatusFilter = {};
+  const scan = ctx.fraudScanPak_({ start: at(6, 0, 18), finish: at(6, 0, 19) });
+  check('a claim after midnight meets the next morning\'s production',
+        scan.rows.length === 1 && Math.abs(scan.rows[0].overlapStd - 0.25) < 1e-9,
+        scan.rows.length + ' rows');
+  ctx.archiveView = null;
+  check('and Live, with no span, still reads allSideData',
+        ctx.fraudSourcePak_() === ctx.allSideData);
 }
 
 head('[6] an empty table says WHICH kind of empty it is');

@@ -73,6 +73,11 @@
              Days with no archive are rendered as plain spans, not buttons, so
              they cannot be picked or focused. -->
         <div class="date-menu date-calendar" id="dateMenu" role="dialog" aria-label="Choose a date">
+          <!-- Collapsed while the custom-range fields are open - see
+               toggleDateRangePanel_. The two answer the same question
+               ("which day(s)"), so showing both at once is a popover asking
+               it twice; the calendar reappears the moment the fields close. -->
+          <div id="calBody">
           <div class="cal-head">
             <button type="button" class="cal-nav" data-cal-nav="-1" aria-label="Previous month">
               <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
@@ -93,6 +98,46 @@
                means Live, so the two were one request wearing two labels. -->
           <div class="cal-foot">
             <button type="button" class="cal-action" data-cal-action="today">Today (Live)</button>
+          </div>
+          </div>
+
+          <!-- A span rather than one day: From/To date AND time, for when
+               Hours Range's rolling windows do not fit the question - a
+               night audit running across several shifts, say. Its own
+               server call (getDashboardDataRange), not the single-archive
+               one above, so it can cross as many days as asked for. -->
+          <div class="date-range-panel">
+            <button type="button" class="date-range-toggle" id="dateRangeToggle"
+                    onclick="toggleDateRangePanel_()" aria-expanded="false" aria-controls="dateRangeFields">
+              <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i> Custom range&hellip;
+            </button>
+            <div class="date-range-fields" id="dateRangeFields" hidden>
+              <!-- The calendar's own way back, since it is collapsed while
+                   these fields are up - see toggleDateRangePanel_. Default
+                   Range cancels the span and shows the calendar again, still
+                   inside this popover; Live (Today) is the calendar's own
+                   Today action, close at hand instead of behind it. -->
+              <div class="date-range-quick-actions">
+                <button type="button" class="cal-action" onclick="useDefaultRangePak_()">Default Range</button>
+                <button type="button" class="cal-action" data-cal-action="today">Live (Today)</button>
+              </div>
+              <div class="date-range-row">
+                <span class="date-range-label">From</span>
+                <input type="date" id="rangeFromDate" class="date-range-input" aria-label="From date">
+                <input type="time" id="rangeFromTime" class="date-range-input date-range-time"
+                       step="900" value="00:00" aria-label="From time">
+              </div>
+              <div class="date-range-row">
+                <span class="date-range-label">To</span>
+                <input type="date" id="rangeToDate" class="date-range-input" aria-label="To date">
+                <input type="time" id="rangeToTime" class="date-range-input date-range-time"
+                       step="900" value="00:00" aria-label="To time">
+              </div>
+              <p class="date-range-error" id="dateRangeError" role="alert" hidden></p>
+              <div class="date-range-actions">
+                <button type="button" class="cal-action" id="rangeApplyBtn" onclick="applyDateRange_()">Apply range</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -245,8 +245,12 @@ head('[6c] the bonus search is not narrowed by building');
   check('the scoping function is gone entirely',
         (state + init + ui).indexOf('refreshBonusListForScope_') === -1,
         'a surviving caller would re-narrow the list');
+  // Or, on a past date, from the window's rows - which are cut from
+  // allSideData before scopeRowsToSite_ runs, so they are still unscoped.
   check('the list comes straight from the payload',
-        /allBonusList\s*=\s*data\.bonusList\s*\|\|\s*\[\]/.test(init));
+        /var bonusList = data\.bonusList \|\| \[\];/.test(init) &&
+        /allBonusList = bonusList;/.test(init) &&
+        /bonusList = applyArchiveWindowPak_\(data, allSideData\);\s*\n\s*else archiveView = null;\s*\n\s*rawSideData = scopeRowsToSite_\(allSideData\);/.test(init));
 }
 
 head('[7] an OS-only operator is findable under a building filter');

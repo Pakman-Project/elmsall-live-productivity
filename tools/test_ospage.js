@@ -45,7 +45,11 @@ function mediaBlockFor(css, marker) {
 
 const R = f => fs.readFileSync(APPS + f, 'utf8');
 
-const ctx = { console, document: undefined };
+// A custom range (Web - JsUi's applyDateRange_) locks this page's own From/
+// To disabled and spanning the whole window - null here by default; some
+// checks below set it to confirm applyBonusRangePak_/ensureTimeSelectsPak_
+// respect it.
+const ctx = { console, document: undefined, customRangeQuery: null };
 vm.createContext(ctx);
 vm.runInContext(strip(R('Web - JsHelpers.html')), ctx);
 vm.runInContext(strip(R('Web - JsState.html')).split('function applyConfigToCSSPak')[0], ctx);
@@ -1087,7 +1091,7 @@ head('[11] Hours Range and Time Window are inert where they do nothing');
         /var PAGES_WITH_OWN_RANGE_ = \[2, 3, 4, 5\];/.test(ui));
   check('and goToPage syncs it', /syncTimeAxisControlsPak_\(index\);/.test(ui));
   check('both controls are disabled, not hidden',
-        /\['hoursRange', 'timeWindow'\]/.test(ui) && /el\.disabled = off;/.test(ui),
+        /\['hoursRange', 'timeWindow'\]/.test(ui) && /el\.disabled = off \|\| rangeOff;/.test(ui),
         'hidden, the row would reflow every time you change page');
   check('the field greys with them',
         /hc-field-off/.test(ui) && R('Web - Styles.html').indexOf('.hc-field-off {') !== -1);
@@ -1332,17 +1336,22 @@ head('[22] a control the USER moved skeletons; the clock ticking does not');
         /function handleControlChangePak[\s\S]{0,1000}osMarkControlChangedPak_\(\);/.test(data));
   check('the Warehouse picker too, but only when it actually changed',
         /if \(changed && typeof osMarkControlChangedPak_ === 'function'\)/.test(ui));
+  // Shared with applyDateRange_ (Web - JsUi) under the name beginNewViewPak_,
+  // so a custom range starts from nothing exactly as picking a single day
+  // does - checked as "the handler calls it, and it does the marking",
+  // rather than as one long stretch of inline text, now that both callers
+  // reach it by name instead of repeating it.
   check('and the date picker, since another day is other data entirely',
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,2600}osMarkControlChangedPak_\(\);/
-          .test(init),
+        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,400}beginNewViewPak_\(\);/.test(init) &&
+        /function beginNewViewPak_\(\)[\s\S]{0,400}osMarkControlChangedPak_\(\);/.test(init),
         'otherwise yesterday spells swap for today under the reader, silently');
   // All three pages that hold their own logs, not just OS. The other two were
   // cleared inside renderDashboardPayload_ instead - which does not run until
   // the new day comes BACK from the server, so the page a reader was looking
   // at when they picked the date showed the old day for the whole round trip.
   check('...and so do the NPL and Claims pages',
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,2800}nplMarkControlChangedPak_\(\);/.test(init) &&
-        /archiveSelect'\)\.addEventListener\('change'[\s\S]{0,2800}fraudMarkControlChangedPak_\(\);/.test(init));
+        /function beginNewViewPak_\(\)[\s\S]{0,600}nplMarkControlChangedPak_\(\);/.test(init) &&
+        /function beginNewViewPak_\(\)[\s\S]{0,600}fraudMarkControlChangedPak_\(\);/.test(init));
   check('and the page on screen is redrawn at once, not when the data lands',
         /redrawCurrentPagePak_\(\);/.test(init) &&
         /function redrawCurrentPagePak_\(\)/.test(ui),
@@ -1732,6 +1741,23 @@ head('[32] a bonus filter widens the range to cover that person');
   check('...and clearing still gives back the ORIGINAL range',
         to.selectedIndex === 1,
         'saving on every pick would have restored to the first widening');
+
+  // On a past date the options can grow under the same pick: a run followed
+  // past the window (see stretchBlocksPak_) gains blocks when its edge rows
+  // land, and the range has to follow it rather than stay where it was put.
+  ctx.selectedBonuses = ['AAA'];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  from.selectedIndex = 0;
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  const heldAt = from.selectedIndex;
+  ctx.viewStretch = { before: [], after: ['x', 'y'], rows: [], needsEdge: false };
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
+  check('a stretch that grows re-applies the range, same pick or not',
+        heldAt === 0 && from.options[from.selectedIndex].value.startsWith('09/09/2026 08:15'),
+        heldAt + ' then ' + from.options[from.selectedIndex].value);
+  ctx.viewStretch = { before: [], after: [], rows: [], needsEdge: false };
+  ctx.selectedBonuses = [];
+  ctx.applyBonusRangePak_('os', 'osFrom', 'osTo', rows);
 
   check('a picked bonus that cannot be placed on a clock moves nothing',
         (function () {

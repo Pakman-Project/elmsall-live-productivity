@@ -56,23 +56,33 @@ function handleControlChangePak(sourceElement, type) {
   applyLocalFiltersPak();
 }
 
-// Builds all 96 fifteen-minute blocks (00:00-00:15 … 23:45-00:00) for a single
-// day, so the Data Table can always show the full day regardless of the Hours
-// Range selector — including blocks later than "now" or with no data yet, which
-// come back as zero-value placeholder rows from generateMainRows_.
+// Builds all 96 fifteen-minute blocks of a single LIVE day, so the Data Table
+// can always show the full day regardless of the Hours Range selector -
+// including blocks later than "now" or with no data yet, which come back as
+// zero-value placeholder rows from generateMainRows_. Archive dates never
+// reach this - see applyLocalFiltersPak, which windows those itself.
+//
+// "A day" follows the same setting Settings offers for past dates
+// (dayModePak_): 00:00-00:00, or 06:00-06:00 so a night shift straddling
+// midnight stays on one row of the table instead of being cut at the date
+// line. In 6-6 mode a block before 06:00 belongs to the PRODUCTION day that
+// started the morning before, the same fold the OS/NPL log's own Date
+// column uses - see FRAUD_DAY_START_HOUR_.
 //
 // The day is anchored to the MOST RECENT loaded block's date, not the first.
 // On the live view the feed can include a couple of pre-midnight blocks from
 // yesterday (the pipeline's pre-midnight grace), so the first block can be
-// yesterday — the latest block is today, which is the day we want. For a
-// History snapshot the latest block is simply that day. Returns null if there's
-// no data yet (caller falls back to the Hours-Range-scoped list).
+// yesterday — the latest block is today, which is the day we want. Returns
+// null if there's no data yet (caller falls back to the Hours-Range-scoped
+// list).
 function buildFullDayTimeList_() {
   if (!timeRanges.length) return null;
   var latest = timeRanges[timeRanges.length - 1];
-  var dayStart = parseDateTimePartPak(extractRangePartsPak(latest).start);
-  if (!dayStart) return null;
-  dayStart.setHours(0, 0, 0, 0);
+  var latestStart = parseDateTimePartPak(extractRangePartsPak(latest).start);
+  if (!latestStart) return null;
+  var h0 = dayModePak_() === '6-6' ? 6 : 0;
+  var dayStart = new Date(latestStart.getFullYear(), latestStart.getMonth(), latestStart.getDate(), h0, 0, 0, 0);
+  if (latestStart.getHours() < h0) dayStart.setDate(dayStart.getDate() - 1);
   var list = [];
   for (var b = 0; b < 96; b++) {
     var s = new Date(dayStart.getTime() + b * 15 * 60000);
@@ -80,6 +90,172 @@ function buildFullDayTimeList_() {
     list.push(formatDatePak(s) + ' - ' + formatDatePak(e));
   }
   return list;
+}
+
+// ── Past dates: which 24 hours, and a run that carries on past them ────────
+// An archive file is one calendar day, and its payload brings the next
+// morning (00:00-06:00) beside it - see getDashboardData. Which 24 hours of
+// that are on screen is the reader's choice, from Settings. Live is a rolling
+// 24 hours and none of this applies to it.
+
+// "dd/mm/yyyy hh:mm" for `min` minutes after 00:00 on `day`. Counted on the
+// clock rather than in milliseconds, because that is how the pivot labels its
+// blocks - so a day the clocks change on still has 96 of them.
+function archiveClockPak_(day, min) {
+  var d = new Date(day.getFullYear(), day.getMonth(), day.getDate() + Math.floor(min / 1440));
+  var m = ((min % 1440) + 1440) % 1440;
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' +
+         d.getFullYear() + ' ' + ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+}
+
+function archiveBlockPak_(day, min) {
+  return archiveClockPak_(day, min) + ' - ' + archiveClockPak_(day, min + 15);
+}
+
+// The 96 blocks `mode` puts on screen for the archive dated dayKey, and the
+// rows that fall in them. Trailing blocks with no hours are trimmed the way
+// the server trims them (see getDashboardData), because when the next morning
+// is today the rest of it has not happened yet - judged on hours alone, for
+// the reason given there: an OS spell is typed ahead of time.
+function archiveWindowPak_(dayKey, mode, rows) {
+  var p = String(dayKey).split('/');
+  var day = new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+  var from = mode === '0-0' ? 0 : 360;
+  var list = [], inWin = {};
+  for (var b = 0; b < 96; b++) {
+    var tr = archiveBlockPak_(day, from + b * 15);
+    list.push(tr);
+    inWin[tr] = true;
+  }
+  var win = [], hours = {};
+  for (var i = 0; i < rows.length; i++) {
+    if (!inWin[rows[i].timeRange]) continue;
+    win.push(rows[i]);
+    if (rows[i].value > 0) hours[rows[i].timeRange] = true;
+  }
+  var last = list.length - 1;
+  while (last >= 0 && !hours[list[last]]) last--;
+  var trimmed = last >= 0 && last < list.length - 1;
+  return { day: day, from: from, list: trimmed ? list.slice(0, last + 1) : list,
+           rows: win, trimmed: trimmed };
+}
+
+// Puts the reader's 24 hours of an archive payload in place of the payload's
+// own: timeRanges and allSideData become the window's. Returns the window's
+// bonus numbers, because the server's list covers the calendar date alone and
+// would leave anyone who only worked the next morning unsearchable.
+//
+// The view survives a re-render of the SAME date - a change of day setting -
+// so edge rows already fetched for it are not fetched again.
+function applyArchiveWindowPak_(data, rows) {
+  var span = rows.concat(decodeSideRowsPak_(data.nextDayRows, data.sideSchema));
+  var win = archiveWindowPak_(data.archiveDate, dayModePak_(), span);
+  if (!archiveView || archiveView.day !== data.archiveDate) {
+    archiveView = { day: data.archiveDate, edge: [], edgeFor: {}, edgeAsked: {} };
+  }
+  archiveView.span = span;
+  archiveView.dayStart = win.day;
+  archiveView.from = win.from;
+  archiveView.list = win.list;
+  archiveView.trimmed = win.trimmed;
+  timeRanges = win.list;
+  allSideData = win.rows;
+  var seen = {};
+  for (var i = 0; i < win.rows.length; i++) seen[win.rows[i].bonus] = true;
+  return Object.keys(seen).sort();
+}
+
+// A picked bonus number at work in the window's first or last block is
+// followed out past it, a block at a time, for as long as it stays at work -
+// hours, an OS spell or an NPL spell, the three things the chart's bands are
+// drawn from - up to the longest shift the OS page believes. A run that only
+// reaches the edge from outside, starting at 06:00 say, is left alone.
+//
+// The far end is widened to the Time Window's boundary: a bucket short of
+// blocks is dropped at the ends of a series (dropPartialEdgeGroupKeys_), and
+// would take the stretch with it.
+//
+// needsEdge: the run was still going where the loaded rows stop, so the rows
+// beyond have to be asked for - see requestEdgeRowsPak_.
+function stretchBlocksPak_(view, rows, bonuses, wm) {
+  var out = { before: [], after: [], rows: [], needsEdge: false };
+  var picked = {}, active = {}, mine = [];
+  for (var b = 0; b < bonuses.length; b++) picked[bonuses[b]] = true;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!picked[r.bonus]) continue;
+    mine.push(r);
+    if ((Number(r.value) || 0) > 0 || r.os || r.npl) active[r.timeRange] = true;
+  }
+  var edgeOn = bonuses.every(function (x) { return view.edgeFor[x]; });
+  // Minutes from 00:00 on the date that rows are loaded for: the date and the
+  // next morning, and with the edges in, 08:00 the day before to 22:00 after.
+  var lo = edgeOn ? -960 : 0, hi = edgeOn ? 2760 : 1800;
+  var cap = OS_MAX_SHIFT_HOURS_PAK_ * 60;
+  var day = view.dayStart, w0 = view.from, w1 = view.from + view.list.length * 15;
+  var k;
+  if (active[archiveBlockPak_(day, w0)]) {
+    for (k = w0 - 15; k >= w0 - cap; k -= 15) {
+      if (k < lo) { out.needsEdge = !edgeOn; break; }
+      if (!active[archiveBlockPak_(day, k)]) break;
+      out.before.unshift(archiveBlockPak_(day, k));
+    }
+  }
+  // Never past a trimmed end: that end is the present, and an OS spell typed
+  // ahead of time would walk the axis into blocks that have not happened.
+  if (!view.trimmed && active[archiveBlockPak_(day, w1 - 15)]) {
+    for (k = w1; k < w1 + cap; k += 15) {
+      if (k >= hi) { out.needsEdge = !edgeOn; break; }
+      if (!active[archiveBlockPak_(day, k)]) break;
+      out.after.push(archiveBlockPak_(day, k));
+    }
+  }
+  var step = Math.max(15, wm || 15);
+  if (out.before.length) {
+    var first = w0 - out.before.length * 15;
+    for (k = first - 15; k >= first - ((first % step) + step) % step; k -= 15) {
+      out.before.unshift(archiveBlockPak_(day, k));
+    }
+  }
+  if (out.after.length) {
+    var end = w1 + out.after.length * 15;
+    for (k = end; k < end + (step - ((end % step) + step) % step) % step; k += 15) {
+      out.after.push(archiveBlockPak_(day, k));
+    }
+  }
+  var inStretch = {};
+  out.before.concat(out.after).forEach(function (t) { inStretch[t] = true; });
+  out.rows = scopeRowsToSite_(mine.filter(function (x) { return inStretch[x.timeRange]; }));
+  return out;
+}
+
+function computeViewStretchPak_(wm) {
+  if (!archiveView || !selectedBonuses.length) {
+    return { before: [], after: [], rows: [], needsEdge: false };
+  }
+  return stretchBlocksPak_(archiveView, archiveView.span.concat(archiveView.edge),
+                           selectedBonuses, wm);
+}
+
+// Asked once per bonus number per date, and the answer re-draws the page.
+// Dropped if it lands after the reader has moved to another date, or while the
+// tour's demo data is up; a failure is logged and not retried, so the run just
+// stops where the loaded rows do.
+function requestEdgeRowsPak_() {
+  var view = archiveView;
+  if (!view || (typeof tourActive !== 'undefined' && tourActive)) return;
+  var want = selectedBonuses.filter(function (b) { return !view.edgeAsked[b]; });
+  if (!want.length) return;
+  want.forEach(function (b) { view.edgeAsked[b] = true; });
+  google.script.run.withSuccessHandler(function (res) {
+    if (archiveView !== view || (typeof tourActive !== 'undefined' && tourActive)) return;
+    if (res && res.timing) console.info(res.timing);
+    view.edge = view.edge.concat(decodeSideRowsPak_(res && res.rows, res && res.sideSchema));
+    want.forEach(function (b) { view.edgeFor[b] = true; });
+    applyLocalFiltersPak();
+  }).withFailureHandler(function (err) {
+    console.warn('Edge rows failed to load:', err && err.message ? err.message : err);
+  }).getEdgeRows(view.day, want);
 }
 
 function applyLocalFiltersPak() {
@@ -95,11 +271,22 @@ function applyLocalFiltersPak() {
   var hoursRange = parseInt($('hoursRange').value, 10) || 3;
   var windowMinutes = parseInt($('timeWindow').value, 10);
   var rowsLimit = parseInt($('sharedRowsLimit').value, 10) || 10;
-  var blocksToKeep = hoursRange * 4;
+  // A custom range already says both ends explicitly - Hours Range is
+  // disabled in the UI for exactly this reason (see syncHoursRangeGateUi_),
+  // and reading its value here regardless would silently re-narrow a
+  // multi-day range down to however many hours the control was last left at.
+  var blocksToKeep = customRangeQuery ? timeRanges.length : hoursRange * 4;
+  // On a past date, a filtered bonus number's run carried on past the window
+  // - see stretchBlocksPak_. Empty everywhere else.
+  viewStretch = computeViewStretchPak_(windowMinutes);
+  var viewData = viewStretch.rows.length ? rawSideData.concat(viewStretch.rows) : rawSideData;
   var targetTimeList = timeRanges.slice(-blocksToKeep);
+  // The early side only when the Hours Range reaches back to the window's start.
+  if (blocksToKeep >= timeRanges.length) targetTimeList = viewStretch.before.concat(targetTimeList);
+  targetTimeList = targetTimeList.concat(viewStretch.after);
   var targetTimeRanges = {};
   for (var i = 0; i < targetTimeList.length; i++) { targetTimeRanges[targetTimeList[i]] = true; }
-  var filteredData = rawSideData.filter(function(row) {
+  var filteredData = viewData.filter(function(row) {
     if (!targetTimeRanges[row.timeRange]) return false;
     if (selectedBonuses.length > 0 && selectedBonuses.indexOf(row.bonus) === -1) return false;
     return true;
@@ -129,11 +316,19 @@ function applyLocalFiltersPak() {
   // in the future, and any the pipeline has not published, are dropped rather
   // than shown as empty rows. Presence is judged against the UNFILTERED data so
   // the table keeps the same shape when a bonus filter is applied.
-  var tableTimeList = buildFullDayTimeList_() || targetTimeList;
+  //
+  // A past date's table is its window, plus any run carried past it:
+  // buildFullDayTimeList_ anchors to the midnight of the LAST block, which on a
+  // 06:00-06:00 day is the next morning's. A custom range is already exactly
+  // what was asked for, start to finish - there is no wider "full day" of it
+  // to fall back to, nor an Hours Range to be independent of.
+  var tableTimeList = customRangeQuery ? timeRanges
+    : archiveView ? viewStretch.before.concat(timeRanges, viewStretch.after)
+    : (buildFullDayTimeList_() || targetTimeList);
   var presentBlocks = {};
-  for (var pb = 0; pb < rawSideData.length; pb++) { presentBlocks[rawSideData[pb].timeRange] = true; }
+  for (var pb = 0; pb < viewData.length; pb++) { presentBlocks[viewData[pb].timeRange] = true; }
   tableTimeList = tableTimeList.filter(function(tr) { return presentBlocks[tr]; });
-  var tableSourceData = rawSideData.filter(function(row) {
+  var tableSourceData = viewData.filter(function(row) {
     return selectedBonuses.length === 0 || selectedBonuses.indexOf(row.bonus) !== -1;
   });
   // Raw on purpose: no threshold filtering, so the Data Table shows exactly what
@@ -162,6 +357,8 @@ function applyLocalFiltersPak() {
   renderPageIfNeeded_(currentPage);
 
   saveUserPreferences();
+
+  if (viewStretch.needsEdge) requestEdgeRowsPak_();
 }
 
 // opts.applyThreshold (default true): drop rows whose standard hours for the

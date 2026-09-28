@@ -3106,6 +3106,12 @@ body.page-scrolled-far .back-to-top {
   flex-shrink: 0;
 }
 
+/* The day question drops its number when it is asked on its own - see
+   openDayModePrompt_. The display above would otherwise beat [hidden]. */
+.ag-step-num[hidden] {
+  display: none;
+}
+
 .ag-step-hint {
   margin: 0 0 12px;
   font-size: 12px;
@@ -4455,6 +4461,15 @@ body.page-scrolled-far .back-to-top {
 
 .breakdown-time-select:focus {
   border-color: var(--accent);
+}
+
+/* A custom date range (see customRangeQuery) already locks this page's From/
+   To to the whole span - greyed the same way Hours Range is, in the header,
+   for the same reason: a control you can still turn that then changes
+   nothing reads as the page being broken. */
+.breakdown-time-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .breakdown-time-select option {
@@ -6314,7 +6329,12 @@ kbd {
   cursor: pointer;
 }
 
-.setting-row input[type="checkbox"] {
+.setting-row + .setting-row {
+  margin-top: 12px;
+}
+
+.setting-row input[type="checkbox"],
+.setting-row input[type="radio"] {
   width: 16px;
   height: 16px;
   margin: 0;
@@ -7135,7 +7155,7 @@ textarea:focus-visible {
 
 .kpi-cell-value {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   justify-content: center;
 }
@@ -7450,7 +7470,15 @@ textarea:focus-visible {
   min-height: 38px;
   width: 100%;
   padding: 0 12px;
-  display: inline-flex;
+  /* flex, not inline-flex: this is always the sole content of its wrapper
+     div, at its own width:100% - there is no surrounding inline content for
+     "inline" to matter to. Left inline-flex, it sits in an inline formatting
+     context of its own and picks up that context's line-height as extra
+     space below its baseline - real, layout-affecting space, not a visual
+     artefact - which is what actually pushed Warehouse and Time Window a
+     few px out of line with Threshold and Date (whose OWN #datePickerBtn
+     rule already overrides this, undiscovered until now, to plain flex). */
+  display: flex;
   align-items: center;
   gap: 8px;
   background: var(--panel) !important;
@@ -7654,6 +7682,82 @@ select.hc-control {
 }
 .cal-action:hover { background: var(--w6); }
 
+/* The custom-range panel: a second way to leave Live, folded under the same
+   popover as the calendar rather than a control of its own - see
+   applyDateRange_ in Web - JsUi. */
+.date-range-panel {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.date-range-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+.date-range-toggle:hover { background: var(--w6); border-radius: 6px; }
+/* Hidden while the fields it opens are up - see toggleDateRangePanel_ and
+   useDefaultRangePak_. The display above would otherwise beat [hidden]. */
+.date-range-toggle[hidden] { display: none; }
+
+.date-range-fields {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The calendar's own way back, since it is collapsed while these fields are
+   open - see toggleDateRangePanel_. Bordered below like .cal-foot, which it
+   replaces for as long as the fields are up. */
+.date-range-quick-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+.date-range-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.date-range-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.date-range-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 5px 6px;
+}
+.date-range-time { font-variant-numeric: tabular-nums; }
+.date-range-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-bad);
+}
+.date-range-actions { display: flex; justify-content: flex-end; }
+.date-range-fields[hidden] { display: none; }
+
 /* ---- three controls per row ----
    Six fields, two rows of three, at every width above the phone breakpoint.
    The bonus field no longer grows: an even grid is what makes the panel read
@@ -7721,6 +7825,27 @@ select.hc-control {
    move between pages. See syncTimeAxisControlsPak_. */
 .hc-field-off { opacity: 0.4; }
 .hc-field-off .hc-control { cursor: not-allowed; }
+
+/* Hours Range under a custom date range, though: a picked From/To already
+   says both ends, so the field is not merely inert here the way it is on a
+   page with its own range - there is nothing left for it to show at all.
+   Removed outright rather than greyed, and the Date field takes the column
+   it leaves behind - see syncTimeAxisControlsPak_. */
+.hc-field-range-hide { display: none; }
+/* The filter row is a GRID (see .hc-filters below), not the flex row this
+   used to be - a flex-basis here does nothing, and the min-width a flex
+   version of this rule once carried forced the Date field wider than its
+   own track, which is what actually OVERLAPPED the field beside it. A grid
+   item claims real room by spanning tracks instead: Hours Range's own track
+   is gone (display:none removes it from the grid entirely), so Date, still
+   first in source order, auto-places across the two tracks that leaves -
+   its old one and the one that was Hours Range's. */
+.hc-field-range-grow { grid-column: span 2; }
+/* #datePickerBtn's own max-width (see above) is sized for a single day's
+   name - "21/09 00:00 -> 28/09 06:00" does not fit it, and the ellipsis that
+   caught the overflow read as the date running into the control beside it.
+   Lifted only here, where the field has room to actually use it. */
+.hc-field-range-grow #datePickerBtn { max-width: none; width: 100%; }
 
 /* Filter by Bonus keeps a filled ground: it is the one control you TYPE into,
    and the fill is what says so. Everything else is white. */

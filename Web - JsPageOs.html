@@ -111,10 +111,27 @@
     var toSel = $(toId);
     if (!fromSel || !toSel) return;
 
-    var sliced = timeRanges.slice(-96);
+    // A custom range (see customRangeQuery) already says both ends - this
+    // page's own From/To would only let someone narrow WITHIN it, which
+    // reads as two controls disagreeing about the window. Locked to the
+    // whole span and disabled while one is active, the same treatment
+    // Hours Range gets.
+    fromSel.disabled = !!customRangeQuery;
+    toSel.disabled = !!customRangeQuery;
+
+    // A filtered run carried past a past date's window adds its blocks at
+    // either end - see stretchBlocksPak_ - so the pickers can reach them.
+    // The 96-block cap is what keeps a single day's list to a day - a custom
+    // range already IS its own bounds, of whatever length was asked for, so
+    // it is not cut down to the last 24 hours of it.
+    var sliced = viewStretch.before.concat(
+      customRangeQuery ? timeRanges.slice() : timeRanges.slice(-96), viewStretch.after);
     var sig = sliced.length
       ? (sliced[0] + '||' + sliced[sliced.length - 1] + '||' + sliced.length) : '';
-    if (fromSel.dataset.sig === sig) return;
+    if (fromSel.dataset.sig === sig) {
+      if (customRangeQuery) { fromSel.selectedIndex = 0; toSel.selectedIndex = sliced.length - 1; }
+      return;
+    }
 
     var prevFrom = fromSel.value;
     var prevTo = toSel.value;
@@ -134,6 +151,12 @@
       toSel.appendChild(optT);
     }
     fromSel.dataset.sig = sig;
+
+    if (customRangeQuery) {
+      fromSel.selectedIndex = 0;
+      toSel.selectedIndex = sliced.length - 1;
+      return;
+    }
 
     var fromRestored = false, toRestored = false;
     for (var j = 0; j < sliced.length; j++) {
@@ -175,10 +198,21 @@
   // 06:00 to 06:00, so a spell starting at 02:00 on the 9th is logged against
   // the 8th. Sent to the server so it needs no read of its own to work this
   // out.
+  //
+  // A past date also asks for the day after it, whichever 24 hours are on
+  // screen: a run carried on past the window (see stretchBlocksPak_) reaches
+  // into it, and asking for the same three days either way keeps a change of
+  // day setting from changing the request.
   function osLogWantDates_() {
     var out = {}, keys = [];
-    for (var i = 0; i < timeRanges.length; i++) {
-      var d = parseDateTimePartPak(extractRangePartsPak(timeRanges[i]).start);
+    var blocks = timeRanges;
+    if (archiveView && archiveView.dayStart) {
+      var next = new Date(archiveView.dayStart.getFullYear(), archiveView.dayStart.getMonth(),
+                          archiveView.dayStart.getDate() + 1);
+      blocks = timeRanges.concat([formatDatePak(next) + ' - ' + formatDatePak(next)]);
+    }
+    for (var i = 0; i < blocks.length; i++) {
+      var d = parseDateTimePartPak(extractRangePartsPak(blocks[i]).start);
       if (!d) continue;
       [d, new Date(d.getTime() - 86400000)].forEach(function (x) {
         var k = ('0' + x.getDate()).slice(-2) + '/' +
@@ -286,8 +320,10 @@
   // productive work; it is the pivot that does.
   function osPureBonusesPak_(win) {
     var productive = {};
-    for (var i = 0; i < rawSideData.length; i++) {
-      var r = rawSideData[i];
+    // With the rows of any stretched run, whose blocks the window can now reach.
+    var src = viewStretch.rows.length ? rawSideData.concat(viewStretch.rows) : rawSideData;
+    for (var i = 0; i < src.length; i++) {
+      var r = src[i];
       if ((Number(r.value) || 0) <= 0) continue;
       var d = parseDateTimePartPak(extractRangePartsPak(r.timeRange).start);
       if (!d || d < win.start || d >= win.finish) continue;
@@ -657,8 +693,11 @@
   // is on: every manual change would be undone by the next draw.
   var _bonusRangePak_ = {};
 
+  // The stretch's size is part of it: when a run's edge rows arrive and it
+  // grows, the range has to widen to follow, not stay where the first draw put it.
   function bonusPickSigPak_() {
-    return (typeof selectedBonuses === 'undefined') ? '' : selectedBonuses.join(',');
+    return (typeof selectedBonuses === 'undefined') ? ''
+      : selectedBonuses.join(',') + '|' + viewStretch.before.length + '|' + viewStretch.after.length;
   }
 
   // The widest { start, finish } over the rows belonging to a picked bonus,
@@ -695,6 +734,10 @@
   function applyBonusRangePak_(key, fromId, toId, rows) {
     var fromSel = $(fromId), toSel = $(toId);
     if (!fromSel || !toSel || !fromSel.options.length) return;
+    // A custom range already locks these disabled and spanning the whole
+    // window (see ensureTimeSelectsPak_) - narrowing to one person's own
+    // span would fight that lock, undoing the point of disabling it.
+    if (customRangeQuery) return;
     var state = _bonusRangePak_[key];
     var sig = bonusPickSigPak_();
 

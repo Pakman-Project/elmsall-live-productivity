@@ -1117,7 +1117,16 @@
 
     var yMax = Math.ceil((agg.map(function(r){return r.performance;}).length ? Math.max.apply(null, agg.map(function(r){return r.performance;})) : 100) / 10) * 10 + 10;
     var xTicksConfig = { color: CHART_MUTED(), maxRotation: 45, minRotation: 45, autoSkip: true, callback: function(value) { return trimTimeLabelPak(this.getLabelForValue(value)); } };
-    if (hRange >= 24) { xTicksConfig.maxTicksLimit = 24; } else if (hRange >= 12) { xTicksConfig.maxTicksLimit = 12; } else if (hRange >= 6) { xTicksConfig.maxTicksLimit = 8; }
+    if (customRangeQuery) {
+      // Hours Range is hidden under a custom range (see .hc-field-range-hide)
+      // and the value left on it is whatever it was last set to before that -
+      // not the size of the span actually on screen, which can run to days
+      // rather than hours. Capped by the block count actually drawn instead.
+      var blockCount = agg.length;
+      if (blockCount > 96) { xTicksConfig.maxTicksLimit = 24; }
+      else if (blockCount > 48) { xTicksConfig.maxTicksLimit = 12; }
+      else if (blockCount > 24) { xTicksConfig.maxTicksLimit = 8; }
+    } else if (hRange >= 24) { xTicksConfig.maxTicksLimit = 24; } else if (hRange >= 12) { xTicksConfig.maxTicksLimit = 12; } else if (hRange >= 6) { xTicksConfig.maxTicksLimit = 8; }
     // offset and grid.offset, both spelled out, because Chart.js sets them
     // PER CHART TYPE and this one object configures a bar chart and five line
     // charts. Left to the defaults, the bar chart alone got offset: true - so

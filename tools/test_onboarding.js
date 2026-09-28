@@ -48,7 +48,8 @@ function fakeEl() {
 }
 ['onboardingSiteChoices', 'onboardingAreaChoices', 'onboardingAreaTitle',
  'onboardingAreaHint', 'onboardingError', 'onboardingOverlay',
- 'onboardingPage1', 'onboardingPage2',
+ 'onboardingPage1', 'onboardingPage2', 'onboardingPage3',
+ 'onboardingDayChoices', 'onboardingDayNum',
  'onboardingBackBtn', 'onboardingNextBtn', 'onboardingDoneBtn'].forEach(id => { els[id] = fakeEl(); });
 
 const store = {
@@ -73,8 +74,9 @@ const helpers = R('Web - JsHelpers.html');
 vm.runInContext(`
   // Declared below the slice point JsState is cut at, and areaColor_ needs it.
   var currentTheme = 'light';
-  var _calls = { site: [], tour: 0, saved: 0, tourOpts: null, tourBeforeClose: null };
+  var _calls = { site: [], tour: 0, saved: 0, day: [], tourOpts: null, tourBeforeClose: null };
   function setSiteFilter_(k) { _calls.site.push(k); siteFilterPreferred = k; siteFilter = k; }
+  function setDayMode_(m) { _calls.day.push(m); dayMode = m; }
   function maybeAutoStartTour_(opts) {
     _calls.tour++;
     _calls.tourOpts = opts || null;
@@ -91,7 +93,8 @@ const ev = e => vm.runInContext(e, ctx);
 const reset = () => {
   ev('hiddenVolumeAreas = []; hiddenBonusAreas = []; overviewVolAreas = []; syncAreaChips = true;');
   ev('siteFilter = "all"; siteFilterPreferred = "all";');
-  ev('_calls = { site: [], tour: 0, saved: 0 };');
+  ev('_calls = { site: [], tour: 0, saved: 0, day: [] };');
+  ev('dayMode = null;');
   store._d = {};
   els.onboardingError.hidden = false;
   ev('openOnboarding_({ chainTour: true })');
@@ -249,22 +252,34 @@ check('a deep link skips it', ev('shouldShowOnboarding_()') === false);
 check('but is NOT marked seen, so the next plain visit asks',
   store.getItem('e3_onboarding_seen_v1') === null);
 
-head('[13] the two pages');
+head('[13] the three pages');
 // The area question is "which of THESE", so it cannot be on screen before the
-// building is known.
+// building is known. The day question comes last.
 reset();
-check('opens on the building question', !els.onboardingPage1.hidden && els.onboardingPage2.hidden);
+const onPage = n => [1, 2, 3].every(p => els['onboardingPage' + p].hidden === (p !== n));
+check('opens on the building question', onPage(1));
 check('offers Next, not Done', !els.onboardingNextBtn.hidden && els.onboardingDoneBtn.hidden);
 check('no Back on the first page', els.onboardingBackBtn.hidden);
 
 ev('onboardingNext_()');
-check('Next shows the areas', els.onboardingPage1.hidden && !els.onboardingPage2.hidden);
-check('and swaps Next for Done', els.onboardingNextBtn.hidden && !els.onboardingDoneBtn.hidden);
+check('Next shows the areas', onPage(2));
+check('and still offers Next, not Done', !els.onboardingNextBtn.hidden && els.onboardingDoneBtn.hidden);
 check('Back is now offered', !els.onboardingBackBtn.hidden);
 check('the area list was rendered', els.onboardingAreaChoices.innerHTML.length > 0);
 
+ev('onboardingNext_()');
+check('Next again shows the day question', onPage(3));
+check('and swaps Next for Done', els.onboardingNextBtn.hidden && !els.onboardingDoneBtn.hidden);
+check('Back is still offered', !els.onboardingBackBtn.hidden);
+check('the two day choices were rendered',
+  (els.onboardingDayChoices.innerHTML.match(/name="onboardingDay"/g) || []).length === 2);
+check('with 06:00-06:00 picked, since nothing was answered yet',
+  /value="6-6" checked/.test(els.onboardingDayChoices.innerHTML));
+
 ev('onboardingBack_()');
-check('Back returns to the building', !els.onboardingPage1.hidden && els.onboardingPage2.hidden);
+check('Back from the day returns to the areas', onPage(2));
+ev('onboardingBack_()');
+check('Back returns to the building', onPage(1));
 
 head('[14] changing building on page 1 re-asks page 2 against it');
 reset();
@@ -289,6 +304,75 @@ ev('commitOnboarding_()');
 check('the tour was asked to start immediately',
   ev('_calls.tourOpts && _calls.tourOpts.immediate === true'), JSON.stringify(ev('_calls.tourOpts')));
 check('and the backdrop came down after it', ev('_calls.tourBeforeClose') === true);
+
+head('[16] the day question, in the full setup');
+reset();
+ev('onboardingNext_()');
+ev('_onboardDraft.families = []');
+ev('onboardingNext_()');
+check('an empty area answer is refused at Next, not only at the end', onPage(2),
+  'the day page would otherwise be reachable with nothing to show');
+check('and says why', els.onboardingError.hidden === false, els.onboardingError.textContent);
+
+reset();
+ev('onboardingNext_(); onboardingNext_()');
+ev('onOnboardingDayChange({ value: "0-0" })');
+check('picking a day marks it', /value="0-0" checked/.test(els.onboardingDayChoices.innerHTML));
+ev('commitOnboarding_()');
+check('Done writes the day', ev('_calls.day.join()') === '0-0', ev('_calls.day').join());
+check('alongside the building', ev('_calls.site.join()') === 'all', ev('_calls.site').join());
+
+reset();
+ev('_onboardDraft.dayMode = "0-0"');
+ev('closeOnboarding_()');
+check('Escape gives 06:00-06:00', ev('_calls.day.join()') === '6-6', ev('_calls.day').join());
+
+head('[17] asked alone, the day is all that changes');
+// For someone who set up before the question existed. Going through the area
+// commit would rebuild hiddenVolumeAreas and drop their chart set-up.
+const dayOnly = () => {
+  ev('hiddenVolumeAreas = ["pieVol"]; siteFilter = "e3"; siteFilterPreferred = "e3";');
+  ev('_calls = { site: [], tour: 0, saved: 0, day: [] }; dayMode = null;');
+  store._d = { e3_onboarding_seen_v1: '1' };
+  ev('openDayModePrompt_({ chainTour: true })');
+};
+dayOnly();
+check('opens straight on the day question', onPage(3));
+check('with Done and no way Back to questions it is not asking',
+  !els.onboardingDoneBtn.hidden && els.onboardingBackBtn.hidden && els.onboardingNextBtn.hidden);
+check('and no step number in front of it', els.onboardingDayNum.hidden === true);
+ev('onOnboardingDayChange({ value: "0-0" })');
+ev('commitOnboarding_()');
+check('the day is written', ev('_calls.day.join()') === '0-0', ev('_calls.day').join());
+check('the building is not touched', ev('_calls.site.length') === 0, ev('_calls.site').join());
+check('nor the hidden areas', hidden().join() === 'pieVol', hidden().join());
+check('the dialog closed', !ev('$("onboardingOverlay").classList.contains("active")'));
+check('and the tour is still handed over to', ev('_calls.tour') === 1);
+
+dayOnly();
+ev('closeOnboarding_()');
+check('Escape there gives 06:00-06:00 too', ev('_calls.day.join()') === '6-6', ev('_calls.day').join());
+check('and still leaves the areas alone', hidden().join() === 'pieVol' && ev('_calls.site.length') === 0);
+
+reset();
+check('the full dialog shows its step number again', els.onboardingDayNum.hidden === false);
+
+head('[18] when to ask the day question on its own');
+ev('TOUR_FORCE = "0"; DEEP_SITE = ""; DEEP_BONUS = ""');
+store._d = { e3_onboarding_seen_v1: '1' };
+ev('dayMode = null');
+check('set up before, never answered: asked', ev('shouldAskDayMode_()') === true);
+check('and the full setup is not', ev('shouldShowOnboarding_()') === false);
+ev('dayMode = "6-6"');
+check('answered: not asked again', ev('shouldAskDayMode_()') === false);
+ev('dayMode = null');
+store._d = {};
+check('a first visit gets the full setup instead',
+  ev('shouldAskDayMode_()') === false && ev('shouldShowOnboarding_()') === true);
+store._d = { e3_onboarding_seen_v1: '1' };
+ev('DEEP_BONUS = "AAA"');
+check('a deep link holds it back, like the full setup', ev('shouldAskDayMode_()') === false);
+ev('DEEP_BONUS = ""');
 
 console.log('\n' + (fail ? fail + ' CHECK(S) FAILED' : 'ALL CHECKS PASSED'));
 process.exit(fail ? 1 : 0);

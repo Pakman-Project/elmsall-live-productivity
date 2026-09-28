@@ -67,7 +67,17 @@
 
   // `day` is for the 07:00 email (see Spreadsheet - Claims Email.js), which
   // has no date control to read; the page always leaves it out.
+  //
+  // A custom range (see customRangeQuery) has no single production day to
+  // fold onto at all - it is already its own exact start and finish, however
+  // many days that spans - so it is read directly rather than through
+  // fraudSelectedDayPak_, which only ever knows a single calendar date.
   function fraudWindowPak_(day) {
+    if (!day && customRangeQuery) {
+      var f = parseDateTimePartPak(customRangeQuery.from);
+      var t = parseDateTimePartPak(customRangeQuery.to);
+      if (f && t) return { start: f, finish: t };
+    }
     day = day || fraudSelectedDayPak_();
     var start = new Date(day.getFullYear(), day.getMonth(), day.getDate(),
                          FRAUD_DAY_START_HOUR_, 0);
@@ -109,6 +119,16 @@
 
   // ── what was produced, and where ───────────────────────────────────────────
 
+  // The pivot rows the page reads. On a past date that is everything the
+  // payload brought - the date and the next morning - rather than the window
+  // on screen: this page's day is 06:00 to 06:00 whichever 24 hours the
+  // charts show, and a 00:00-00:00 window stops six hours short of it.
+  function fraudSourcePak_() {
+    if (archiveView && archiveView.span) return archiveView.span;
+    return (typeof allSideData !== 'undefined' && allSideData.length)
+      ? allSideData : rawSideData;
+  }
+
   // bonus||blockStartMs -> the pivot row for that person in that block.
   //
   // Built from allSideData, NOT the site-scoped rawSideData: the Warehouse
@@ -117,8 +137,7 @@
   // page must not give.
   function fraudStdIndexPak_() {
     var idx = {};
-    var src = (typeof allSideData !== 'undefined' && allSideData.length)
-      ? allSideData : rawSideData;
+    var src = fraudSourcePak_();
     for (var i = 0; i < src.length; i++) {
       var r = src[i];
       var d = parseDateTimePartPak(extractRangePartsPak(r.timeRange).start);
@@ -136,8 +155,7 @@
   // two were combined.
   function fraudTotalStdIndexPak_(win) {
     var totals = {};
-    var src = (typeof allSideData !== 'undefined' && allSideData.length)
-      ? allSideData : rawSideData;
+    var src = fraudSourcePak_();
     for (var i = 0; i < src.length; i++) {
       var r = src[i];
       var d = parseDateTimePartPak(extractRangePartsPak(r.timeRange).start);
@@ -294,8 +312,7 @@
   // those it is would be worse than no table.
   function fraudCoveragePak_(win) {
     var lo = null, hi = null;
-    var src = (typeof allSideData !== 'undefined' && allSideData.length)
-      ? allSideData : rawSideData;
+    var src = fraudSourcePak_();
     for (var i = 0; i < src.length; i++) {
       var d = parseDateTimePartPak(extractRangePartsPak(src[i].timeRange).start);
       if (!d) continue;
@@ -344,8 +361,27 @@
   // silent: a background refresh keeps the table on screen while it waits, and
   // on failure keeps it showing rather than replacing good rows with an error -
   // the next refresh simply tries again. The same bargain osFetchLogPak_ makes.
+  // Every production day the window on screen touches, so a custom range
+  // spanning several days asks for all of them - not just the one single-day
+  // views resolve to. Walked hourly rather than by 15-minute block: only the
+  // CALENDAR day each hour folds onto matters here, and a set absorbs the
+  // repeats for free. For a single production day this still comes back as
+  // exactly the one key it always did - every hour of [D 06:00, D+1 06:00)
+  // folds to D.
+  function fraudWantDatesPak_() {
+    var win = fraudWindowPak_();
+    var out = {}, keys = [];
+    for (var t = win.start.getTime(); t < win.finish.getTime(); t += 3600000) {
+      var d = new Date(t);
+      if (d.getHours() < FRAUD_DAY_START_HOUR_) d = new Date(d.getTime() - 86400000);
+      var k = fraudDateKeyPak_(d);
+      if (!out[k]) { out[k] = true; keys.push(k); }
+    }
+    return keys;
+  }
+
   function fraudFetchLogsPak_(silent) {
-    var key = fraudDateKeyPak_(fraudSelectedDayPak_());
+    var keys = fraudWantDatesPak_();
     var pending = 2;
     var failed = '';
 
@@ -371,7 +407,7 @@
         failed = (err && err.message) || 'The OS log could not be read';
         done();
       })
-      .getOsLogRows([key], currentArchiveUrl || null);
+      .getOsLogRows(keys, currentArchiveUrl || null);
 
     google.script.run
       .withSuccessHandler(function (res) {
@@ -383,7 +419,7 @@
         failed = (err && err.message) || 'The NPL log could not be read';
         done();
       })
-      .getNplLogRows([key], currentArchiveUrl || null);
+      .getNplLogRows(keys, currentArchiveUrl || null);
   }
 
   // ── the table ──────────────────────────────────────────────────────────────
@@ -738,11 +774,21 @@
   function fraudNoteTextPak_(win, scan) {
     var cov = fraudCoveragePak_(win);
     var n = scan.claims + ' claim' + (scan.claims === 1 ? '' : 's');
+    // "this production day" is a plain untruth for a custom range (see
+    // customRangeQuery) - it can span several of them, or none at all, or
+    // stop mid-day - so it says what is actually on screen instead. Guarded
+    // by typeof: the 07:00 email shares this function but not the rest of
+    // the page's state, and always passes a real production day - see
+    // Spreadsheet - Claims Email.js's own file list.
+    var ranged = typeof customRangeQuery !== 'undefined' && customRangeQuery;
     if (!cov) {
-      return 'None of this production day is loaded yet, so nothing has been ' +
-             'checked. ' + n + ' fall in the window.';
+      return ranged
+        ? 'None of this range is loaded yet, so nothing has been checked. ' + n + ' fall in the window.'
+        : 'None of this production day is loaded yet, so nothing has been ' +
+          'checked. ' + n + ' fall in the window.';
     }
-    return n + ' in this production day, checked against produced hours from ' +
+    return n + ' in ' + (ranged ? 'this range' : 'this production day') +
+           ', checked against produced hours from ' +
            fraudDateKeyPak_(cov.from) + ' ' + fraudTimeTextPak_(cov.from) +
            ' to ' + fraudDateKeyPak_(cov.to) + ' ' + fraudTimeTextPak_(cov.to) + '.';
   }
@@ -757,8 +803,15 @@
       // "to", not an arrow glyph: this badge is set in Roboto Mono, which has
       // no U+2192 and drew a replacement box instead - and the one thing this
       // line has to be is unambiguous about which direction the day runs.
-      badge.textContent = fraudDateKeyPak_(win.start) + ' 06:00  to  ' +
-                          fraudDateKeyPak_(win.finish) + ' 06:00';
+      //
+      // The TIMES come off win itself rather than a literal "06:00" either
+      // side: outside a custom range this window is always 06:00-to-06:00
+      // (FRAUD_DAY_START_HOUR_), so reading it off win says the same thing -
+      // but a custom range's own start and finish can be anything, and the
+      // literal used to print "06:00" regardless of what was actually asked
+      // for or checked.
+      badge.textContent = fraudDateKeyPak_(win.start) + ' ' + fraudTimeTextPak_(win.start) +
+                          '  to  ' + fraudDateKeyPak_(win.finish) + ' ' + fraudTimeTextPak_(win.finish);
     }
 
     if (fraudLogState === null) { ensureFraudLogsPak_(); return; }

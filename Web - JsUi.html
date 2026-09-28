@@ -308,6 +308,25 @@
     setMultiBonusFilter_(el.checked);
   }
 
+  // Which 24 hours a past date shows. Saved even when it has not changed:
+  // answering the question with the default is still an answer, and must stop
+  // it being asked again. A past date on screen is re-cut from the payload it
+  // already has - no round trip - and Live is not affected at all.
+  function setDayMode_(mode) {
+    var was = dayModePak_();
+    dayMode = mode === '0-0' ? '0-0' : '6-6';
+    syncDayModeUi_();
+    saveUserPreferences();
+    if (dayMode !== was && archiveView && lastRealPayload && !tourActive) {
+      renderDashboardPayload_(lastRealPayload);
+    }
+  }
+
+  function syncDayModeUi_() {
+    var radios = document.querySelectorAll('input[name="dayMode"]');
+    for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === dayModePak_();
+  }
+
   // ── Settings dialog ────────────────────────────────────────────────────────
   // Everything here used to live at the bottom of the "?" dialog, behind a
   // question-mark icon that promises help rather than configuration. Nobody
@@ -317,6 +336,7 @@
     if (multiCb) multiCb.checked = allowMultiBonusFilter;
     var syncCb = $('syncAreaChipsToggle');
     if (syncCb) syncCb.checked = syncAreaChips;
+    syncDayModeUi_();
 
     var ov = $('settingsOverlay');
     if (ov) ov.classList.add('active');
@@ -864,7 +884,13 @@
     toggleDateMenu_(false);
     // Re-picking the day already on screen is a no-op, not a reload: the
     // archive read is the most expensive thing this dashboard does.
-    if (sel.value === String(value || '')) return;
+    //
+    // NOT a no-op while a custom range is active, though, even when its
+    // value happens to be '' too (applyDateRange_ leaves the select on Live
+    // so a later single-day pick still differs from it) - Live is not what
+    // is actually showing, and skipping the change event here left Hours
+    // Range disabled and the range still applied no matter what was clicked.
+    if (sel.value === String(value || '') && !customRangeQuery) return;
     sel.value = String(value || '');
     syncDateUi_();
     // Setting .value in script does not fire a change event, and the change
@@ -878,6 +904,16 @@
   function syncDateUi_() {
     var sel = $('archiveSelect'), btn = $('datePickerBtn'), label = $('datePickerLabel');
     if (!sel || !btn || !label) return;
+    // A custom range is not one of the select's own options, so it is read
+    // and shown before anything below asks the select what is picked.
+    if (customRangeQuery) {
+      var short = dateRangeShortLabelPak_(customRangeQuery);
+      label.textContent = short;
+      btn.classList.toggle('is-history', true);
+      btn.title = 'Viewing ' + short + '. Change date.';
+      btn.setAttribute('aria-label', 'Showing: ' + short + '. Change date.');
+      return;
+    }
     var opt = sel.options[sel.selectedIndex];
     var name = opt ? opt.textContent : 'Live';
     var parts = dateOptionParts_(name);
@@ -885,6 +921,136 @@
     btn.classList.toggle('is-history', !!sel.value);
     btn.title = sel.value ? 'Viewing ' + name + '. Change date.' : 'Live, or an earlier day';
     btn.setAttribute('aria-label', 'Showing: ' + (parts ? parts.long : name) + '. Change date.');
+  }
+
+  // ── Custom range: From date+time to To date+time, replacing the single-day
+  // pick when the built-in Hours Range windows do not fit the question being
+  // asked - a night audit spanning several shifts, say. Lives in the same
+  // popover as the calendar rather than a control of its own: leaving Live is
+  // one decision with two ways to say which day(s), not two separate features.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Both ends, in full - "20/09/2026 14:00 -> 22/09/2026 09:00". Used to drop
+  // the year to fit the button's old fixed width, which read as one date
+  // missing a year rather than two dates sharing one; the button now grows
+  // to fit a custom range (see .hc-field-range-grow) and has the room.
+  function dateRangeShortLabelPak_(q) {
+    return q.from + ' → ' + q.to;
+  }
+
+  // Native date inputs give "yyyy-mm-dd"; every other date on this dashboard
+  // is "dd/MM/yyyy" - so this is the one place the two meet.
+  function isoDateToDmyPak_(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+  }
+
+  function showDateRangeError_(msg) {
+    var el = $('dateRangeError');
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function hideDateRangeError_() {
+    var el = $('dateRangeError');
+    if (el) el.hidden = true;
+  }
+
+  function toggleDateRangePanel_() {
+    var fields = $('dateRangeFields'), toggle = $('dateRangeToggle');
+    if (!fields || !toggle) return;
+    var open = fields.hidden;
+    fields.hidden = !open;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    // The calendar answers the same question ("which day(s)") as the fields
+    // it is making room for - showing both at once is the popover asking
+    // twice. Collapsed rather than removed, so the month it was on survives
+    // a Back out of the range fields.
+    var calBody = $('calBody');
+    if (calBody) calBody.hidden = open;
+    // Hidden rather than left showing beside the fields' own way back
+    // (Default Range) - two controls that both mean "go back" is one too
+    // many. Restored by useDefaultRangePak_ on the way out.
+    toggle.hidden = open;
+    if (open && customRangeQuery) {
+      // Reopened onto a range already showing: seed the fields with it
+      // rather than whatever they last held, so Apply without a change
+      // cannot silently narrow the range to today's date.
+      var fd = $('rangeFromDate'), ft = $('rangeFromTime'),
+          td = $('rangeToDate'), tt = $('rangeToTime');
+      var fm = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})$/.exec(customRangeQuery.from);
+      var tm = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})$/.exec(customRangeQuery.to);
+      if (fm && fd && ft) { fd.value = fm[3] + '-' + fm[2] + '-' + fm[1]; ft.value = fm[4]; }
+      if (tm && td && tt) { td.value = tm[3] + '-' + tm[2] + '-' + tm[1]; tt.value = tm[4]; }
+    }
+  }
+
+  // The custom-range fields' own way back to the calendar - cancels the
+  // applied span (Live is what the hidden select already reads, so the
+  // change event does the rest: clears customRangeQuery, re-enables Hours
+  // Range, reloads) without closing the whole popover the way jumping
+  // straight to Live does. Also the plain "never opened the fields" state:
+  // called with no range active it is just a collapse.
+  function useDefaultRangePak_() {
+    if (customRangeQuery) {
+      var sel = $('archiveSelect');
+      if (sel) {
+        sel.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    var fields = $('dateRangeFields'), toggle = $('dateRangeToggle'), calBody = $('calBody');
+    if (fields) fields.hidden = true;
+    if (toggle) { toggle.hidden = false; toggle.setAttribute('aria-expanded', 'false'); }
+    if (calBody) calBody.hidden = false;
+  }
+
+  // The longest span a single query will read - see DATE_RANGE_MAX_DAYS_ in
+  // Code.js. Kept here too so a doomed request never leaves this device: a
+  // day open under mismatched limits reads as arbitrary either way, but only
+  // ONE of them is a wasted round trip.
+  var DATE_RANGE_MAX_DAYS_PAK_ = 31;
+
+  function applyDateRange_() {
+    var fd = $('rangeFromDate'), ft = $('rangeFromTime'), td = $('rangeToDate'), tt = $('rangeToTime');
+    if (!fd || !td) return;
+    hideDateRangeError_();
+    if (!fd.value || !td.value) { showDateRangeError_('Pick both a From and a To date.'); return; }
+
+    var fromStr = isoDateToDmyPak_(fd.value) + ' ' + (ft && ft.value ? ft.value : '00:00');
+    var toStr = isoDateToDmyPak_(td.value) + ' ' + (tt && tt.value ? tt.value : '00:00');
+    var fromDt = parseDateTimePartPak(fromStr);
+    var toDt = parseDateTimePartPak(toStr);
+    if (!fromDt || !toDt) { showDateRangeError_('Could not read those dates.'); return; }
+    if (toDt.getTime() <= fromDt.getTime()) { showDateRangeError_('To must be after From.'); return; }
+    var days = Math.ceil((toDt.getTime() - fromDt.getTime()) / 86400000);
+    if (days > DATE_RANGE_MAX_DAYS_PAK_) {
+      showDateRangeError_('That is ' + days + ' days - the longest range is ' + DATE_RANGE_MAX_DAYS_PAK_ + '.');
+      return;
+    }
+
+    customRangeQuery = { from: fromStr, to: toStr };
+    currentArchiveUrl = null;
+    var sel = $('archiveSelect');
+    if (sel) sel.value = '';
+    syncDateUi_();
+    // Hours Range means nothing once a custom range already says both ends -
+    // the same greyed, tooltipped "not yours to change here" treatment the
+    // pages with their own range already get, layered on top of it rather
+    // than a second copy - see syncTimeAxisControlsPak_.
+    if (typeof syncTimeAxisControlsPak_ === 'function') syncTimeAxisControlsPak_(currentPage);
+    toggleDateMenu_(false);
+    beginNewViewPak_();
+    // 15, NOT the 60 a single archive day defaults to: an arbitrary custom
+    // range rarely starts or ends on the hour, and dropPartialEdgeGroupKeys_
+    // drops whichever of its own ends falls mid-bucket at a wider window -
+    // exactly the two blocks the reader picked a precise time to include.
+    // At 15 there is nothing to aggregate, so nothing at the edges to drop;
+    // Time Window is still live, so a wider one can be chosen deliberately.
+    var syncedWindows = document.querySelectorAll('[data-sync="timeWindow"]');
+    for (var i = 0; i < syncedWindows.length; i++) { syncedWindows[i].value = '15'; }
+    loadDataPak();
   }
 
   function initDatePicker_() {
@@ -1157,22 +1323,41 @@
       var off = PAGES_IGNORING_[ids[i]].indexOf(index) !== -1;
       var el = document.getElementById(ids[i]);
       if (!el) continue;
-      el.disabled = off;
+      // A custom range (see customRangeQuery) already says both ends, on
+      // EVERY page - a second, page-independent reason for Hours Range alone
+      // to be off. Time Window still aggregates a range the same as any other
+      // view, so it is untouched by this.
+      var rangeOff = ids[i] === 'hoursRange' && !!customRangeQuery;
+      el.disabled = off || rangeOff;
       // The label greys with it. Walked rather than queried so this works
       // whatever the field wrapper is called.
       var field = el.parentNode;
       while (field && field.classList && !field.classList.contains('hc-field')) {
         field = field.parentNode;
       }
-      if (field && field.classList) field.classList.toggle('hc-field-off', off);
+      // A page ignoring the control still leaves it in its column, greyed -
+      // see .hc-field-off. A custom range is different: the field is not
+      // merely not-yours-to-change here, it has nothing left to show, so it
+      // is removed outright and the Date field grows into the column it
+      // leaves - see .hc-field-range-hide/-grow.
+      if (field && field.classList) {
+        field.classList.toggle('hc-field-off', off && !rangeOff);
+        field.classList.toggle('hc-field-range-hide', rangeOff);
+      }
+      if (ids[i] === 'hoursRange') {
+        var dateField = document.getElementById('archiveSelect');
+        dateField = dateField && dateField.closest ? dateField.closest('.hc-field') : null;
+        if (dateField && dateField.classList) dateField.classList.toggle('hc-field-range-grow', rangeOff);
+      }
       // Two different reasons to be inert, and the tooltip is the only place
       // that can say which - "this page has its own range" would be a plain
       // untruth on the Data Table, which has no range picker of its own and
       // simply always draws the whole day.
-      el.title = !off ? ''
-        : (index === 6 ? 'The Data Table always shows the whole day'
-        : (index === 3 ? 'This page covers one production day, 06:00 to 06:00'
-                       : 'This page has its own From / To range'));
+      el.title = off
+        ? (index === 6 ? 'The Data Table always shows the whole day'
+          : (index === 3 ? 'This page covers one production day, 06:00 to 06:00'
+                         : 'This page has its own From / To range'))
+        : (rangeOff ? 'A custom date range already covers both ends' : '');
     }
   }
 
@@ -1606,8 +1791,16 @@
     var toSel = document.getElementById('breakdownTo');
     if (!fromSel || !toSel) return;
 
+    // A custom range (see customRangeQuery) already says both ends - this
+    // dialog's own From/To would only let someone narrow WITHIN it, which
+    // reads as two controls disagreeing about the window. Locked to the
+    // whole span and disabled while one is active, the same treatment
+    // Hours Range and every page's own From/To get.
+    fromSel.disabled = !!customRangeQuery;
+    toSel.disabled = !!customRangeQuery;
+
     var maxBlocks = 24 * 4; // 96 blocks = 24 hours
-    var sliced = timeRanges.slice(-maxBlocks);
+    var sliced = customRangeQuery ? timeRanges.slice() : timeRanges.slice(-maxBlocks);
 
     function getStartLabel(tr) {
       var parts = String(tr || '').trim().split(' - ');
@@ -1630,7 +1823,7 @@
       toSel.appendChild(optT);
     }
 
-    var defaultFromIdx = Math.max(0, sliced.length - 4);
+    var defaultFromIdx = customRangeQuery ? 0 : Math.max(0, sliced.length - 4);
     fromSel.selectedIndex = defaultFromIdx;
     toSel.selectedIndex = sliced.length - 1;
 

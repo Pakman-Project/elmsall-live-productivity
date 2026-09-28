@@ -118,7 +118,7 @@
   // Only LIVE data is cached. Archive snapshots are picked deliberately and are
   // never the default view on startup, so caching them would only burn quota.
   function savePayloadCache_(data, archiveUrl) {
-    if (archiveUrl || payloadCacheQuotaHit_) return;
+    if (archiveUrl || customRangeQuery || payloadCacheQuotaHit_) return;
     try {
       var json = JSON.stringify({ savedAt: Date.now(), payload: data });
       // Logged, not silent. Declining the write costs the instant repaint on
@@ -281,6 +281,13 @@
     // so with no filter set the two are the same and nothing behaves
     // differently from before.
     allSideData = decodeSideRowsPak_(data.rawSideData, data.sideSchema);
+    // A past date is cut to the reader's 24 hours of it here, before anything
+    // reads timeRanges or allSideData - see applyArchiveWindowPak_. Decided by
+    // the payload rather than by currentArchiveUrl, which is only set once
+    // this has returned, and which the tour's demo data never touches.
+    var bonusList = data.bonusList || [];
+    if (data.archiveDate) bonusList = applyArchiveWindowPak_(data, allSideData);
+    else archiveView = null;
     rawSideData = scopeRowsToSite_(allSideData);
     tmDirectory = data.tmDirectory || {};
     // The OS log no longer travels in the payload - the OS page fetches it
@@ -326,7 +333,7 @@
     }
     // The server's list is already every operator on site, which is what the
     // search wants regardless of the building in view.
-    allBonusList = data.bonusList || [];
+    allBonusList = bonusList;
     if (typeof syncSiteUi_ === 'function') syncSiteUi_();
     currentThreshold = parseFloat(data.threshold) || 0;
     if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }
@@ -379,7 +386,7 @@
 
   function pollForUpdates_() {
     if (lastRefreshTimestamp === null) return;
-    if (currentArchiveUrl) return;
+    if (isHistoricalViewPak_()) return;
     google.script.run.withSuccessHandler(function(remoteTimestamp) {
       if (remoteTimestamp !== null && remoteTimestamp !== lastRefreshTimestamp) {
         loadDataPak(currentArchiveUrl, true);
@@ -388,8 +395,8 @@
   }
 
   function refreshTick_() {
-    // Archive snapshots are static — nothing to poll for.
-    if (currentArchiveUrl) return;
+    // Archive snapshots and custom ranges are static — nothing to poll for.
+    if (isHistoricalViewPak_()) return;
     if (Date.now() < nextPollAt) return;
     nextPollAt = Date.now() + POLL_INTERVAL_MS;
     pollForUpdates_();
@@ -432,9 +439,9 @@
       var meta = document.querySelector('.next-header-meta');
       if (meta) meta.setAttribute('title', 'Data last updated: ' + el.textContent);
     };
-    // Archive snapshots are historical by definition — "3h ago" against a date
-    // the user deliberately chose would be noise.
-    if (currentArchiveUrl || lastRefreshTimestamp === null) {
+    // Archive snapshots and custom ranges are historical by definition —
+    // "3h ago" against a date the user deliberately chose would be noise.
+    if (isHistoricalViewPak_() || lastRefreshTimestamp === null) {
       el.textContent = lastUpdateAbsText;
       syncTitle();
       return;
@@ -448,8 +455,9 @@
   function updateStaleWarning_() {
     var el = $('staleWarning');
     if (!el) return;
-    // Archive snapshots are historical by definition — "stale" is meaningless.
-    if (currentArchiveUrl || lastRefreshTimestamp === null) {
+    // Archive snapshots and custom ranges are historical by definition —
+    // "stale" is meaningless.
+    if (isHistoricalViewPak_() || lastRefreshTimestamp === null) {
       el.style.display = 'none';
       return;
     }
@@ -516,7 +524,7 @@
 
     var urlToFetch = archiveUrl !== undefined ? archiveUrl : currentArchiveUrl;
 
-    google.script.run.withSuccessHandler(function(data) {
+    var runner = google.script.run.withSuccessHandler(function(data) {
       // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
       try {
         // Logged HERE rather than in renderDashboardPayload_, which also runs
@@ -536,7 +544,11 @@
           setChartAnimationEnabled_(!silent);
           renderDashboardPayload_(data);
           setChartAnimationEnabled_(true);
-          currentArchiveUrl = urlToFetch || null;
+          // Left alone in range mode: urlToFetch is whatever was picked
+          // BEFORE the range was applied (often null), and overwriting
+          // currentArchiveUrl with it here would make the two disagree
+          // about which historical view is actually on screen.
+          if (!customRangeQuery) { currentArchiveUrl = urlToFetch || null; }
           lastRealPayload = data;
           lastRealPayload.__archiveUrl = urlToFetch || null;
 
@@ -575,7 +587,56 @@
       if (typeof progressEndPak_ === 'function') progressEndPak_('dashboard');
       document.body.classList.remove('loading-skeleton');
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
-    }).getDashboardData(urlToFetch);
+    });
+
+    // A custom range wins over whatever `archiveUrl` was passed - the only
+    // callers that pass one while a range is active are retryLoadPak and the
+    // auto-refresh paths above, both of which are already held back from
+    // running at all while isHistoricalViewPak_() is true; this is what makes
+    // a plain "reload the current view" (deep-link restore, tour handover)
+    // do the right thing without every caller having to know which mode is
+    // active.
+    if (customRangeQuery) {
+      runner.getDashboardDataRange(customRangeQuery.from, customRangeQuery.to);
+    } else {
+      runner.getDashboardData(urlToFetch);
+    }
+  }
+
+  // Whatever is about to load - a different single day, or a custom range -
+  // is different data, not a newer read of the same window, so these start
+  // from nothing rather than silently swapping yesterday's spells for
+  // today's under the reader. Shared by the archiveSelect change handler
+  // below and applyDateRange_ in JsUi, so the two cannot drift apart.
+  //
+  // All THREE of them, and then a re-render of whatever is on screen. The
+  // page state used to be cleared inside renderDashboardPayload_, which
+  // does not run until the new day has come back from the server - so the
+  // page a reader was looking at when they picked the date went on showing
+  // the OLD day's rows for the whole round trip, with nothing to say it was
+  // out of date. Marking them here and drawing immediately puts the
+  // skeleton up at the moment of the click, which is when the reader asked
+  // the question.
+  //
+  // HELD, not fetched. Marking them and drawing immediately is right - it
+  // acknowledges the click - but the draw used to start the fetches too,
+  // and those build their request out of timeRanges, which is still the
+  // OLD day until the payload below comes back. So the three pages asked
+  // the server for the previous day's dates, got a perfectly good answer,
+  // and drew it as if it were the day that had just been picked. Filtering
+  // by bonus then matched nothing, because the filter was the new day's
+  // and the rows were not.
+  //
+  // The hold lets them show that they are loading without asking anything
+  // yet; releaseLogFetchesPak_ starts the real fetches once the payload
+  // has landed.
+  function beginNewViewPak_() {
+    logFetchesHeldPak_ = true;
+    if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
+    if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
+    if (typeof fraudMarkControlChangedPak_ === 'function') { fraudMarkControlChangedPak_(); }
+    if (typeof renderPageIfNeeded_ === 'function') { markAllPagesDirty_(); }
+    if (typeof redrawCurrentPagePak_ === 'function') { redrawCurrentPagePak_(); }
   }
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -663,37 +724,11 @@
 
     $('archiveSelect').addEventListener('change', function() {
       currentArchiveUrl = this.value;
-      // A different day is different data, not a newer read of the same
-      // window - so these start from nothing rather than silently swapping
-      // yesterday's spells for today's under the reader.
-      //
-      // All THREE of them, and then a re-render of whatever is on screen. The
-      // page state used to be cleared inside renderDashboardPayload_, which
-      // does not run until the new day has come back from the server - so the
-      // page a reader was looking at when they picked the date went on showing
-      // the OLD day's rows for the whole round trip, with nothing to say it was
-      // out of date. Marking them here and drawing immediately puts the
-      // skeleton up at the moment of the click, which is when the reader asked
-      // the question.
-      //
-      // HELD, not fetched. Marking them and drawing immediately is right - it
-      // acknowledges the click - but the draw used to start the fetches too,
-      // and those build their request out of timeRanges, which is still the
-      // OLD day until the payload below comes back. So the three pages asked
-      // the server for the previous day's dates, got a perfectly good answer,
-      // and drew it as if it were the day that had just been picked. Filtering
-      // by bonus then matched nothing, because the filter was the new day's
-      // and the rows were not.
-      //
-      // The hold lets them show that they are loading without asking anything
-      // yet; releaseLogFetchesPak_ starts the real fetches once the payload
-      // has landed.
-      logFetchesHeldPak_ = true;
-      if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
-      if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
-      if (typeof fraudMarkControlChangedPak_ === 'function') { fraudMarkControlChangedPak_(); }
-      if (typeof renderPageIfNeeded_ === 'function') { markAllPagesDirty_(); }
-      if (typeof redrawCurrentPagePak_ === 'function') { redrawCurrentPagePak_(); }
+      // Picking a single day is leaving a custom range exactly as much as
+      // leaving Live - there is one "which historical view" at a time.
+      customRangeQuery = null;
+      if (typeof syncTimeAxisControlsPak_ === 'function') syncTimeAxisControlsPak_(currentPage);
+      beginNewViewPak_();
       if (currentArchiveUrl) {
         var syncedHours = document.querySelectorAll('[data-sync="hoursRange"]');
         for (var i = 0; i < syncedHours.length; i++) { syncedHours[i].value = '24'; }
@@ -731,6 +766,11 @@
     // the dialog seeds itself from.
     if (typeof shouldShowOnboarding_ === 'function' && shouldShowOnboarding_()) {
       openOnboarding_({ chainTour: true });
+      return;
+    }
+    // Set up before the day question existed: asked that alone, once.
+    if (typeof shouldAskDayMode_ === 'function' && shouldAskDayMode_()) {
+      openDayModePrompt_({ chainTour: true });
       return;
     }
     // Shows demo data while the real data keeps loading in the background.

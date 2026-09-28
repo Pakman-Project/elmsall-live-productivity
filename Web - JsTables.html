@@ -263,21 +263,24 @@ function buildMainRowDetail(rowData) {
   var p = extractRangePartsPak(rowData.dateTime);
   var startDate = parseDateTimePartPak(p.start);
   var matchSet = {};
+  // A row in a stretched run (see stretchBlocksPak_) lies outside timeRanges,
+  // and its people are in viewStretch rather than rawSideData.
+  var blocks = viewStretch.before.concat(timeRanges, viewStretch.after);
 
   if (startDate) {
     var endDate = new Date(startDate.getTime() + wm * 60000);
-    for (var i = 0; i < timeRanges.length; i++) {
-      var tp = extractRangePartsPak(timeRanges[i]);
+    for (var i = 0; i < blocks.length; i++) {
+      var tp = extractRangePartsPak(blocks[i]);
       var ts = parseDateTimePartPak(tp.start);
       if (ts && ts >= startDate && ts < endDate) {
-        matchSet[timeRanges[i]] = true;
+        matchSet[blocks[i]] = true;
       }
     }
   } else {
     matchSet[rowData.dateTime] = true;
   }
 
-  var slice = rawSideData.filter(function (r) {
+  var slice = rawSideData.concat(viewStretch.rows).filter(function (r) {
     if (!matchSet[r.timeRange]) return false;
     if (selectedBonuses.length > 0 && selectedBonuses.indexOf(r.bonus) === -1) return false;
     return true;
@@ -510,14 +513,30 @@ function ensureBonusTimeSelects_() {
   var toSel = $('bonusTo');
   if (!fromSel || !toSel) return;
 
-  var sliced = timeRanges.slice(-96);
+  // A custom range (see customRangeQuery) already says both ends - its own
+  // From/To would only let someone narrow WITHIN it, which reads as two
+  // controls disagreeing about the window. Locked to the whole span and
+  // disabled while one is active, the same treatment Hours Range gets.
+  fromSel.disabled = !!customRangeQuery;
+  toSel.disabled = !!customRangeQuery;
+
+  var sliced = customRangeQuery ? timeRanges.slice() : timeRanges.slice(-96);
   var sig = bonusTimeSlicedSig_(sliced);
-  if (fromSel.dataset.sig === sig) return;
+  if (fromSel.dataset.sig === sig) {
+    if (customRangeQuery) { fromSel.selectedIndex = 0; toSel.selectedIndex = sliced.length - 1; }
+    return;
+  }
 
   var prevFrom = fromSel.value;
   var prevTo = toSel.value;
 
   rebuildBonusTimeOptions_(fromSel, toSel, sliced);
+
+  if (customRangeQuery) {
+    fromSel.selectedIndex = 0;
+    toSel.selectedIndex = sliced.length - 1;
+    return;
+  }
 
   var fromRestored = false;
   var toRestored = false;
@@ -542,9 +561,12 @@ function resetBonusTimeRangeToDefault_() {
   var fromSel = $('bonusFrom');
   var toSel = $('bonusTo');
   if (!fromSel || !toSel) return;
-  var sliced = timeRanges.slice(-96);
+  fromSel.disabled = !!customRangeQuery;
+  toSel.disabled = !!customRangeQuery;
+  var sliced = customRangeQuery ? timeRanges.slice() : timeRanges.slice(-96);
   rebuildBonusTimeOptions_(fromSel, toSel, sliced);
-  var def = bonusDefaultIndexesPak_(sliced);
+  // A custom range already says both ends - see ensureBonusTimeSelects_.
+  var def = customRangeQuery ? { from: 0, to: sliced.length - 1 } : bonusDefaultIndexesPak_(sliced);
   fromSel.selectedIndex = def.from;
   toSel.selectedIndex = def.to;
   refreshBonusTables();

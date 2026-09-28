@@ -57,6 +57,10 @@ function saveUserPreferences() {
       syncAreaChips: syncAreaChips,
       siteFilter: siteFilterPreferred,
       theme: currentTheme,
+      // Null when never answered, and saved as null: this runs on the very
+      // first paint, before the one-time question is asked, and a default
+      // written here would read as an answer - see shouldAskDayMode_.
+      dayMode: dayMode,
       areaOrderVersion: AREA_ORDER_VERSION,
       // Only so the setup dialog can reopen showing what was answered. The
       // filter it produced lives in hiddenVolumeAreas above, and that is what
@@ -77,6 +81,9 @@ function loadUserPreferences() {
     var prefs = JSON.parse(raw);
 
     applyTheme_(prefs.theme === 'dark' ? 'dark' : 'light');
+
+    // One of the two answers, or still unanswered - never a guess.
+    dayMode = (prefs.dayMode === '6-6' || prefs.dayMode === '0-0') ? prefs.dayMode : null;
 
     // Restored before the payload arrives, so the first render is already
     // scoped rather than showing the whole site and then narrowing.

@@ -57,8 +57,14 @@ function world(opts) {
       calls.dash.push(url || 'live');
       const rows = url ? side.filter(s => s.d === 23) : side.filter(s => s.d === 24 || s.h >= 7);
       const schema = wire.sideSchema_();
-      return JSON.parse(JSON.stringify({ timeRanges: [], sideSchema: schema,
-                                         rawSideData: wire.encodeSideRows_(rows, schema) }));
+      const payload = { timeRanges: [], sideSchema: schema, rawSideData: wire.encodeSideRows_(rows, schema) };
+      // An archive also brings the next morning beside its date now, for the
+      // dashboard's day setting - the very rows the email takes from live.
+      if (url) {
+        payload.archiveDate = '23/09/2026';
+        payload.nextDayRows = wire.encodeSideRows_(side.filter(s => s.d === 24 && s.h < 6), schema);
+      }
+      return JSON.parse(JSON.stringify(payload));
     },
     SpreadsheetApp: {
       openByUrl: u => { calls.opened.push(u); return { getSheetByName: () => claimsTab }; },
@@ -199,6 +205,23 @@ head('[4] failures are loud, not silent');
   check('no archive for the day throws', /no archive for 21\/09\/2026/.test(
         throws({}, new Date(2026, 8, 22, 7, 0))));
   check('no recipients throws', /no recipients/.test(throws({ recipients: [''] })));
+}
+
+head('[5] the morning an archive now carries is not counted a second time');
+// getDashboardData(url) brings nextDayRows beside the date, and they are the
+// same rows the email already takes from the live file - read both and every
+// claim after midnight doubles.
+{
+  const { ctx, calls } = world(Object.assign({}, BASE, {
+    side: BASE.side.concat([{ d: 24, h: 2, m: 0, bonus: 'EEE', value: 0.25 }]),
+    npl: BASE.npl.concat([{ bonus: 'EEE', date: '23/09/2026', from: '02:00', to: '02:30',
+                            check: 'OK', tmAuth: 'K Lee', task: 'Meeting' }])
+  }));
+  ctx.sendClaimsEmailFor_(new Date(2026, 8, 24, 7, 0));
+  const body = calls.writes.find(w => w.r === 2);
+  const eee = body && body.v.find(r => r[0] === 'EEE');
+  check('a claim at 02:00 overlaps 15 minutes, not 30',
+        eee && eee[2] === '15' && eee[3] === '15', eee && eee.join(' | '));
 }
 
 console.log('\n' + (fail ? fail + ' FAILED' : 'all passed'));
