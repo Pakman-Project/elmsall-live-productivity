@@ -433,13 +433,17 @@ head('[7] the table names every part of the case');
   // kept in the same order by hand is how a column ends up labelled as its
   // neighbour.
   const cols = ctx.FRAUD_COLUMNS_;
-  check('the ten columns, in order',
+  check('the eleven columns, in order',
         cols.map(c => c.label).join() ===
-          'Bonus,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,Task,TM authorised,Status',
+          'Bonus,Date,Work Areas,Total Std Mins Produced,Overlap Std Mins,Overlap Time,Claim,Claim Time,Task,TM authorised,Status',
         cols.map(c => c.label).join());
-  check('ten widths summing to 100',
-        cols.length === 10 && cols.reduce((a, c) => a + c.width, 0) === 100,
+  check('eleven widths summing to 100',
+        cols.length === 11 && cols.reduce((a, c) => a + c.width, 0) === 100,
         cols.map(c => c.width).join('+') + '=' + cols.reduce((a, c) => a + c.width, 0));
+  // A custom range (see customRangeQuery) can span several production days,
+  // and Claim Time alone cannot say which one a row belongs to.
+  check('Date sorts as a real date, off the same window the claim itself uses',
+        cols.find(c => c.key === 'date').sort === 'time');
   check('every column names the row field it reads, and how it sorts',
         cols.every(c => c.key && c.sort),
         'a heading with no key is a heading that cannot be sorted by');
@@ -738,7 +742,7 @@ head('[13] the whole row goes blue when its bonus is filtered, not just the chip
   const mk2 = over => Object.assign({
     bonus: 'AAA', areas: [], areaStd: {}, totalStd: 1, overlapStd: 1,
     overlapFrom: at(10, 0), overlapTo: at(10, 15), kind: 'OS',
-    from: at(10, 0), to: at(10, 15), auth: '', statusHtml: '', statusText: ''
+    date: at(10, 0), from: at(10, 0), to: at(10, 15), auth: '', statusHtml: '', statusText: ''
   }, over);
   ctx.selectedBonuses = ['AAA'];
   const html = ctx.fraudTableHtmlPak_([mk2({ bonus: 'AAA' }), mk2({ bonus: 'BBB' })]);

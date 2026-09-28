@@ -281,8 +281,10 @@ head('[7] the record row shows the six things it was asked for');
   check('and the record status', html.indexOf('Approved') !== -1);
   check('headed in that order',
         JSON.stringify(ctx.OS_JOB_COLUMNS_) ===
-        '["Bonus","Time","TM Authorising","Deployed by","Reports to","Record Status"]',
+        '["Bonus","Date","Time","TM Authorising","Deployed by","Reports to","Record Status"]',
         JSON.stringify(ctx.OS_JOB_COLUMNS_));
+  check('and the row carries the date, for a custom range spanning several days',
+        html.indexOf('<td data-label="Date">') !== -1);
 
   // The bonus number behaves like every other one on the dashboard: it sets
   // the global filter, and it carries the manager card.
@@ -832,8 +834,8 @@ head('[15f] the records-to-be-aware-of row is a bar, not a squeezed label');
   check('the records table is fixed, with shares spent on what needs them',
         /\.record-table:not\(\.bad-record-table\) \{ table-layout: fixed; \}/.test(css),
         'auto would size each table from its own content and misalign the next one down');
-  check('a colgroup carries those shares, not a blind six-way split',
-        /var OS_JOB_COL_WIDTHS_ = \[10, 13, 19, 19, 19, 20\];/.test(PAGE) &&
+  check('a colgroup carries those shares, not a blind seven-way split',
+        /var OS_JOB_COL_WIDTHS_ = \[10, 11, 12, 17, 17, 17, 16\];/.test(PAGE) &&
         /html \+= '<col style="width:' \+ OS_JOB_COL_WIDTHS_\[w\] \+ '%">';/.test(PAGE),
         'the bare `table` rule\'s equal split crushed the bonus chip to the ' +
         'width of "TM Authorising"');

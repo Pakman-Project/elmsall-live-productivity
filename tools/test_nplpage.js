@@ -281,25 +281,30 @@ head('[7] the four filters, and the cascade');
 }
 
 head('[8] the record table');
-// Bonus | Time | Site Transfer | TM authorised | Check, and the widths have to
-// sum to 100 - one task is one table and a department can hold a dozen of them
-// down the page, so they have to agree with each other on where a column sits.
+// Bonus | Date | Time | Site Transfer | TM authorised | Check, and the widths
+// have to sum to 100 - one task is one table and a department can hold a
+// dozen of them down the page, so they have to agree with each other on
+// where a column sits.
 {
   const cols = /var NPL_TASK_COLUMNS_ = \[([\s\S]*?)\];/.exec(PAGE);
-  check('the five columns, in order',
+  check('the six columns, in order',
         !!cols && cols[1].replace(/['\s\n\r]/g, '') ===
-          'Bonus,Time,SiteTransfer,TMauthorised,Check',
+          'Bonus,Date,Time,SiteTransfer,TMauthorised,Check',
         cols ? cols[1].replace(/\s+/g, ' ') : 'not declared');
   const w = /var NPL_TASK_COL_WIDTHS_ = \[([\d,\s]+)\];/.exec(PAGE);
   const nums = w ? w[1].split(',').map(Number) : [];
-  check('five widths', nums.length === 5, String(nums.length));
+  check('six widths', nums.length === 6, String(nums.length));
   check('summing to 100', nums.reduce((a, b) => a + b, 0) === 100,
         String(nums.reduce((a, b) => a + b, 0)));
   check('the bonus is clickable, like every other bonus number on the dashboard',
         /toggleBonusFilter\(/.test(PAGE) && /bonus-tip-host clickable-bonus/.test(PAGE));
-  check('the time reads as clock times without the date',
-        /osRowTimeTextPak_\(r\)/.test(PAGE),
-        'the date is on the page range picker; repeating it crowds the row');
+  // A custom range (see customRangeQuery) can span several production days,
+  // so the time alone is ambiguous - the Date column is what disambiguates
+  // it, not a repeat of the page's own range picker.
+  check('the time still reads as bare clock times, without a date of its own',
+        /osRowTimeTextPak_\(r\)/.test(PAGE));
+  check('and the row carries its own Date cell beside it',
+        /<td data-label="Date">' \+ escapeTextPak_\(r\.date\) \+ '<\/td>'/.test(PAGE));
   check('Site Transfer and TM authorised fall back to a dash when blank',
         /osPersonCellPak_\(r\.siteTransfer\)/.test(PAGE) &&
         /osPersonCellPak_\(r\.tmAuth\)/.test(PAGE));

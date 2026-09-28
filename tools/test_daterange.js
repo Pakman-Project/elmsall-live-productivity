@@ -58,21 +58,51 @@ function srow(d, h, m, bonus, value) {
   r.push('NO', '');
   return r;
 }
-function sheetFile(rows, b2) {
+function sheetFile(rows, b2, extraSheets) {
   const lines = [HEADER.join('|')].concat(rows.map(r => r.join('|')));
   const backend = { getName: () => 'Backend', getLastRow: () => lines.length,
                     getRange: () => ({ getDisplayValues: () => lines.map(l => [l]) }) };
   const cells = { A2: 0.05, B2: b2 || new Date(2026, 8, 21, 0, 0), G3: '' };
   const front = { getRange: c => ({ getValue: () => cells[c], getDisplayValue: () => String(cells[c]) }) };
   const source = { getLastRow: () => rows.length + 1 };
-  return { getSheets: () => [backend],
+  return { getSheets: () => [backend].concat(extraSheets || []),
            getSheetByName: n => (n === 'Front' ? front : n === 'Processed Data (15mins)' ? source : null) };
 }
+// One OS/NPL log row, laid out by column index rather than by hand, so a
+// column moving in Web - Code.js moves it here too rather than silently
+// reading the wrong cell.
+function osLogRowStub_(cols, width, date, bonus, from, to) {
+  const row = new Array(width).fill('');
+  row[cols.date] = date; row[cols.bonus] = bonus; row[cols.start] = from; row[cols.finish] = to;
+  if ('dept' in cols) row[cols.dept] = 'RSPS';
+  if ('job' in cols) row[cols.job] = 'Pick';
+  if ('task' in cols) row[cols.task] = 'Meeting';
+  if ('status' in cols) row[cols.status] = 'Approved';
+  return row;
+}
+function logSheetStub_(name, firstRow, rows) {
+  return { getName: () => name, getLastRow: () => firstRow + rows.length - 1,
+           getRange: () => ({ getDisplayValues: () => rows }) };
+}
+function osLogSheetStub_(entries) {
+  const C = sctx.OS_LOG_COLS_, W = sctx.OS_LOG_WIDTH_, F = sctx.OS_LOG_FIRST_ROW_;
+  return logSheetStub_('OS log', F, entries.map(e => osLogRowStub_(C, W, e.date, e.bonus, e.from, e.to)));
+}
+function nplLogSheetStub_(entries) {
+  const C = sctx.NPL_LOG_COLS_, W = sctx.NPL_LOG_WIDTH_, F = sctx.NPL_LOG_FIRST_ROW_;
+  return logSheetStub_('NPL log', F, entries.map(e => osLogRowStub_(C, W, e.date, e.bonus, e.from, e.to)));
+}
 const FILES = {
-  U19: sheetFile([srow(19, 20, 0, 'AAA'), srow(19, 23, 0, 'AAA')]),
-  U20: sheetFile([srow(20, 8, 0, 'AAA'), srow(20, 20, 0, 'BBB')]),
+  U19: sheetFile([srow(19, 20, 0, 'AAA'), srow(19, 23, 0, 'AAA')], null,
+                 [osLogSheetStub_([{ date: '19/09/2026', bonus: 'AAA', from: '20:00', to: '23:00' }]),
+                  nplLogSheetStub_([{ date: '19/09/2026', bonus: 'AAA', from: '20:00', to: '20:30' }])]),
+  U20: sheetFile([srow(20, 8, 0, 'AAA'), srow(20, 20, 0, 'BBB')], null,
+                 [osLogSheetStub_([{ date: '20/09/2026', bonus: 'BBB', from: '20:00', to: '23:00' }]),
+                  nplLogSheetStub_([{ date: '20/09/2026', bonus: 'BBB', from: '20:00', to: '20:30' }])]),
   // 21/09 has no archive yet - it is "today", read from the live file.
-  LIVE: sheetFile([srow(21, 1, 0, 'CCC'), srow(21, 8, 0, 'DDD'), srow(21, 8, 45, 'DDD')])
+  LIVE: sheetFile([srow(21, 1, 0, 'CCC'), srow(21, 8, 0, 'DDD'), srow(21, 8, 45, 'DDD')], null,
+                  [osLogSheetStub_([{ date: '21/09/2026', bonus: 'CCC', from: '01:00', to: '08:00' }]),
+                   nplLogSheetStub_([{ date: '21/09/2026', bonus: 'CCC', from: '01:00', to: '01:30' }])])
 };
 const opened = [];
 sctx.SpreadsheetApp = {
@@ -139,6 +169,44 @@ head('[3] a doomed request is refused before it opens anything');
   opened.length = 0;
   throws('21/09/2026 09:00', '20/09/2026 14:00');
   check('and nothing was opened for a request that was always going to fail', opened.length === 0);
+}
+
+head('[3b] the OS/NPL log follows a custom range across several already-archived days');
+// Before this, getOsLogRows/getNplLogRows took ONE archiveUrl for the whole
+// call - fine for a single day, wrong for a custom range: 19/09 and 20/09 are
+// each a SEPARATE archive, and the single-day view's archiveUrl (here, null -
+// a custom range has none) does not name either of them. Reading it as "no
+// archive" for every date asked for meant only the live file (21/09) was ever
+// read - 19/09 and 20/09 came back empty no matter how the log itself looked.
+{
+  opened.length = 0;
+  const os = sctx.getOsLogRows(['19/09/2026', '20/09/2026', '21/09/2026'], null);
+  check('19/09 comes from ITS OWN archive', os.rows.some(r => r.bonus === 'AAA' && r.date === '19/09/2026'));
+  check('20/09 comes from a DIFFERENT archive', os.rows.some(r => r.bonus === 'BBB' && r.date === '20/09/2026'));
+  check('21/09, not yet archived, comes from the live file', os.rows.some(r => r.bonus === 'CCC'));
+  check('all three sources were actually opened, not just one',
+        ['U19', 'U20', 'LIVE'].every(u => opened.includes(u)), opened.join(', '));
+
+  opened.length = 0;
+  const npl = sctx.getNplLogRows(['19/09/2026', '20/09/2026', '21/09/2026'], null);
+  check('the NPL log is grouped the same way', npl.rows.map(r => r.bonus).sort().join() === 'AAA,BBB,CCC',
+        npl.rows.map(r => r.bonus).join());
+  check('and it too opens every source touched', ['U19', 'U20', 'LIVE'].every(u => opened.includes(u)));
+
+  // A single day, one archive - the ordinary case this must not disturb -
+  // still reads exactly that one file, exactly as before.
+  opened.length = 0;
+  const single = sctx.getOsLogRows(['20/09/2026'], 'U20');
+  check('a single archived day still reads just its own file',
+        single.rows.length === 1 && single.rows[0].bonus === 'BBB' && opened.join() === 'U20', opened.join());
+
+  // The archiveUrl argument is a FALLBACK only, for a date the Links sheet
+  // does not (yet) list - never a substitute for a date's own resolved
+  // archive once one exists.
+  opened.length = 0;
+  const hinted = sctx.getOsLogRows(['19/09/2026'], 'U20');
+  check('a resolvable date ignores the archiveUrl hint - it is not a substitute for its OWN archive',
+        opened.join() === 'U19', opened.join());
 }
 
 // ── the client ───────────────────────────────────────────────────────────
@@ -342,12 +410,57 @@ head('[6c] Default Range cancels the span and shows the calendar again');
   ctx.$ = was$;
 }
 
+head('[6d] the minute select only ever offers the quarter-hour, and reopening seeds both selects from it');
+{
+  check('the minute select in the markup offers exactly 00/15/30/45, nothing else',
+        (() => {
+          const header = R('Web - Header.html');
+          const m = /id="rangeFromMinute"[^>]*>([\s\S]*?)<\/select>/.exec(header);
+          if (!m) return false;
+          const values = [...m[1].matchAll(/value="(\d+)"/g)].map(x => x[1]);
+          return values.join(',') === '00,15,30,45';
+        })());
+  check('the hour select still offers the full 00-23 - only the minute is restricted',
+        (() => {
+          const header = R('Web - Header.html');
+          const m = /id="rangeFromHour"[^>]*>([\s\S]*?)<\/select>/.exec(header);
+          if (!m) return false;
+          const values = [...m[1].matchAll(/value="(\d+)"/g)].map(x => x[1]);
+          return values.length === 24 && values[0] === '00' && values[23] === '23';
+        })());
+  check('the old free-typed type="time" input is gone', !/type="time"/.test(R('Web - Header.html')));
+
+  const fake = () => ({ value: '', hidden: true, setAttribute() {} });
+  const cEls = { dateRangeFields: fake(), dateRangeToggle: fake(), calBody: fake(),
+                 rangeFromDate: fake(), rangeFromHour: fake(), rangeFromMinute: fake(),
+                 rangeToDate: fake(), rangeToHour: fake(), rangeToMinute: fake() };
+  cEls.dateRangeFields.hidden = true;   // closed, about to be opened
+  const was$ = ctx.$;
+  ctx.$ = id => cEls[id] || null;
+  ctx.customRangeQuery = { from: '20/09/2026 14:37', to: '22/09/2026 09:00' };
+
+  ctx.toggleDateRangePanel_();
+  check('opening onto an existing range seeds the date and hour as-is',
+        cEls.rangeFromDate.value === '2026-09-20' && cEls.rangeFromHour.value === '14');
+  check('and snaps a minute the select cannot offer down to the quarter below it',
+        cEls.rangeFromMinute.value === '30', cEls.rangeFromMinute.value);
+  check('a minute already on the quarter is left exactly as it was',
+        cEls.rangeToMinute.value === '00', cEls.rangeToMinute.value);
+  ctx.$ = was$;
+  ctx.customRangeQuery = null;
+}
+
 head('[7] applying a range validates, then takes over from Live');
 {
   const els = {};
   const fake = () => ({ value: '', hidden: true, textContent: '', setAttribute() {}, classList: { _s: {}, add(c) { this._s[c] = true; }, toggle(c, on) { this._s[c] = !!on; } } });
-  ['rangeFromDate', 'rangeFromTime', 'rangeToDate', 'rangeToTime', 'dateRangeError',
+  ['rangeFromDate', 'rangeFromHour', 'rangeFromMinute', 'rangeToDate', 'rangeToHour', 'rangeToMinute', 'dateRangeError',
    'archiveSelect', 'datePickerBtn', 'datePickerLabel', 'dateMenu'].forEach(id => { els[id] = fake(); });
+  const setRangeTime = (prefix, hhmm) => {
+    const parts = hhmm.split(':');
+    els['range' + prefix + 'Hour'].value = parts[0];
+    els['range' + prefix + 'Minute'].value = parts[1];
+  };
   ctx.$ = id => els[id] || null;
   const timeWindowEl = { value: '60' };
   ctx.document = { querySelectorAll: sel => (sel === '[data-sync="timeWindow"]' ? [timeWindowEl] : []),
@@ -359,8 +472,8 @@ head('[7] applying a range validates, then takes over from Live');
 
   els.rangeFromDate.value = '2026-09-22';
   els.rangeToDate.value = '2026-09-20';
-  els.rangeFromTime.value = '14:00';
-  els.rangeToTime.value = '09:00';
+  setRangeTime('From', '14:00');
+  setRangeTime('To', '09:00');
   ctx.applyDateRange_();
   check('To before From is refused', els.dateRangeError.hidden === false && calls.load === 0,
         els.dateRangeError.textContent);
@@ -371,8 +484,8 @@ head('[7] applying a range validates, then takes over from Live');
   ctx.applyDateRange_();
   check('a span past the cap is refused too', /31/.test(els.dateRangeError.textContent), els.dateRangeError.textContent);
 
-  els.rangeFromDate.value = '2026-09-20'; els.rangeFromTime.value = '14:00';
-  els.rangeToDate.value = '2026-09-22'; els.rangeToTime.value = '09:00';
+  els.rangeFromDate.value = '2026-09-20'; setRangeTime('From', '14:00');
+  els.rangeToDate.value = '2026-09-22'; setRangeTime('To', '09:00');
   ctx.currentArchiveUrl = 'U18';
   els.archiveSelect.value = 'U18';
   ctx.applyDateRange_();
