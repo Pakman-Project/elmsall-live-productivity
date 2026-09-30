@@ -55,8 +55,11 @@
   }
 
   function nplFetchLogPak_(silent) {
+    var seq = ++fetchSeqPak_.npl;
     google.script.run
       .withSuccessHandler(function (res) {
+        // Overtaken, or for a date no longer on screen - see fetchSeqPak_.
+        if (seq !== fetchSeqPak_.npl) return;
         nplLogRows = (res && res.rows) || [];
         nplLogSkipped = (res && Number(res.skipped)) || 0;
         nplLogBad = (res && res.bad) || [];
@@ -72,6 +75,7 @@
         renderNplPagePak();
       })
       .withFailureHandler(function (err) {
+        if (seq !== fetchSeqPak_.npl) return;
         progressEndPak_('npllog');
         var message = (err && err.message) || 'The NPL log could not be read';
         if (silent) { console.warn('NPL log background refresh failed: ' + message); return; }
@@ -216,7 +220,9 @@
 
   // ── the record table ──────────────────────────────────────────────────────
 
-  var NPL_TASK_COLUMNS_ = ['Bonus', 'Time', 'Site Transfer', 'TM authorised', 'Check'];
+  // Date, not just Time: a custom range (see customRangeQuery) can span
+  // several production days, and a bare time cannot say which one a row is.
+  var NPL_TASK_COLUMNS_ = ['Bonus', 'Date', 'Time', 'Site Transfer', 'TM authorised', 'Check'];
 
   // Site Transfer answers a question only one task asks. On the DESKTOP table
   // the column stays whatever the task is - a table with a column missing from
@@ -232,8 +238,8 @@
   }
   // A percentage per column, summing to 100, so every task table down the page
   // lines its columns up with every other one - the bare `table` rule would
-  // give five equal fifths and spend as much on the bonus chip as on a name.
-  var NPL_TASK_COL_WIDTHS_ = [14, 18, 24, 24, 20];
+  // give six equal shares and spend as much on the bonus chip as on a name.
+  var NPL_TASK_COL_WIDTHS_ = [13, 12, 15, 22, 20, 18];
 
   function nplTaskTableHtmlPak_(records) {
     var html = '<div class="table-wrap record-table-wrap"><table class="record-table">' +
@@ -259,6 +265,7 @@
               escapeTextPak_(r.bonus) +
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
+      html += '<td data-label="Date">' + escapeTextPak_(r.date) + '</td>';
       html += '<td class="time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
       html += '<td data-label="Site Transfer"' +
               (nplIsSiteTransferTaskPak_(r.task) ? '' : ' class="npl-task-only"') +

@@ -7,12 +7,12 @@
     <div class="card kpi-multi">
       <div class="kpi-cell">
         <div class="kpi-cell-label">
-          Head Deployed Last Hour
+          <span id="headDeployedLabel">Head Deployed Last Hour</span>
           <span class="kpi-tooltip">
             <i class="fa-solid fa-circle-info"></i>
             <span class="kpi-tooltip-content">
               <span class="tt-title">Unique Heads</span>
-              <span>Counts unique Bonus Numbers active in the last 4 x 15min blocks.</span>
+              <span id="headDeployedTip">Counts unique Bonus Numbers active in the last 4 x 15min blocks.</span>
             </span>
           </span>
         </div>
@@ -27,7 +27,7 @@
             <i class="fa-solid fa-chart-pie"></i> Breakdown
           </button>
         </div>
-        <div class="kpi-cell-sub">Last 4 blocks</div>
+        <div class="kpi-cell-sub" id="headDeployedSub">Last 4 blocks</div>
       </div>
 
       <div class="kpi-divider" aria-hidden="true"></div>
@@ -39,7 +39,7 @@
             <i class="fa-solid fa-circle-info"></i>
             <span class="kpi-tooltip-content">
               <span class="tt-title">Above Threshold</span>
-              <span>Workers meeting/exceeding the hourly productivity target.</span>
+              <span id="headAbove20Tip">Workers meeting/exceeding the hourly productivity target.</span>
             </span>
           </span>
         </div>
@@ -54,7 +54,7 @@
 
       <div class="kpi-cell">
         <div class="kpi-cell-label">
-          Last Hour Productivity
+          <span id="avgPerfLabel">Last Hour Productivity</span>
           <span class="kpi-tooltip">
             <i class="fa-solid fa-circle-info"></i>
             <span class="kpi-tooltip-content">
@@ -67,7 +67,7 @@
           <span class="value" id="avgPerf">-</span>
           <span class="kpi-trend" id="avgPerfTrend"></span>
         </div>
-        <div class="kpi-cell-sub">Last 4 blocks</div>
+        <div class="kpi-cell-sub" id="avgPerfSub">Last 4 blocks</div>
       </div>
     </div>
   </div>

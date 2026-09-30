@@ -977,13 +977,22 @@
       // Reopened onto a range already showing: seed the fields with it
       // rather than whatever they last held, so Apply without a change
       // cannot silently narrow the range to today's date.
-      var fd = $('rangeFromDate'), ft = $('rangeFromTime'),
-          td = $('rangeToDate'), tt = $('rangeToTime');
-      var fm = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})$/.exec(customRangeQuery.from);
-      var tm = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})$/.exec(customRangeQuery.to);
-      if (fm && fd && ft) { fd.value = fm[3] + '-' + fm[2] + '-' + fm[1]; ft.value = fm[4]; }
-      if (tm && td && tt) { td.value = tm[3] + '-' + tm[2] + '-' + tm[1]; tt.value = tm[4]; }
+      var fd = $('rangeFromDate'), td = $('rangeToDate');
+      var fm = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(customRangeQuery.from);
+      var tm = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(customRangeQuery.to);
+      if (fm && fd) { fd.value = fm[3] + '-' + fm[2] + '-' + fm[1]; setRangeTimeSelectsPak_('From', fm[4], fm[5]); }
+      if (tm && td) { td.value = tm[3] + '-' + tm[2] + '-' + tm[1]; setRangeTimeSelectsPak_('To', tm[4], tm[5]); }
     }
+  }
+
+  // The minute select only ever offers 00/15/30/45 (see Web - Header.html),
+  // so a range applied before this existed - or read back from anywhere else
+  // that isn't one of these two selects - is snapped down to the quarter
+  // rather than left showing a minute the control cannot actually select.
+  function setRangeTimeSelectsPak_(prefix, hh, mm) {
+    var h = $('range' + prefix + 'Hour'), m = $('range' + prefix + 'Minute');
+    if (h) h.value = hh;
+    if (m) m.value = String(Math.floor(Number(mm) / 15) * 15).replace(/^(\d)$/, '0$1');
   }
 
   // The custom-range fields' own way back to the calendar - cancels the
@@ -1012,14 +1021,21 @@
   // ONE of them is a wasted round trip.
   var DATE_RANGE_MAX_DAYS_PAK_ = 31;
 
+  // "00:00" if either select is missing, rather than throwing - matches the
+  // input this replaces, which read as midnight the same way when empty.
+  function rangeTimeValuePak_(prefix) {
+    var h = $('range' + prefix + 'Hour'), m = $('range' + prefix + 'Minute');
+    return (h && h.value ? h.value : '00') + ':' + (m && m.value ? m.value : '00');
+  }
+
   function applyDateRange_() {
-    var fd = $('rangeFromDate'), ft = $('rangeFromTime'), td = $('rangeToDate'), tt = $('rangeToTime');
+    var fd = $('rangeFromDate'), td = $('rangeToDate');
     if (!fd || !td) return;
     hideDateRangeError_();
     if (!fd.value || !td.value) { showDateRangeError_('Pick both a From and a To date.'); return; }
 
-    var fromStr = isoDateToDmyPak_(fd.value) + ' ' + (ft && ft.value ? ft.value : '00:00');
-    var toStr = isoDateToDmyPak_(td.value) + ' ' + (tt && tt.value ? tt.value : '00:00');
+    var fromStr = isoDateToDmyPak_(fd.value) + ' ' + rangeTimeValuePak_('From');
+    var toStr = isoDateToDmyPak_(td.value) + ' ' + rangeTimeValuePak_('To');
     var fromDt = parseDateTimePartPak(fromStr);
     var toDt = parseDateTimePartPak(toStr);
     if (!fromDt || !toDt) { showDateRangeError_('Could not read those dates.'); return; }

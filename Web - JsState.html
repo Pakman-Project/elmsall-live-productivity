@@ -803,6 +803,14 @@ var fraudLogNeedsRefresh = false;
 // for the OLD day's dates and draws the answer as if it were the new one. Held
 // here, released by releaseLogFetchesPak_ once the payload has landed.
 var logFetchesHeldPak_ = false;
+// A ticket per server read that a newer one can overtake. A google.script.run
+// call cannot be cancelled, so picking a second date while the first is still
+// loading used to get BOTH answered - and whichever landed last was drawn,
+// which was not always the one the date control was showing. Each read takes
+// the next number as it starts and its answer is dropped unless that number
+// is still the newest. beginNewViewPak_ also moves the three log counters on,
+// so a log read for the old date is dropped even before the new one starts.
+var fetchSeqPak_ = { dash: 0, os: 0, npl: 0, fraud: 0 };
 // The five filters. Each is a whitelist and an EMPTY one means no filter, not
 // nothing - same bargain as the OS page's, for the same reason: the first
 // click on a fresh dropdown emptying the page reads as the page being broken.

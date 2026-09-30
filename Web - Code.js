@@ -809,18 +809,31 @@ function getOsLogRows(dateKeys, archiveUrl) {
     } catch (e) {}
   }
 
-  var ss;
-  try {
-    ss = archiveUrl ? SpreadsheetApp.openByUrl(archiveUrl)
-                    : SpreadsheetApp.getActiveSpreadsheet();
-  } catch (e) {
-    return { rows: [], skipped: 0, bad: [], error: 'Could not open the spreadsheet' };
+  // Each already-archived date is read from its OWN copy of the workbook,
+  // not the one spreadsheet a single-day view used to assume - see
+  // groupLogKeysBySource_. archiveUrl (the day the client happens to be
+  // looking at) is only a fallback, for a date the Links sheet does not
+  // know about yet.
+  var groups = groupLogKeysBySource_(keys);
+  var rows = [], skipped = 0, bad = [], cellsTotal = 0, openError = null;
+  for (var g = 0; g < groups.length; g++) {
+    var group = groups[g];
+    var ss;
+    try {
+      ss = (group.url || archiveUrl) ? SpreadsheetApp.openByUrl(group.url || archiveUrl)
+                                      : SpreadsheetApp.getActiveSpreadsheet();
+    } catch (e) { openError = 'Could not open the spreadsheet'; continue; }
+    var part = readOsLogRows_(ss, group.want);
+    rows = rows.concat(part.rows);
+    skipped += part.skipped;
+    bad = bad.concat(part.bad);
+    cellsTotal += osLogCellsRead_;
   }
-  tm.mark('open');
-
-  var out = readOsLogRows_(ss, want);
+  osLogCellsRead_ = cellsTotal;
   tm.mark('osLog', osLogCellsRead_);
-  tm.note('rows=' + out.rows.length);
+  tm.note('rows=' + rows.length);
+  var out = { rows: rows, skipped: skipped, bad: bad };
+  if (rows.length === 0 && bad.length === 0 && openError) out.error = openError;
   out.timing = tm.done('OSLOG');
   cachePutLarge_(cacheKey, JSON.stringify(out), 300);
   return out;
@@ -955,18 +968,29 @@ function getNplLogRows(dateKeys, archiveUrl) {
     } catch (e) {}
   }
 
-  var ss;
-  try {
-    ss = archiveUrl ? SpreadsheetApp.openByUrl(archiveUrl)
-                    : SpreadsheetApp.getActiveSpreadsheet();
-  } catch (e) {
-    return { rows: [], skipped: 0, bad: [], error: 'Could not open the spreadsheet' };
+  // Same reasoning as getOsLogRows: each already-archived date reads its own
+  // copy of the workbook, not the single spreadsheet a one-day view used to
+  // assume - see groupLogKeysBySource_.
+  var groups = groupLogKeysBySource_(keys);
+  var rows = [], skipped = 0, bad = [], cellsTotal = 0, openError = null;
+  for (var g = 0; g < groups.length; g++) {
+    var group = groups[g];
+    var ss;
+    try {
+      ss = (group.url || archiveUrl) ? SpreadsheetApp.openByUrl(group.url || archiveUrl)
+                                      : SpreadsheetApp.getActiveSpreadsheet();
+    } catch (e) { openError = 'Could not open the spreadsheet'; continue; }
+    var part = readNplLogRows_(ss, group.want);
+    rows = rows.concat(part.rows);
+    skipped += part.skipped;
+    bad = bad.concat(part.bad);
+    cellsTotal += nplLogCellsRead_;
   }
-  tm.mark('open');
-
-  var out = readNplLogRows_(ss, want);
+  nplLogCellsRead_ = cellsTotal;
   tm.mark('nplLog', nplLogCellsRead_);
-  tm.note('rows=' + out.rows.length);
+  tm.note('rows=' + rows.length);
+  var out = { rows: rows, skipped: skipped, bad: bad };
+  if (rows.length === 0 && bad.length === 0 && openError) out.error = openError;
   out.timing = tm.done('NPLLOG');
   cachePutLarge_(cacheKey, JSON.stringify(out), 300);
   return out;
@@ -1165,6 +1189,27 @@ function archiveUrlFor_(name) {
     if (links[a].name === name) return links[a].url;
   }
   return null;
+}
+
+// Groups dd/MM/yyyy keys by the spreadsheet that actually holds each day's
+// OS/NPL log - its own archive if the Links sheet lists one, the live file
+// otherwise. A custom range can span several already-archived days, each in
+// its OWN copy of the workbook - see getDashboardDataRange, which groups the
+// same way, for the same reason: one archiveUrl (or none) cannot serve all
+// of them. Order is stable, so a group list built from the same keys is
+// always the same shape.
+function groupLogKeysBySource_(keys) {
+  var order = [];
+  var groups = {};
+  for (var i = 0; i < keys.length; i++) {
+    var url = archiveUrlFor_(keys[i]) || '';
+    if (!Object.prototype.hasOwnProperty.call(groups, url)) {
+      groups[url] = { url: url || null, want: {} };
+      order.push(url);
+    }
+    groups[url].want[keys[i]] = true;
+  }
+  return order.map(function (u) { return groups[u]; });
 }
 
 // One day's rows in trSet (timeRange -> true), as side entries.

@@ -121,17 +121,53 @@
                 <button type="button" class="cal-action" onclick="useDefaultRangePak_()">Default Range</button>
                 <button type="button" class="cal-action" data-cal-action="today">Live (Today)</button>
               </div>
+              <!-- A plain time input's minute field takes any two
+                   digits typed into it - step="900" only nudges its spinner
+                   arrows by 15, so 07 or 52 both still parse. Two <select>s
+                   instead: the hour list is free (the read runs to whichever
+                   quarter it lands on regardless), but the minute list IS the
+                   validation - only 00/15/30/45 are ever offered. -->
               <div class="date-range-row">
                 <span class="date-range-label">From</span>
                 <input type="date" id="rangeFromDate" class="date-range-input" aria-label="From date">
-                <input type="time" id="rangeFromTime" class="date-range-input date-range-time"
-                       step="900" value="00:00" aria-label="From time">
+                <div class="date-range-time-group">
+                  <select id="rangeFromHour" class="date-range-input date-range-time" aria-label="From hour">
+                    <option value="00">00</option><option value="01">01</option><option value="02">02</option>
+                    <option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                    <option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                    <option value="09">09</option><option value="10">10</option><option value="11">11</option>
+                    <option value="12">12</option><option value="13">13</option><option value="14">14</option>
+                    <option value="15">15</option><option value="16">16</option><option value="17">17</option>
+                    <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                    <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+                  </select>
+                  <span class="date-range-time-sep" aria-hidden="true">:</span>
+                  <select id="rangeFromMinute" class="date-range-input date-range-time" aria-label="From minute">
+                    <option value="00">00</option><option value="15">15</option>
+                    <option value="30">30</option><option value="45">45</option>
+                  </select>
+                </div>
               </div>
               <div class="date-range-row">
                 <span class="date-range-label">To</span>
                 <input type="date" id="rangeToDate" class="date-range-input" aria-label="To date">
-                <input type="time" id="rangeToTime" class="date-range-input date-range-time"
-                       step="900" value="00:00" aria-label="To time">
+                <div class="date-range-time-group">
+                  <select id="rangeToHour" class="date-range-input date-range-time" aria-label="To hour">
+                    <option value="00">00</option><option value="01">01</option><option value="02">02</option>
+                    <option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                    <option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                    <option value="09">09</option><option value="10">10</option><option value="11">11</option>
+                    <option value="12">12</option><option value="13">13</option><option value="14">14</option>
+                    <option value="15">15</option><option value="16">16</option><option value="17">17</option>
+                    <option value="18">18</option><option value="19">19</option><option value="20">20</option>
+                    <option value="21">21</option><option value="22">22</option><option value="23">23</option>
+                  </select>
+                  <span class="date-range-time-sep" aria-hidden="true">:</span>
+                  <select id="rangeToMinute" class="date-range-input date-range-time" aria-label="To minute">
+                    <option value="00">00</option><option value="15">15</option>
+                    <option value="30">30</option><option value="45">45</option>
+                  </select>
+                </div>
               </div>
               <p class="date-range-error" id="dateRangeError" role="alert" hidden></p>
               <div class="date-range-actions">

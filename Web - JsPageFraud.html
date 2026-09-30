@@ -264,6 +264,10 @@
       out.push({
         bonus: row.bonus,
         kind: kind,
+        // Same Date object as from, under its own key: a custom range (see
+        // customRangeQuery) can span several production days, and "Claim
+        // Time" alone cannot say which one a row is - see the Date column.
+        date: w.start,
         from: w.start,
         to: w.finish,
         overlapFrom: overlapFrom,
@@ -384,6 +388,10 @@
     var keys = fraudWantDatesPak_();
     var pending = 2;
     var failed = '';
+    // One ticket for the pair: either half of an overtaken read is dropped
+    // before it can touch the rows - see fetchSeqPak_.
+    var seq = ++fetchSeqPak_.fraud;
+    function current() { return seq === fetchSeqPak_.fraud; }
 
     function done() {
       if (--pending > 0) return;   // the other log is still in the air
@@ -399,11 +407,13 @@
 
     google.script.run
       .withSuccessHandler(function (res) {
+        if (!current()) return;
         fraudOsRows = (res && res.rows) || [];
         if (res && res.error) failed = res.error;
         done();
       })
       .withFailureHandler(function (err) {
+        if (!current()) return;
         failed = (err && err.message) || 'The OS log could not be read';
         done();
       })
@@ -411,11 +421,13 @@
 
     google.script.run
       .withSuccessHandler(function (res) {
+        if (!current()) return;
         fraudNplRows = (res && res.rows) || [];
         if (res && res.error) failed = res.error;
         done();
       })
       .withFailureHandler(function (err) {
+        if (!current()) return;
         failed = (err && err.message) || 'The NPL log could not be read';
         done();
       })
@@ -430,13 +442,16 @@
   // order by hand. The widths still have to sum to 100; test_fraudpage checks
   // that, because a colgroup that does not is a table that drifts.
   var FRAUD_COLUMNS_ = [
-    { key: 'bonus',       label: 'Bonus',           width: 8,  sort: 'text' },
-    { key: 'areas',       label: 'Work Areas',      width: 10, sort: 'text' },
-    { key: 'totalStd',    label: 'Total Std Mins Produced', width: 12, sort: 'num'  },
-    { key: 'overlapStd',  label: 'Overlap Std Mins',        width: 10, sort: 'num'  },
-    { key: 'overlapFrom', label: 'Overlap Time',    width: 12, sort: 'time' },
+    { key: 'bonus',       label: 'Bonus',           width: 7,  sort: 'text' },
+    // A custom range (see customRangeQuery) can span several production
+    // days, and Claim Time alone cannot say which one a row is.
+    { key: 'date',        label: 'Date',            width: 6,  sort: 'time' },
+    { key: 'areas',       label: 'Work Areas',      width: 9,  sort: 'text' },
+    { key: 'totalStd',    label: 'Total Std Mins Produced', width: 11, sort: 'num'  },
+    { key: 'overlapStd',  label: 'Overlap Std Mins',        width: 9,  sort: 'num'  },
+    { key: 'overlapFrom', label: 'Overlap Time',    width: 11, sort: 'time' },
     { key: 'kind',        label: 'Claim',           width: 6,  sort: 'text' },
-    { key: 'from',        label: 'Claim Time',      width: 12, sort: 'time' },
+    { key: 'from',        label: 'Claim Time',      width: 11, sort: 'time' },
     // The OS Job / NPL Task the record itself carries - what consider() used
     // to pass only as extra, a tooltip on Claim Time. A column now, because
     // that is worth reading at a glance, not on hover.
@@ -664,6 +679,7 @@
               escapeTextPak_(r.bonus) +
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
+      html += '<td data-label="Date">' + escapeTextPak_(fraudDateKeyPak_(r.date)) + '</td>';
       html += '<td data-label="Work Areas" class="fraud-areas-cell">' +
               fraudAreasCellPak_(r.areas, r.areaStd) + '</td>';
       html += '<td data-label="Total Std Mins Produced" class="fraud-std-cell"' +
@@ -919,7 +935,7 @@
   function fraudRowTextsPak_(r) {
     var areas = !r.areas.length ? '-'
       : (r.areaStd ? fraudAreasByStdPak_(r.areas, r.areaStd) : r.areas).join(', ');
-    return [r.bonus, areas, fraudMinsTextPak_(r.totalStd), fraudMinsTextPak_(r.overlapStd),
+    return [r.bonus, fraudDateKeyPak_(r.date), areas, fraudMinsTextPak_(r.totalStd), fraudMinsTextPak_(r.overlapStd),
             fraudRangeTextPak_(r.overlapFrom, r.overlapTo), r.kind,
             fraudRangeTextPak_(r.from, r.to), r.task || '-', fraudAuthValuePak_(r), r.statusText];
   }

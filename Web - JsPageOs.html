@@ -274,8 +274,11 @@
   // data with an error - the next refresh will simply try again. The first
   // load has nothing to protect and shows the real loading and error states.
   function osFetchLogPak_(silent) {
+    var seq = ++fetchSeqPak_.os;
     google.script.run
       .withSuccessHandler(function (res) {
+        // Overtaken, or for a date no longer on screen - see fetchSeqPak_.
+        if (seq !== fetchSeqPak_.os) return;
         osLogRows = (res && res.rows) || [];
         osLogSkipped = (res && Number(res.skipped)) || 0;
         osLogBad = (res && res.bad) || [];
@@ -291,6 +294,7 @@
         renderOsPagePak();
       })
       .withFailureHandler(function (err) {
+        if (seq !== fetchSeqPak_.os) return;
         progressEndPak_('oslog');
         var message = (err && err.message) || 'The OS log could not be read';
         if (silent) { console.warn('OS log background refresh failed: ' + message); return; }
@@ -833,16 +837,19 @@
     return s ? escapeTextPak_(s) : '<span class="cell-none">&ndash;</span>';
   }
 
-  var OS_JOB_COLUMNS_ = ['Bonus', 'Time', 'TM Authorising', 'Deployed by',
+  // Date, not just Time: a custom range (see customRangeQuery) can span
+  // several production days, and "20:00 - 23:00" alone cannot say which one
+  // a given row is.
+  var OS_JOB_COLUMNS_ = ['Bonus', 'Date', 'Time', 'TM Authorising', 'Deployed by',
                          'Reports to', 'Record Status'];
 
   // One job type is one table, and a zone can hold a dozen of them down the
   // page - so unlike the bad-records table, this one has to agree with every
   // OTHER job table on where its columns sit, not just read well on its own.
   // A percentage per column, spent on a bonus chip needing little and three
-  // name columns needing more, rather than the six-way equal split the bare
+  // name columns needing more, rather than the seven-way equal split the bare
   // `table` rule would otherwise give it.
-  var OS_JOB_COL_WIDTHS_ = [10, 13, 19, 19, 19, 20];
+  var OS_JOB_COL_WIDTHS_ = [10, 11, 12, 17, 17, 17, 16];
 
   function osJobTableHtmlPak_(records) {
     var html = '<div class="table-wrap record-table-wrap"><table class="record-table">' +
@@ -868,6 +875,7 @@
               escapeTextPak_(r.bonus) +
               '<i class="fa-solid fa-filter chip-filter-icon"></i>' +
               bonusTipHtmlPak_(r.bonus, picked) + '</span></td>';
+      html += '<td data-label="Date">' + escapeTextPak_(r.date) + '</td>';
       html += '<td class="time-cell" data-label="Time">' + escapeTextPak_(osRowTimeTextPak_(r)) + '</td>';
       html += '<td data-label="TM Authorising">' + osPersonCellPak_(r.auth) + '</td>';
       html += '<td data-label="Deployed by">' + osPersonCellPak_(r.deployedBy) + '</td>';

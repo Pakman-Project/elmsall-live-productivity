@@ -219,7 +219,11 @@
       if (!headHours[b]) headHours[b] = 0;
       headHours[b] += (rows[i].value || 0);
     }
-    var target = currentThreshold * 4;
+    // Per block, not per hour: threshold is what ONE 15-min block must clear,
+    // so the bar for the whole slice scales with however many blocks it
+    // holds - 4 for the rolling last hour, as many as the day (or the picked
+    // range) holds once isHistoricalViewPak_() is true (see below).
+    var target = currentThreshold * blockSlice.length;
     var above = 0;
     var hk = Object.keys(headHours);
     for (var i = 0; i < hk.length; i++) { if (headHours[hk[i]] >= target) above++; }
@@ -259,9 +263,23 @@
     };
   }
 
-  var thisHour = computeHourKpis_(timeRanges.slice(-4));
-  // Blocks -8..-5: the hour immediately before the one being displayed.
-  var prevHour = computeHourKpis_(timeRanges.slice(-8, -4));
+  // Live is a rolling last-24-hours, so "the last hour" is a real, moving
+  // window worth its own trend. Anywhere else - a picked archive day, or a
+  // custom range, both fixed spans a reader chose on purpose - "the last
+  // hour" would silently score the tail of the window and call it the whole
+  // thing; the whole window is used instead, and there is no previous WHOLE
+  // window to compare it with, so the trend is left off rather than compared
+  // against a made-up one.
+  var historical = (typeof isHistoricalViewPak_ === 'function') && isHistoricalViewPak_();
+  var thisHour, prevHour;
+  if (historical) {
+    thisHour = computeHourKpis_(timeRanges);
+    prevHour = { heads: 0, above: 0, perf: 0, hasData: false };
+  } else {
+    thisHour = computeHourKpis_(timeRanges.slice(-4));
+    // Blocks -8..-5: the hour immediately before the one being displayed.
+    prevHour = computeHourKpis_(timeRanges.slice(-8, -4));
+  }
 
   $('headDeployed').textContent = thisHour.heads;
   $('headAbove20').textContent = thisHour.above;
@@ -272,6 +290,24 @@
   setKpiTrend_('headDeployedTrend', thisHour.heads, prevHour.heads, prevHour.hasData, '');
   setKpiTrend_('headAbove20Trend', thisHour.above, prevHour.above, prevHour.hasData, '');
   setKpiTrend_('avgPerfTrend', thisHour.perf, prevHour.perf, prevHour.hasData, 'pp');
+
+  var suffix = historical ? '' : ' Last Hour';
+  var headLabel = $('headDeployedLabel'), perfLabel = $('avgPerfLabel'),
+      headSub = $('headDeployedSub'), perfSub = $('avgPerfSub');
+  if (headLabel) headLabel.textContent = 'Head Deployed' + suffix;
+  if (perfLabel) perfLabel.textContent = historical ? 'Productivity' : 'Last Hour Productivity';
+  if (headSub) headSub.textContent = historical ? 'All blocks' : 'Last 4 blocks';
+  if (perfSub) perfSub.textContent = historical ? 'All blocks' : 'Last 4 blocks';
+  var above20 = $('headAbove20Label');
+  if (above20) above20.textContent = 'Head > ' + Math.round(currentThreshold * 4 * 100) + '% Prod.' + suffix;
+
+  var headTip = $('headDeployedTip'), above20Tip = $('headAbove20Tip');
+  if (headTip) headTip.textContent = historical
+    ? 'Counts unique Bonus Numbers active anywhere in the selected window.'
+    : 'Counts unique Bonus Numbers active in the last 4 x 15min blocks.';
+  if (above20Tip) above20Tip.textContent = historical
+    ? 'Workers meeting/exceeding the productivity target across the whole selected window.'
+    : 'Workers meeting/exceeding the hourly productivity target.';
   }
 
   function renderDashboardPayload_(data) {
@@ -338,7 +374,8 @@
     currentThreshold = parseFloat(data.threshold) || 0;
     if (data.currentTimestamp) { lastRefreshTimestamp = data.currentTimestamp; }
 
-    $('headAbove20Label').textContent = 'Head > ' + Math.round(currentThreshold * 4 * 100) + '% Prod. Last Hour';
+    // headAbove20Label's text is set in renderKpiCards_, which also decides
+    // the "Last Hour" wording - both need the same live-vs-historical answer.
     renderBonusChips();
     updateClearBtnVisibility();
     $('thresholdDisplay').textContent = currentThreshold || '-';
@@ -474,6 +511,7 @@
   }
 
   function loadDataPak(archiveUrl, silent) {
+    var seq = ++fetchSeqPak_.dash;
     var overlay = $('loadingOverlay');
     // Not on a silent refresh: nothing is covered, there is nothing to wait
     // in front of, and a bar appearing over a populated dashboard would be
@@ -525,6 +563,9 @@
     var urlToFetch = archiveUrl !== undefined ? archiveUrl : currentArchiveUrl;
 
     var runner = google.script.run.withSuccessHandler(function(data) {
+      // Overtaken - see fetchSeqPak_. Nothing here is torn down: the skeleton
+      // and the bar belong to the newer load, which clears them when it lands.
+      if (seq !== fetchSeqPak_.dash) { console.info('Dropped a dashboard load overtaken by a newer one'); return; }
       // CRITICAL FIX: Wrap in try/catch so a rendering error doesn't trap the overlay.
       try {
         // Logged HERE rather than in renderDashboardPayload_, which also runs
@@ -576,6 +617,8 @@
       if (!silent && !tourActive && overlay) overlay.classList.remove('active');
 
     }).withFailureHandler(function(err) {
+      // An overtaken load failing says nothing about the one now on its way.
+      if (seq !== fetchSeqPak_.dash) return;
       if (!tourActive) {
         // Offer a way back: without this the only recovery was a page reload.
         var msg = (err && err.message) ? err.message : String(err);
@@ -635,6 +678,10 @@
     if (typeof osMarkControlChangedPak_ === 'function') { osMarkControlChangedPak_(); }
     if (typeof nplMarkControlChangedPak_ === 'function') { nplMarkControlChangedPak_(); }
     if (typeof fraudMarkControlChangedPak_ === 'function') { fraudMarkControlChangedPak_(); }
+    // Any log read still in the air is for the OLD date - see fetchSeqPak_.
+    fetchSeqPak_.os++;
+    fetchSeqPak_.npl++;
+    fetchSeqPak_.fraud++;
     if (typeof renderPageIfNeeded_ === 'function') { markAllPagesDirty_(); }
     if (typeof redrawCurrentPagePak_ === 'function') { redrawCurrentPagePak_(); }
   }
