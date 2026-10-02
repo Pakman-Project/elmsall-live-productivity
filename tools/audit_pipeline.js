@@ -68,7 +68,7 @@ vm.runInContext(
   stateCtx);
 const ev = expr => vm.runInContext(expr, stateCtx);
 
-const AREAS = 24;
+const AREAS = 25;
 const COLS = AREAS + 5;   // 4 identity columns + areas + Productivity %
 
 head('[1] work-area enumerations (expect ' + AREAS + ')');
@@ -252,7 +252,13 @@ const keys = [];
 keys.forEach(k => {
   const missing = [
     ['JsData block total', data.indexOf('r.' + k + ' || 0') !== -1],
-    ['JsData row field', data.indexOf(k + 'Vol:') !== -1],
+    // THREE places shape a row, and the field has to be in each: the Data Table
+    // row, the raw-data rows, and the aggregated chart bucket. One bare
+    // `<key>Vol:` match used to satisfy this, so an area left out of two of the
+    // three still passed - and showed as zeros in just the view that was missed.
+    ['JsData table row', data.indexOf(k + 'Vol: ' + k + 'Total') !== -1],
+    ['JsData raw-data rows', data.indexOf(k + 'Vol: Number(r.' + k + ')') !== -1],
+    ['JsData aggregated result', data.indexOf(k + 'Vol: g.' + k + 'Vol') !== -1],
     ['JsData group init', data.indexOf(k + 'Vol: 0') !== -1],
     ['JsData group accum', data.indexOf('g.' + k + 'Vol +=') !== -1],
     ['Index th', idx.indexOf('data-key="' + k + 'Vol"') !== -1],

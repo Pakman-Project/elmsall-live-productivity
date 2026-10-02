@@ -426,7 +426,8 @@ var PROC_AREA_COLUMNS_ = [
   { key: 'sorter6ParcelInduct', stdHeader: 'D.Analysis - Sorter 6 Parcel Induct', volHeader: 'Volume - Sorter 6 Parcel Induct' },
   { key: 'forwardTpa',         stdHeader: 'D.Analysis - Forward TPA',            volHeader: 'Volume - Forward TPA' },
   { key: 'tpRetail',           stdHeader: 'D.Analysis - TP Retail',              volHeader: 'Volume - TP Retail' },
-  { key: 'rtf',                stdHeader: 'D.Analysis - RTF',                    volHeader: 'Volume - RTF' }
+  { key: 'rtf',                stdHeader: 'D.Analysis - RTF',                    volHeader: 'Volume - RTF' },
+  { key: 'dropAndSweep',       stdHeader: 'D.Analysis - Drop and Sweep',         volHeader: 'Volume - Drop and Sweep' }
 ];
 
 // Headers are typed and re-typed by hand on ten-odd archive files, so they are

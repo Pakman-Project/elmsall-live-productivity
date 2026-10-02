@@ -49,7 +49,7 @@ head('[1] every area belongs to a declared family');
 {
   const fams = ev('AREA_FAMILIES.map(f => f.name)');
   const vt = ev('VOLUME_TYPES.map(t => ({key:t.key, family:t.family, color:t.color, dark:t.colorDark}))');
-  check('24 areas', vt.length === 24, '= ' + vt.length);
+  check('25 areas', vt.length === 25, '= ' + vt.length);
   // Seven: six after BPP folded into Packing and Automation Pick into Picking,
   // then TP Retail's gold. The eight-slot requirement moved to
   // AREA_GROUP_COLORS, which is what actually needed it - see the
@@ -181,11 +181,11 @@ for (const mode of (V ? ['light', 'dark'] : [])) {
   });
 }
 
-// RECORDED, not asserted. Twenty-four touching series cannot clear the adjacent
+// RECORDED, not asserted. Twenty-five touching series cannot clear the adjacent
 // separation floors - that is a limit of the eye, not a defect in the hexes -
 // and the combined chart leans on its legend and hover tooltip instead. Kept
 // visible here so the cost stays known rather than forgotten.
-head('[5] all 24 on one plot, for the record');
+head('[5] all 25 on one plot, for the record');
 for (const mode of (V ? ['light', 'dark'] : [])) {
   const pick = mode === 'dark' ? 'colorDark' : 'color';
   const all = ev(`VOLUME_TYPES.map(t => t.${pick})`);

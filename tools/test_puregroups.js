@@ -101,7 +101,7 @@ check('charging deployment spent elsewhere',
       (loose.g0_std / loose.g0_dep * 100).toFixed(1) + '% vs ' +
       (pure.g0_std / pure.g0_dep * 100).toFixed(1) + '%');
 
-head('[4] "outside" means all 24 areas, both buildings');
+head('[4] "outside" means all 25 areas, both buildings');
 // scopeRowsToSite_ copies every area field across and only rewrites `value`,
 // so a row still carries its out-of-building standard hours - and time in the
 // other building dilutes a percentage exactly as much as time in the next
